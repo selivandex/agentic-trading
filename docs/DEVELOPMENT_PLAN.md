@@ -135,24 +135,24 @@
 
 ### 4.1 AI Provider Interface
 
-- [ ] Provider interface with GetModel, ListModels, SupportsStreaming, SupportsTools
-- [ ] ModelInfo struct with costs and capabilities
-- [ ] ProviderRegistry for multi-provider support
+- [x] Provider interface with GetModel, ListModels, SupportsStreaming, SupportsTools
+- [x] ModelInfo struct with costs and capabilities
+- [x] ProviderRegistry for multi-provider support
 
 ### 4.2 AI Provider Implementations
 
-- [ ] Claude provider (primary, was "Anthropic")
-- [ ] OpenAI provider
-- [ ] DeepSeek provider
-- [ ] Gemini provider
-- [ ] Provider factory with registry
+- [x] Claude provider (primary, was "Anthropic")
+- [x] OpenAI provider
+- [x] DeepSeek provider
+- [x] Gemini provider
+- [x] Provider factory with registry
 
 ### 4.3 Model Configuration
 
-- [ ] Model selection per agent type
-- [ ] Cost tracking per model
-- [ ] Token usage monitoring
-- [ ] Timeout configuration per provider
+- [x] Model selection per agent type
+- [x] Cost tracking per model
+- [x] Token usage monitoring
+- [x] Timeout configuration per provider
 
 ---
 
