@@ -11,11 +11,14 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/pgvector/pgvector-go v0.3.0
-	github.com/redis/go-redis/v9 v9.17.0
-	github.com/segmentio/kafka-go v0.4.49
-	github.com/shopspring/decimal v1.4.0
-	go.uber.org/zap v1.27.0
+        github.com/redis/go-redis/v9 v9.17.0
+        github.com/segmentio/kafka-go v0.4.49
+        github.com/shopspring/decimal v1.4.0
+        google.golang.org/adk v0.0.0
+        go.uber.org/zap v1.27.0
 )
+
+replace google.golang.org/adk => ./internal/adk
 
 require (
 	github.com/ClickHouse/ch-go v0.69.0 // indirect

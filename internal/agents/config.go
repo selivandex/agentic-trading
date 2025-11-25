@@ -2,11 +2,15 @@ package agents
 
 import "time"
 
-// AgentConfig captures runtime settings for an agent instance.
+// AgentConfig captures runtime settings for an ADK agent instance.
 type AgentConfig struct {
 	Type                 AgentType
 	Name                 string
+	Description          string
+	AIProvider           string
+	Model                string
 	Tools                []string
+	OutputKey            string
 	SystemPromptTemplate string
 
 	MaxToolCalls      int
@@ -21,7 +25,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentMarketAnalyst: {
 		Type:                 AgentMarketAnalyst,
 		Name:                 "MarketAnalyst",
+		Description:          "Technical analyst focusing on price action and indicators",
 		Tools:                AgentToolMap[AgentMarketAnalyst],
+		OutputKey:            "market_analysis",
 		SystemPromptTemplate: "agents/market_analyst",
 		MaxToolCalls:         25,
 		MaxThinkingTokens:    4000,
@@ -32,7 +38,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentSMCAnalyst: {
 		Type:                 AgentSMCAnalyst,
 		Name:                 "SMCAnalyst",
+		Description:          "Smart Money Concepts analyst spotting liquidity and structure",
 		Tools:                AgentToolMap[AgentSMCAnalyst],
+		OutputKey:            "smc_analysis",
 		SystemPromptTemplate: "agents/smc_analyst",
 		MaxToolCalls:         15,
 		MaxThinkingTokens:    4000,
@@ -43,7 +51,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentSentimentAnalyst: {
 		Type:                 AgentSentimentAnalyst,
 		Name:                 "SentimentAnalyst",
+		Description:          "Sentiment analyst aggregating news and social data",
 		Tools:                AgentToolMap[AgentSentimentAnalyst],
+		OutputKey:            "sentiment_analysis",
 		SystemPromptTemplate: "agents/sentiment_analyst",
 		MaxToolCalls:         10,
 		MaxThinkingTokens:    2000,
@@ -54,7 +64,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentOnChainAnalyst: {
 		Type:                 AgentOnChainAnalyst,
 		Name:                 "OnChainAnalyst",
+		Description:          "On-chain analyst evaluating flows and supply",
 		Tools:                AgentToolMap[AgentOnChainAnalyst],
+		OutputKey:            "onchain_analysis",
 		SystemPromptTemplate: "agents/onchain_analyst",
 		MaxToolCalls:         10,
 		MaxThinkingTokens:    2000,
@@ -65,7 +77,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentCorrelationAnalyst: {
 		Type:                 AgentCorrelationAnalyst,
 		Name:                 "CorrelationAnalyst",
+		Description:          "Cross-market correlation analyst",
 		Tools:                AgentToolMap[AgentCorrelationAnalyst],
+		OutputKey:            "correlation_analysis",
 		SystemPromptTemplate: "agents/correlation_analyst",
 		MaxToolCalls:         8,
 		MaxThinkingTokens:    3000,
@@ -76,7 +90,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentMacroAnalyst: {
 		Type:                 AgentMacroAnalyst,
 		Name:                 "MacroAnalyst",
+		Description:          "Macro analyst covering economic events",
 		Tools:                AgentToolMap[AgentMacroAnalyst],
+		OutputKey:            "macro_analysis",
 		SystemPromptTemplate: "agents/macro_analyst",
 		MaxToolCalls:         8,
 		MaxThinkingTokens:    3000,
@@ -87,7 +103,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentOrderFlowAnalyst: {
 		Type:                 AgentOrderFlowAnalyst,
 		Name:                 "OrderFlowAnalyst",
+		Description:          "Order flow analyst reading tape and imbalance",
 		Tools:                AgentToolMap[AgentOrderFlowAnalyst],
+		OutputKey:            "orderflow_analysis",
 		SystemPromptTemplate: "agents/order_flow_analyst",
 		MaxToolCalls:         12,
 		MaxThinkingTokens:    3000,
@@ -98,7 +116,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentDerivativesAnalyst: {
 		Type:                 AgentDerivativesAnalyst,
 		Name:                 "DerivativesAnalyst",
+		Description:          "Derivatives analyst tracking options and gamma",
 		Tools:                AgentToolMap[AgentDerivativesAnalyst],
+		OutputKey:            "derivatives_analysis",
 		SystemPromptTemplate: "agents/derivatives_analyst",
 		MaxToolCalls:         10,
 		MaxThinkingTokens:    3000,
@@ -109,7 +129,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentStrategyPlanner: {
 		Type:                 AgentStrategyPlanner,
 		Name:                 "StrategyPlanner",
+		Description:          "Planner synthesizing agent outputs into a trade plan",
 		Tools:                AgentToolMap[AgentStrategyPlanner],
+		OutputKey:            "trade_plan",
 		SystemPromptTemplate: "agents/strategy_planner",
 		MaxToolCalls:         8,
 		MaxThinkingTokens:    6000,
@@ -120,7 +142,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentRiskManager: {
 		Type:                 AgentRiskManager,
 		Name:                 "RiskManager",
+		Description:          "Risk manager validating trades and sizing positions",
 		Tools:                AgentToolMap[AgentRiskManager],
+		OutputKey:            "risk_assessment",
 		SystemPromptTemplate: "agents/risk_manager",
 		MaxToolCalls:         5,
 		MaxThinkingTokens:    2000,
@@ -131,7 +155,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentExecutor: {
 		Type:                 AgentExecutor,
 		Name:                 "Executor",
+		Description:          "Executor responsible for placing and managing orders",
 		Tools:                AgentToolMap[AgentExecutor],
+		OutputKey:            "execution_result",
 		SystemPromptTemplate: "agents/executor",
 		MaxToolCalls:         3,
 		MaxThinkingTokens:    1500,
@@ -142,7 +168,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentPositionManager: {
 		Type:                 AgentPositionManager,
 		Name:                 "PositionManager",
+		Description:          "Position manager monitoring live trades",
 		Tools:                AgentToolMap[AgentPositionManager],
+		OutputKey:            "position_update",
 		SystemPromptTemplate: "agents/position_manager",
 		MaxToolCalls:         5,
 		MaxThinkingTokens:    2000,
@@ -153,7 +181,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 	AgentSelfEvaluator: {
 		Type:                 AgentSelfEvaluator,
 		Name:                 "SelfEvaluator",
+		Description:          "Self evaluator reviewing performance",
 		Tools:                AgentToolMap[AgentSelfEvaluator],
+		OutputKey:            "evaluation_report",
 		SystemPromptTemplate: "agents/self_evaluator",
 		MaxToolCalls:         10,
 		MaxThinkingTokens:    4000,

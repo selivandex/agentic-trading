@@ -22,8 +22,8 @@ func (m RetryMiddleware) Wrap(t tools.Tool) tools.Tool {
 
 	backoff := m.Backoff
 
-	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args interface{}) (interface{}, error) {
-		var result interface{}
+	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+		var result map[string]interface{}
 		var err error
 
 		for i := 0; i < attempts; i++ {

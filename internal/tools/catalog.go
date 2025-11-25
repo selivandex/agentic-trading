@@ -150,7 +150,7 @@ func Definitions() []Definition {
 func RegisterAllTools(registry *Registry) {
 	for _, def := range toolDefinitions {
 		definition := def
-		registry.Register(definition.Name, New(definition.Name, definition.Description, func(ctx context.Context, args interface{}) (interface{}, error) {
+		registry.Register(definition.Name, New(definition.Name, definition.Description, func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			return nil, fmt.Errorf("tool %s not implemented", definition.Name)
 		}))
 	}

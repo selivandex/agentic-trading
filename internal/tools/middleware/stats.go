@@ -24,7 +24,7 @@ func (m *StatsMiddleware) Wrap(t tools.Tool) tools.Tool {
 		return t
 	}
 
-	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args interface{}) (interface{}, error) {
+	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		start := time.Now()
 		result, err := t.Execute(ctx, args)
 		duration := time.Since(start)

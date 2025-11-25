@@ -19,3 +19,13 @@ const (
 	AgentPositionManager AgentType = "position_manager"
 	AgentSelfEvaluator   AgentType = "self_evaluator"
 )
+
+// UserAgentConfig carries runtime user-specific context for building pipelines.
+type UserAgentConfig struct {
+	UserID     string
+	AIProvider string
+	Model      string
+	Symbol     string
+	MarketType string
+	RiskLevel  string
+}
