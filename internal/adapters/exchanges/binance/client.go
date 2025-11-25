@@ -458,17 +458,17 @@ func (c *client) GetOpenOrders(ctx context.Context, symbol string) ([]exchanges.
 	}
 
 	var res []struct {
-		OrderID    int64  `json:"orderId"`
-		ClientID   string `json:"clientOrderId"`
-		Symbol     string `json:"symbol"`
-		Side       string `json:"side"`
-		Type       string `json:"type"`
-		Status     string `json:"status"`
+		OrderID     int64  `json:"orderId"`
+		ClientID    string `json:"clientOrderId"`
+		Symbol      string `json:"symbol"`
+		Side        string `json:"side"`
+		Type        string `json:"type"`
+		Status      string `json:"status"`
 		TimeInForce string `json:"timeInForce"`
-		Price      string `json:"price"`
-		OrigQty    string `json:"origQty"`
+		Price       string `json:"price"`
+		OrigQty     string `json:"origQty"`
 		ExecutedQty string `json:"executedQty"`
-		UpdateTime int64  `json:"updateTime"`
+		UpdateTime  int64  `json:"updateTime"`
 	}
 
 	if err := json.Unmarshal(data, &res); err != nil {
@@ -478,19 +478,19 @@ func (c *client) GetOpenOrders(ctx context.Context, symbol string) ([]exchanges.
 	orders := make([]exchanges.Order, 0, len(res))
 	for _, o := range res {
 		orders = append(orders, exchanges.Order{
-			ID:           strconv.FormatInt(o.OrderID, 10),
+			ID:            strconv.FormatInt(o.OrderID, 10),
 			ClientOrderID: o.ClientID,
-			Symbol:       o.Symbol,
-			Market:       c.cfg.Market,
-			Type:         orderTypeFromString(o.Type),
-			Side:         orderSideFromString(o.Side),
-			Status:       orderStatusFromString(o.Status),
-			TimeInForce:  timeInForceFromString(o.TimeInForce),
-			Price:        parseDecimal(o.Price),
-			Quantity:     parseDecimal(o.OrigQty),
-			Filled:       parseDecimal(o.ExecutedQty),
-			CreatedAt:    time.UnixMilli(o.UpdateTime),
-			UpdatedAt:    time.UnixMilli(o.UpdateTime),
+			Symbol:        o.Symbol,
+			Market:        c.cfg.Market,
+			Type:          orderTypeFromString(o.Type),
+			Side:          orderSideFromString(o.Side),
+			Status:        orderStatusFromString(o.Status),
+			TimeInForce:   timeInForceFromString(o.TimeInForce),
+			Price:         parseDecimal(o.Price),
+			Quantity:      parseDecimal(o.OrigQty),
+			Filled:        parseDecimal(o.ExecutedQty),
+			CreatedAt:     time.UnixMilli(o.UpdateTime),
+			UpdatedAt:     time.UnixMilli(o.UpdateTime),
 		})
 	}
 
@@ -536,16 +536,16 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 	}
 
 	var res struct {
-		OrderID      int64  `json:"orderId"`
-		ClientOrderID string `json:"clientOrderId"`
-		Symbol       string `json:"symbol"`
-		Side         string `json:"side"`
-		Type         string `json:"type"`
-		TransactTime int64  `json:"transactTime"`
-		Price        string `json:"price"`
-		OrigQty      string `json:"origQty"`
+		OrderID        int64  `json:"orderId"`
+		ClientOrderID  string `json:"clientOrderId"`
+		Symbol         string `json:"symbol"`
+		Side           string `json:"side"`
+		Type           string `json:"type"`
+		TransactTime   int64  `json:"transactTime"`
+		Price          string `json:"price"`
+		OrigQty        string `json:"origQty"`
 		CummulativeQty string `json:"cummulativeQuoteQty"`
-		Status       string `json:"status"`
+		Status         string `json:"status"`
 	}
 
 	if err := json.Unmarshal(data, &res); err != nil {
@@ -825,4 +825,3 @@ func marginModeFromString(v string) exchanges.MarginMode {
 func normalizeSymbol(symbol string) string {
 	return strings.ToUpper(strings.ReplaceAll(symbol, "-", ""))
 }
-

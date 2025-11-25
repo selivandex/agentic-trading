@@ -12,4 +12,3 @@ var (
 	// ErrRateLimited indicates HTTP 429 or throttling.
 	ErrRateLimited = errors.New("exchange rate limited the request")
 )
-

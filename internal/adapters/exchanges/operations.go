@@ -100,16 +100,16 @@ func ClosePosition(ctx context.Context, ex Exchange, symbol string, market Marke
 
 // ProtectionRequest defines stop-loss and take-profit placement request.
 type ProtectionRequest struct {
-	Symbol            string
-	Market            MarketType
-	PositionSide      PositionSide
-	Quantity          decimal.Decimal
-	StopLossPrice     decimal.Decimal
-	TakeProfitPrice   decimal.Decimal
-	StopOrderType     OrderType
-	TakeProfitType    OrderType
-	TimeInForce       TimeInForce
-	Tag               string
+	Symbol          string
+	Market          MarketType
+	PositionSide    PositionSide
+	Quantity        decimal.Decimal
+	StopLossPrice   decimal.Decimal
+	TakeProfitPrice decimal.Decimal
+	StopOrderType   OrderType
+	TakeProfitType  OrderType
+	TimeInForce     TimeInForce
+	Tag             string
 }
 
 // ProtectionResponse returns any created protective orders.
@@ -213,4 +213,3 @@ func fallbackTIF(value, def TimeInForce) TimeInForce {
 	}
 	return value
 }
-

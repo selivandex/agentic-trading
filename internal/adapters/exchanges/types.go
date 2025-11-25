@@ -10,11 +10,11 @@ import (
 type MarketType string
 
 const (
-	MarketTypeSpot         MarketType = "spot"
-	MarketTypeLinearPerp   MarketType = "linear_perp"
-	MarketTypeInversePerp  MarketType = "inverse_perp"
-	MarketTypeDeliveryFut  MarketType = "delivery_futures"
-	MarketTypeUnknown      MarketType = "unknown"
+	MarketTypeSpot        MarketType = "spot"
+	MarketTypeLinearPerp  MarketType = "linear_perp"
+	MarketTypeInversePerp MarketType = "inverse_perp"
+	MarketTypeDeliveryFut MarketType = "delivery_futures"
+	MarketTypeUnknown     MarketType = "unknown"
 )
 
 // OrderSide defines buy or sell direction.
@@ -48,14 +48,14 @@ const (
 type OrderStatus string
 
 const (
-	OrderStatusNew       OrderStatus = "new"
-	OrderStatusOpen      OrderStatus = "open"
-	OrderStatusPartial   OrderStatus = "partial"
-	OrderStatusFilled    OrderStatus = "filled"
-	OrderStatusCanceled  OrderStatus = "canceled"
-	OrderStatusRejected  OrderStatus = "rejected"
-	OrderStatusExpired   OrderStatus = "expired"
-	OrderStatusUnknown   OrderStatus = "unknown"
+	OrderStatusNew      OrderStatus = "new"
+	OrderStatusOpen     OrderStatus = "open"
+	OrderStatusPartial  OrderStatus = "partial"
+	OrderStatusFilled   OrderStatus = "filled"
+	OrderStatusCanceled OrderStatus = "canceled"
+	OrderStatusRejected OrderStatus = "rejected"
+	OrderStatusExpired  OrderStatus = "expired"
+	OrderStatusUnknown  OrderStatus = "unknown"
 )
 
 // TimeInForce enumerates supported order time policies.
@@ -251,4 +251,3 @@ type LadderOrderRequest struct {
 type LadderOrderResponse struct {
 	Orders []*Order
 }
-

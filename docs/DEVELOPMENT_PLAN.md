@@ -108,26 +108,26 @@
 
 ### 3.1 Exchange Interface
 
-- [ ] Unified Exchange interface (GetTicker, GetOrderBook, GetOHLCV, GetTrades)
-- [ ] SpotExchange and FuturesExchange interfaces
-- [ ] OrderRequest and OrderResponse structs
+- [x] Unified Exchange interface (GetTicker, GetOrderBook, GetOHLCV, GetTrades)
+- [x] SpotExchange and FuturesExchange interfaces
+- [x] OrderRequest and OrderResponse structs
 
 ### 3.2 Exchange Adapters
 
-- [ ] Binance adapter (Spot + Futures)
-- [ ] Bybit adapter (Spot + Futures)
-- [ ] OKX adapter (Spot + Futures)
-- [ ] Exchange factory with client pooling
-- [ ] Central factory for market data collection (uses ENV API keys, not user keys)
+- [x] Binance adapter (Spot + Futures)
+- [x] Bybit adapter (Spot + Futures)
+- [x] OKX adapter (Spot + Futures)
+- [x] Exchange factory with client pooling
+- [x] Central factory for market data collection (uses ENV API keys, not user keys)
 
 ### 3.3 Exchange Operations
 
-- [ ] Market data fetching (OHLCV, tickers, orderbook, trades)
-- [ ] Order placement (market, limit, stop orders)
-- [ ] Bracket orders (Entry + SL + TP)
-- [ ] Ladder orders (multiple TP levels)
-- [ ] Position management (get positions, close, modify SL/TP)
-- [ ] Leverage and margin mode settings
+- [x] Market data fetching (OHLCV, tickers, orderbook, trades)
+- [x] Order placement (market, limit, stop orders)
+- [x] Bracket orders (Entry + SL + TP)
+- [x] Ladder orders (multiple TP levels)
+- [x] Position management (get positions, close, modify SL/TP)
+- [x] Leverage and margin mode settings
 
 ---
 

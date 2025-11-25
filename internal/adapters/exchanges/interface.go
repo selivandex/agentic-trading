@@ -39,4 +39,3 @@ type SpotExchange interface {
 type FuturesExchange interface {
 	Exchange
 }
-
