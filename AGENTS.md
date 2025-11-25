@@ -32,6 +32,7 @@ You are an expert in Go, microservices architecture, and clean backend developme
 - Avoid global state; prefer constructors to inject dependencies and propagate `context.Context`.
 - Guard goroutines with sync primitives/channels; cancel work via context to prevent leaks.
 - Defer resource cleanup and validate all external inputs.
+- Keep `cmd/main.go` Prefer constructor-style helpers (e.g., `provideDB()`, `provideRedis()`) and invoke them from `func main()` so initialization stays readable and testable.
 
 ### Security & Resilience
 
