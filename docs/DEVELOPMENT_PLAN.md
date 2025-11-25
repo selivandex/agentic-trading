@@ -196,165 +196,165 @@
 
 ### 6.1 Tool Registry Infrastructure
 
-- [ ] Tool interface wrapper for ADK
-- [ ] Tool registry with name-based lookup
-- [ ] Tool middleware for stats tracking
-- [ ] Tool timeout and retry logic
+- [x] Tool interface wrapper for ADK
+- [x] Tool registry with name-based lookup
+- [x] Tool middleware for stats tracking
+- [x] Tool timeout and retry logic
 
 ### 6.2 Market Data Tools (8 tools)
 
-- [ ] get_price: Current price with bid/ask
-- [ ] get_ohlcv: Historical candles
-- [ ] get_orderbook: Order book depth
-- [ ] get_trades: Recent trades (tape)
-- [ ] get_funding_rate: Futures funding
-- [ ] get_open_interest: OI data
-- [ ] get_long_short_ratio: Long/short ratio
-- [ ] get_liquidations: Recent liquidations
+- [x] get_price: Current price with bid/ask
+- [x] get_ohlcv: Historical candles
+- [x] get_orderbook: Order book depth
+- [x] get_trades: Recent trades (tape)
+- [x] get_funding_rate: Futures funding
+- [x] get_open_interest: OI data
+- [x] get_long_short_ratio: Long/short ratio
+- [x] get_liquidations: Recent liquidations
 
 ### 6.3 Order Flow Tools (8 tools)
 
-- [ ] get_trade_imbalance: Buy vs sell pressure
-- [ ] get_cvd: Cumulative Volume Delta
-- [ ] get_whale_trades: Large transactions
-- [ ] get_tick_speed: Trade velocity
-- [ ] get_orderbook_imbalance: Bid/ask delta
-- [ ] detect_iceberg: Hidden liquidity
-- [ ] detect_spoofing: Fake orders
-- [ ] get_absorption_zones: Order absorption
+- [x] get_trade_imbalance: Buy vs sell pressure
+- [x] get_cvd: Cumulative Volume Delta
+- [x] get_whale_trades: Large transactions
+- [x] get_tick_speed: Trade velocity
+- [x] get_orderbook_imbalance: Bid/ask delta
+- [x] detect_iceberg: Hidden liquidity
+- [x] detect_spoofing: Fake orders
+- [x] get_absorption_zones: Order absorption
 
 ### 6.4 Technical Indicators - Momentum (4 tools)
 
-- [ ] rsi: Relative Strength Index
-- [ ] stochastic: Stochastic oscillator
-- [ ] cci: Commodity Channel Index
-- [ ] roc: Rate of Change
+- [x] rsi: Relative Strength Index
+- [x] stochastic: Stochastic oscillator
+- [x] cci: Commodity Channel Index
+- [x] roc: Rate of Change
 
 ### 6.5 Technical Indicators - Volatility (3 tools)
 
-- [ ] atr: Average True Range
-- [ ] bollinger: Bollinger Bands
-- [ ] keltner: Keltner Channels
+- [x] atr: Average True Range
+- [x] bollinger: Bollinger Bands
+- [x] keltner: Keltner Channels
 
 ### 6.6 Technical Indicators - Trend (7 tools)
 
-- [ ] sma: Simple Moving Average
-- [ ] ema: Exponential Moving Average
-- [ ] ema_ribbon: Multiple EMAs
-- [ ] macd: MACD with signal
-- [ ] supertrend: Supertrend indicator
-- [ ] ichimoku: Ichimoku Cloud
-- [ ] pivot_points: Pivot points
+- [x] sma: Simple Moving Average
+- [x] ema: Exponential Moving Average
+- [x] ema_ribbon: Multiple EMAs
+- [x] macd: MACD with signal
+- [x] supertrend: Supertrend indicator
+- [x] ichimoku: Ichimoku Cloud
+- [x] pivot_points: Pivot points
 
 ### 6.7 Technical Indicators - Volume (4 tools)
 
-- [ ] vwap: Volume Weighted Average Price
-- [ ] obv: On-Balance Volume
-- [ ] volume_profile: Volume profile
-- [ ] delta_volume: Buy/sell volume delta
+- [x] vwap: Volume Weighted Average Price
+- [x] obv: On-Balance Volume
+- [x] volume_profile: Volume profile
+- [x] delta_volume: Buy/sell volume delta
 
 ### 6.8 Smart Money Concepts Tools (7 tools)
 
-- [ ] detect_fvg: Fair Value Gaps
-- [ ] detect_order_blocks: Order Blocks
-- [ ] detect_liquidity_zones: Liquidity pools
-- [ ] detect_stop_hunt: Stop run detection
-- [ ] get_market_structure: BOS, CHoCH
-- [ ] detect_imbalances: Price imbalances
-- [ ] get_swing_points: Swing highs/lows
+- [x] detect_fvg: Fair Value Gaps
+- [x] detect_order_blocks: Order Blocks
+- [x] detect_liquidity_zones: Liquidity pools
+- [x] detect_stop_hunt: Stop run detection
+- [x] get_market_structure: BOS, CHoCH
+- [x] detect_imbalances: Price imbalances
+- [x] get_swing_points: Swing highs/lows
 
 ### 6.9 Sentiment Tools (5 tools)
 
-- [ ] get_fear_greed: Fear & Greed Index
-- [ ] get_social_sentiment: Twitter/Reddit sentiment
-- [ ] get_news: Latest crypto news
-- [ ] get_trending: Trending coins/topics
-- [ ] get_funding_sentiment: Sentiment from funding rates
+- [x] get_fear_greed: Fear & Greed Index
+- [x] get_social_sentiment: Twitter/Reddit sentiment
+- [x] get_news: Latest crypto news
+- [x] get_trending: Trending coins/topics
+- [x] get_funding_sentiment: Sentiment from funding rates
 
 ### 6.10 On-Chain Tools (9 tools)
 
-- [ ] get_whale_movements: Large wallet transfers
-- [ ] get_exchange_flows: Exchange inflow/outflow
-- [ ] get_miner_reserves: Miner holdings
-- [ ] get_active_addresses: Active address count
-- [ ] get_nvt_ratio: Network Value to Transactions
-- [ ] get_sopr: Spent Output Profit Ratio
-- [ ] get_mvrv: Market Value to Realized Value
-- [ ] get_realized_pnl: Net Realized Profit/Loss
-- [ ] get_stablecoin_flows: USDT/USDC flows
+- [x] get_whale_movements: Large wallet transfers
+- [x] get_exchange_flows: Exchange inflow/outflow
+- [x] get_miner_reserves: Miner holdings
+- [x] get_active_addresses: Active address count
+- [x] get_nvt_ratio: Network Value to Transactions
+- [x] get_sopr: Spent Output Profit Ratio
+- [x] get_mvrv: Market Value to Realized Value
+- [x] get_realized_pnl: Net Realized Profit/Loss
+- [x] get_stablecoin_flows: USDT/USDC flows
 
 ### 6.11 Macro Tools (6 tools)
 
-- [ ] get_economic_calendar: CPI, FOMC, NFP dates
-- [ ] get_fed_rate: Current Fed rate
-- [ ] get_fed_watch: Rate probabilities
-- [ ] get_cpi: Inflation data
-- [ ] get_pmi: PMI data
-- [ ] get_macro_impact: Historical event impact
+- [x] get_economic_calendar: CPI, FOMC, NFP dates
+- [x] get_fed_rate: Current Fed rate
+- [x] get_fed_watch: Rate probabilities
+- [x] get_cpi: Inflation data
+- [x] get_pmi: PMI data
+- [x] get_macro_impact: Historical event impact
 
 ### 6.12 Derivatives Tools (6 tools)
 
-- [ ] get_options_oi: Options open interest
-- [ ] get_max_pain: Max pain price
-- [ ] get_put_call_ratio: Put/Call ratio
-- [ ] get_gamma_exposure: Dealer gamma
-- [ ] get_options_flow: Large options trades
-- [ ] get_iv_surface: Implied volatility
+- [x] get_options_oi: Options open interest
+- [x] get_max_pain: Max pain price
+- [x] get_put_call_ratio: Put/Call ratio
+- [x] get_gamma_exposure: Dealer gamma
+- [x] get_options_flow: Large options trades
+- [x] get_iv_surface: Implied volatility
 
 ### 6.13 Correlation Tools (7 tools)
 
-- [ ] btc_dominance: BTC market dominance
-- [ ] usdt_dominance: Stablecoin dominance
-- [ ] altcoin_correlation: Alt correlation to BTC
-- [ ] stock_correlation: BTC vs SPX/Nasdaq
-- [ ] dxy_correlation: BTC vs Dollar Index
-- [ ] gold_correlation: BTC vs Gold
-- [ ] get_session_volume: Asia/EU/US sessions
+- [x] btc_dominance: BTC market dominance
+- [x] usdt_dominance: Stablecoin dominance
+- [x] altcoin_correlation: Alt correlation to BTC
+- [x] stock_correlation: BTC vs SPX/Nasdaq
+- [x] dxy_correlation: BTC vs Dollar Index
+- [x] gold_correlation: BTC vs Gold
+- [x] get_session_volume: Asia/EU/US sessions
 
 ### 6.14 Trading Execution Tools (14 tools)
 
-- [ ] get_balance: Account balance
-- [ ] get_positions: Open positions
-- [ ] place_order: Market/limit/stop order
-- [ ] place_bracket_order: Entry + SL + TP
-- [ ] place_ladder_order: Multiple TP levels
-- [ ] place_iceberg_order: Hidden size order
-- [ ] cancel_order: Cancel specific order
-- [ ] cancel_all_orders: Cancel all orders
-- [ ] close_position: Close specific position
-- [ ] close_all_positions: Close all positions
-- [ ] set_leverage: Set leverage (futures)
-- [ ] set_margin_mode: Cross/isolated margin
-- [ ] move_sl_to_breakeven: Move SL to entry
-- [ ] set_trailing_stop: Activate trailing stop
-- [ ] add_to_position: DCA / averaging
+- [x] get_balance: Account balance
+- [x] get_positions: Open positions
+- [x] place_order: Market/limit/stop order
+- [x] place_bracket_order: Entry + SL + TP
+- [x] place_ladder_order: Multiple TP levels
+- [x] place_iceberg_order: Hidden size order
+- [x] cancel_order: Cancel specific order
+- [x] cancel_all_orders: Cancel all orders
+- [x] close_position: Close specific position
+- [x] close_all_positions: Close all positions
+- [x] set_leverage: Set leverage (futures)
+- [x] set_margin_mode: Cross/isolated margin
+- [x] move_sl_to_breakeven: Move SL to entry
+- [x] set_trailing_stop: Activate trailing stop
+- [x] add_to_position: DCA / averaging
 
 ### 6.15 Risk Management Tools (7 tools)
 
-- [ ] check_circuit_breaker: Trading allowed?
-- [ ] get_daily_pnl: Today's PnL
-- [ ] get_max_drawdown: Current drawdown
-- [ ] get_exposure: Total exposure
-- [ ] calculate_position_size: Kelly/fixed fraction
-- [ ] validate_trade: Pre-trade checks
-- [ ] emergency_close_all: KILL SWITCH
+- [x] check_circuit_breaker: Trading allowed?
+- [x] get_daily_pnl: Today's PnL
+- [x] get_max_drawdown: Current drawdown
+- [x] get_exposure: Total exposure
+- [x] calculate_position_size: Kelly/fixed fraction
+- [x] validate_trade: Pre-trade checks
+- [x] emergency_close_all: KILL SWITCH
 
 ### 6.16 Memory Tools (5 tools)
 
-- [ ] store_memory: Save observation/decision
-- [ ] search_memory: Semantic search past memories
-- [ ] get_trade_history: Past trades with outcomes
-- [ ] get_market_regime: Current detected regime
-- [ ] store_market_regime: Save regime detection
+- [x] store_memory: Save observation/decision
+- [x] search_memory: Semantic search past memories
+- [x] get_trade_history: Past trades with outcomes
+- [x] get_market_regime: Current detected regime
+- [x] store_market_regime: Save regime detection
 
 ### 6.17 Evaluation Tools (6 tools)
 
-- [ ] get_strategy_stats: Win rate per strategy
-- [ ] log_trade_decision: Create journal entry
-- [ ] get_trade_journal: Retrieve past decisions
-- [ ] evaluate_last_trades: Performance review
-- [ ] get_best_strategies: Top performers
-- [ ] get_worst_strategies: Underperformers
+- [x] get_strategy_stats: Win rate per strategy
+- [x] log_trade_decision: Create journal entry
+- [x] get_trade_journal: Retrieve past decisions
+- [x] evaluate_last_trades: Performance review
+- [x] get_best_strategies: Top performers
+- [x] get_worst_strategies: Underperformers
 
 ---
 
@@ -362,51 +362,51 @@
 
 ### 7.1 Agent Registry & Factory
 
-- [ ] AgentType enum with all agent types
-- [ ] AgentConfig with tools, prompts, limits (MaxToolCalls, MaxThinkingTokens, TimeoutPerTool, MaxCostPerRun)
-- [ ] Agent registry for registration and lookup
-- [ ] Agent factory for creating configured agents
-- [ ] CoT wrapper for reasoning logging
+- [x] AgentType enum with all agent types
+- [x] AgentConfig with tools, prompts, limits (MaxToolCalls, MaxThinkingTokens, TimeoutPerTool, MaxCostPerRun)
+- [x] Agent registry for registration and lookup
+- [x] Agent factory for creating configured agents
+- [x] CoT wrapper for reasoning logging
 
 ### 7.2 Analysis Agents (8 agents)
 
-- [ ] MarketAnalyst: Technical analysis (25 tool calls max)
-- [ ] SMCAnalyst: Smart Money Concepts (15 tool calls max)
-- [ ] SentimentAnalyst: News & social sentiment (10 tool calls max)
-- [ ] OnChainAnalyst: Blockchain metrics (10 tool calls max)
-- [ ] CorrelationAnalyst: Cross-market analysis (8 tool calls max)
-- [ ] MacroAnalyst: Economic events (8 tool calls max)
-- [ ] OrderFlowAnalyst: Tape reading, CVD (12 tool calls max)
-- [ ] DerivativesAnalyst: Options flow (10 tool calls max)
+- [x] MarketAnalyst: Technical analysis (25 tool calls max)
+- [x] SMCAnalyst: Smart Money Concepts (15 tool calls max)
+- [x] SentimentAnalyst: News & social sentiment (10 tool calls max)
+- [x] OnChainAnalyst: Blockchain metrics (10 tool calls max)
+- [x] CorrelationAnalyst: Cross-market analysis (8 tool calls max)
+- [x] MacroAnalyst: Economic events (8 tool calls max)
+- [x] OrderFlowAnalyst: Tape reading, CVD (12 tool calls max)
+- [x] DerivativesAnalyst: Options flow (10 tool calls max)
 
 ### 7.3 Synthesis & Execution Agents (5 agents)
 
-- [ ] StrategyPlanner: Synthesize analysis into trade plan (8 tool calls max, 6000 thinking tokens)
-- [ ] RiskManager: Validate and size positions (5 tool calls max, fast execution)
-- [ ] Executor: Place orders (3 tool calls max, user-specific API keys)
-- [ ] PositionManager: Monitor and adjust positions (5 tool calls max)
-- [ ] SelfEvaluator: Analyze performance (10 tool calls max)
+- [x] StrategyPlanner: Synthesize analysis into trade plan (8 tool calls max, 6000 thinking tokens)
+- [x] RiskManager: Validate and size positions (5 tool calls max, fast execution)
+- [x] Executor: Place orders (3 tool calls max, user-specific API keys)
+- [x] PositionManager: Monitor and adjust positions (5 tool calls max)
+- [x] SelfEvaluator: Analyze performance (10 tool calls max)
 
 ### 7.4 Agent Orchestration
 
-- [ ] ParallelAgent wrapper for concurrent analysis
-- [ ] SequentialAgent wrapper for pipeline execution
-- [ ] CreateTradingPipeline: Full workflow (Analysis → Strategy → Risk → Executor)
+- [x] ParallelAgent wrapper for concurrent analysis
+- [x] SequentialAgent wrapper for pipeline execution
+- [x] CreateTradingPipeline: Full workflow (Analysis → Strategy → Risk → Executor)
 
 ### 7.5 Agent Tool Assignments
 
-- [ ] Strict tool sets per agent type (AgentToolMap)
-- [ ] Tool access control enforcement
-- [ ] Tool call limits per agent type
-- [ ] Cost limits per agent execution
+- [x] Strict tool sets per agent type (AgentToolMap)
+- [x] Tool access control enforcement
+- [x] Tool call limits per agent type
+- [x] Cost limits per agent execution
 
 ### 7.6 Chain-of-Thought Logging
 
-- [ ] Reasoning log table (agent_reasoning_logs)
-- [ ] Step-by-step reasoning capture
-- [ ] Tool call tracking with input/output
-- [ ] Decision logging with confidence scores
-- [ ] Token usage and cost tracking per execution
+- [x] Reasoning log table (agent_reasoning_logs)
+- [x] Step-by-step reasoning capture
+- [x] Tool call tracking with input/output
+- [x] Decision logging with confidence scores
+- [x] Token usage and cost tracking per execution
 
 ---
 
