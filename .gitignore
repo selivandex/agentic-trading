@@ -1,0 +1,76 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+prometheus
+cmd/prometheus
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Dependency directories
+vendor/
+
+# Test cache
+.cache/
+
+# Build output
+bin/
+dist/
+build/
+
+# Docker volumes
+docker-volumes/
+
+# ML models (large files)
+*.onnx
+*.pkl
+*.h5
+*.pt
+*.pth
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+
