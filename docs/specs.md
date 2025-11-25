@@ -470,6 +470,11 @@ prometheus/
 └── README.md
 ```
 
+### 3.1 Agent layering with ADK
+
+- **`internal/adapters/adk`** — in-repo shim of the Google ADK Go interfaces. It provides the minimal agent, tool, and model contracts plus small workflow helpers so the project can compile and run without pulling the external module. Nothing here contains product logic; it is just the framework surface we program against.
+- **`internal/agents`** — domain-level orchestration built on top of the ADK contracts. This layer wires prompts, tool registries, model selection, and middleware, then instantiates concrete analysts/execution agents through factories. Swapping ADK to the upstream module (or another framework) only requires adapting this layer’s dependencies while keeping business prompts and tool bindings intact.
+
 ---
 
 ## 4. Domain Entities
