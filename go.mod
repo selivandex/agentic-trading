@@ -18,7 +18,7 @@ require (
         go.uber.org/zap v1.27.0
 )
 
-replace google.golang.org/adk => ./internal/adk
+replace google.golang.org/adk => ./internal/adapters/adk
 
 require (
 	github.com/ClickHouse/ch-go v0.69.0 // indirect
