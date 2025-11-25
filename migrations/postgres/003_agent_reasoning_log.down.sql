@@ -3,3 +3,7 @@
 
 DROP TABLE IF EXISTS agent_reasoning_logs;
 
+-- Rollback reasoning log table
+
+DROP TABLE IF EXISTS agent_reasoning_logs;
+
