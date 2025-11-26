@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -109,7 +108,7 @@ func (l *Logger) Errorf(template string, args ...interface{}) {
 	l.SugaredLogger.Errorf(template, args...)
 
 	if l.errorTracker != nil {
-		err := fmt.Errorf(template, args...)
+		err := errors.Newf(template, args...)
 		l.errorTracker.CaptureError(context.Background(), err, map[string]string{
 			"component": "logger",
 		})

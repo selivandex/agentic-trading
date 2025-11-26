@@ -103,7 +103,7 @@ func (rd *RegimeDetector) detectRegime(ctx context.Context, symbol string) error
 	}
 
 	// Calculate regime indicators
-	adr := rd.calculateADR(candles1d)        // Average Daily Range
+	adr := rd.calculateADR(candles1d)               // Average Daily Range
 	volatility := rd.calculateVolatility(candles1h) // Price volatility
 	trendStrength := rd.calculateTrendStrength(candles4h)
 
@@ -120,16 +120,16 @@ func (rd *RegimeDetector) detectRegime(ctx context.Context, symbol string) error
 
 	// Store regime to database
 	newRegime := &regime.MarketRegime{
-		Symbol:     symbol,
-		Timestamp:  time.Now(),
-		Regime:     regimeType,
-		Confidence: rd.calculateConfidence(adr, volatility, trendStrength),
-		Volatility: rd.classifyVolatility(volatility),
-		Trend:      rd.classifyTrend(trendStrength),
-		ATR14:      adr,
-		ADX:        abs(trendStrength),
-		BBWidth:    0, // TODO: Calculate Bollinger Band width
-		Volume24h:  0, // TODO: Get 24h volume
+		Symbol:       symbol,
+		Timestamp:    time.Now(),
+		Regime:       regimeType,
+		Confidence:   rd.calculateConfidence(adr, volatility, trendStrength),
+		Volatility:   rd.classifyVolatility(volatility),
+		Trend:        rd.classifyTrend(trendStrength),
+		ATR14:        adr,
+		ADX:          abs(trendStrength),
+		BBWidth:      0, // TODO: Calculate Bollinger Band width
+		Volume24h:    0, // TODO: Get 24h volume
 		VolumeChange: 0, // TODO: Calculate volume change
 	}
 
@@ -341,4 +341,3 @@ func sqrt(x float64) float64 {
 	}
 	return z
 }
-

@@ -22,4 +22,12 @@ type Repository interface {
 	// Trades operations
 	InsertTrades(ctx context.Context, trades []Trade) error
 	GetRecentTrades(ctx context.Context, exchange, symbol string, limit int) ([]Trade, error)
+
+	// Funding rate operations
+	InsertFundingRate(ctx context.Context, fundingRate *FundingRate) error
+	GetLatestFundingRate(ctx context.Context, exchange, symbol string) (*FundingRate, error)
+
+	// Open interest operations
+	InsertOpenInterest(ctx context.Context, oi *OpenInterest) error
+	GetLatestOpenInterest(ctx context.Context, exchange, symbol string) (*OpenInterest, error)
 }

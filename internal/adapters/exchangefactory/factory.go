@@ -219,21 +219,21 @@ func (f *centralFactory) GetClient(exchange string) (exchanges.Exchange, error) 
 	switch strings.ToLower(exchange) {
 	case "binance":
 		client, err = binance.NewClient(binance.Config{
-			APIKey:    f.cfg.BinanceAPIKey,
-			SecretKey: f.cfg.BinanceSecret,
+			APIKey:    f.cfg.Binance.APIKey,
+			SecretKey: f.cfg.Binance.Secret,
 			Market:    exchanges.MarketTypeSpot,
 		})
 	case "bybit":
 		client, err = bybit.NewClient(bybit.Config{
-			APIKey:    f.cfg.BybitAPIKey,
-			SecretKey: f.cfg.BybitSecret,
+			APIKey:    f.cfg.Bybit.APIKey,
+			SecretKey: f.cfg.Bybit.Secret,
 			Market:    exchanges.MarketTypeLinearPerp,
 		})
 	case "okx":
 		client, err = okx.NewClient(okx.Config{
-			APIKey:     f.cfg.OKXAPIKey,
-			SecretKey:  f.cfg.OKXSecret,
-			Passphrase: f.cfg.OKXPassphrase,
+			APIKey:     f.cfg.OKX.APIKey,
+			SecretKey:  f.cfg.OKX.Secret,
+			Passphrase: f.cfg.OKX.Passphrase,
 			Market:     exchanges.MarketTypeSpot,
 		})
 	default:

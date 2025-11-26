@@ -99,3 +99,18 @@ func (c *Client) IncrementBy(ctx context.Context, key string, value int64) (int6
 func (c *Client) Expire(ctx context.Context, key string, ttl time.Duration) error {
 	return c.rdb.Expire(ctx, key, ttl).Err()
 }
+
+// GetString retrieves a value as string (for simple values like cost amounts)
+func (c *Client) GetString(ctx context.Context, key string) (string, error) {
+	return c.rdb.Get(ctx, key).Result()
+}
+
+// SetString stores a string value with optional TTL
+func (c *Client) SetString(ctx context.Context, key string, value string, ttl time.Duration) error {
+	return c.rdb.Set(ctx, key, value, ttl).Err()
+}
+
+// IncrByFloat increments a float value (for cost tracking)
+func (c *Client) IncrByFloat(ctx context.Context, key string, value float64) (float64, error) {
+	return c.rdb.IncrByFloat(ctx, key, value).Result()
+}

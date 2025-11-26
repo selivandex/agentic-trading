@@ -11,33 +11,41 @@ import (
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/user"
 	"prometheus/internal/workers"
+	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 )
 
 // PositionMonitor monitors all open positions and updates their PnL
 type PositionMonitor struct {
 	*workers.BaseWorker
+	userRepo    user.Repository
 	posRepo     position.Repository
 	accountRepo exchange_account.Repository
 	exchFactory exchanges.Factory
+	encryptor   crypto.Encryptor
 	kafka       *kafka.Producer
 }
 
 // NewPositionMonitor creates a new position monitor worker
 func NewPositionMonitor(
+	userRepo user.Repository,
 	posRepo position.Repository,
 	accountRepo exchange_account.Repository,
 	exchFactory exchanges.Factory,
+	encryptor crypto.Encryptor,
 	kafka *kafka.Producer,
 	interval time.Duration,
 	enabled bool,
 ) *PositionMonitor {
 	return &PositionMonitor{
 		BaseWorker:  workers.NewBaseWorker("position_monitor", interval, enabled),
+		userRepo:    userRepo,
 		posRepo:     posRepo,
 		accountRepo: accountRepo,
 		exchFactory: exchFactory,
+		encryptor:   encryptor,
 		kafka:       kafka,
 	}
 }
@@ -46,28 +54,53 @@ func NewPositionMonitor(
 func (pm *PositionMonitor) Run(ctx context.Context) error {
 	pm.Log().Debug("Position monitor: starting iteration")
 
-	// Get all open positions (for all users)
-	// We need to get them per user since we have to use their exchange credentials
-	// For now, we'll implement a simpler approach: get all users with open positions
-	// In a production system, you'd want to cache exchange clients
+	// Get all active users (using large limit)
+	// In production, you'd want pagination or stream processing for large user bases
+	users, err := pm.userRepo.List(ctx, 1000, 0)
+	if err != nil {
+		return errors.Wrap(err, "failed to list users")
+	}
 
-	// TODO: This is a simplified implementation
-	// In production, you'd want to:
-	// 1. Get list of users with open positions
-	// 2. Group positions by user + exchange
-	// 3. Create exchange clients once per user+exchange combination
-	// 4. Update all positions for that combination
+	// Filter only active users
+	var activeUsers []*user.User
+	for _, usr := range users {
+		if usr.IsActive {
+			activeUsers = append(activeUsers, usr)
+		}
+	}
 
-	// For now, we'll just log that we need to implement this
-	// The full implementation would require a user repository
-	pm.Log().Warn("Position monitor: simplified implementation - need user repository to get exchange credentials")
+	if len(activeUsers) == 0 {
+		pm.Log().Debug("No active users to monitor")
+		return nil
+	}
+
+	pm.Log().Debug("Monitoring positions for users", "user_count", len(activeUsers))
+
+	// Monitor positions for each user
+	successCount := 0
+	errorCount := 0
+	for _, usr := range activeUsers {
+		if err := pm.monitorUserPositions(ctx, usr.ID); err != nil {
+			pm.Log().Error("Failed to monitor user positions",
+				"user_id", usr.ID,
+				"error", err,
+			)
+			errorCount++
+			// Continue with other users
+			continue
+		}
+		successCount++
+	}
+
+	pm.Log().Info("Position monitor: iteration complete",
+		"users_processed", successCount,
+		"errors", errorCount,
+	)
 
 	return nil
 }
 
 // monitorUserPositions monitors positions for a specific user
-//
-//nolint:unused // TODO: Will be used when user repository is added to Run method
 func (pm *PositionMonitor) monitorUserPositions(ctx context.Context, userID uuid.UUID) error {
 	// Get all open positions for this user
 	positions, err := pm.posRepo.GetOpenByUser(ctx, userID)
@@ -109,11 +142,11 @@ func (pm *PositionMonitor) monitorAccountPositions(ctx context.Context, accountI
 		return errors.Wrap(err, "failed to get exchange account")
 	}
 
-	// TODO: Need encryptor to decrypt credentials
-	// For now, skip exchange client creation
-	_ = account
-	var exchangeClient exchanges.Exchange
-	exchangeClient = nil
+	// Create exchange client (factory handles decryption internally)
+	exchangeClient, err := pm.exchFactory.CreateClient(account, &pm.encryptor)
+	if err != nil {
+		return errors.Wrap(err, "failed to create exchange client")
+	}
 
 	// Update each position
 	for _, pos := range positions {

@@ -253,16 +253,16 @@ func (jc *JournalCompiler) generateTradeNotes(pos *position.Position) string {
 // Event structure
 
 type JournalEntryEvent struct {
-	UserID       string  `json:"user_id"`
-	TradeID      string  `json:"trade_id"`
-	Symbol       string  `json:"symbol"`
-	Strategy     string  `json:"strategy"`
-	Outcome      string  `json:"outcome"`
-	RealizedPnL  string  `json:"realized_pnl"`
-	RealizedPnLPct string  `json:"realized_pnl_pct"`
-	HoldDuration string  `json:"hold_duration"`
-	Notes        string  `json:"notes"`
-	Timestamp    time.Time `json:"timestamp"`
+	UserID         string    `json:"user_id"`
+	TradeID        string    `json:"trade_id"`
+	Symbol         string    `json:"symbol"`
+	Strategy       string    `json:"strategy"`
+	Outcome        string    `json:"outcome"`
+	RealizedPnL    string    `json:"realized_pnl"`
+	RealizedPnLPct string    `json:"realized_pnl_pct"`
+	HoldDuration   string    `json:"hold_duration"`
+	Notes          string    `json:"notes"`
+	Timestamp      time.Time `json:"timestamp"`
 }
 
 func (jc *JournalCompiler) publishJournalEvent(ctx context.Context, entry *journal.JournalEntry) {
@@ -283,4 +283,3 @@ func (jc *JournalCompiler) publishJournalEvent(ctx context.Context, entry *journ
 		jc.Log().Error("Failed to publish journal entry event", "error", err)
 	}
 }
-

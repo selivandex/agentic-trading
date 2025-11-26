@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package events;
+
+option go_package = "prometheus/internal/events/proto;eventspb";
+
+import "google/protobuf/timestamp.proto";
+
+// BaseEvent contains common fields for all events
+message BaseEvent {
+  string id = 1;
+  string type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string source = 4;
+  string user_id = 5;
+  string version = 6;
+}
+
+// OpportunityFoundEvent is published when a trading opportunity is detected
+message OpportunityFoundEvent {
+  BaseEvent base = 1;
+  string symbol = 2;
+  string exchange = 3;
+  string direction = 4;  // "long" or "short"
+  double confidence = 5; // 0.0 - 1.0
+  double entry = 6;
+  double stop_loss = 7;
+  double take_profit = 8;
+  string timeframe = 9;
+  string strategy = 10;
+  string reasoning = 11;
+  map<string, string> indicators = 12;
+}
+
+// RegimeChangedEvent is published when market regime changes
+message RegimeChangedEvent {
+  BaseEvent base = 1;
+  string symbol = 2;
+  string old_regime = 3;
+  string new_regime = 4;  // "trending", "ranging", "volatile"
+  double confidence = 5;
+  double volatility = 6;
+  string trend = 7;  // "bullish", "bearish", "neutral"
+}
+
+// OrderPlacedEvent is published when an order is placed
+message OrderPlacedEvent {
+  BaseEvent base = 1;
+  string order_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  string side = 5;  // "buy" or "sell"
+  string type = 6;  // "market", "limit", "stop"
+  double price = 7;
+  double amount = 8;
+  string agent_id = 9;
+  string strategy_id = 10;
+}
+
+// OrderFilledEvent is published when an order is filled
+message OrderFilledEvent {
+  BaseEvent base = 1;
+  string order_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  string side = 5;
+  double filled_price = 6;
+  double filled_amount = 7;
+  double fee = 8;
+  string fee_currency = 9;
+}
+
+// PositionOpenedEvent is published when a position is opened
+message PositionOpenedEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  string side = 5;
+  double entry_price = 6;
+  double amount = 7;
+  double leverage = 8;
+  double stop_loss = 9;
+  double take_profit = 10;
+  string strategy_id = 11;
+}
+
+// PositionClosedEvent is published when a position is closed
+message PositionClosedEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  string side = 5;
+  double entry_price = 6;
+  double exit_price = 7;
+  double amount = 8;
+  double pnl = 9;
+  double pnl_percent = 10;
+  int64 duration_seconds = 11;
+  string close_reason = 12;  // "take_profit", "stop_loss", "manual", "timeout"
+}
+
+// CircuitBreakerTrippedEvent is published when circuit breaker is activated
+message CircuitBreakerTrippedEvent {
+  BaseEvent base = 1;
+  string reason = 2;
+  double current_loss = 3;
+  double threshold = 4;
+  double drawdown = 5;
+  bool auto_resume = 6;
+  google.protobuf.Timestamp resume_at = 7;
+}
+
+// AgentExecutedEvent is published after agent execution
+message AgentExecutedEvent {
+  BaseEvent base = 1;
+  string agent_type = 2;
+  string model = 3;
+  int64 duration_ms = 4;
+  int32 tokens_used = 5;
+  double cost_usd = 6;
+  bool success = 7;
+  string error = 8;
+  string decision = 9;
+  double confidence = 10;
+}
+
+// DecisionMadeEvent is published when agent makes a decision
+message DecisionMadeEvent {
+  BaseEvent base = 1;
+  string agent_type = 2;
+  string decision = 3;
+  string action = 4;  // "buy", "sell", "hold", "close"
+  string symbol = 5;
+  double confidence = 6;
+  string reasoning = 7;
+  map<string, string> context = 8;
+}
+
+// WorkerFailedEvent is published when a worker fails
+message WorkerFailedEvent {
+  BaseEvent base = 1;
+  string worker_name = 2;
+  string error = 3;
+  int32 fail_count = 4;
+  google.protobuf.Timestamp last_success = 5;
+}
+

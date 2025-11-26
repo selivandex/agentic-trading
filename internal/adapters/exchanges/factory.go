@@ -1,6 +1,7 @@
 package exchanges
 
 import (
+	"context"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/pkg/crypto"
 )
@@ -26,4 +27,15 @@ type Factory interface {
 type CentralFactory interface {
 	GetClient(exchange string) (Exchange, error)
 	ListExchanges() []string
+}
+
+// WebSocketClient interface for real-time WebSocket connections
+type WebSocketClient interface {
+	Connect(ctx context.Context) error
+	Disconnect() error
+	SubscribeOrderBook(symbol string, callback func(*OrderBook)) error
+	SubscribeTrades(symbol string, callback func(*Trade)) error
+	SubscribeTicker(symbol string, callback func(*Ticker)) error
+	IsConnected() bool
+	Ping() error
 }

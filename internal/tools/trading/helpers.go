@@ -1,7 +1,6 @@
 package trading
 
 import (
-
 	"github.com/google/uuid"
 	"prometheus/pkg/errors"
 )

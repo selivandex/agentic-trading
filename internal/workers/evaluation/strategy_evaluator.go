@@ -255,25 +255,25 @@ func (se *StrategyEvaluator) disableStrategy(ctx context.Context, userID uuid.UU
 // Event structures
 
 type StrategyDisabledEvent struct {
-	UserID         string  `json:"user_id"`
-	Strategy       string  `json:"strategy"`
-	Reason         string  `json:"reason"`
-	TotalTrades    int     `json:"total_trades"`
-	WinRate        float64 `json:"win_rate"`
-	ProfitFactor   string  `json:"profit_factor"`
-	MaxDrawdownPct float64 `json:"max_drawdown_pct"`
-	TotalPnL       string  `json:"total_pnl"`
+	UserID         string    `json:"user_id"`
+	Strategy       string    `json:"strategy"`
+	Reason         string    `json:"reason"`
+	TotalTrades    int       `json:"total_trades"`
+	WinRate        float64   `json:"win_rate"`
+	ProfitFactor   string    `json:"profit_factor"`
+	MaxDrawdownPct float64   `json:"max_drawdown_pct"`
+	TotalPnL       string    `json:"total_pnl"`
 	Timestamp      time.Time `json:"timestamp"`
 }
 
 type StrategyWarningEvent struct {
-	UserID         string  `json:"user_id"`
-	Strategy       string  `json:"strategy"`
-	Reason         string  `json:"reason"`
-	TotalTrades    int     `json:"total_trades"`
-	WinRate        float64 `json:"win_rate"`
-	ProfitFactor   string  `json:"profit_factor"`
-	MaxDrawdownPct float64 `json:"max_drawdown_pct"`
+	UserID         string    `json:"user_id"`
+	Strategy       string    `json:"strategy"`
+	Reason         string    `json:"reason"`
+	TotalTrades    int       `json:"total_trades"`
+	WinRate        float64   `json:"win_rate"`
+	ProfitFactor   string    `json:"profit_factor"`
+	MaxDrawdownPct float64   `json:"max_drawdown_pct"`
 	Timestamp      time.Time `json:"timestamp"`
 }
 
@@ -323,4 +323,3 @@ func (se *StrategyEvaluator) publishStrategyWarningEvent(
 		se.Log().Error("Failed to publish strategy warning event", "error", err)
 	}
 }
-

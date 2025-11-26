@@ -57,33 +57,35 @@ func (m MemoryType) String() string {
 	return string(m)
 }
 
-// CollectiveMemory represents shared knowledge across users
+// CollectiveMemory represents shared knowledge validated across users
 type CollectiveMemory struct {
 	ID uuid.UUID `db:"id"`
 
 	// Scope
-	AgentType   string `db:"agent_type"`  // "market_analyst", "risk_manager", etc.
-	Personality string `db:"personality"` // "conservative", "aggressive", "balanced"
+	AgentType   string  `db:"agent_type"`  // "market_analyst", "risk_manager", etc.
+	Personality *string `db:"personality"` // NULL for all personalities
 
 	// Content
 	Type      MemoryType      `db:"type"`
 	Content   string          `db:"content"`
 	Embedding pgvector.Vector `db:"embedding"`
 
-	// Validation
-	ValidationScore  float64    `db:"validation_score"`  // How well this lesson performed
+	// Validation (promoted only when proven)
+	ValidationScore  float64    `db:"validation_score"`  // 0-100, how well this lesson performed
 	ValidationTrades int        `db:"validation_trades"` // Number of trades that validated this
 	ValidatedAt      *time.Time `db:"validated_at"`
 
 	// Metadata
-	Symbol     string  `db:"symbol"`
-	Timeframe  string  `db:"timeframe"`
-	Importance float64 `db:"importance"`
+	Symbol     *string  `db:"symbol"`     // NULL for general lessons
+	Timeframe  *string  `db:"timeframe"`  // NULL for general lessons
+	Importance float64  `db:"importance"` // 0-1, for retrieval ranking
+	Tags       []string `db:"tags"`       // Additional categorization
 
-	// Source
+	// Source (anonymized)
 	SourceUserID  *uuid.UUID `db:"source_user_id"`  // Who contributed this
 	SourceTradeID *uuid.UUID `db:"source_trade_id"` // Which trade led to this lesson
 
 	CreatedAt time.Time  `db:"created_at"`
-	ExpiresAt *time.Time `db:"expires_at"`
+	UpdatedAt time.Time  `db:"updated_at"`
+	ExpiresAt *time.Time `db:"expires_at"` // TTL for time-sensitive lessons
 }

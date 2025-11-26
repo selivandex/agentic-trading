@@ -9,6 +9,7 @@ import (
 
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/user"
 	"prometheus/internal/risk"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
@@ -17,6 +18,7 @@ import (
 // RiskMonitor monitors user risk levels and trips circuit breakers when needed
 type RiskMonitor struct {
 	*workers.BaseWorker
+	userRepo   user.Repository
 	riskEngine *risk.RiskEngine
 	posRepo    position.Repository
 	kafka      *kafka.Producer
@@ -24,6 +26,7 @@ type RiskMonitor struct {
 
 // NewRiskMonitor creates a new risk monitor worker
 func NewRiskMonitor(
+	userRepo user.Repository,
 	riskEngine *risk.RiskEngine,
 	posRepo position.Repository,
 	kafka *kafka.Producer,
@@ -32,6 +35,7 @@ func NewRiskMonitor(
 ) *RiskMonitor {
 	return &RiskMonitor{
 		BaseWorker: workers.NewBaseWorker("risk_monitor", interval, enabled),
+		userRepo:   userRepo,
 		riskEngine: riskEngine,
 		posRepo:    posRepo,
 		kafka:      kafka,
@@ -42,10 +46,47 @@ func NewRiskMonitor(
 func (rm *RiskMonitor) Run(ctx context.Context) error {
 	rm.Log().Debug("Risk monitor: starting iteration")
 
-	// This is a simplified implementation
-	// In production, we'd need a user repository to get all active users
-	// For now, we'll log that this needs implementation
-	rm.Log().Warn("Risk monitor: simplified implementation - need user repository to monitor all users")
+	// Get all active users (using large limit)
+	users, err := rm.userRepo.List(ctx, 1000, 0)
+	if err != nil {
+		return errors.Wrap(err, "failed to list users")
+	}
+
+	// Filter only active users
+	var activeUsers []*user.User
+	for _, usr := range users {
+		if usr.IsActive {
+			activeUsers = append(activeUsers, usr)
+		}
+	}
+
+	if len(activeUsers) == 0 {
+		rm.Log().Debug("No active users to monitor")
+		return nil
+	}
+
+	rm.Log().Debug("Monitoring risk for users", "user_count", len(activeUsers))
+
+	// Monitor risk for each user
+	successCount := 0
+	errorCount := 0
+	for _, usr := range activeUsers {
+		if err := rm.monitorUser(ctx, usr.ID); err != nil {
+			rm.Log().Error("Failed to monitor user risk",
+				"user_id", usr.ID,
+				"error", err,
+			)
+			errorCount++
+			// Continue with other users
+			continue
+		}
+		successCount++
+	}
+
+	rm.Log().Info("Risk monitor: iteration complete",
+		"users_processed", successCount,
+		"errors", errorCount,
+	)
 
 	return nil
 }

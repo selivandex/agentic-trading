@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	App           AppConfig
+	HTTP          HTTPConfig
 	Postgres      PostgresConfig
 	ClickHouse    ClickHouseConfig
 	Redis         RedisConfig
@@ -27,8 +28,13 @@ type Config struct {
 type AppConfig struct {
 	Name     string `envconfig:"APP_NAME" default:"prometheus"`
 	Env      string `envconfig:"APP_ENV" default:"development"`
+	Version  string `envconfig:"APP_VERSION" default:"1.0.0"`
 	LogLevel string `envconfig:"LOG_LEVEL" default:"info"`
 	Debug    bool   `envconfig:"DEBUG" default:"false"`
+}
+
+type HTTPConfig struct {
+	Port int `envconfig:"HTTP_PORT" default:"8080"`
 }
 
 type PostgresConfig struct {
@@ -79,26 +85,47 @@ type TelegramConfig struct {
 }
 
 type AIConfig struct {
-	ClaudeKey       string `envconfig:"CLAUDE_API_KEY"`
-	OpenAIKey       string `envconfig:"OPENAI_API_KEY"`
-	DeepSeekKey     string `envconfig:"DEEPSEEK_API_KEY"`
-	GeminiKey       string `envconfig:"GEMINI_API_KEY"`
-	DefaultProvider string `envconfig:"DEFAULT_AI_PROVIDER" default:"claude"`
+	ClaudeKey           string `envconfig:"CLAUDE_API_KEY"`
+	OpenAIKey           string `envconfig:"OPENAI_API_KEY"`
+	DeepSeekKey         string `envconfig:"DEEPSEEK_API_KEY"`
+	GeminiKey           string `envconfig:"GEMINI_API_KEY"`
+	DefaultProvider     string `envconfig:"DEFAULT_AI_PROVIDER" default:"claude"`
+	MaxDailyCostPerUser string `envconfig:"AI_MAX_DAILY_COST_PER_USER" default:"10.00"` // Max daily AI spending per user (USD)
+	MaxCostPerExecution string `envconfig:"AI_MAX_COST_PER_EXECUTION" default:"1.00"`   // Max cost per single agent execution (USD)
 }
 
 type CryptoConfig struct {
 	EncryptionKey string `envconfig:"ENCRYPTION_KEY" required:"true"` // 32 bytes for AES-256
 }
 
+// BinanceConfig contains Binance-specific market data credentials
+type BinanceConfig struct {
+	APIKey string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
+	Secret string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
+}
+
+// BybitMarketDataConfig contains Bybit-specific market data credentials
+type BybitConfig struct {
+	APIKey string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
+	Secret string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
+}
+
+// OKXMarketDataConfig contains OKX-specific market data credentials
+type OKXConfig struct {
+	APIKey     string `envconfig:"OKX_MARKET_DATA_API_KEY"`
+	Secret     string `envconfig:"OKX_MARKET_DATA_SECRET"`
+	Passphrase string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+}
+
+// MarketDataConfig contains centralized market data collection credentials
+// These are used by workers to collect market data, separate from user trading accounts
 type MarketDataConfig struct {
-	// Central API keys for market data collection (not user-specific)
-	BinanceAPIKey string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
-	BinanceSecret string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
-	BybitAPIKey   string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
-	BybitSecret   string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
-	OKXAPIKey     string `envconfig:"OKX_MARKET_DATA_API_KEY"`
-	OKXSecret     string `envconfig:"OKX_MARKET_DATA_SECRET"`
-	OKXPassphrase string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+	Binance BinanceConfig
+	Bybit   BybitConfig
+	OKX     OKXConfig
+
+	// News/sentiment API keys
+	NewsAPIKey string `envconfig:"NEWS_API_KEY"` // CryptoPanic API key (optional for public endpoint)
 }
 
 type ErrorTrackingConfig struct {
@@ -116,9 +143,17 @@ type WorkerConfig struct {
 	PositionMonitorInterval time.Duration `envconfig:"WORKER_POSITION_MONITOR_INTERVAL" default:"1m"` // Check positions every minute
 	OrderSyncInterval       time.Duration `envconfig:"WORKER_ORDER_SYNC_INTERVAL" default:"30s"`      // Sync orders every 30s
 	RiskMonitorInterval     time.Duration `envconfig:"WORKER_RISK_MONITOR_INTERVAL" default:"30s"`    // Check risk every 30s
+	PnLCalculatorInterval   time.Duration `envconfig:"WORKER_PNL_CALCULATOR_INTERVAL" default:"5m"`   // Calculate PnL every 5 minutes
 
 	// Market data workers (medium frequency)
-	OHLCVCollectorInterval time.Duration `envconfig:"WORKER_OHLCV_COLLECTOR_INTERVAL" default:"1m"` // Collect candles every minute
+	OHLCVCollectorInterval     time.Duration `envconfig:"WORKER_OHLCV_COLLECTOR_INTERVAL" default:"1m"`      // Collect candles every minute
+	TickerCollectorInterval    time.Duration `envconfig:"WORKER_TICKER_COLLECTOR_INTERVAL" default:"10s"`    // Collect tickers every 10 seconds
+	OrderBookCollectorInterval time.Duration `envconfig:"WORKER_ORDERBOOK_COLLECTOR_INTERVAL" default:"10s"` // Collect order books every 10 seconds
+	TradesCollectorInterval    time.Duration `envconfig:"WORKER_TRADES_COLLECTOR_INTERVAL" default:"1s"`     // Collect trades every second
+	FundingCollectorInterval   time.Duration `envconfig:"WORKER_FUNDING_COLLECTOR_INTERVAL" default:"1m"`    // Collect funding rates every minute
+
+	// Sentiment workers (low frequency)
+	NewsCollectorInterval time.Duration `envconfig:"WORKER_NEWS_COLLECTOR_INTERVAL" default:"10m"` // Collect news every 10 minutes
 
 	// Analysis workers (core agentic system)
 	MarketScannerInterval     time.Duration `envconfig:"WORKER_MARKET_SCANNER_INTERVAL" default:"2m"`      // Full agent analysis every 2 minutes

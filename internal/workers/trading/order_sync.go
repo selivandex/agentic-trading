@@ -12,36 +12,44 @@ import (
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/user"
 	"prometheus/internal/workers"
+	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 )
 
 // OrderSync synchronizes order status with exchanges
 type OrderSync struct {
 	*workers.BaseWorker
+	userRepo    user.Repository
 	orderRepo   order.Repository
 	posRepo     position.Repository
 	accountRepo exchange_account.Repository
 	exchFactory exchanges.Factory
+	encryptor   crypto.Encryptor
 	kafka       *kafka.Producer
 }
 
 // NewOrderSync creates a new order sync worker
 func NewOrderSync(
+	userRepo user.Repository,
 	orderRepo order.Repository,
 	posRepo position.Repository,
 	accountRepo exchange_account.Repository,
 	exchFactory exchanges.Factory,
+	encryptor crypto.Encryptor,
 	kafka *kafka.Producer,
 	interval time.Duration,
 	enabled bool,
 ) *OrderSync {
 	return &OrderSync{
 		BaseWorker:  workers.NewBaseWorker("order_sync", interval, enabled),
+		userRepo:    userRepo,
 		orderRepo:   orderRepo,
 		posRepo:     posRepo,
 		accountRepo: accountRepo,
 		exchFactory: exchFactory,
+		encryptor:   encryptor,
 		kafka:       kafka,
 	}
 }
@@ -50,13 +58,47 @@ func NewOrderSync(
 func (os *OrderSync) Run(ctx context.Context) error {
 	os.Log().Debug("Order sync: starting iteration")
 
-	// This is a simplified implementation
-	// In production, we'd need:
-	// 1. User repository to get all users
-	// 2. Group orders by user + exchange account
-	// 3. Sync orders for each combination
+	// Get all active users (using large limit)
+	users, err := os.userRepo.List(ctx, 1000, 0)
+	if err != nil {
+		return errors.Wrap(err, "failed to list users")
+	}
 
-	os.Log().Warn("Order sync: simplified implementation - need user repository")
+	// Filter only active users
+	var activeUsers []*user.User
+	for _, usr := range users {
+		if usr.IsActive {
+			activeUsers = append(activeUsers, usr)
+		}
+	}
+
+	if len(activeUsers) == 0 {
+		os.Log().Debug("No active users to sync orders for")
+		return nil
+	}
+
+	os.Log().Debug("Syncing orders for users", "user_count", len(activeUsers))
+
+	// Sync orders for each user
+	successCount := 0
+	errorCount := 0
+	for _, usr := range activeUsers {
+		if err := os.syncUserOrders(ctx, usr.ID); err != nil {
+			os.Log().Error("Failed to sync user orders",
+				"user_id", usr.ID,
+				"error", err,
+			)
+			errorCount++
+			// Continue with other users
+			continue
+		}
+		successCount++
+	}
+
+	os.Log().Info("Order sync: iteration complete",
+		"users_processed", successCount,
+		"errors", errorCount,
+	)
 
 	return nil
 }
@@ -103,11 +145,11 @@ func (os *OrderSync) syncAccountOrders(ctx context.Context, accountID uuid.UUID,
 		return errors.Wrap(err, "failed to get exchange account")
 	}
 
-	// TODO: Need encryptor to decrypt credentials and CreateClient method
-	// For now, skip exchange client creation
-	_ = account
-	var exchangeClient exchanges.Exchange
-	exchangeClient = nil
+	// Create exchange client (factory handles decryption internally)
+	exchangeClient, err := os.exchFactory.CreateClient(account, &os.encryptor)
+	if err != nil {
+		return errors.Wrap(err, "failed to create exchange client")
+	}
 
 	// Sync each order
 	for _, ord := range orders {

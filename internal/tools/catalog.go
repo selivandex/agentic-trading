@@ -1,193 +1,491 @@
 package tools
 
 import (
-	"context"
-
-	"prometheus/internal/tools/indicators"
-	"prometheus/internal/tools/market"
-	memtools "prometheus/internal/tools/memory"
-	riskactions "prometheus/internal/tools/risk"
-	"prometheus/internal/tools/shared"
-	"prometheus/internal/tools/trading"
-
-	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
-	"prometheus/pkg/errors"
+	"encoding/json"
+	"sync"
 )
 
-// Definition describes a tool's metadata for registration and documentation.
-type Definition struct {
-	Name        string
-	Description string
-	Category    string
+// ToolDefinition describes a tool's metadata
+type ToolDefinition struct {
+	Name         string                 `json:"name"`
+	Category     string                 `json:"category"`
+	Description  string                 `json:"description"`
+	InputSchema  map[string]interface{} `json:"input_schema,omitempty"`
+	OutputSchema map[string]interface{} `json:"output_schema,omitempty"`
+	RequiresAuth bool                   `json:"requires_auth"` // If tool needs user-specific credentials
+	RateLimit    int                    `json:"rate_limit"`    // Calls per minute (0 = unlimited)
 }
 
-// toolDefinitions enumerates all tools outlined for phases 6 and 7.
-var toolDefinitions = []Definition{
-	{Name: "get_price", Description: "Fetch current price with bid/ask spread", Category: "market_data"},
-	{Name: "get_ohlcv", Description: "Retrieve historical OHLCV candles", Category: "market_data"},
-	{Name: "get_orderbook", Description: "Get depth snapshot for a trading pair", Category: "market_data"},
-	{Name: "get_trades", Description: "Stream or fetch recent trades", Category: "market_data"},
-	{Name: "get_funding_rate", Description: "Return latest perpetual funding rate", Category: "market_data"},
-	{Name: "get_open_interest", Description: "Query futures open interest", Category: "market_data"},
-	{Name: "get_long_short_ratio", Description: "Provide long/short positioning ratio", Category: "market_data"},
-	{Name: "get_liquidations", Description: "List recent liquidation events", Category: "market_data"},
+// Definition is an alias for backward compatibility
+type Definition = ToolDefinition
 
-	{Name: "get_trade_imbalance", Description: "Calculate buy vs sell pressure", Category: "order_flow"},
-	{Name: "get_cvd", Description: "Compute cumulative volume delta", Category: "order_flow"},
-	{Name: "get_whale_trades", Description: "Detect unusually large trades", Category: "order_flow"},
-	{Name: "get_tick_speed", Description: "Measure trade velocity", Category: "order_flow"},
-	{Name: "get_orderbook_imbalance", Description: "Bid/ask volume delta across levels", Category: "order_flow"},
-	{Name: "detect_iceberg", Description: "Identify iceberg order patterns", Category: "order_flow"},
-	{Name: "detect_spoofing", Description: "Spot spoofing or layered orders", Category: "order_flow"},
-	{Name: "get_absorption_zones", Description: "Highlight liquidity absorption zones", Category: "order_flow"},
+// ToolCategory represents a category of tools
+type ToolCategory string
 
-	{Name: "rsi", Description: "Relative Strength Index", Category: "momentum"},
-	{Name: "stochastic", Description: "Stochastic oscillator", Category: "momentum"},
-	{Name: "cci", Description: "Commodity Channel Index", Category: "momentum"},
-	{Name: "roc", Description: "Rate of Change momentum", Category: "momentum"},
+const (
+	CategoryMarketData  ToolCategory = "market_data"
+	CategoryMomentum    ToolCategory = "momentum"
+	CategoryVolatility  ToolCategory = "volatility"
+	CategoryTrend       ToolCategory = "trend"
+	CategoryVolume      ToolCategory = "volume"
+	CategorySMC         ToolCategory = "smc"
+	CategoryOrderFlow   ToolCategory = "order_flow"
+	CategorySentiment   ToolCategory = "sentiment"
+	CategoryOnChain     ToolCategory = "onchain"
+	CategoryMacro       ToolCategory = "macro"
+	CategoryDerivatives ToolCategory = "derivatives"
+	CategoryCorrelation ToolCategory = "correlation"
+	CategoryAccount     ToolCategory = "account"
+	CategoryExecution   ToolCategory = "execution"
+	CategoryRisk        ToolCategory = "risk"
+	CategoryMemory      ToolCategory = "memory"
+	CategoryEvaluation  ToolCategory = "evaluation"
+)
 
-	{Name: "atr", Description: "Average True Range for volatility", Category: "volatility"},
-	{Name: "bollinger", Description: "Bollinger Bands", Category: "volatility"},
-	{Name: "keltner", Description: "Keltner Channels", Category: "volatility"},
+var (
+	catalog     []ToolDefinition
+	catalogOnce sync.Once
+)
 
-	{Name: "sma", Description: "Simple Moving Average", Category: "trend"},
-	{Name: "ema", Description: "Exponential Moving Average", Category: "trend"},
-	{Name: "ema_ribbon", Description: "EMA ribbon across multiple periods", Category: "trend"},
-	{Name: "macd", Description: "Moving Average Convergence Divergence", Category: "trend"},
-	{Name: "supertrend", Description: "Supertrend indicator", Category: "trend"},
-	{Name: "ichimoku", Description: "Ichimoku Cloud signals", Category: "trend"},
-	{Name: "pivot_points", Description: "Classical and Fibonacci pivot points", Category: "trend"},
-	{Name: "fibonacci", Description: "Fibonacci retracement and extension levels", Category: "trend"},
-
-	{Name: "vwap", Description: "Volume Weighted Average Price", Category: "volume"},
-	{Name: "obv", Description: "On-Balance Volume", Category: "volume"},
-	{Name: "volume_profile", Description: "Volume profile by price", Category: "volume"},
-	{Name: "delta_volume", Description: "Buy versus sell volume delta", Category: "volume"},
-
-	{Name: "detect_fvg", Description: "Detect fair value gaps", Category: "smc"},
-	{Name: "detect_order_blocks", Description: "Identify order blocks", Category: "smc"},
-	{Name: "detect_liquidity_zones", Description: "Locate liquidity pools", Category: "smc"},
-	{Name: "detect_stop_hunt", Description: "Spot stop-hunting moves", Category: "smc"},
-	{Name: "get_market_structure", Description: "Detect BOS/CHoCH market structure", Category: "smc"},
-	{Name: "detect_imbalances", Description: "Find price inefficiencies", Category: "smc"},
-	{Name: "get_swing_points", Description: "Return swing highs and lows", Category: "smc"},
-
-	{Name: "get_fear_greed", Description: "Crypto Fear & Greed index", Category: "sentiment"},
-	{Name: "get_social_sentiment", Description: "Aggregate Twitter/Reddit sentiment", Category: "sentiment"},
-	{Name: "get_news", Description: "Fetch latest crypto news", Category: "sentiment"},
-	{Name: "get_trending", Description: "Trending coins and topics", Category: "sentiment"},
-	{Name: "get_funding_sentiment", Description: "Sentiment inferred from funding", Category: "sentiment"},
-
-	{Name: "get_whale_movements", Description: "Large wallet transfer tracker", Category: "onchain"},
-	{Name: "get_exchange_flows", Description: "Exchange inflow/outflow", Category: "onchain"},
-	{Name: "get_miner_reserves", Description: "Miner reserve balances", Category: "onchain"},
-	{Name: "get_active_addresses", Description: "Active addresses count", Category: "onchain"},
-	{Name: "get_nvt_ratio", Description: "Network Value to Transactions", Category: "onchain"},
-	{Name: "get_sopr", Description: "Spent Output Profit Ratio", Category: "onchain"},
-	{Name: "get_mvrv", Description: "Market Value to Realized Value", Category: "onchain"},
-	{Name: "get_realized_pnl", Description: "Realized profit and loss", Category: "onchain"},
-	{Name: "get_stablecoin_flows", Description: "Stablecoin supply flows", Category: "onchain"},
-
-	{Name: "get_economic_calendar", Description: "Upcoming macro events", Category: "macro"},
-	{Name: "get_fed_rate", Description: "Current Federal Reserve rate", Category: "macro"},
-	{Name: "get_fed_watch", Description: "FedWatch rate probabilities", Category: "macro"},
-	{Name: "get_cpi", Description: "Consumer Price Index data", Category: "macro"},
-	{Name: "get_pmi", Description: "Purchasing Managers' Index", Category: "macro"},
-	{Name: "get_macro_impact", Description: "Historical macro event impact", Category: "macro"},
-
-	{Name: "get_options_oi", Description: "Options open interest", Category: "derivatives"},
-	{Name: "get_max_pain", Description: "Max pain price for options", Category: "derivatives"},
-	{Name: "get_put_call_ratio", Description: "Put/Call ratio", Category: "derivatives"},
-	{Name: "get_gamma_exposure", Description: "Dealer gamma exposure", Category: "derivatives"},
-	{Name: "get_options_flow", Description: "Large options trades", Category: "derivatives"},
-	{Name: "get_iv_surface", Description: "Implied volatility surface", Category: "derivatives"},
-
-	{Name: "btc_dominance", Description: "Bitcoin market dominance", Category: "correlation"},
-	{Name: "usdt_dominance", Description: "Stablecoin dominance", Category: "correlation"},
-	{Name: "altcoin_correlation", Description: "Altcoin correlation to BTC", Category: "correlation"},
-	{Name: "stock_correlation", Description: "Correlation to equities indices", Category: "correlation"},
-	{Name: "dxy_correlation", Description: "Correlation to Dollar Index", Category: "correlation"},
-	{Name: "gold_correlation", Description: "Correlation to gold", Category: "correlation"},
-	{Name: "get_session_volume", Description: "Volume by trading session", Category: "correlation"},
-
-	{Name: "get_balance", Description: "Retrieve account balances", Category: "account"},
-	{Name: "get_positions", Description: "List open positions", Category: "account"},
-	{Name: "place_order", Description: "Place a market or limit order", Category: "execution"},
-	{Name: "place_bracket_order", Description: "Place bracket order with SL/TP", Category: "execution"},
-	{Name: "place_ladder_order", Description: "Place laddered profit targets", Category: "execution"},
-	{Name: "place_iceberg_order", Description: "Submit iceberg order", Category: "execution"},
-	{Name: "cancel_order", Description: "Cancel a specific order", Category: "execution"},
-	{Name: "cancel_all_orders", Description: "Cancel all open orders", Category: "execution"},
-	{Name: "close_position", Description: "Close a single position", Category: "execution"},
-	{Name: "close_all_positions", Description: "Close all positions", Category: "execution"},
-	{Name: "set_leverage", Description: "Configure leverage", Category: "execution"},
-	{Name: "set_margin_mode", Description: "Switch margin mode", Category: "execution"},
-	{Name: "move_sl_to_breakeven", Description: "Adjust stop to breakeven", Category: "execution"},
-	{Name: "set_trailing_stop", Description: "Enable trailing stop", Category: "execution"},
-	{Name: "add_to_position", Description: "DCA or increase position size", Category: "execution"},
-
-	{Name: "check_circuit_breaker", Description: "Check if trading is allowed", Category: "risk"},
-	{Name: "get_daily_pnl", Description: "Return today's PnL", Category: "risk"},
-	{Name: "get_max_drawdown", Description: "Current drawdown stats", Category: "risk"},
-	{Name: "get_exposure", Description: "Total portfolio exposure", Category: "risk"},
-	{Name: "calculate_position_size", Description: "Compute position size", Category: "risk"},
-	{Name: "validate_trade", Description: "Pre-trade validation checks", Category: "risk"},
-	{Name: "emergency_close_all", Description: "Kill switch to close everything", Category: "risk"},
-
-	{Name: "store_memory", Description: "Persist a memory entry", Category: "memory"},
-	{Name: "search_memory", Description: "Semantic memory search", Category: "memory"},
-	{Name: "get_trade_history", Description: "Retrieve past trades", Category: "memory"},
-	{Name: "get_market_regime", Description: "Get detected market regime", Category: "memory"},
-	{Name: "store_market_regime", Description: "Persist market regime detection", Category: "memory"},
-
-	{Name: "get_strategy_stats", Description: "Strategy performance stats", Category: "evaluation"},
-	{Name: "log_trade_decision", Description: "Write trade decision to journal", Category: "evaluation"},
-	{Name: "get_trade_journal", Description: "Retrieve trade journal entries", Category: "evaluation"},
-	{Name: "evaluate_last_trades", Description: "Evaluate recent trades", Category: "evaluation"},
-	{Name: "get_best_strategies", Description: "Top performing strategies", Category: "evaluation"},
-	{Name: "get_worst_strategies", Description: "Underperforming strategies", Category: "evaluation"},
+// Definitions returns all tool definitions
+func Definitions() []ToolDefinition {
+	catalogOnce.Do(initCatalog)
+	return catalog
 }
 
-// Definitions exposes a copy of all tool definitions.
-func Definitions() []Definition {
-	defs := make([]Definition, len(toolDefinitions))
-	copy(defs, toolDefinitions)
-	return defs
-}
+// DefinitionsByCategory returns tools filtered by category
+func DefinitionsByCategory(category ToolCategory) []ToolDefinition {
+	catalogOnce.Do(initCatalog)
 
-type toolFactory func(deps shared.Deps) tool.Tool
-
-var implementedTools = map[string]toolFactory{
-	"get_price":             market.NewGetPriceTool,
-	"get_ohlcv":             market.NewGetOHLCVTool,
-	"get_orderbook":         market.NewGetOrderBookTool,
-	"get_trades":            market.NewGetTradesTool,
-	"rsi":                   indicators.NewRSITool,
-	"ema":                   indicators.NewEMATool,
-	"macd":                  indicators.NewMACDTool,
-	"atr":                   indicators.NewATRTool,
-	"get_balance":           trading.NewGetBalanceTool,
-	"get_positions":         trading.NewGetPositionsTool,
-	"place_order":           trading.NewPlaceOrderTool,
-	"cancel_order":          trading.NewCancelOrderTool,
-	"check_circuit_breaker": riskactions.NewCheckCircuitBreakerTool,
-	"validate_trade":        riskactions.NewValidateTradeTool,
-	"emergency_close_all":   riskactions.NewEmergencyCloseAllTool,
-	"search_memory":         memtools.NewSearchMemoryTool,
-}
-
-// RegisterAllTools registers concrete implementations where available and placeholders elsewhere.
-func RegisterAllTools(registry *Registry, deps shared.Deps) {
-	for _, def := range toolDefinitions {
-		if factory, ok := implementedTools[def.Name]; ok {
-			registry.Register(def.Name, factory(deps))
-			continue
+	var filtered []ToolDefinition
+	for _, def := range catalog {
+		if def.Category == string(category) {
+			filtered = append(filtered, def)
 		}
+	}
+	return filtered
+}
 
-		definition := def
-		registry.Register(definition.Name, functiontool.New(definition.Name, definition.Description, func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-			return nil, errors.Wrapf(errors.ErrInternal, "tool %s not implemented", definition.Name)
-		}))
+// DefinitionByName returns a tool definition by name
+func DefinitionByName(name string) (*ToolDefinition, bool) {
+	catalogOnce.Do(initCatalog)
+
+	for _, def := range catalog {
+		if def.Name == name {
+			return &def, true
+		}
+	}
+	return nil, false
+}
+
+// initCatalog initializes the tool catalog
+func initCatalog() {
+	catalog = []ToolDefinition{
+		// Market Data Tools
+		{
+			Name:         "get_price",
+			Category:     string(CategoryMarketData),
+			Description:  "Get current price with bid/ask spread",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_ohlcv",
+			Category:     string(CategoryMarketData),
+			Description:  "Get historical OHLCV candles",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_orderbook",
+			Category:     string(CategoryMarketData),
+			Description:  "Get order book depth",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_trades",
+			Category:     string(CategoryMarketData),
+			Description:  "Get recent trades (tape)",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+
+		// Momentum Indicators
+		{
+			Name:         "rsi",
+			Category:     string(CategoryMomentum),
+			Description:  "Calculate Relative Strength Index",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "macd",
+			Category:     string(CategoryMomentum),
+			Description:  "Calculate MACD indicator",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "stochastic",
+			Category:     string(CategoryMomentum),
+			Description:  "Calculate Stochastic Oscillator",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "cci",
+			Category:     string(CategoryMomentum),
+			Description:  "Calculate Commodity Channel Index",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "roc",
+			Category:     string(CategoryMomentum),
+			Description:  "Calculate Rate of Change",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+
+		// Volatility Indicators
+		{
+			Name:         "atr",
+			Category:     string(CategoryVolatility),
+			Description:  "Calculate Average True Range",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "bollinger",
+			Category:     string(CategoryVolatility),
+			Description:  "Calculate Bollinger Bands",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "keltner",
+			Category:     string(CategoryVolatility),
+			Description:  "Calculate Keltner Channels",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+
+		// Trend Indicators
+		{
+			Name:         "ema",
+			Category:     string(CategoryTrend),
+			Description:  "Calculate Exponential Moving Average",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "sma",
+			Category:     string(CategoryTrend),
+			Description:  "Calculate Simple Moving Average",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "ema_ribbon",
+			Category:     string(CategoryTrend),
+			Description:  "Calculate multiple EMAs (9, 21, 55, 200)",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "supertrend",
+			Category:     string(CategoryTrend),
+			Description:  "Calculate Supertrend indicator",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "ichimoku",
+			Category:     string(CategoryTrend),
+			Description:  "Calculate Ichimoku Cloud",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "pivot_points",
+			Category:     string(CategoryTrend),
+			Description:  "Calculate pivot points and support/resistance",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+
+		// Volume Indicators
+		{
+			Name:         "vwap",
+			Category:     string(CategoryVolume),
+			Description:  "Calculate Volume Weighted Average Price",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "obv",
+			Category:     string(CategoryVolume),
+			Description:  "Calculate On-Balance Volume",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "volume_profile",
+			Category:     string(CategoryVolume),
+			Description:  "Calculate Volume Profile histogram",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+		{
+			Name:         "delta_volume",
+			Category:     string(CategoryVolume),
+			Description:  "Calculate Buy vs Sell volume delta",
+			RequiresAuth: false,
+			RateLimit:    120,
+		},
+
+		// Smart Money Concepts
+		{
+			Name:         "detect_fvg",
+			Category:     string(CategorySMC),
+			Description:  "Detect Fair Value Gaps",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "detect_order_blocks",
+			Category:     string(CategorySMC),
+			Description:  "Detect Order Blocks",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_swing_points",
+			Category:     string(CategorySMC),
+			Description:  "Identify swing highs and lows",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "detect_liquidity_zones",
+			Category:     string(CategorySMC),
+			Description:  "Detect liquidity zones and pools",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "detect_stop_hunt",
+			Category:     string(CategorySMC),
+			Description:  "Detect stop hunts and liquidity sweeps",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "detect_imbalances",
+			Category:     string(CategorySMC),
+			Description:  "Detect price imbalances",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_market_structure",
+			Category:     string(CategorySMC),
+			Description:  "Analyze market structure (BOS, CHoCH)",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+
+		// Order Flow
+		{
+			Name:         "get_trade_imbalance",
+			Category:     string(CategoryOrderFlow),
+			Description:  "Get buy vs sell pressure",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_cvd",
+			Category:     string(CategoryOrderFlow),
+			Description:  "Calculate Cumulative Volume Delta",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_whale_trades",
+			Category:     string(CategoryOrderFlow),
+			Description:  "Detect large trades (whales)",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_orderbook_imbalance",
+			Category:     string(CategoryOrderFlow),
+			Description:  "Calculate orderbook bid/ask imbalance",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_tick_speed",
+			Category:     string(CategoryOrderFlow),
+			Description:  "Calculate trade velocity (ticks per second)",
+			RequiresAuth: false,
+			RateLimit:    60,
+		},
+
+		// Sentiment
+		{
+			Name:         "get_fear_greed",
+			Category:     string(CategorySentiment),
+			Description:  "Get Fear & Greed Index",
+			RequiresAuth: false,
+			RateLimit:    10,
+		},
+		{
+			Name:         "get_news",
+			Category:     string(CategorySentiment),
+			Description:  "Get latest crypto news",
+			RequiresAuth: false,
+			RateLimit:    30,
+		},
+
+		// On-Chain
+		{
+			Name:         "get_whale_movements",
+			Category:     string(CategoryOnChain),
+			Description:  "Get large wallet transfers",
+			RequiresAuth: false,
+			RateLimit:    30,
+		},
+		{
+			Name:         "get_exchange_flows",
+			Category:     string(CategoryOnChain),
+			Description:  "Get exchange inflow/outflow",
+			RequiresAuth: false,
+			RateLimit:    30,
+		},
+
+		// Macro
+		{
+			Name:         "get_economic_calendar",
+			Category:     string(CategoryMacro),
+			Description:  "Get economic events calendar",
+			RequiresAuth: false,
+			RateLimit:    10,
+		},
+
+		// Trading (requires user auth)
+		{
+			Name:         "get_balance",
+			Category:     string(CategoryAccount),
+			Description:  "Get account balance",
+			RequiresAuth: true,
+			RateLimit:    60,
+		},
+		{
+			Name:         "get_positions",
+			Category:     string(CategoryAccount),
+			Description:  "Get open positions",
+			RequiresAuth: true,
+			RateLimit:    60,
+		},
+		{
+			Name:         "place_order",
+			Category:     string(CategoryExecution),
+			Description:  "Place market/limit/stop order",
+			RequiresAuth: true,
+			RateLimit:    30,
+		},
+		{
+			Name:         "cancel_order",
+			Category:     string(CategoryExecution),
+			Description:  "Cancel an order",
+			RequiresAuth: true,
+			RateLimit:    60,
+		},
+
+		// Risk Management
+		{
+			Name:         "check_circuit_breaker",
+			Category:     string(CategoryRisk),
+			Description:  "Check if trading is allowed",
+			RequiresAuth: true,
+			RateLimit:    0,
+		},
+		{
+			Name:         "validate_trade",
+			Category:     string(CategoryRisk),
+			Description:  "Validate trade before execution",
+			RequiresAuth: true,
+			RateLimit:    0,
+		},
+		{
+			Name:         "emergency_close_all",
+			Category:     string(CategoryRisk),
+			Description:  "Emergency close all positions (kill switch)",
+			RequiresAuth: true,
+			RateLimit:    0,
+		},
+
+		// Memory
+		{
+			Name:         "search_memory",
+			Category:     string(CategoryMemory),
+			Description:  "Semantic search past memories",
+			RequiresAuth: true,
+			RateLimit:    60,
+		},
+		{
+			Name:         "store_memory",
+			Category:     string(CategoryMemory),
+			Description:  "Store observation/decision",
+			RequiresAuth: true,
+			RateLimit:    120,
+		},
+
+		// Evaluation
+		{
+			Name:         "get_strategy_stats",
+			Category:     string(CategoryEvaluation),
+			Description:  "Get strategy statistics",
+			RequiresAuth: true,
+			RateLimit:    30,
+		},
+		{
+			Name:         "get_trade_journal",
+			Category:     string(CategoryEvaluation),
+			Description:  "Get trade journal entries",
+			RequiresAuth: true,
+			RateLimit:    30,
+		},
+	}
+}
+
+// ToJSON exports catalog to JSON
+func ToJSON() ([]byte, error) {
+	catalogOnce.Do(initCatalog)
+	return json.MarshalIndent(catalog, "", "  ")
+}
+
+// Categories returns all unique categories
+func Categories() []ToolCategory {
+	return []ToolCategory{
+		CategoryMarketData,
+		CategoryMomentum,
+		CategoryVolatility,
+		CategoryTrend,
+		CategoryVolume,
+		CategorySMC,
+		CategoryOrderFlow,
+		CategorySentiment,
+		CategoryOnChain,
+		CategoryMacro,
+		CategoryDerivatives,
+		CategoryCorrelation,
+		CategoryAccount,
+		CategoryExecution,
+		CategoryRisk,
+		CategoryMemory,
+		CategoryEvaluation,
 	}
 }

@@ -101,6 +101,18 @@ func (m *mockPosRepo) GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*p
 	return result, nil
 }
 
+func (m *mockPosRepo) GetClosedInRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]*position.Position, error) {
+	result := make([]*position.Position, 0)
+	for _, pos := range m.positions {
+		if pos.UserID == userID && pos.Status == position.PositionClosed {
+			if pos.UpdatedAt.After(start) && pos.UpdatedAt.Before(end) {
+				result = append(result, pos)
+			}
+		}
+	}
+	return result, nil
+}
+
 func (m *mockPosRepo) GetByTradingPair(ctx context.Context, tradingPairID uuid.UUID) ([]*position.Position, error) {
 	return nil, nil
 }

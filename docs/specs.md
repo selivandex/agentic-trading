@@ -1282,15 +1282,28 @@ type CryptoConfig struct {
     EncryptionKey string `envconfig:"ENCRYPTION_KEY" required:"true"` // 32 bytes for AES-256
 }
 
+// Exchange-specific market data credentials
+type BinanceMarketDataConfig struct {
+    APIKey string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
+    Secret string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
+}
+
+type BybitMarketDataConfig struct {
+    APIKey string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
+    Secret string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
+}
+
+type OKXMarketDataConfig struct {
+    APIKey     string `envconfig:"OKX_MARKET_DATA_API_KEY"`
+    Secret     string `envconfig:"OKX_MARKET_DATA_SECRET"`
+    Passphrase string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+}
+
 type MarketDataConfig struct {
     // Central API keys for market data collection (not user-specific)
-    BinanceAPIKey    string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
-    BinanceSecret    string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
-    BybitAPIKey      string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
-    BybitSecret      string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
-    OKXAPIKey        string `envconfig:"OKX_MARKET_DATA_API_KEY"`
-    OKXSecret        string `envconfig:"OKX_MARKET_DATA_SECRET"`
-    OKXPassphrase    string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+    Binance BinanceMarketDataConfig
+    Bybit   BybitMarketDataConfig
+    OKX     OKXMarketDataConfig
 }
 
 type ErrorTrackingConfig struct {
@@ -7556,13 +7569,25 @@ type Config struct {
 
 type MarketDataConfig struct {
     // Exchange API keys for market data collection (not user-specific)
-    BinanceAPIKey    string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
-    BinanceSecret    string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
-    BybitAPIKey      string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
-    BybitSecret      string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
-    OKXAPIKey        string `envconfig:"OKX_MARKET_DATA_API_KEY"`
-    OKXSecret        string `envconfig:"OKX_MARKET_DATA_SECRET"`
-    OKXPassphrase    string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+    Binance BinanceMarketDataConfig
+    Bybit   BybitMarketDataConfig
+    OKX     OKXMarketDataConfig
+}
+
+type BinanceMarketDataConfig struct {
+    APIKey string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
+    Secret string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
+}
+
+type BybitMarketDataConfig struct {
+    APIKey string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
+    Secret string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
+}
+
+type OKXMarketDataConfig struct {
+    APIKey     string `envconfig:"OKX_MARKET_DATA_API_KEY"`
+    Secret     string `envconfig:"OKX_MARKET_DATA_SECRET"`
+    Passphrase string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
 }
 ```
 

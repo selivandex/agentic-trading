@@ -77,6 +77,35 @@ var (
 	ErrRateLimitExceeded = errors.New("rate limit exceeded")
 )
 
+// AI cost-related errors
+
+var (
+	// ErrQuotaExceeded indicates cost quota limit exceeded
+	ErrQuotaExceeded = errors.New("cost quota exceeded")
+
+	// ErrDailyLimitExceeded indicates daily AI spending limit exceeded
+	ErrDailyLimitExceeded = errors.New("daily AI cost limit exceeded")
+
+	// ErrExecutionLimitExceeded indicates single execution cost limit exceeded
+	ErrExecutionLimitExceeded = errors.New("execution cost limit exceeded")
+)
+
+// WebSocket-specific errors
+
+var (
+	// ErrWSNotConnected indicates WebSocket is not connected
+	ErrWSNotConnected = errors.New("websocket not connected")
+
+	// ErrWSSubscriptionFailed indicates WebSocket subscription failed
+	ErrWSSubscriptionFailed = errors.New("websocket subscription failed")
+
+	// ErrWSReconnectFailed indicates WebSocket reconnection failed
+	ErrWSReconnectFailed = errors.New("websocket reconnection failed")
+
+	// ErrWSMaxReconnectAttempts indicates max reconnection attempts reached
+	ErrWSMaxReconnectAttempts = errors.New("max websocket reconnection attempts reached")
+)
+
 // DomainError wraps an error with additional context
 type DomainError struct {
 	Code    string
@@ -189,4 +218,12 @@ func Wrapf(err error, format string, args ...interface{}) error {
 		return nil
 	}
 	return fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), err)
+}
+
+func New(message string) error {
+	return errors.New(message)
+}
+
+func Newf(format string, args ...interface{}) error {
+	return fmt.Errorf(format, args...)
 }

@@ -195,3 +195,64 @@ func (r *OrderRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
+
+// UpdateStatusBatch updates status for multiple orders in a transaction
+func (r *OrderRepository) UpdateStatusBatch(ctx context.Context, updates []OrderStatusUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+		UPDATE orders SET
+			status = $2,
+			filled_amount = $3,
+			avg_fill_price = $4,
+			updated_at = NOW(),
+			filled_at = CASE WHEN $2 = 'filled' THEN NOW() ELSE filled_at END
+		WHERE id = $1`
+
+	for _, update := range updates {
+		_, err := tx.ExecContext(ctx, query,
+			update.OrderID,
+			update.Status,
+			update.FilledAmount,
+			update.AvgFillPrice,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// OrderStatusUpdate represents a batch status update
+type OrderStatusUpdate struct {
+	OrderID      uuid.UUID
+	Status       order.OrderStatus
+	FilledAmount decimal.Decimal
+	AvgFillPrice decimal.Decimal
+}
+
+// CancelBatch cancels multiple orders by exchange order IDs
+func (r *OrderRepository) CancelBatch(ctx context.Context, orderIDs []string) error {
+	if len(orderIDs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE orders SET
+			status = $2,
+			updated_at = NOW()
+		WHERE exchange_order_id = ANY($1)
+			AND status IN ('pending', 'open', 'partial')`
+
+	_, err := r.db.ExecContext(ctx, query, orderIDs, order.OrderStatusCanceled)
+	return err
+}

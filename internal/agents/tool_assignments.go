@@ -49,3 +49,16 @@ func ToolsForAgent(agentType AgentType) []string {
 	copy(res, tools)
 	return res
 }
+
+// ValidateToolAccess checks if an agent has access to a specific tool
+func ValidateToolAccess(agentType AgentType, toolName string) bool {
+	allowedTools := AgentToolMap[agentType]
+
+	for _, allowed := range allowedTools {
+		if allowed == toolName {
+			return true
+		}
+	}
+
+	return false
+}

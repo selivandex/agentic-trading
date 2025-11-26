@@ -48,7 +48,7 @@ func (p *Producer) getWriter(topic string) *kafka.Writer {
 	return w
 }
 
-// Publish sends a message to a topic
+// Publish sends a message to a topic (with JSON serialization)
 func (p *Producer) Publish(ctx context.Context, topic string, key string, event interface{}) error {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -66,6 +66,22 @@ func (p *Producer) Publish(ctx context.Context, topic string, key string, event 
 	}
 
 	p.log.Debugf("Published to %s: %s", topic, key)
+	return nil
+}
+
+// PublishBinary sends pre-serialized binary data to a topic (for protobuf)
+func (p *Producer) PublishBinary(ctx context.Context, topic string, key []byte, data []byte) error {
+	msg := kafka.Message{
+		Key:   key,
+		Value: data,
+	}
+
+	if err := p.getWriter(topic).WriteMessages(ctx, msg); err != nil {
+		p.log.Errorf("Failed to publish binary to %s: %v", topic, err)
+		return err
+	}
+
+	p.log.Debugf("Published binary to %s (%d bytes)", topic, len(data))
 	return nil
 }
 

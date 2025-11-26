@@ -214,3 +214,69 @@ func (r *MarketDataRepository) GetRecentTrades(ctx context.Context, exchange, sy
 	err := r.conn.Select(ctx, &trades, query, exchange, symbol, limit)
 	return trades, err
 }
+
+// InsertFundingRate inserts a funding rate snapshot
+func (r *MarketDataRepository) InsertFundingRate(ctx context.Context, fundingRate *market_data.FundingRate) error {
+	query := `
+		INSERT INTO funding_rates (
+			exchange, symbol, timestamp, funding_rate, next_funding_time, mark_price, index_price
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7
+		)`
+
+	return r.conn.Exec(ctx, query,
+		fundingRate.Exchange, fundingRate.Symbol, fundingRate.Timestamp,
+		fundingRate.FundingRate, fundingRate.NextFundingTime,
+		fundingRate.MarkPrice, fundingRate.IndexPrice,
+	)
+}
+
+// GetLatestFundingRate retrieves the latest funding rate for a symbol
+func (r *MarketDataRepository) GetLatestFundingRate(ctx context.Context, exchange, symbol string) (*market_data.FundingRate, error) {
+	var fundingRate market_data.FundingRate
+
+	query := `
+		SELECT * FROM funding_rates
+		WHERE exchange = $1 AND symbol = $2
+		ORDER BY timestamp DESC
+		LIMIT 1`
+
+	err := r.conn.QueryRow(ctx, query, exchange, symbol).ScanStruct(&fundingRate)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fundingRate, nil
+}
+
+// InsertOpenInterest inserts an open interest snapshot
+func (r *MarketDataRepository) InsertOpenInterest(ctx context.Context, oi *market_data.OpenInterest) error {
+	query := `
+		INSERT INTO open_interest (
+			exchange, symbol, timestamp, amount
+		) VALUES (
+			$1, $2, $3, $4
+		)`
+
+	return r.conn.Exec(ctx, query,
+		oi.Exchange, oi.Symbol, oi.Timestamp, oi.Amount,
+	)
+}
+
+// GetLatestOpenInterest retrieves the latest open interest for a symbol
+func (r *MarketDataRepository) GetLatestOpenInterest(ctx context.Context, exchange, symbol string) (*market_data.OpenInterest, error) {
+	var oi market_data.OpenInterest
+
+	query := `
+		SELECT * FROM open_interest
+		WHERE exchange = $1 AND symbol = $2
+		ORDER BY timestamp DESC
+		LIMIT 1`
+
+	err := r.conn.QueryRow(ctx, query, exchange, symbol).ScanStruct(&oi)
+	if err != nil {
+		return nil, err
+	}
+
+	return &oi, nil
+}

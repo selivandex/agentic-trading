@@ -56,6 +56,25 @@ type Trade struct {
 	IsBuyer   bool      `ch:"is_buyer"`
 }
 
+// FundingRate represents funding rate for perpetual futures
+type FundingRate struct {
+	Exchange        string    `ch:"exchange"`
+	Symbol          string    `ch:"symbol"`
+	Timestamp       time.Time `ch:"timestamp"`
+	FundingRate     float64   `ch:"funding_rate"`
+	NextFundingTime time.Time `ch:"next_funding_time"`
+	MarkPrice       float64   `ch:"mark_price"`
+	IndexPrice      float64   `ch:"index_price"`
+}
+
+// OpenInterest represents open interest for futures contracts
+type OpenInterest struct {
+	Exchange  string    `ch:"exchange"`
+	Symbol    string    `ch:"symbol"`
+	Timestamp time.Time `ch:"timestamp"`
+	Amount    float64   `ch:"amount"` // Open interest in contracts or USD
+}
+
 // OHLCVQuery represents query parameters for OHLCV data
 type OHLCVQuery struct {
 	Exchange  string

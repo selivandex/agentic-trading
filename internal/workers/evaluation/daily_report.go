@@ -251,20 +251,20 @@ type DailyReportData struct {
 // Event structure
 
 type DailyReportEvent struct {
-	UserID        string  `json:"user_id"`
-	Date          string  `json:"date"`
-	TotalTrades   int     `json:"total_trades"`
-	WinningTrades int     `json:"winning_trades"`
-	LosingTrades  int     `json:"losing_trades"`
-	WinRate       float64 `json:"win_rate"`
-	TotalPnL      string  `json:"total_pnl"`
-	TotalPnLPct   string  `json:"total_pnl_pct"`
-	BestTrade     string  `json:"best_trade"`
-	WorstTrade    string  `json:"worst_trade"`
-	AvgWin        string  `json:"avg_win"`
-	AvgLoss       string  `json:"avg_loss"`
-	ProfitFactor  string  `json:"profit_factor"`
-	Summary       string  `json:"summary"`
+	UserID        string    `json:"user_id"`
+	Date          string    `json:"date"`
+	TotalTrades   int       `json:"total_trades"`
+	WinningTrades int       `json:"winning_trades"`
+	LosingTrades  int       `json:"losing_trades"`
+	WinRate       float64   `json:"win_rate"`
+	TotalPnL      string    `json:"total_pnl"`
+	TotalPnLPct   string    `json:"total_pnl_pct"`
+	BestTrade     string    `json:"best_trade"`
+	WorstTrade    string    `json:"worst_trade"`
+	AvgWin        string    `json:"avg_win"`
+	AvgLoss       string    `json:"avg_loss"`
+	ProfitFactor  string    `json:"profit_factor"`
+	Summary       string    `json:"summary"`
 	Timestamp     time.Time `json:"timestamp"`
 }
 
@@ -308,4 +308,3 @@ func (dr *DailyReport) publishReportEvent(ctx context.Context, report DailyRepor
 		dr.Log().Error("Failed to publish daily report event", "error", err)
 	}
 }
-

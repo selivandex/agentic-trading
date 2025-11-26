@@ -149,4 +149,3 @@ func (r *RegimeRepository) GetHistory(ctx context.Context, symbol string, since 
 
 	return regimes, nil
 }
-
