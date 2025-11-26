@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"prometheus/internal/adapters/kafka"
@@ -10,6 +11,11 @@ import (
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
+
+// abs returns absolute value of a float64
+func abs(x float64) float64 {
+	return math.Abs(x)
+}
 
 // SMCScanner scans for Smart Money Concepts patterns:
 // - Fair Value Gaps (FVG)
