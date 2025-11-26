@@ -8,7 +8,7 @@ import (
 	"google.golang.org/adk/tool/functiontool"
 
 	"prometheus/internal/domain/stats"
-	toolctx "prometheus/internal/tools"
+	toolctx "prometheus/internal/tools/shared"
 )
 
 // StatsMiddleware records tool usage metrics into the stats repository.

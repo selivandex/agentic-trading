@@ -1,0 +1,46 @@
+package market
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"prometheus/internal/tools/shared"
+
+	"google.golang.org/adk/tool/functiontool"
+)
+
+// NewGetTradesTool returns a tool fetching recent trades from storage.
+func NewGetTradesTool(deps shared.Deps) *functiontool.Tool {
+	return functiontool.New("get_trades", "Fetch recent trades", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+		if !deps.HasMarketData() {
+			return nil, fmt.Errorf("get_trades: market data repository not configured")
+		}
+
+		exchange, _ := args["exchange"].(string)
+		symbol, _ := args["symbol"].(string)
+		limit := parseLimit(args["limit"], 50)
+		if exchange == "" || symbol == "" {
+			return nil, fmt.Errorf("get_trades: exchange and symbol are required")
+		}
+
+		trades, err := deps.MarketDataRepo.GetRecentTrades(ctx, exchange, symbol, limit)
+		if err != nil {
+			return nil, fmt.Errorf("get_trades: fetch trades: %w", err)
+		}
+
+		data := make([]map[string]interface{}, 0, len(trades))
+		for _, t := range trades {
+			data = append(data, map[string]interface{}{
+				"trade_id":  t.TradeID,
+				"price":     t.Price,
+				"quantity":  t.Quantity,
+				"side":      t.Side,
+				"is_buyer":  t.IsBuyer,
+				"timestamp": t.Timestamp.Format(time.RFC3339),
+			})
+		}
+
+		return map[string]interface{}{"trades": data}, nil
+	})
+}
