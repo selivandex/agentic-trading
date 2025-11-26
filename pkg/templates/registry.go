@@ -153,12 +153,12 @@ func (r *Registry) loadTemplate(path string) error {
 	id := r.pathToID(path)
 	content, err := fs.ReadFile(r.fs, path)
 	if err != nil {
-		return errors.Wrapf(errors.ErrInternal, "read template %s: %w", id, err)
+		return errors.Wrapf(err, "read template %s: %w", id)
 	}
 
 	parsed, err := template.New(id).Parse(string(content))
 	if err != nil {
-		return errors.Wrapf(errors.ErrInternal, "parse template %s: %w", id, err)
+		return errors.Wrapf(err, "parse template %s: %w", id)
 	}
 
 	r.mu.Lock()
