@@ -156,39 +156,39 @@
 
 ---
 
-## Phase 5: Template System (Week 4)
+## Phase 5: Template System ✅ (Week 4)
 
-### 5.1 Template Registry
+### 5.1 Template Registry ✅
 
-- [ ] Template loader from filesystem
-- [ ] Template caching and hot-reload
-- [ ] Template ID mapping (path-based)
-- [ ] Template.Render() with data binding
+- [x] Template loader from filesystem
+- [x] Template caching and lazy-load
+- [x] Template ID mapping (path-based)
+- [x] Template.Render() with data binding
 
-### 5.2 Agent Prompt Templates (with Chain-of-Thought)
+### 5.2 Agent Prompt Templates (with Chain-of-Thought) ✅
 
-- [ ] Market Analyst system prompt with CoT protocol
-- [ ] SMC Analyst system prompt
-- [ ] Sentiment Analyst system prompt
-- [ ] On-Chain Analyst system prompt
-- [ ] Correlation Analyst system prompt
-- [ ] Macro Analyst system prompt
-- [ ] Order Flow Analyst system prompt
-- [ ] Derivatives Analyst system prompt
-- [ ] Strategy Planner system prompt with synthesis
-- [ ] Risk Manager system prompt with validation
-- [ ] Executor system prompt
-- [ ] Position Manager system prompt
-- [ ] Self Evaluator system prompt
+- [x] Market Analyst system prompt with CoT protocol
+- [x] SMC Analyst system prompt
+- [x] Sentiment Analyst system prompt
+- [x] On-Chain Analyst system prompt
+- [x] Correlation Analyst system prompt
+- [x] Macro Analyst system prompt
+- [x] Order Flow Analyst system prompt
+- [x] Derivatives Analyst system prompt
+- [x] Strategy Planner system prompt with synthesis
+- [x] Risk Manager system prompt with validation
+- [x] Executor system prompt
+- [x] Position Manager system prompt
+- [x] Self Evaluator system prompt
 
-### 5.3 Notification Templates
+### 5.3 Notification Templates ✅
 
-- [ ] Trade opened notification
-- [ ] Trade closed notification
-- [ ] Stop loss hit notification
-- [ ] Take profit hit notification
-- [ ] Circuit breaker triggered notification
-- [ ] Daily performance report
+- [x] Trade opened notification
+- [x] Trade closed notification
+- [x] Stop loss hit notification
+- [x] Take profit hit notification
+- [x] Circuit breaker triggered notification
+- [x] Daily performance report
 
 ---
 
@@ -510,13 +510,14 @@
 
 ### 10.1 User Memory (Isolated per user)
 
-- [ ] Personal observations storage
-- [ ] User-specific trade history
-- [ ] Personal context and patterns
-- [ ] Semantic search with pgvector
+- [x] Personal observations storage (repository layer)
+- [x] User-specific trade history
+- [x] Personal context and patterns
+- [x] Semantic search with pgvector
 
 ### 10.2 Collective Memory (Shared knowledge)
 
+- [x] Collective memory table structure
 - [ ] Validated lessons promotion (score >= 0.8, >= 3 confirming trades)
 - [ ] Market patterns that work across users
 - [ ] Strategy insights shared by personality type
@@ -535,6 +536,7 @@
 
 ### 11.1 Strategy Evaluator
 
+- [x] Strategy stats repository (repository layer)
 - [ ] Calculate strategy stats (win rate, profit factor, expected value)
 - [ ] Per-strategy performance tracking
 - [ ] Sharpe ratio calculation
@@ -549,7 +551,9 @@
 
 ### 11.3 Trade Journal
 
-- [ ] JournalEntry creation after each trade
+- [x] JournalEntry repository (repository layer)
+- [x] GetStrategyStats() aggregation query
+- [ ] JournalEntry creation after each trade (service layer)
 - [ ] Lessons learned (AI-generated)
 - [ ] Improvement tips generation
 - [ ] Context capture (indicators, regime, confidence)
@@ -816,25 +820,25 @@
 
 ## Key Milestones
 
-| Milestone                    | Week    | Deliverable                                     |
-| ---------------------------- | ------- | ----------------------------------------------- |
-| **M1: Foundation Complete**  | Week 2  | Database, config, logging, adapters working     |
-| **M2: Domain & Repos Ready** | Week 3  | All entities, repositories, migrations complete |
-| **M3: Exchange Integration** | Week 3  | Can fetch data and place orders on testnet      |
-| **M4: AI & Templates**       | Week 4  | All providers and prompts configured            |
-| **M5: Tools Complete**       | Week 6  | All 80+ tools implemented and tested            |
-| **M6: Agent System**         | Week 7  | All 13 agents with CoT working                  |
-| **M7: Workers Running**      | Week 8  | All data collection and analysis workers active |
-| **M8: Risk Engine Active**   | Week 8  | Circuit breaker and kill switch operational     |
-| **M9: Memory System**        | Week 9  | User + collective memory with semantic search   |
-| **M10: Self-Evaluation**     | Week 9  | Strategy analysis and auto-disable working      |
-| **M11: Telegram Bot Live**   | Week 10 | Full bot with all commands functional           |
-| **M12: Data Sources**        | Week 11 | All external data providers integrated          |
-| **M13: Kafka Streaming**     | Week 11 | Event-driven architecture complete              |
-| **M14: Testing Complete**    | Week 12 | Unit, integration, E2E tests passing            |
-| **M15: Production Ready**    | Week 12 | Deployed and monitored                          |
-| **M16: Advanced Features**   | Week 14 | ML prep, advanced orders, portfolio management  |
-| **M17: Documentation**       | Week 14 | All docs complete, code production-ready        |
+| Milestone                    | Week    | Status | Deliverable                                     |
+| ---------------------------- | ------- | ------ | ----------------------------------------------- |
+| **M1: Foundation Complete**  | Week 2  | ✅     | Database, config, logging, adapters working     |
+| **M2: Domain & Repos Ready** | Week 3  | ✅     | All entities, repositories, migrations complete |
+| **M3: Exchange Integration** | Week 3  | ✅     | Can fetch data and place orders on testnet      |
+| **M4: AI & Templates**       | Week 4  | ✅     | All providers and prompts configured            |
+| **M5: Tools Complete**       | Week 6  | ✅     | All 80+ tools implemented and tested            |
+| **M6: Agent System**         | Week 7  | ✅     | All 13 agents with CoT working                  |
+| **M7: Workers Running**      | Week 8  | ⏸️     | All data collection and analysis workers active |
+| **M8: Risk Engine Active**   | Week 8  | ⏸️     | Circuit breaker and kill switch operational     |
+| **M9: Memory System**        | Week 9  | ⏸️     | User + collective memory with semantic search   |
+| **M10: Self-Evaluation**     | Week 9  | ⏸️     | Strategy analysis and auto-disable working      |
+| **M11: Telegram Bot Live**   | Week 10 | ⏸️     | Full bot with all commands functional           |
+| **M12: Data Sources**        | Week 11 | ⏸️     | All external data providers integrated          |
+| **M13: Kafka Streaming**     | Week 11 | ⏸️     | Event-driven architecture complete              |
+| **M14: Testing Complete**    | Week 12 | ⏸️     | Unit, integration, E2E tests passing            |
+| **M15: Production Ready**    | Week 12 | ⏸️     | Deployed and monitored                          |
+| **M16: Advanced Features**   | Week 14 | ⏸️     | ML prep, advanced orders, portfolio management  |
+| **M17: Documentation**       | Week 14 | ⏸️     | All docs complete, code production-ready        |
 
 ---
 
