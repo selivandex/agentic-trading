@@ -1,8 +1,10 @@
-package trading
+package risk
+
 import (
-	"prometheus/pkg/errors"
 	"github.com/google/uuid"
+	"prometheus/pkg/errors"
 )
+
 func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
 	switch v := raw.(type) {
 	case string:
@@ -28,3 +30,4 @@ func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
 func toUUID(raw interface{}) (uuid.UUID, error) {
 	return parseUUIDArg(raw, "id")
 }
+

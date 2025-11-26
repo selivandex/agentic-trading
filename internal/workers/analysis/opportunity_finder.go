@@ -5,74 +5,93 @@ import (
 	"fmt"
 	"time"
 
-	"prometheus/internal/adapters/exchanges"
-	"prometheus/internal/adapters/kafka"
-	"prometheus/internal/domain/market_data"
-	"prometheus/internal/domain/trading_pair"
-	"prometheus/internal/events"
-	eventspb "prometheus/internal/events/proto"
+	"github.com/google/uuid"
+	"google.golang.org/adk/agent"
+	"google.golang.org/adk/runner"
+	"google.golang.org/adk/session"
+	"google.golang.org/genai"
+
+	"prometheus/internal/agents/workflows"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
-
-	"google.golang.org/protobuf/proto"
+	"prometheus/pkg/logger"
 )
 
-// OpportunityFinder scans markets for trading setups and opportunities
-// This worker runs more frequently than market_scanner to catch quick opportunities
+// OpportunityFinder runs market research workflow to find trading opportunities
+// This worker executes the global market research workflow (8 analysts + synthesizer)
+// for each monitored symbol, publishing high-quality signals to Kafka for user consumption.
 type OpportunityFinder struct {
 	*workers.BaseWorker
-	mdRepo          market_data.Repository
-	tradingPairRepo trading_pair.Repository
-	exchFactory     exchanges.Factory
-	kafka           *kafka.Producer
-	symbols         []string // List of symbols to monitor
+	workflow       agent.Agent      // MarketResearchWorkflow (ADK)
+	runner         *runner.Runner   // ADK runner
+	sessionService session.Service  // Session persistence
+	symbols        []string         // List of symbols to monitor
+	exchange       string           // Primary exchange for analysis
+	log            *logger.Logger
 }
 
-// NewOpportunityFinder creates a new opportunity finder worker
+// NewOpportunityFinder creates a new opportunity finder using ADK workflow
 func NewOpportunityFinder(
-	mdRepo market_data.Repository,
-	tradingPairRepo trading_pair.Repository,
-	exchFactory exchanges.Factory,
-	kafka *kafka.Producer,
+	workflowFactory *workflows.Factory,
+	sessionService session.Service,
 	symbols []string,
+	exchange string,
 	interval time.Duration,
 	enabled bool,
-) *OpportunityFinder {
-	return &OpportunityFinder{
-		BaseWorker:      workers.NewBaseWorker("opportunity_finder", interval, enabled),
-		mdRepo:          mdRepo,
-		tradingPairRepo: tradingPairRepo,
-		exchFactory:     exchFactory,
-		kafka:           kafka,
-		symbols:         symbols,
+) (*OpportunityFinder, error) {
+	log := logger.Get().With("component", "opportunity_finder")
+
+	// Create market research workflow
+	workflow, err := workflowFactory.CreateMarketResearchWorkflow()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create market research workflow")
 	}
+
+	// Create ADK runner
+	runnerInstance, err := runner.New(runner.Config{
+		AppName:        "prometheus_market_research",
+		Agent:          workflow,
+		SessionService: sessionService,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create ADK runner")
+	}
+
+	log.Info("OpportunityFinder initialized with ADK MarketResearchWorkflow")
+
+	return &OpportunityFinder{
+		BaseWorker:     workers.NewBaseWorker("opportunity_finder", interval, enabled),
+		workflow:       workflow,
+		runner:         runnerInstance,
+		sessionService: sessionService,
+		symbols:        symbols,
+		exchange:       exchange,
+		log:            log,
+	}, nil
 }
 
-// Run executes one iteration of opportunity finding
-// Scans for:
-// - Strong breakouts with volume confirmation
-// - Significant price movements (>2% in 1m)
-// - Large liquidations (potential reversals)
-// - Funding rate extremes
-// - Unusual volume spikes
+// Run executes one iteration of market research
+// For each symbol, runs the full MarketResearchWorkflow (8 analysts + synthesizer)
 func (of *OpportunityFinder) Run(ctx context.Context) error {
-	of.Log().Debug("Opportunity finder: starting iteration")
+	of.Log().Debug("Market research: starting iteration")
 
 	if len(of.symbols) == 0 {
-		of.Log().Warn("No symbols configured for opportunity finding")
+		of.Log().Warn("No symbols configured for market research")
 		return nil
 	}
 
 	opportunities := 0
+	errors := 0
 
+	// Run workflow for each symbol
 	for _, symbol := range of.symbols {
-		// Check for opportunities on this symbol
-		found, err := of.findOpportunities(ctx, symbol)
+		found, err := of.analyzeSymbol(ctx, symbol)
 		if err != nil {
-			of.Log().Error("Failed to find opportunities",
+			of.Log().Error("Failed to analyze symbol",
 				"symbol", symbol,
 				"error", err,
 			)
+			errors++
 			continue
 		}
 
@@ -81,184 +100,106 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 		}
 	}
 
-	of.Log().Debug("Opportunity finding complete", "opportunities_found", opportunities)
+	of.Log().Debug("Market research complete",
+		"opportunities_published", opportunities,
+		"errors", errors,
+		"total_symbols", len(of.symbols),
+	)
 
 	return nil
 }
 
-// findOpportunities checks a single symbol for trading opportunities
-func (of *OpportunityFinder) findOpportunities(ctx context.Context, symbol string) (bool, error) {
-	// Get recent OHLCV data (last 60 candles of 1m)
-	candles, err := of.mdRepo.GetOHLCV(ctx, market_data.OHLCVQuery{
-		Symbol:    symbol,
-		Timeframe: "1m",
-		Limit:     60,
-	})
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get OHLCV data")
+// analyzeSymbol runs the market research workflow for a single symbol
+func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (bool, error) {
+	sessionID := uuid.New().String()
+	userID := "system" // Global analysis (no specific user)
+
+	of.log.Debug("Starting market research workflow",
+		"symbol", symbol,
+		"exchange", of.exchange,
+		"session_id", sessionID,
+	)
+
+	// Build input prompt for workflow
+	input := &genai.Content{
+		Role: "user",
+		Parts: []*genai.Part{
+			{Text: of.buildResearchPrompt(symbol)},
+		},
 	}
 
-	if len(candles) < 2 {
-		return false, nil // Not enough data
+	// Run workflow through ADK runner
+	runConfig := agent.RunConfig{
+		StreamingMode: agent.StreamingModeNone, // No streaming for background jobs
 	}
 
-	// Get latest two candles
-	current := candles[len(candles)-1]
-	previous := candles[len(candles)-2]
+	// Track if opportunity was published
+	opportunityPublished := false
 
-	// Check for strong price movement (>2% in 1m)
-	priceChange := ((current.Close - previous.Close) / previous.Close) * 100
-
-	if abs(priceChange) >= 2.0 {
-		// Strong movement detected
-		direction := "up"
-		if priceChange < 0 {
-			direction = "down"
+	// Iterate through events from the workflow
+	for event, err := range of.runner.Run(ctx, userID, sessionID, input, runConfig) {
+		if err != nil {
+			return false, errors.Wrap(err, "market research workflow failed")
 		}
 
-		of.Log().Info("Strong price movement detected",
-			"symbol", symbol,
-			"change_pct", priceChange,
-			"direction", direction,
-			"current_price", current.Close,
-		)
+		if event == nil {
+			continue
+		}
 
-		// Check if volume confirms the move
-		avgVolume := of.calculateAvgVolume(candles[:len(candles)-1])
-		volumeRatio := current.Volume / avgVolume
+		// Skip partial events
+		if event.LLMResponse.Partial {
+			continue
+		}
 
-		if volumeRatio >= 2.0 {
-			// Volume confirmation - this is a strong signal
-			of.Log().Info("Volume confirmation",
+		// Check for tool calls (publish_opportunity)
+		if event.LLMResponse.Content != nil {
+			for _, part := range event.LLMResponse.Content.Parts {
+				if part.FunctionCall != nil && part.FunctionCall.Name == "publish_opportunity" {
+					opportunityPublished = true
+					of.log.Info("Opportunity signal published",
+						"symbol", symbol,
+						"session_id", sessionID,
+					)
+				}
+			}
+		}
+
+		// Check if workflow is complete
+		if event.TurnComplete && event.IsFinalResponse() {
+			of.log.Debug("Market research workflow complete",
 				"symbol", symbol,
-				"volume_ratio", volumeRatio,
-				"avg_volume", avgVolume,
-				"current_volume", current.Volume,
+				"session_id", sessionID,
+				"opportunity_published", opportunityPublished,
 			)
-
-			// Publish opportunity event
-			of.publishOpportunityEvent(ctx, symbol, "breakout", priceChange, volumeRatio)
-			return true, nil
+			break
 		}
 	}
 
-	// TODO: Add more opportunity detection patterns:
-	// - RSI divergence
-	// - Support/resistance breakouts
-	// - Liquidity zones
-	// - Fair value gaps
-	// - Order flow imbalances
-
-	return false, nil
+	return opportunityPublished, nil
 }
 
-// calculateAvgVolume calculates average volume from candles
-func (of *OpportunityFinder) calculateAvgVolume(candles []market_data.OHLCV) float64 {
-	if len(candles) == 0 {
-		return 0
-	}
+// buildResearchPrompt creates the input prompt for market research workflow
+func (of *OpportunityFinder) buildResearchPrompt(symbol string) string {
+	return fmt.Sprintf(`Conduct comprehensive market research for %s on %s exchange.
 
-	sum := 0.0
-	for _, candle := range candles {
-		sum += candle.Volume
-	}
+**Your task:**
+1. Analyze ALL dimensions (technical, SMC, sentiment, orderflow, derivatives, macro, onchain, correlation)
+2. Synthesize findings into a coherent market view
+3. Determine if there is a high-confidence (>65%%) trading opportunity
+4. If YES → publish via publish_opportunity tool
+5. If NO → explain why the signal is not strong enough
 
-	return sum / float64(len(candles))
-}
+**Analysis requirements:**
+- Use available tools to gather market data
+- Think step-by-step and show your reasoning
+- Be rigorous: only publish high-quality opportunities
+- Ensure clear entry, stop-loss, and take-profit levels
+- Verify R:R ratio > 2:1
 
-// Event structures
+**Consensus requirement:**
+- 5+ analysts must agree on direction
+- Weighted confidence > 65%%
+- No major conflicts
 
-type OpportunityEvent struct {
-	Symbol       string    `json:"symbol"`
-	Type         string    `json:"type"`          // breakout, reversal, divergence, etc
-	Direction    string    `json:"direction"`     // up, down
-	PriceChange  float64   `json:"price_change"`  // percentage
-	VolumeRatio  float64   `json:"volume_ratio"`  // vs average
-	CurrentPrice float64   `json:"current_price"` // current price
-	Timestamp    time.Time `json:"timestamp"`
-}
-
-func (of *OpportunityFinder) publishOpportunityEvent(
-	ctx context.Context,
-	symbol, opportunityType string,
-	priceChange, volumeRatio float64,
-) {
-	direction := "long"
-	if priceChange < 0 {
-		direction = "short"
-	}
-
-	// Create protobuf event
-	event := &eventspb.OpportunityFoundEvent{
-		Base:       events.NewBaseEvent(events.TopicOpportunityFound, "opportunity_finder", ""),
-		Symbol:     symbol,
-		Exchange:   "binance", // TODO: Make configurable
-		Direction:  direction,
-		Confidence: calculateConfidence(priceChange, volumeRatio),
-		Entry:      0, // TODO: Get from latest candle
-		StopLoss:   0, // TODO: Calculate based on ATR
-		TakeProfit: 0, // TODO: Calculate R:R ratio
-		Timeframe:  "1m",
-		Strategy:   opportunityType,
-		Reasoning:  formatReasoning(priceChange, volumeRatio),
-		Indicators: make(map[string]string),
-	}
-
-	// Serialize to protobuf
-	data, err := proto.Marshal(event)
-	if err != nil {
-		of.Log().Error("Failed to marshal opportunity event", "error", err)
-		return
-	}
-
-	// Publish binary data to Kafka
-	if err := of.kafka.PublishBinary(ctx, events.TopicOpportunityFound, []byte(symbol), data); err != nil {
-		of.Log().Error("Failed to publish opportunity event", "error", err)
-	}
-}
-
-// calculateConfidence calculates opportunity confidence based on signals
-func calculateConfidence(priceChange, volumeRatio float64) float64 {
-	// Simple heuristic - improve with ML later
-	confidence := 0.5 // Base confidence
-
-	// Stronger price movement → higher confidence
-	if abs(priceChange) >= 5.0 {
-		confidence += 0.2
-	} else if abs(priceChange) >= 3.0 {
-		confidence += 0.1
-	}
-
-	// Higher volume confirmation → higher confidence
-	if volumeRatio >= 3.0 {
-		confidence += 0.2
-	} else if volumeRatio >= 2.0 {
-		confidence += 0.1
-	}
-
-	// Cap at 0.95 (never 100% certain)
-	if confidence > 0.95 {
-		confidence = 0.95
-	}
-
-	return confidence
-}
-
-// formatReasoning generates human-readable reasoning
-func formatReasoning(priceChange, volumeRatio float64) string {
-	direction := "upward"
-	if priceChange < 0 {
-		direction = "downward"
-		priceChange = -priceChange
-	}
-
-	return fmt.Sprintf("Strong %s movement (%.2f%%) with %.1fx volume confirmation",
-		direction, priceChange, volumeRatio)
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
+Think comprehensively. Be thorough.`, symbol, of.exchange)
 }

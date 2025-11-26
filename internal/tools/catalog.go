@@ -419,6 +419,14 @@ func initCatalog() {
 			RiskLevel:    RiskLevelLow,
 		},
 		{
+			Name:         "get_portfolio_summary",
+			Category:     string(CategoryAccount),
+			Description:  "Get aggregated portfolio summary with exposure breakdown",
+			RequiresAuth: true,
+			RateLimit:    60,
+			RiskLevel:    RiskLevelLow,
+		},
+		{
 			Name:         "place_order",
 			Category:     string(CategoryExecution),
 			Description:  "Place market/limit/stop order",
@@ -458,6 +466,22 @@ func initCatalog() {
 			RequiresAuth: true,
 			RateLimit:    0,
 			RiskLevel:    RiskLevelCritical,
+		},
+		{
+			Name:         "get_user_risk_profile",
+			Category:     string(CategoryRisk),
+			Description:  "Get user's risk tolerance and trading preferences",
+			RequiresAuth: true,
+			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
+		},
+		{
+			Name:         "publish_opportunity",
+			Category:     string(CategoryMarketData),
+			Description:  "Publish validated trading opportunity to event stream",
+			RequiresAuth: false,
+			RateLimit:    10,
+			RiskLevel:    RiskLevelLow,
 		},
 		// Memory
 		{

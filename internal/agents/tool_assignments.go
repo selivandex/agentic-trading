@@ -15,11 +15,15 @@ var AgentToolCategories = map[AgentType][]string{
 	AgentCorrelationAnalyst: {"market_data", "correlation", "memory"},
 
 	// Decision makers - also need memory for saving plans and decisions
-	AgentStrategyPlanner: {"market_data", "memory", "expert_agents"}, // Strategy planner can consult experts
+	AgentStrategyPlanner: {"market_data", "account", "risk", "memory", "expert_agents"}, // Strategy planner can consult experts
 	AgentRiskManager:     {"account", "risk", "memory"},
 	AgentExecutor:        {"account", "execution", "memory"},
 	AgentPositionManager: {"account", "execution", "memory"},
 	AgentSelfEvaluator:   {"evaluation", "memory"},
+
+	// Market research and portfolio management
+	AgentOpportunitySynthesizer: {"market_data", "memory"}, // No execution tools, only publishes signals
+	AgentPortfolioArchitect:     {"market_data", "momentum", "correlation", "account", "memory"},
 }
 
 // AgentToolMap resolves tool names per agent by filtering the global catalog by category.

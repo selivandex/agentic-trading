@@ -10,6 +10,7 @@ import (
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/reasoning"
 	"prometheus/internal/domain/risk"
+	"prometheus/internal/domain/user"
 	"prometheus/pkg/logger"
 )
 // RiskEngine interface to avoid circular dependency
@@ -22,6 +23,7 @@ type EmbeddingService interface {
 }
 // Deps bundles dependencies required by concrete tool implementations
 // Note: Stats tracking is now handled by ADK callbacks, not tool middleware
+// Note: KafkaProducer is not included here - tools that need it receive it directly
 type Deps struct {
 	MarketDataRepo      market_data.Repository
 	OrderRepo           order.Repository
@@ -30,6 +32,7 @@ type Deps struct {
 	MemoryRepo          memory.Repository
 	ReasoningRepo       reasoning.Repository
 	RiskRepo            risk.Repository
+	UserRepo            user.Repository
 	RiskEngine          RiskEngine
 	EmbeddingService    EmbeddingService
 	Redis               RedisClient

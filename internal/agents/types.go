@@ -13,11 +13,13 @@ const (
 	AgentOrderFlowAnalyst   AgentType = "order_flow_analyst"
 	AgentDerivativesAnalyst AgentType = "derivatives_analyst"
 
-	AgentStrategyPlanner AgentType = "strategy_planner"
-	AgentRiskManager     AgentType = "risk_manager"
-	AgentExecutor        AgentType = "executor"
-	AgentPositionManager AgentType = "position_manager"
-	AgentSelfEvaluator   AgentType = "self_evaluator"
+	AgentStrategyPlanner        AgentType = "strategy_planner"
+	AgentRiskManager            AgentType = "risk_manager"
+	AgentExecutor               AgentType = "executor"
+	AgentPositionManager        AgentType = "position_manager"
+	AgentSelfEvaluator          AgentType = "self_evaluator"
+	AgentOpportunitySynthesizer AgentType = "opportunity_synthesizer"
+	AgentPortfolioArchitect     AgentType = "portfolio_architect"
 )
 
 // UserAgentConfig carries runtime user-specific context for building pipelines.

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/tools/indicators"
 	"prometheus/internal/tools/market"
 	toolmemory "prometheus/internal/tools/memory"
@@ -15,7 +16,8 @@ import (
 )
 
 // RegisterAllTools registers all available tools in the registry
-func RegisterAllTools(registry *Registry, deps shared.Deps) {
+// Note: kafkaProducer is passed separately because publish_opportunity needs the concrete type
+func RegisterAllTools(registry *Registry, deps shared.Deps, kafkaProducer interface{}) {
 	log := deps.Log.With("component", "tool_registration")
 	// Note: All tools now use shared.NewToolBuilder() fluent API with built-in middleware:
 	// - .WithRetry(attempts, backoff) - automatic retry with exponential backoff
@@ -31,6 +33,14 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("get_ohlcv", market.NewGetOHLCVTool(deps))
 	registry.Register("get_orderbook", market.NewGetOrderBookTool(deps))
 	registry.Register("get_trades", market.NewGetTradesTool(deps))
+	
+	// publish_opportunity requires kafka producer (concrete type, not interface)
+	if kafkaProducer != nil {
+		if kp, ok := kafkaProducer.(*kafka.Producer); ok {
+			registry.Register("publish_opportunity", market.NewPublishOpportunityTool(kp))
+		}
+	}
+	
 	log.Debug("Registered market data tools")
 	// ========================================
 	// Technical Indicators - Momentum
@@ -91,6 +101,7 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	// ========================================
 	registry.Register("get_balance", trading.NewGetBalanceTool(deps))
 	registry.Register("get_positions", trading.NewGetPositionsTool(deps))
+	registry.Register("get_portfolio_summary", trading.NewGetPortfolioSummaryTool(deps))
 	registry.Register("place_order", trading.NewPlaceOrderTool(deps))
 	registry.Register("cancel_order", trading.NewCancelOrderTool(deps))
 	log.Debug("Registered trading tools")
@@ -100,6 +111,7 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("check_circuit_breaker", toolrisk.NewCheckCircuitBreakerTool(deps))
 	registry.Register("validate_trade", toolrisk.NewValidateTradeTool(deps))
 	registry.Register("emergency_close_all", toolrisk.NewEmergencyCloseAllTool(deps))
+	registry.Register("get_user_risk_profile", toolrisk.NewGetUserRiskProfileTool(deps))
 	log.Debug("Registered risk management tools")
 	// ========================================
 	// Memory Tools

@@ -24,6 +24,7 @@ import (
 	pgclient "prometheus/internal/adapters/postgres"
 	redisclient "prometheus/internal/adapters/redis"
 	"prometheus/internal/agents"
+	"prometheus/internal/agents/workflows"
 	"prometheus/internal/api/health"
 	"prometheus/internal/consumers"
 	"prometheus/internal/domain/derivatives"
@@ -151,7 +152,7 @@ func main() {
 	notificationConsumer := provideKafkaConsumer(cfg, "notifications", log)
 	riskConsumer := provideKafkaConsumer(cfg, "risk_events", log)
 	analyticsConsumer := provideKafkaConsumer(cfg, "analytics", log)
-	opportunityConsumer := provideKafkaConsumer(cfg, events.TopicOpportunityFound, log)
+	opportunityKafkaConsumer := provideKafkaConsumer(cfg, events.TopicOpportunityFound, log)
 
 	encryptor, err := crypto.NewEncryptor(cfg.Crypto.EncryptionKey)
 	if err != nil {
@@ -174,8 +175,10 @@ func main() {
 		exchangeAccountRepo,
 		memoryRepo,
 		riskRepo,
+		userRepo,
 		riskEngine,
 		redisClient,
+		kafkaProducer,
 		log,
 	)
 
@@ -231,11 +234,15 @@ func main() {
 	notificationSvc := consumers.NewNotificationConsumer(notificationConsumer, log)
 	riskSvc := consumers.NewRiskConsumer(riskConsumer, riskEngine, log)
 	analyticsSvc := consumers.NewAnalyticsConsumer(analyticsConsumer, log)
+	// Create workflow factory for personal trading workflows
+	workflowFactory := workflows.NewFactory(agentFactory, cfg.AI.DefaultProvider, "claude-sonnet-4")
+
 	opportunitySvc := consumers.NewOpportunityConsumer(
-		opportunityConsumer,
+		opportunityKafkaConsumer,
 		userRepo,
 		tradingPairRepo,
-		agentFactory,
+		workflowFactory,
+		adkSessionService,
 		cfg.Workers.MarketScannerMaxConcurrency,
 		log,
 	)
@@ -346,7 +353,7 @@ func main() {
 		notificationConsumer,
 		riskConsumer,
 		analyticsConsumer,
-		opportunityConsumer,
+		opportunityKafkaConsumer,
 		pgClient,
 		chClient,
 		redisClient,
@@ -454,8 +461,10 @@ func provideToolRegistry(
 	exchangeAccountRepo exchange_account.Repository,
 	memoryRepo memory.Repository,
 	riskRepo domainRisk.Repository,
+	userRepo user.Repository,
 	riskEngine *riskengine.RiskEngine,
 	redisClient *redisclient.Client,
+	kafkaProducer *kafka.Producer,
 	log *logger.Logger,
 ) *tools.Registry {
 	log.Info("Registering tools...")
@@ -468,12 +477,13 @@ func provideToolRegistry(
 		ExchangeAccountRepo: exchangeAccountRepo,
 		MemoryRepo:          memoryRepo,
 		RiskRepo:            riskRepo,
+		UserRepo:            userRepo,
 		RiskEngine:          riskEngine,
 		Redis:               redisClient,
 		Log:                 log,
 	}
 
-	tools.RegisterAllTools(registry, deps)
+	tools.RegisterAllTools(registry, deps, kafkaProducer)
 	log.Infof("✓ Registered %d tools", len(registry.List()))
 	return registry
 }
@@ -576,6 +586,9 @@ func provideWorkers(
 	log.Info("Initializing workers...")
 
 	scheduler := workers.NewScheduler()
+
+	// Create workflow factory for market research and personal trading workflows
+	workflowFactory := workflows.NewFactory(agentFactory, cfg.AI.DefaultProvider, "claude-sonnet-4")
 
 	// Default monitored symbols
 	defaultSymbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"}
@@ -870,16 +883,19 @@ func provideWorkers(
 		true, // enabled
 	))
 
-	// Opportunity finder: Finds trading setups
-	scheduler.RegisterWorker(analysis.NewOpportunityFinder(
-		marketDataRepo,
-		tradingPairRepo,
-		exchFactory,
-		kafkaProducer,
+	// Opportunity finder: Runs market research workflow (8 analysts + synthesizer)
+	opportunityFinder, err := analysis.NewOpportunityFinder(
+		workflowFactory,
+		adkSessionService,
 		defaultSymbols,
+		"binance", // Primary exchange
 		cfg.Workers.OpportunityFinderInterval,
 		true, // enabled
-	))
+	)
+	if err != nil {
+		log.Fatalf("Failed to create opportunity finder: %v", err)
+	}
+	scheduler.RegisterWorker(opportunityFinder)
 
 	// Regime detector: Detects market regime
 	scheduler.RegisterWorker(analysis.NewRegimeDetector(
@@ -984,7 +1000,7 @@ func gracefulShutdown(
 	notificationConsumer *kafka.Consumer,
 	riskConsumer *kafka.Consumer,
 	analyticsConsumer *kafka.Consumer,
-	opportunityConsumer *kafka.Consumer,
+	opportunityKafkaConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -1046,7 +1062,7 @@ func gracefulShutdown(
 		"notification": notificationConsumer,
 		"risk":         riskConsumer,
 		"analytics":    analyticsConsumer,
-		"opportunity":  opportunityConsumer,
+		"opportunity":  opportunityKafkaConsumer,
 	} {
 		if consumer != nil {
 			if err := consumer.Close(); err != nil {

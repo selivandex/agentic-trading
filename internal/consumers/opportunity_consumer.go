@@ -2,49 +2,60 @@ package consumers
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
-	"prometheus/internal/adapters/kafka"
-	"prometheus/internal/agents"
+	"github.com/google/uuid"
+	"github.com/segmentio/kafka-go"
+	"google.golang.org/adk/agent"
+	"google.golang.org/adk/runner"
+	"google.golang.org/adk/session"
+	"google.golang.org/genai"
+	"google.golang.org/protobuf/proto"
+
+	kafkaadapter "prometheus/internal/adapters/kafka"
+	"prometheus/internal/agents/workflows"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	eventspb "prometheus/internal/events/proto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
-
-	kafkago "github.com/segmentio/kafka-go"
-	"google.golang.org/protobuf/proto"
 )
 
-// OpportunityConsumer handles market opportunity events with immediate agent analysis
-// This enables event-driven trading: opportunity detected → instant analysis → quick execution
+// OpportunityConsumer handles market opportunity events with personal trading workflows
+// This is the event-driven trading engine: receives global opportunity signals and
+// runs personalized trading decisions for each interested user
 type OpportunityConsumer struct {
-	consumer        *kafka.Consumer
+	consumer        *kafkaadapter.Consumer
 	userRepo        user.Repository
 	tradingPairRepo trading_pair.Repository
-	agentFactory    *agents.Factory
+	workflowFactory *workflows.Factory
+	sessionService  session.Service
 	maxConcurrency  int
 	log             *logger.Logger
 }
 
 // NewOpportunityConsumer creates a new opportunity event consumer
 func NewOpportunityConsumer(
-	consumer *kafka.Consumer,
+	consumer *kafkaadapter.Consumer,
 	userRepo user.Repository,
 	tradingPairRepo trading_pair.Repository,
-	agentFactory *agents.Factory,
+	workflowFactory *workflows.Factory,
+	sessionService session.Service,
 	maxConcurrency int,
 	log *logger.Logger,
 ) *OpportunityConsumer {
 	if maxConcurrency <= 0 {
-		maxConcurrency = 5 // Default: 5 concurrent analyses
+		maxConcurrency = 5 // Default: 5 concurrent user workflows
 	}
 
 	return &OpportunityConsumer{
 		consumer:        consumer,
 		userRepo:        userRepo,
 		tradingPairRepo: tradingPairRepo,
-		agentFactory:    agentFactory,
+		workflowFactory: workflowFactory,
+		sessionService:  sessionService,
 		maxConcurrency:  maxConcurrency,
 		log:             log,
 	}
@@ -78,7 +89,7 @@ func (oc *OpportunityConsumer) Start(ctx context.Context) error {
 }
 
 // handleOpportunity processes a single opportunity event
-func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafkago.Message) error {
+func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.Message) error {
 	oc.log.Debug("Processing opportunity event",
 		"topic", msg.Topic,
 		"size", len(msg.Value),
@@ -114,7 +125,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafkag
 		"users_count", len(pairs),
 	)
 
-	// Run agent analysis for each interested user (concurrent with limit)
+	// Run personal trading workflow for each interested user (concurrent with limit)
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, oc.maxConcurrency)
 
@@ -126,7 +137,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafkag
 			continue
 		}
 
-		// Skip inactive users
+		// Skip inactive users or users with circuit breaker off
 		if !usr.IsActive || !usr.Settings.CircuitBreakerOn {
 			continue
 		}
@@ -139,8 +150,8 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafkag
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			if err := oc.analyzeOpportunity(ctx, u, p, &event); err != nil {
-				oc.log.Error("Failed to analyze opportunity",
+			if err := oc.runPersonalTradingWorkflow(ctx, u, p, &event); err != nil {
+				oc.log.Error("Personal trading workflow failed",
 					"user_id", u.ID,
 					"symbol", p.Symbol,
 					"error", err,
@@ -159,33 +170,166 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafkag
 	return nil
 }
 
-// analyzeOpportunity runs agent analysis for a specific opportunity
-func (oc *OpportunityConsumer) analyzeOpportunity(
+// runPersonalTradingWorkflow runs the trading workflow for a specific user
+func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 	ctx context.Context,
 	usr *user.User,
 	pair *trading_pair.TradingPair,
 	opportunity *eventspb.OpportunityFoundEvent,
 ) error {
-	oc.log.Info("Analyzing opportunity for user",
+	oc.log.Info("Running personal trading workflow",
 		"user_id", usr.ID,
 		"symbol", pair.Symbol,
-		"opportunity_direction", opportunity.Direction,
 		"opportunity_confidence", opportunity.Confidence,
 	)
 
-	// TODO: Implement agent pipeline
-	// 1. Run quick validation (is user still interested in this symbol?)
-	// 2. Run RiskManager agent (can we take this trade?)
-	// 3. If approved → run Executor agent (place the trade)
-	// 4. Log decision to journal
+	// Create personal trading workflow
+	workflow, err := oc.workflowFactory.CreatePersonalTradingWorkflow()
+	if err != nil {
+		return errors.Wrap(err, "failed to create personal trading workflow")
+	}
 
-	// For now, just log
-	oc.log.Debug("Would run event-driven analysis",
-		"user_id", usr.ID,
-		"symbol", pair.Symbol,
-		"opportunity_strategy", opportunity.Strategy,
-		"opportunity_entry", opportunity.Entry,
-	)
+	// Create ADK runner
+	runnerInstance, err := runner.New(runner.Config{
+		AppName:        fmt.Sprintf("prometheus_trading_%s", usr.ID),
+		Agent:          workflow,
+		SessionService: oc.sessionService,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to create runner")
+	}
+
+	// Build input prompt with PRE-ANALYZED signal + user context
+	input := &genai.Content{
+		Role: "user",
+		Parts: []*genai.Part{
+			{Text: oc.buildTradingPrompt(usr, pair, opportunity)},
+		},
+	}
+
+	// Run workflow
+	sessionID := uuid.New().String()
+	userID := usr.ID.String()
+
+	runConfig := agent.RunConfig{
+		StreamingMode: agent.StreamingModeNone, // No streaming for background jobs
+	}
+
+	// Track execution
+	startTime := time.Now()
+	orderPlaced := false
+
+	// Execute workflow and track events
+	for event, err := range runnerInstance.Run(ctx, userID, sessionID, input, runConfig) {
+		if err != nil {
+			return errors.Wrap(err, "workflow execution failed")
+		}
+
+		if event == nil || event.LLMResponse.Partial {
+			continue
+		}
+
+		// Check for order placement
+		if event.LLMResponse.Content != nil {
+			for _, part := range event.LLMResponse.Content.Parts {
+				if part.FunctionCall != nil && part.FunctionCall.Name == "place_order" {
+					orderPlaced = true
+					oc.log.Info("Order placed by executor",
+						"user_id", usr.ID,
+						"symbol", pair.Symbol,
+					)
+				}
+			}
+		}
+
+		// Check if workflow is complete
+		if event.TurnComplete && event.IsFinalResponse() {
+			duration := time.Since(startTime)
+			oc.log.Info("Personal trading workflow complete",
+				"user_id", usr.ID,
+				"symbol", pair.Symbol,
+				"session_id", sessionID,
+				"order_placed", orderPlaced,
+				"duration", duration,
+			)
+			break
+		}
+	}
 
 	return nil
+}
+
+// buildTradingPrompt creates the input prompt for personal trading workflow
+func (oc *OpportunityConsumer) buildTradingPrompt(
+	usr *user.User,
+	pair *trading_pair.TradingPair,
+	opp *eventspb.OpportunityFoundEvent,
+) string {
+	return fmt.Sprintf(`# Trading Opportunity Signal
+
+## Pre-Analyzed Market Signal (Global Research)
+
+**Symbol**: %s
+**Exchange**: %s
+**Direction**: %s
+**Confidence**: %.2f
+**Strategy**: %s
+
+**Entry Price**: %.2f
+**Stop Loss**: %.2f
+**Take Profit**: %.2f
+**Timeframe**: %s
+
+**Analysis Reasoning**:
+%s
+
+---
+
+## Your Personal Context
+
+**User ID**: %s
+**Risk Tolerance**: %s
+**Trading Pair**: %s
+
+**Your Task**:
+
+You are executing a personal trading workflow. The market research has ALREADY been completed by 8 specialist analysts. Your job is to make a personalized trading decision based on:
+
+1. **The PRE-ANALYZED market signal above** (objective market view)
+2. **Your personal context** (portfolio, risk profile, existing positions)
+
+### Step 1: StrategyPlanner
+- Use tools to get YOUR context:
+  - get_portfolio_summary() - understand current portfolio
+  - get_positions() - check existing positions
+  - get_user_risk_profile() - understand risk limits
+- Decide: Should YOU take this trade? If yes, with what size?
+- Output: Personal trading plan
+
+### Step 2: RiskManager
+- Validate the plan against YOUR risk limits
+- Check: daily loss limits, position size limits, correlation
+- Output: Approved/rejected + adjusted plan
+
+### Step 3: Executor
+- If approved → place order using place_order() tool
+- If rejected → log reason and skip
+
+**Think step-by-step. Be thorough but decisive.**
+
+Your decision should be personalized to YOUR portfolio and risk profile, not just the global signal.`,
+		opp.Symbol,
+		opp.Exchange,
+		opp.Direction,
+		opp.Confidence,
+		opp.Strategy,
+		opp.Entry,
+		opp.StopLoss,
+		opp.TakeProfit,
+		opp.Timeframe,
+		opp.Reasoning,
+		usr.ID,
+		usr.Settings.RiskLevel,
+		pair.Symbol,
+	)
 }
