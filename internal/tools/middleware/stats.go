@@ -4,8 +4,11 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/functiontool"
+
 	"prometheus/internal/domain/stats"
-	"prometheus/internal/tools"
+	toolctx "prometheus/internal/tools"
 )
 
 // StatsMiddleware records tool usage metrics into the stats repository.
@@ -19,17 +22,17 @@ func NewStatsMiddleware(repo stats.Repository) *StatsMiddleware {
 }
 
 // Wrap adds asynchronous stats tracking around a tool.
-func (m *StatsMiddleware) Wrap(t tools.Tool) tools.Tool {
+func (m *StatsMiddleware) Wrap(t tool.Tool) tool.Tool {
 	if m == nil || m.statsRepo == nil {
 		return t
 	}
 
-	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	return functiontool.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		start := time.Now()
 		result, err := t.Execute(ctx, args)
 		duration := time.Since(start)
 
-		if meta, ok := tools.MetadataFromContext(ctx); ok {
+		if meta, ok := toolctx.MetadataFromContext(ctx); ok {
 			usage := &stats.ToolUsageEvent{
 				UserID:     meta.UserID,
 				AgentID:    meta.AgentID,

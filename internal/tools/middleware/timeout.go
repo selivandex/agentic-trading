@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"prometheus/internal/tools"
+	"google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/functiontool"
 )
 
 // TimeoutMiddleware enforces per-call deadlines for tool execution.
@@ -13,12 +14,12 @@ type TimeoutMiddleware struct {
 }
 
 // Wrap sets a timeout on tool execution if configured.
-func (m TimeoutMiddleware) Wrap(t tools.Tool) tools.Tool {
+func (m TimeoutMiddleware) Wrap(t tool.Tool) tool.Tool {
 	if m.Timeout <= 0 {
 		return t
 	}
 
-	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	return functiontool.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, m.Timeout)
 		defer cancel()
 		return t.Execute(ctxWithTimeout, args)

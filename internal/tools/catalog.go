@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"fmt"
+
+	"google.golang.org/adk/tool/functiontool"
 )
 
 // Definition describes a tool's metadata for registration and documentation.
@@ -150,7 +152,7 @@ func Definitions() []Definition {
 func RegisterAllTools(registry *Registry) {
 	for _, def := range toolDefinitions {
 		definition := def
-		registry.Register(definition.Name, New(definition.Name, definition.Description, func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+		registry.Register(definition.Name, functiontool.New(definition.Name, definition.Description, func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			return nil, fmt.Errorf("tool %s not implemented", definition.Name)
 		}))
 	}

@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"prometheus/internal/tools"
+	"google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/functiontool"
 )
 
 // RetryMiddleware retries tool execution on error with optional backoff.
@@ -14,7 +15,7 @@ type RetryMiddleware struct {
 }
 
 // Wrap adds retry semantics to a tool. The final error from the last attempt is returned.
-func (m RetryMiddleware) Wrap(t tools.Tool) tools.Tool {
+func (m RetryMiddleware) Wrap(t tool.Tool) tool.Tool {
 	attempts := m.Attempts
 	if attempts <= 0 {
 		attempts = 1
@@ -22,7 +23,7 @@ func (m RetryMiddleware) Wrap(t tools.Tool) tools.Tool {
 
 	backoff := m.Backoff
 
-	return tools.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	return functiontool.New(t.Name(), t.Description(), func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		var result map[string]interface{}
 		var err error
 

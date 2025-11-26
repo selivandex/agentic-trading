@@ -1,27 +1,31 @@
 package agents
 
-import "sync"
+import (
+	"sync"
+
+	"google.golang.org/adk/agent"
+)
 
 // Registry stores agents by their type for quick lookup.
 type Registry struct {
-	agents map[AgentType]Agent
+	agents map[AgentType]agent.Agent
 	mu     sync.RWMutex
 }
 
 // NewRegistry constructs an empty agent registry.
 func NewRegistry() *Registry {
-	return &Registry{agents: make(map[AgentType]Agent)}
+	return &Registry{agents: make(map[AgentType]agent.Agent)}
 }
 
 // Register adds or replaces an agent entry.
-func (r *Registry) Register(agentType AgentType, ag Agent) {
+func (r *Registry) Register(agentType AgentType, ag agent.Agent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.agents[agentType] = ag
 }
 
 // Get retrieves an agent by type.
-func (r *Registry) Get(agentType AgentType) (Agent, bool) {
+func (r *Registry) Get(agentType AgentType) (agent.Agent, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	ag, ok := r.agents[agentType]
