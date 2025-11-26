@@ -6,4 +6,3 @@ import "math"
 func abs(x float64) float64 {
 	return math.Abs(x)
 }
-

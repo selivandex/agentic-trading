@@ -868,22 +868,9 @@ func provideWorkers(
 	// Analysis Workers (core agentic system)
 	// ========================================
 
-	// Market scanner: Runs SCHEDULED agent analysis for ALL active users
-	// For event-driven analysis, see OpportunityConsumer in consumers
-	scheduler.RegisterWorker(analysis.NewMarketScanner(
-		userRepo,
-		tradingPairRepo,
-		agentFactory,
-		kafkaProducer,
-		adkSessionService,      // ADK session service
-		cfg.AI.DefaultProvider, // Default AI provider
-		"claude-sonnet-4",      // Default AI model
-		cfg.Workers.MarketScannerInterval,
-		cfg.Workers.MarketScannerMaxConcurrency,
-		true, // enabled
-	))
-
 	// Opportunity finder: Runs market research workflow (8 analysts + synthesizer)
+	// This replaces the old MarketScanner - now we do global analysis once per symbol
+	// instead of per-user analysis (much more efficient)
 	opportunityFinder, err := analysis.NewOpportunityFinder(
 		workflowFactory,
 		adkSessionService,
