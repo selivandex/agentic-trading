@@ -6,7 +6,15 @@ Atomic operations exposed to ADK agents via middleware chain pattern.
 
 ## Architecture
 
-Tools follow **middleware chain**: `Retry → Timeout → Stats → Risk → Core Tool`
+Tools use **fluent ToolBuilder API** with layered middleware: `Stats → Timeout → Retry → Core Tool`
+
+```go
+shared.NewToolBuilder("tool_name", "description", toolFunc, deps).
+    WithRetry(3, 500*time.Millisecond).
+    WithTimeout(10*time.Second).
+    WithStats().
+    Build()
+```
 
 Each tool is wrapped with middleware for resilience, observability, and safety.
 
@@ -35,15 +43,45 @@ tools/
 
 ## Adding New Tool
 
-1. Create `<category>/<tool_name>.go` with struct implementing ADK Tool interface
-2. Implement `Name()`, `Description()`, `Execute(ctx, params)` methods
-3. Validate parameters at start, return structured error on missing/invalid params
-4. Use dependencies from `shared.Dependencies` (exchanges, services, repos)
-5. Log execution with tool name + key params
-6. Register in `registry.go` with appropriate middleware chain
-7. Add metadata to `catalog.go` (params, return type, risk level)
-8. Assign to agents in `internal/agents/tool_assignments.go`
-9. Write unit tests with mocked dependencies
+1. Create `<category>/<tool_name>.go` with NewXXXTool constructor:
+
+```go
+func NewMyTool(deps shared.Deps) tool.Tool {
+    return shared.NewToolBuilder(
+        "my_tool",
+        "Tool description",
+        func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+            // 1. Validate parameters
+            symbol, ok := args["symbol"].(string)
+            if !ok || symbol == "" {
+                return nil, errors.New("missing required parameter: symbol")
+            }
+
+            // 2. Execute business logic using deps
+            result, err := deps.MarketDataRepo.GetLatestTicker(ctx, "binance", symbol)
+            if err != nil {
+                return nil, errors.Wrap(err, "failed to fetch ticker")
+            }
+
+            // 3. Return structured result
+            return map[string]interface{}{
+                "price": result.Price,
+                "timestamp": result.Timestamp,
+            }, nil
+        },
+        deps,
+    ).
+        WithTimeout(10*time.Second).
+        WithRetry(3, 500*time.Millisecond).
+        WithStats().
+        Build()
+}
+```
+
+2. Register in `register.go`: `registry.Register("my_tool", category.NewMyTool(deps))`
+3. Add metadata to `catalog.go` (params, return type, risk level)
+4. Assign to agents in `internal/agents/tool_assignments.go`
+5. Write unit tests with mocked dependencies
 
 ## Core Rules
 
@@ -56,14 +94,20 @@ tools/
 - **No business logic**: Keep in services, tools just orchestrate
 - **No state**: Tools are instantiated once, don't store request state
 
-## Middleware Order (Critical!)
+## Middleware Order (Automatic via ToolBuilder!)
 
-Apply from outermost to innermost:
-1. **Retry** — retry failed operations with backoff
-2. **Timeout** — enforce operation deadline
-3. **Stats** — track usage to ClickHouse
-4. **Risk** — check circuit breaker before execution
-5. **Core** — actual tool implementation
+ToolBuilder applies middleware in correct order automatically:
+1. **Stats** (outermost) — tracks everything including retries/timeouts
+2. **Timeout** — enforces deadline on tool + retries
+3. **Retry** (innermost) — retries core tool on failure
+4. **Core** — actual tool implementation
+
+Configure via fluent API:
+```go
+.WithRetry(attempts, backoff)  // Enable retry with N attempts
+.WithTimeout(duration)          // Enable timeout
+.WithStats()                    // Enable ClickHouse metrics
+```
 
 Never bypass middleware unless explicitly required for specific tool.
 

@@ -1,22 +1,21 @@
 package indicators
 
 import (
+	"time"
+
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewVWAPTool computes Volume Weighted Average Price
 // VWAP = cumsum(price * volume) / cumsum(volume)
 // Typically calculated from start of trading day
 func NewVWAPTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "vwap",
-			Description: "Volume Weighted Average Price",
-		},
+	return shared.NewToolBuilder(
+		"vwap",
+		"Volume Weighted Average Price",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 100)
@@ -79,6 +78,11 @@ func NewVWAPTool(deps shared.Deps) tool.Tool {
 				"position":      position,
 				"signal":        signal,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

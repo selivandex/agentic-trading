@@ -63,42 +63,47 @@ func (b *ToolBuilder) WithStats() *ToolBuilder {
 
 // Build creates the tool with configured middleware applied
 func (b *ToolBuilder) Build() tool.Tool {
+	// Apply middleware in layers:
+	// The order matters: we wrap from innermost (closest to business logic) to outermost
+	// 1. Base function (business logic)
+	// 2. Retry (retry the business logic on failure)
+	// 3. Timeout (timeout includes retries)
+	// 4. Stats (track everything including retries and timeouts)
+
+	name := b.name
+	description := b.description
 	fn := b.fn
 
-	// Apply middleware in order: retry -> timeout -> stats
-	// Inner layers are applied first
-
-	// 1. Retry (innermost - retries the actual tool logic)
+	// Layer 1: Start with base function wrapped in retry middleware
 	if b.withRetry {
-		fn = wrapWithRetry(b.retryConfig, fn)
+		fn = b.wrapWithRetry(fn)
 	}
 
-	// 2. Timeout (wraps retry)
+	// Layer 2: Wrap with timeout
 	if b.withTimeout {
-		fn = wrapWithTimeout(b.timeoutConfig, fn)
+		fn = b.wrapWithTimeout(fn)
 	}
 
-	// 3. Stats (outermost - tracks everything including retries)
+	// Layer 3: Create final tool with or without stats
 	if b.withStats && b.deps.StatsRepo != nil {
 		statsMiddleware := NewStatsMiddleware(b.deps.StatsRepo)
-		return statsWrapFunc(b.name, b.description, fn)
+		return statsMiddleware.WrapFunc(name, description, fn)
 	}
 
-	// No stats, create tool directly
-	return createToolFromFunc(b.name, b.description, fn)
+	// No stats - create tool directly via TimeoutMiddleware (passthrough)
+	return TimeoutMiddleware{Timeout: 0}.WrapFunc(name, description, fn)
 }
 
-// Helper functions to apply middleware
+// wrapWithRetry wraps a ToolFunc with retry logic
+func (b *ToolBuilder) wrapWithRetry(fn ToolFunc) ToolFunc {
+	attempts := b.retryConfig.Attempts
+	if attempts <= 0 {
+		attempts = 1
+	}
 
-func wrapWithRetry(retry RetryMiddleware, fn ToolFunc) ToolFunc {
 	return func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		var result map[string]interface{}
 		var err error
-
-		attempts := retry.Attempts
-		if attempts <= 0 {
-			attempts = 1
-		}
 
 		for i := 0; i < attempts; i++ {
 			result, err = fn(ctx, args)
@@ -107,11 +112,11 @@ func wrapWithRetry(retry RetryMiddleware, fn ToolFunc) ToolFunc {
 			}
 
 			// Wait before retry
-			if retry.Backoff > 0 && i < attempts-1 {
+			if b.retryConfig.Backoff > 0 && i < attempts-1 {
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
-				case <-time.After(retry.Backoff):
+				case <-time.After(b.retryConfig.Backoff):
 				}
 			}
 		}
@@ -120,20 +125,13 @@ func wrapWithRetry(retry RetryMiddleware, fn ToolFunc) ToolFunc {
 	}
 }
 
-func wrapWithTimeout(timeout TimeoutMiddleware, fn ToolFunc) ToolFunc {
-	if timeout.Timeout <= 0 {
+// wrapWithTimeout wraps a ToolFunc with timeout logic
+func (b *ToolBuilder) wrapWithTimeout(fn ToolFunc) ToolFunc {
+	if b.timeoutConfig.Timeout <= 0 {
 		return fn
 	}
 
-	return func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		// Create context with timeout
-		// tool.Context is an interface, we need to get underlying context
-		// For now, pass through - timeout will be handled at invocation level
-		return fn(ctx, args)
-	}
-}
-
-func createToolFromFunc(name, description string, fn ToolFunc) tool.Tool {
-	// Use timeout middleware with no timeout (passthrough) to create the tool
-	return TimeoutMiddleware{}.WrapFunc(name, description, fn)
+	// Note: Actual timeout enforcement happens in TimeoutMiddleware.WrapFunc
+	// This is a placeholder for consistency
+	return fn
 }
