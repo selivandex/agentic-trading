@@ -1,21 +1,21 @@
 package middleware
 
 import (
-	"context"
-
 	"github.com/google/uuid"
+
+	"google.golang.org/adk/tool"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 )
 
 // ToolExecutor is a function type that executes a tool with given arguments
-type ToolExecutor func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error)
+type ToolExecutor func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error)
 
 // WithRiskCheck wraps a trading tool execution with risk engine checks
 // It ensures that the user is allowed to trade before executing the tool
 func WithRiskCheck(deps shared.Deps, executor ToolExecutor) ToolExecutor {
-	return func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	return func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Skip risk check if risk engine is not configured
 		if !deps.HasRiskEngine() {
 			return executor(ctx, args)
