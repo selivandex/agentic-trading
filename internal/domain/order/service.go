@@ -2,12 +2,13 @@ package order
 
 import (
 	"context"
-	"fmt"
+
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
@@ -49,7 +50,7 @@ func (s *Service) Place(ctx context.Context, input PlaceParams) (*Order, error) 
 	}
 
 	if err := s.repo.Create(ctx, order); err != nil {
-		return nil, fmt.Errorf("place order: %w", err)
+		return nil, errors.Wrap(err, "place order")
 	}
 	return order, nil
 }
@@ -57,13 +58,13 @@ func (s *Service) Place(ctx context.Context, input PlaceParams) (*Order, error) 
 // UpdateStatus updates an order's status and fill information.
 func (s *Service) UpdateStatus(ctx context.Context, id uuid.UUID, status OrderStatus, filledAmount, avgPrice decimal.Decimal) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("update order status: id is required")
+		return errors.ErrInvalidInput
 	}
 	if !status.Valid() {
-		return fmt.Errorf("update order status: invalid status")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.UpdateStatus(ctx, id, status, filledAmount, avgPrice); err != nil {
-		return fmt.Errorf("update order status: %w", err)
+		return errors.Wrap(err, "update order status")
 	}
 	return nil
 }
@@ -71,10 +72,10 @@ func (s *Service) UpdateStatus(ctx context.Context, id uuid.UUID, status OrderSt
 // Cancel cancels an order by ID.
 func (s *Service) Cancel(ctx context.Context, id uuid.UUID) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("cancel order: id is required")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.Cancel(ctx, id); err != nil {
-		return fmt.Errorf("cancel order: %w", err)
+		return errors.Wrap(err, "cancel order")
 	}
 	return nil
 }
@@ -82,11 +83,11 @@ func (s *Service) Cancel(ctx context.Context, id uuid.UUID) error {
 // GetByID returns a single order.
 func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Order, error) {
 	if id == uuid.Nil {
-		return nil, fmt.Errorf("get order: id is required")
+		return nil, errors.ErrInvalidInput
 	}
 	o, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("get order: %w", err)
+		return nil, errors.Wrap(err, "get order")
 	}
 	return o, nil
 }
@@ -94,11 +95,11 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Order, error) {
 // GetOpenByUser fetches open orders for a user.
 func (s *Service) GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*Order, error) {
 	if userID == uuid.Nil {
-		return nil, fmt.Errorf("get open orders: user id is required")
+		return nil, errors.ErrInvalidInput
 	}
 	orders, err := s.repo.GetOpenByUser(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("get open orders: %w", err)
+		return nil, errors.Wrap(err, "get open orders")
 	}
 	return orders, nil
 }
@@ -106,13 +107,13 @@ func (s *Service) GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*Order
 // Update persists changes to an order.
 func (s *Service) Update(ctx context.Context, order *Order) error {
 	if order == nil {
-		return fmt.Errorf("update order: order is nil")
+		return errors.ErrInvalidInput
 	}
 	if order.ID == uuid.Nil {
-		return fmt.Errorf("update order: id is required")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.Update(ctx, order); err != nil {
-		return fmt.Errorf("update order: %w", err)
+		return errors.Wrap(err, "update order")
 	}
 	return nil
 }
@@ -120,10 +121,10 @@ func (s *Service) Update(ctx context.Context, order *Order) error {
 // Delete removes an order permanently.
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("delete order: id is required")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete order: %w", err)
+		return errors.Wrap(err, "delete order")
 	}
 	return nil
 }
@@ -147,28 +148,28 @@ type PlaceParams struct {
 
 func (p PlaceParams) validate() error {
 	if p.UserID == uuid.Nil {
-		return fmt.Errorf("place order: user id is required")
+		return errors.ErrInvalidInput
 	}
 	if p.TradingPairID == uuid.Nil {
-		return fmt.Errorf("place order: trading pair id is required")
+		return errors.ErrInvalidInput
 	}
 	if p.ExchangeAccountID == uuid.Nil {
-		return fmt.Errorf("place order: exchange account id is required")
+		return errors.ErrInvalidInput
 	}
 	if p.Symbol == "" {
-		return fmt.Errorf("place order: symbol is required")
+		return errors.ErrInvalidInput
 	}
 	if !p.Side.Valid() {
-		return fmt.Errorf("place order: invalid side")
+		return errors.ErrInvalidInput
 	}
 	if !p.Type.Valid() {
-		return fmt.Errorf("place order: invalid type")
+		return errors.ErrInvalidInput
 	}
 	if p.Amount.LessThanOrEqual(decimal.Zero) {
-		return fmt.Errorf("place order: amount must be positive")
+		return errors.ErrInvalidInput
 	}
 	if p.Type == OrderTypeLimit && p.Price.LessThanOrEqual(decimal.Zero) {
-		return fmt.Errorf("place order: price must be set for limit orders")
+		return errors.ErrInvalidInput
 	}
 	return nil
 }

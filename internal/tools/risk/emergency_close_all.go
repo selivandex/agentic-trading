@@ -2,7 +2,6 @@ package risk
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 
@@ -11,13 +10,14 @@ import (
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
+	"prometheus/pkg/errors"
 )
 
 // NewEmergencyCloseAllTool closes all open positions for the user using the kill switch.
 func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("emergency_close_all", "Kill switch to close all positions and cancel all orders immediately", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if deps.PositionRepo == nil || deps.OrderRepo == nil || deps.RiskRepo == nil {
-			return nil, fmt.Errorf("emergency_close_all: required repositories not configured")
+			return nil, errors.Wrapf(errors.ErrInternal, "emergency_close_all: required repositories not configured")
 		}
 
 		// Extract user ID from context or args
@@ -31,10 +31,10 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 				var err error
 				userID, err = uuid.Parse(userIDStr)
 				if err != nil {
-					return nil, fmt.Errorf("emergency_close_all: invalid user_id: %w", err)
+					return nil, errors.Wrap(err, "emergency_close_all: invalid user_id")
 				}
 			} else {
-				return nil, fmt.Errorf("emergency_close_all: user metadata required")
+				return nil, errors.ErrInvalidInput
 			}
 		}
 
@@ -56,16 +56,16 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 		// Activate kill switch
 		result, err := killSwitch.Activate(ctx, userID, reason)
 		if err != nil {
-			return nil, fmt.Errorf("emergency_close_all: %w", err)
+			return nil, errors.Wrap(err, "emergency_close_all")
 		}
 
 		// Build response
 		response := map[string]interface{}{
-			"success":           true,
-			"positions_closed":  result.PositionsClosed,
-			"orders_cancelled":  result.OrdersCancelled,
-			"circuit_breaker":   result.CircuitBreakerSet,
-			"activated_at":      result.ActivatedAt.Format("2006-01-02 15:04:05"),
+			"success":          true,
+			"positions_closed": result.PositionsClosed,
+			"orders_cancelled": result.OrdersCancelled,
+			"circuit_breaker":  result.CircuitBreakerSet,
+			"activated_at":     result.ActivatedAt.Format("2006-01-02 15:04:05"),
 		}
 
 		if len(result.Errors) > 0 {

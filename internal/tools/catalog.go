@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 
 	"prometheus/internal/tools/indicators"
 	"prometheus/internal/tools/market"
@@ -13,6 +12,7 @@ import (
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
+	"prometheus/pkg/errors"
 )
 
 // Definition describes a tool's metadata for registration and documentation.
@@ -187,7 +187,7 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 
 		definition := def
 		registry.Register(definition.Name, functiontool.New(definition.Name, definition.Description, func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-			return nil, fmt.Errorf("tool %s not implemented", definition.Name)
+			return nil, errors.Wrapf(errors.ErrInternal, "tool %s not implemented", definition.Name)
 		}))
 	}
 }

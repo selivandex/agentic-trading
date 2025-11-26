@@ -2,9 +2,10 @@ package indicators
 
 import (
 	"context"
-	"fmt"
 
 	"prometheus/internal/tools/shared"
+
+	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -20,7 +21,7 @@ func NewEMATool(deps shared.Deps) tool.Tool {
 		period := parseLimit(args["period"], 20)
 		closes := extractCloses(candles)
 		if len(closes) < period {
-			return nil, fmt.Errorf("ema: not enough data for period %d", period)
+			return nil, errors.Wrapf(errors.ErrInternal, "ema: not enough data for period %d", period)
 		}
 
 		multiplier := 2.0 / (float64(period) + 1)

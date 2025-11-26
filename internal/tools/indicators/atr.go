@@ -2,10 +2,11 @@ package indicators
 
 import (
 	"context"
-	"fmt"
 	"math"
 
 	"prometheus/internal/tools/shared"
+
+	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -21,7 +22,7 @@ func NewATRTool(deps shared.Deps) tool.Tool {
 		period := parseLimit(args["period"], 14)
 		high, low, close := extractHighLow(candles)
 		if len(close) < period+1 {
-			return nil, fmt.Errorf("atr: not enough data")
+			return nil, errors.Wrapf(errors.ErrInternal, "atr: not enough data")
 		}
 
 		trs := make([]float64, 0, len(close)-1)
@@ -33,7 +34,7 @@ func NewATRTool(deps shared.Deps) tool.Tool {
 		}
 
 		if len(trs) < period {
-			return nil, fmt.Errorf("atr: not enough true range values")
+			return nil, errors.Wrapf(errors.ErrInternal, "atr: not enough true range values")
 		}
 
 		atr := 0.0

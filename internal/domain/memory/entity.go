@@ -9,12 +9,12 @@ import (
 
 // Memory represents an agent's memory entry with vector embedding
 type Memory struct {
-	ID        uuid.UUID       `db:"id"`
-	UserID    uuid.UUID       `db:"user_id"`
-	AgentID   string          `db:"agent_id"`
-	SessionID string          `db:"session_id"`
+	ID        uuid.UUID `db:"id"`
+	UserID    uuid.UUID `db:"user_id"`
+	AgentID   string    `db:"agent_id"`
+	SessionID string    `db:"session_id"`
 
-	Type      MemoryType      `db:"type"`      // observation, decision, trade, lesson
+	Type      MemoryType      `db:"type"` // observation, decision, trade, lesson
 	Content   string          `db:"content"`
 	Embedding pgvector.Vector `db:"embedding"` // pgvector handles this automatically
 
@@ -59,11 +59,11 @@ func (m MemoryType) String() string {
 
 // CollectiveMemory represents shared knowledge across users
 type CollectiveMemory struct {
-	ID        uuid.UUID       `db:"id"`
+	ID uuid.UUID `db:"id"`
 
 	// Scope
-	AgentType   string `db:"agent_type"`   // "market_analyst", "risk_manager", etc.
-	Personality string `db:"personality"`  // "conservative", "aggressive", "balanced"
+	AgentType   string `db:"agent_type"`  // "market_analyst", "risk_manager", etc.
+	Personality string `db:"personality"` // "conservative", "aggressive", "balanced"
 
 	// Content
 	Type      MemoryType      `db:"type"`

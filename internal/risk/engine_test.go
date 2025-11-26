@@ -2,7 +2,6 @@ package risk
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -34,7 +33,7 @@ func newMockRiskRepo() *mockRiskRepo {
 func (m *mockRiskRepo) GetState(ctx context.Context, userID uuid.UUID) (*risk.CircuitBreakerState, error) {
 	state, ok := m.states[userID]
 	if !ok {
-		return nil, fmt.Errorf("state not found for user %s", userID)
+		return nil, errors.Wrapf(errors.ErrInternal, "state not found for user %s", userID)
 	}
 	return state, nil
 }
@@ -136,7 +135,7 @@ func (m *mockRedis) Get(ctx context.Context, key string, dest interface{}) error
 	// Return error if not found (Redis behavior)
 	_, exists := m.data[key]
 	if !exists {
-		return fmt.Errorf("redis: key not found")
+		return errors.Wrapf(errors.ErrInternal, "redis: key not found")
 	}
 	return nil
 }

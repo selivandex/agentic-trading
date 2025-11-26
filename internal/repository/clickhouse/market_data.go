@@ -7,6 +7,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"prometheus/internal/domain/market_data"
+	"prometheus/pkg/errors"
 )
 
 // Compile-time check
@@ -35,7 +36,7 @@ func (r *MarketDataRepository) InsertOHLCV(ctx context.Context, candles []market
 		)
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to prepare batch: %w", err)
+		return errors.Wrap(err, "failed to prepare batch")
 	}
 
 	for _, candle := range candles {
@@ -45,7 +46,7 @@ func (r *MarketDataRepository) InsertOHLCV(ctx context.Context, candles []market
 			candle.Volume, candle.QuoteVolume, candle.Trades,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to append candle: %w", err)
+			return errors.Wrap(err, "failed to append candle")
 		}
 	}
 

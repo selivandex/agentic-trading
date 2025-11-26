@@ -32,6 +32,6 @@ type SocialSentiment struct {
 // FearGreedIndex represents Fear & Greed index value
 type FearGreedIndex struct {
 	Timestamp time.Time `db:"timestamp"`
-	Value     int       `db:"value"` // 0-100
+	Value     int       `db:"value"`  // 0-100
 	Rating    string    `db:"rating"` // extreme_fear, fear, neutral, greed, extreme_greed
 }

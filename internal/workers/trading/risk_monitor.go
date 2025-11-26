@@ -2,7 +2,6 @@ package trading
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"prometheus/internal/domain/position"
 	"prometheus/internal/risk"
 	"prometheus/internal/workers"
+	"prometheus/pkg/errors"
 )
 
 // RiskMonitor monitors user risk levels and trips circuit breakers when needed
@@ -40,12 +40,12 @@ func NewRiskMonitor(
 // Run executes one iteration of risk monitoring
 func (rm *RiskMonitor) Run(ctx context.Context) error {
 	rm.Log().Debug("Risk monitor: starting iteration")
-	
+
 	// This is a simplified implementation
 	// In production, we'd need a user repository to get all active users
 	// For now, we'll log that this needs implementation
 	rm.Log().Warn("Risk monitor: simplified implementation - need user repository to monitor all users")
-	
+
 	return nil
 }
 
@@ -54,28 +54,28 @@ func (rm *RiskMonitor) monitorUser(ctx context.Context, userID uuid.UUID) error 
 	// Get user's risk state
 	state, err := rm.riskEngine.GetUserState(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get user risk state: %w", err)
+		return errors.Wrap(err, "failed to get user risk state")
 	}
-	
+
 	rm.Log().Debug("Monitoring user risk",
 		"user_id", userID,
 		"daily_pnl", state.DailyPnL,
 		"consecutive_losses", state.ConsecutiveLosses,
 		"can_trade", state.CanTrade,
 	)
-	
+
 	// If circuit breaker is already tripped, send notification if not acknowledged
 	if state.IsCircuitTripped {
 		rm.sendCircuitBreakerAlert(ctx, userID, state)
 		return nil
 	}
-	
+
 	// Calculate current exposure
 	positions, err := rm.posRepo.GetOpenByUser(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get open positions: %w", err)
+		return errors.Wrap(err, "failed to get open positions")
 	}
-	
+
 	totalExposure := decimal.Zero
 	totalUnrealizedPnL := decimal.Zero
 	for _, pos := range positions {
@@ -86,41 +86,41 @@ func (rm *RiskMonitor) monitorUser(ctx context.Context, userID uuid.UUID) error 
 		totalExposure = totalExposure.Add(positionValue)
 		totalUnrealizedPnL = totalUnrealizedPnL.Add(pos.UnrealizedPnL)
 	}
-	
+
 	// Check if approaching drawdown limit (80%)
 	if state.DailyPnL.LessThan(decimal.Zero) {
 		absDrawdown := state.DailyPnL.Abs()
 		warningThreshold := state.MaxDrawdown.Mul(decimal.NewFromFloat(0.80))
-		
+
 		if absDrawdown.GreaterThanOrEqual(warningThreshold) && absDrawdown.LessThan(state.MaxDrawdown) {
 			rm.sendDrawdownWarning(ctx, userID, state, absDrawdown)
 		}
 	}
-	
+
 	// Check consecutive losses warning (at limit - 1)
 	if state.ConsecutiveLosses >= state.MaxConsecutiveLoss-1 && state.ConsecutiveLosses < state.MaxConsecutiveLoss {
 		rm.sendConsecutiveLossesWarning(ctx, userID, state)
 	}
-	
+
 	rm.Log().Debug("Risk monitoring complete",
 		"user_id", userID,
 		"total_exposure", totalExposure,
 		"total_unrealized_pnl", totalUnrealizedPnL,
 	)
-	
+
 	return nil
 }
 
 // Event structures
 
 type CircuitBreakerAlert struct {
-	UserID           string    `json:"user_id"`
-	Reason           string    `json:"reason"`
-	DailyPnL         string    `json:"daily_pnl"`
-	DailyPnLPercent  string    `json:"daily_pnl_percent"`
-	ConsecutiveLosses int      `json:"consecutive_losses"`
-	MaxDrawdown      string    `json:"max_drawdown"`
-	Timestamp        time.Time `json:"timestamp"`
+	UserID            string    `json:"user_id"`
+	Reason            string    `json:"reason"`
+	DailyPnL          string    `json:"daily_pnl"`
+	DailyPnLPercent   string    `json:"daily_pnl_percent"`
+	ConsecutiveLosses int       `json:"consecutive_losses"`
+	MaxDrawdown       string    `json:"max_drawdown"`
+	Timestamp         time.Time `json:"timestamp"`
 }
 
 type DrawdownWarningEvent struct {
@@ -141,15 +141,15 @@ type ConsecutiveLossesWarningEvent struct {
 
 func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState) {
 	event := CircuitBreakerAlert{
-		UserID:           userID.String(),
-		Reason:           state.TripReason,
-		DailyPnL:         state.DailyPnL.String(),
-		DailyPnLPercent:  state.DailyPnLPercent.String(),
+		UserID:            userID.String(),
+		Reason:            state.TripReason,
+		DailyPnL:          state.DailyPnL.String(),
+		DailyPnLPercent:   state.DailyPnLPercent.String(),
 		ConsecutiveLosses: state.ConsecutiveLosses,
-		MaxDrawdown:      state.MaxDrawdown.String(),
-		Timestamp:        time.Now(),
+		MaxDrawdown:       state.MaxDrawdown.String(),
+		Timestamp:         time.Now(),
 	}
-	
+
 	if err := rm.kafka.Publish(ctx, "risk.circuit_breaker_tripped", userID.String(), event); err != nil {
 		rm.Log().Error("Failed to publish circuit breaker alert", "error", err)
 	} else {
@@ -162,7 +162,7 @@ func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.
 
 func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState, currentDrawdown decimal.Decimal) {
 	percentage := currentDrawdown.Div(state.MaxDrawdown).Mul(decimal.NewFromInt(100))
-	
+
 	event := DrawdownWarningEvent{
 		UserID:          userID.String(),
 		CurrentDrawdown: currentDrawdown.String(),
@@ -171,7 +171,7 @@ func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID
 		DailyPnL:        state.DailyPnL.String(),
 		Timestamp:       time.Now(),
 	}
-	
+
 	if err := rm.kafka.Publish(ctx, "risk.drawdown_warning", userID.String(), event); err != nil {
 		rm.Log().Error("Failed to publish drawdown warning", "error", err)
 	} else {
@@ -190,7 +190,7 @@ func (rm *RiskMonitor) sendConsecutiveLossesWarning(ctx context.Context, userID 
 		MaxAllowed:        state.MaxConsecutiveLoss,
 		Timestamp:         time.Now(),
 	}
-	
+
 	if err := rm.kafka.Publish(ctx, "risk.consecutive_losses", userID.String(), event); err != nil {
 		rm.Log().Error("Failed to publish consecutive losses warning", "error", err)
 	} else {
@@ -201,4 +201,3 @@ func (rm *RiskMonitor) sendConsecutiveLossesWarning(ctx context.Context, userID 
 		)
 	}
 }
-

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 
@@ -33,7 +32,7 @@ func WithRiskCheck(deps shared.Deps, executor ToolExecutor) ToolExecutor {
 			if userIDStr, ok := args["user_id"].(string); ok {
 				userID, err = uuid.Parse(userIDStr)
 				if err != nil {
-					return nil, fmt.Errorf("risk_check: invalid user_id: %w", err)
+					return nil, errors.Wrap(err, "risk_check: invalid user_id")
 				}
 			} else {
 				// If no user_id in context or args, skip risk check
@@ -81,4 +80,3 @@ func WithRiskCheckMultiple(deps shared.Deps, executors map[string]ToolExecutor) 
 	}
 	return wrapped
 }
-

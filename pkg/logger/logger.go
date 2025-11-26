@@ -97,7 +97,7 @@ func (l *Logger) Error(args ...interface{}) {
 
 	// Auto-track errors if tracker is set
 	if l.errorTracker != nil {
-		err := fmt.Errorf("%v", args)
+		err := errors.Wrapf(errors.ErrInternal, "%v", args)
 		l.errorTracker.CaptureError(context.Background(), err, map[string]string{
 			"component": "logger",
 		})

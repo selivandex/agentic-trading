@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +9,8 @@ import (
 
 	memorydomain "prometheus/internal/domain/memory"
 	"prometheus/internal/tools/shared"
+
+	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -48,13 +49,13 @@ type MemorySearchResponse struct {
 func NewSearchMemoryTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("search_memory", "Semantic memory search", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if deps.MemoryRepo == nil {
-			return nil, fmt.Errorf("search_memory: memory repository not configured")
+			return nil, errors.Wrapf(errors.ErrInternal, "search_memory: memory repository not configured")
 		}
 
 		// Parse and validate input arguments with strong typing
 		searchArgs, err := parseSearchMemoryArgs(ctx, args)
 		if err != nil {
-			return nil, fmt.Errorf("search_memory: %w", err)
+			return nil, errors.Wrap(err, "search_memory")
 		}
 
 		// Create vector from embedding
@@ -88,7 +89,7 @@ func parseSearchMemoryArgs(ctx context.Context, args map[string]interface{}) (*S
 	if idVal, ok := args["user_id"].(string); ok {
 		parsed, err := uuid.Parse(idVal)
 		if err != nil {
-			return nil, fmt.Errorf("invalid user_id format: %w", err)
+			return nil, errors.Wrap(err, "invalid user_id format")
 		}
 		result.UserID = parsed
 	}
@@ -101,13 +102,13 @@ func parseSearchMemoryArgs(ctx context.Context, args map[string]interface{}) (*S
 	}
 
 	if result.UserID == uuid.Nil {
-		return nil, fmt.Errorf("user_id is required")
+		return nil, errors.Wrapf(errors.ErrInternal, "user_id is required")
 	}
 
 	// Parse embedding
 	rawEmbedding, ok := args["embedding"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("embedding is required")
+		return nil, errors.Wrapf(errors.ErrInternal, "embedding is required")
 	}
 
 	result.Embedding = make([]float32, 0, len(rawEmbedding))
@@ -118,7 +119,7 @@ func parseSearchMemoryArgs(ctx context.Context, args map[string]interface{}) (*S
 		case float32:
 			result.Embedding = append(result.Embedding, val)
 		default:
-			return nil, fmt.Errorf("embedding[%d] must be numeric, got %T", i, v)
+			return nil, errors.Wrapf(errors.ErrInternal, "embedding[%d] must be numeric, got %T", i, v)
 		}
 	}
 

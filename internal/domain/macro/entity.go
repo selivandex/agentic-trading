@@ -4,11 +4,11 @@ import "time"
 
 // MacroEvent represents an economic calendar event
 type MacroEvent struct {
-	ID        string      `db:"id"`
-	EventType EventType   `db:"event_type"`
-	Title     string      `db:"title"`
-	Country   string      `db:"country"`
-	Currency  string      `db:"currency"`
+	ID        string    `db:"id"`
+	EventType EventType `db:"event_type"`
+	Title     string    `db:"title"`
+	Country   string    `db:"country"`
+	Currency  string    `db:"currency"`
 
 	// Timing
 	EventTime time.Time `db:"event_time"`

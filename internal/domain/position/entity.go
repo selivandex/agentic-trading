@@ -34,9 +34,9 @@ type Position struct {
 	RealizedPnL      decimal.Decimal `db:"realized_pnl"`
 
 	// Risk management
-	StopLossPrice    decimal.Decimal `db:"stop_loss_price"`
-	TakeProfitPrice  decimal.Decimal `db:"take_profit_price"`
-	TrailingStopPct  decimal.Decimal `db:"trailing_stop_pct"`
+	StopLossPrice   decimal.Decimal `db:"stop_loss_price"`
+	TakeProfitPrice decimal.Decimal `db:"take_profit_price"`
+	TrailingStopPct decimal.Decimal `db:"trailing_stop_pct"`
 
 	// Orders
 	StopLossOrderID   *uuid.UUID `db:"stop_loss_order_id"`
@@ -45,9 +45,9 @@ type Position struct {
 	// Metadata
 	OpenReasoning string `db:"open_reasoning"`
 
-	Status   PositionStatus `db:"status"`
-	OpenedAt time.Time      `db:"opened_at"`
-	ClosedAt *time.Time     `db:"closed_at"`
+	Status    PositionStatus `db:"status"`
+	OpenedAt  time.Time      `db:"opened_at"`
+	ClosedAt  *time.Time     `db:"closed_at"`
 	UpdatedAt time.Time      `db:"updated_at"`
 }
 

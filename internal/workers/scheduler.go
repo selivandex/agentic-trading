@@ -2,10 +2,10 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
+	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
@@ -48,7 +48,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.mu.Lock()
 	if s.started {
 		s.mu.Unlock()
-		return fmt.Errorf("scheduler already started")
+		return errors.Wrapf(errors.ErrInternal, "scheduler already started")
 	}
 
 	s.started = true
@@ -77,7 +77,7 @@ func (s *Scheduler) Stop() error {
 	s.mu.Lock()
 	if !s.started {
 		s.mu.Unlock()
-		return fmt.Errorf("scheduler not started")
+		return errors.Wrapf(errors.ErrInternal, "scheduler not started")
 	}
 	s.mu.Unlock()
 
@@ -98,7 +98,7 @@ func (s *Scheduler) Stop() error {
 		s.log.Info("All workers stopped gracefully")
 	case <-time.After(30 * time.Second):
 		s.log.Warn("Worker shutdown timed out after 30s")
-		return fmt.Errorf("shutdown timeout")
+		return errors.Wrapf(errors.ErrInternal, "shutdown timeout")
 	}
 
 	s.mu.Lock()

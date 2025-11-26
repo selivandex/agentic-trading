@@ -2,12 +2,12 @@ package marketdata
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"prometheus/internal/adapters/exchanges"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/workers"
+	"prometheus/pkg/errors"
 )
 
 // OHLCVCollector collects OHLCV data from exchanges
@@ -100,7 +100,7 @@ func (oc *OHLCVCollector) collectOHLCVFromExchange(
 	// Fetch OHLCV data from exchange
 	exchangeCandles, err := exchange.GetOHLCV(ctx, symbol, timeframe, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch OHLCV from exchange: %w", err)
+		return nil, errors.Wrap(err, "failed to fetch OHLCV from exchange")
 	}
 
 	// Convert exchange OHLCV to domain OHLCV
@@ -166,7 +166,7 @@ func (oc *OHLCVCollector) retryWithBackoff(ctx context.Context, fn func() error,
 		}
 	}
 
-	return fmt.Errorf("max retries exceeded: %w", err)
+	return errors.Wrap(err, "max retries exceeded")
 }
 
 // RateLimiter implements a simple rate limiter

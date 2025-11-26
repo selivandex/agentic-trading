@@ -2,7 +2,6 @@ package risk
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -11,6 +10,7 @@ import (
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
+	"prometheus/pkg/errors"
 )
 
 // NewValidateTradeTool performs lightweight pre-trade checks.
@@ -18,11 +18,11 @@ func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("validate_trade", "Pre-trade validation checks", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		amountStr, _ := args["amount"].(string)
 		if amountStr == "" {
-			return nil, fmt.Errorf("validate_trade: amount is required")
+			return nil, errors.ErrInvalidInput
 		}
 		amount, err := decimal.NewFromString(amountStr)
 		if err != nil || amount.LessThanOrEqual(decimal.Zero) {
-			return nil, fmt.Errorf("validate_trade: amount must be positive")
+			return nil, errors.ErrInvalidInput
 		}
 
 		// Optional circuit breaker check when risk repository is present.
@@ -34,7 +34,7 @@ func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 		if userID != uuid.Nil && deps.RiskRepo != nil {
 			state, err := deps.RiskRepo.GetState(ctx, userID)
 			if err != nil {
-				return nil, fmt.Errorf("validate_trade: %w", err)
+				return nil, errors.Wrap(err, "validate_trade")
 			}
 			allowed = state == nil || !state.IsTriggered
 		}

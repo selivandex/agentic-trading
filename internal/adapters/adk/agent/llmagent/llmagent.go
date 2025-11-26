@@ -7,6 +7,8 @@ import (
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/model"
 	"google.golang.org/adk/tool"
+
+	"prometheus/pkg/errors"
 )
 
 // Config defines the construction parameters for an LLM-backed agent.
@@ -27,10 +29,10 @@ type Agent struct {
 // New constructs a new llm-style agent.
 func New(cfg Config) (*Agent, error) {
 	if cfg.Name == "" {
-		return nil, fmt.Errorf("agent name is required")
+		return nil, errors.ErrInvalidInput
 	}
 	if cfg.Model == nil {
-		return nil, fmt.Errorf("model is required")
+		return nil, errors.ErrInvalidInput
 	}
 	return &Agent{cfg: cfg}, nil
 }

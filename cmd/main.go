@@ -328,42 +328,38 @@ func initWorkers(
 	scheduler := workers.NewScheduler()
 
 	// Trading workers
-	positionMonitor := trading.NewPositionMonitor(
+	scheduler.RegisterWorker(trading.NewPositionMonitor(
 		repos.Position,
 		repos.ExchangeAccount,
 		exchFactory,
 		kafkaProducer,
 		true, // enabled
-	)
-	scheduler.RegisterWorker(positionMonitor)
+	))
 
-	orderSync := trading.NewOrderSync(
+	scheduler.RegisterWorker(trading.NewOrderSync(
 		repos.Order,
 		repos.Position,
 		repos.ExchangeAccount,
 		exchFactory,
 		kafkaProducer,
 		true, // enabled
-	)
-	scheduler.RegisterWorker(orderSync)
+	))
 
-	riskMonitor := trading.NewRiskMonitor(
+	scheduler.RegisterWorker(trading.NewRiskMonitor(
 		riskEngine,
 		repos.Position,
 		kafkaProducer,
 		true, // enabled
-	)
-	scheduler.RegisterWorker(riskMonitor)
+	))
 
 	// Market data workers
-	ohlcvCollector := marketdata.NewOHLCVCollector(
+	scheduler.RegisterWorker(marketdata.NewOHLCVCollector(
 		repos.MarketData,
 		exchFactory,
 		[]string{"BTC/USDT", "ETH/USDT", "SOL/USDT"},  // Default symbols
 		[]string{"1m", "5m", "15m", "1h", "4h", "1d"}, // Default timeframes
 		true, // enabled
-	)
-	scheduler.RegisterWorker(ohlcvCollector)
+	))
 
 	log.Info("Workers initialized", "count", len(scheduler.GetWorkers()))
 	return scheduler

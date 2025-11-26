@@ -11,6 +11,7 @@ import (
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
 	domainRisk "prometheus/internal/domain/risk"
+	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
@@ -210,7 +211,7 @@ func (k *KillSwitch) IsActive(ctx context.Context, userID uuid.UUID) (bool, erro
 	killSwitchKey := killSwitchKeyPrefix + userID.String()
 	exists, err := k.redis.Exists(ctx, killSwitchKey)
 	if err != nil {
-		return false, fmt.Errorf("failed to check kill switch state: %w", err)
+		return false, errors.Wrap(err, "failed to check kill switch state")
 	}
 	return exists, nil
 }
@@ -222,7 +223,7 @@ func (k *KillSwitch) Deactivate(ctx context.Context, userID uuid.UUID) error {
 	// Reset circuit breaker
 	state, err := k.riskRepo.GetState(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get risk state: %w", err)
+		return errors.Wrap(err, "failed to get risk state")
 	}
 
 	state.IsTriggered = false
@@ -231,7 +232,7 @@ func (k *KillSwitch) Deactivate(ctx context.Context, userID uuid.UUID) error {
 	state.UpdatedAt = time.Now()
 
 	if err := k.riskRepo.SaveState(ctx, state); err != nil {
-		return fmt.Errorf("failed to reset circuit breaker: %w", err)
+		return errors.Wrap(err, "failed to reset circuit breaker")
 	}
 
 	// Remove Redis flag

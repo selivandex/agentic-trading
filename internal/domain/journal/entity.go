@@ -9,8 +9,8 @@ import (
 
 // JournalEntry represents a trade journal entry with reflection
 type JournalEntry struct {
-	ID     uuid.UUID `db:"id"`
-	UserID uuid.UUID `db:"user_id"`
+	ID      uuid.UUID `db:"id"`
+	UserID  uuid.UUID `db:"user_id"`
 	TradeID uuid.UUID `db:"trade_id"`
 
 	// Trade details
@@ -28,7 +28,7 @@ type JournalEntry struct {
 	SetupType    string `db:"setup_type"` // breakout, reversal, trend_follow
 
 	// Decision context
-	MarketRegime    string  `db:"market_regime"`    // trend, range, volatile
+	MarketRegime    string  `db:"market_regime"` // trend, range, volatile
 	EntryReasoning  string  `db:"entry_reasoning"`
 	ExitReasoning   string  `db:"exit_reasoning"`
 	ConfidenceScore float64 `db:"confidence_score"`

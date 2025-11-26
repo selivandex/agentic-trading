@@ -179,17 +179,17 @@ func (e *RiskEngine) RecordTrade(ctx context.Context, userID uuid.UUID, pnl deci
 
 	// Save updated state
 	if err := e.riskRepo.SaveState(ctx, state); err != nil {
-		return fmt.Errorf("failed to save risk state: %w", err)
+		return errors.Wrap(err, "failed to save risk state")
 	}
 
 	// Check if we should trip circuit breaker
 	if e.isDrawdownExceeded(state) {
 		if err := e.tripCircuitBreaker(ctx, state, "Daily drawdown limit exceeded after trade"); err != nil {
-			return fmt.Errorf("failed to trip circuit breaker: %w", err)
+			return errors.Wrap(err, "failed to trip circuit breaker")
 		}
 	} else if e.isConsecutiveLossesExceeded(state) {
 		if err := e.tripCircuitBreaker(ctx, state, "Consecutive losses limit exceeded"); err != nil {
-			return fmt.Errorf("failed to trip circuit breaker: %w", err)
+			return errors.Wrap(err, "failed to trip circuit breaker")
 		}
 	}
 
@@ -227,7 +227,7 @@ func (e *RiskEngine) GetUserState(ctx context.Context, userID uuid.UUID) (*UserR
 	if err != nil {
 		state = e.createDefaultState(userID)
 		if err := e.riskRepo.SaveState(ctx, state); err != nil {
-			return nil, fmt.Errorf("failed to create default risk state: %w", err)
+			return nil, errors.Wrap(err, "failed to create default risk state")
 		}
 	}
 
@@ -242,7 +242,7 @@ func (e *RiskEngine) ResetDaily(ctx context.Context) error {
 	e.log.Info("Resetting daily risk counters for all users")
 
 	if err := e.riskRepo.ResetDaily(ctx); err != nil {
-		return fmt.Errorf("failed to reset daily counters: %w", err)
+		return errors.Wrap(err, "failed to reset daily counters")
 	}
 
 	e.log.Info("Daily risk counters reset successfully")
@@ -263,7 +263,7 @@ func (e *RiskEngine) TripCircuitBreaker(ctx context.Context, userID uuid.UUID, r
 func (e *RiskEngine) ResetCircuitBreaker(ctx context.Context, userID uuid.UUID) error {
 	state, err := e.riskRepo.GetState(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get risk state: %w", err)
+		return errors.Wrap(err, "failed to get risk state")
 	}
 
 	state.IsTriggered = false
@@ -272,7 +272,7 @@ func (e *RiskEngine) ResetCircuitBreaker(ctx context.Context, userID uuid.UUID) 
 	state.UpdatedAt = time.Now()
 
 	if err := e.riskRepo.SaveState(ctx, state); err != nil {
-		return fmt.Errorf("failed to save risk state: %w", err)
+		return errors.Wrap(err, "failed to save risk state")
 	}
 
 	// Invalidate cache
@@ -336,7 +336,7 @@ func (e *RiskEngine) tripCircuitBreaker(ctx context.Context, state *risk.Circuit
 	state.UpdatedAt = now
 
 	if err := e.riskRepo.SaveState(ctx, state); err != nil {
-		return fmt.Errorf("failed to save risk state: %w", err)
+		return errors.Wrap(err, "failed to save risk state")
 	}
 
 	// Create critical risk event

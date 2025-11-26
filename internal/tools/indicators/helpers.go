@@ -2,15 +2,15 @@ package indicators
 
 import (
 	"context"
-	"fmt"
 
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
+	"prometheus/pkg/errors"
 )
 
 func loadCandles(ctx context.Context, deps shared.Deps, args map[string]interface{}, defaultLimit int) ([]market_data.OHLCV, error) {
 	if !deps.HasMarketData() {
-		return nil, fmt.Errorf("indicator: market data repository not configured")
+		return nil, errors.Wrapf(errors.ErrInternal, "indicator: market data repository not configured")
 	}
 
 	exchange, _ := args["exchange"].(string)
@@ -18,15 +18,15 @@ func loadCandles(ctx context.Context, deps shared.Deps, args map[string]interfac
 	timeframe, _ := args["timeframe"].(string)
 	limit := parseLimit(args["limit"], defaultLimit)
 	if exchange == "" || symbol == "" || timeframe == "" {
-		return nil, fmt.Errorf("indicator: exchange, symbol, and timeframe are required")
+		return nil, errors.ErrInvalidInput
 	}
 
 	candles, err := deps.MarketDataRepo.GetLatestOHLCV(ctx, exchange, symbol, timeframe, limit)
 	if err != nil {
-		return nil, fmt.Errorf("indicator: fetch candles: %w", err)
+		return nil, errors.Wrap(err, "indicator: fetch candles")
 	}
 	if len(candles) == 0 {
-		return nil, fmt.Errorf("indicator: no candles available")
+		return nil, errors.Wrapf(errors.ErrInternal, "indicator: no candles available")
 	}
 	return candles, nil
 }

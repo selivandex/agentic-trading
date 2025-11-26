@@ -2,10 +2,10 @@ package exchange_account
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 
+	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
@@ -23,20 +23,20 @@ func NewService(repo Repository) *Service {
 // Create registers a new exchange account for a user.
 func (s *Service) Create(ctx context.Context, account *ExchangeAccount) error {
 	if account == nil {
-		return fmt.Errorf("create exchange account: account is nil")
+		return errors.ErrInvalidInput
 	}
 	if account.ID == uuid.Nil {
 		account.ID = uuid.New()
 	}
 	if account.UserID == uuid.Nil {
-		return fmt.Errorf("create exchange account: user id is required")
+		return errors.ErrInvalidInput
 	}
 	if !account.Exchange.Valid() {
-		return fmt.Errorf("create exchange account: exchange is invalid")
+		return errors.Wrapf(errors.ErrInternal, "create exchange account: exchange is invalid")
 	}
 
 	if err := s.repo.Create(ctx, account); err != nil {
-		return fmt.Errorf("create exchange account: %w", err)
+		return errors.Wrap(err, "create exchange account")
 	}
 	return nil
 }
@@ -44,11 +44,11 @@ func (s *Service) Create(ctx context.Context, account *ExchangeAccount) error {
 // GetByID fetches an exchange account by identifier.
 func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*ExchangeAccount, error) {
 	if id == uuid.Nil {
-		return nil, fmt.Errorf("get exchange account: id is required")
+		return nil, errors.ErrInvalidInput
 	}
 	account, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("get exchange account: %w", err)
+		return nil, errors.Wrap(err, "get exchange account")
 	}
 	return account, nil
 }
@@ -56,11 +56,11 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*ExchangeAccount, 
 // ListByUser returns all exchange accounts for a user.
 func (s *Service) ListByUser(ctx context.Context, userID uuid.UUID) ([]*ExchangeAccount, error) {
 	if userID == uuid.Nil {
-		return nil, fmt.Errorf("list exchange accounts: user id is required")
+		return nil, errors.ErrInvalidInput
 	}
 	accounts, err := s.repo.GetByUser(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list exchange accounts: %w", err)
+		return nil, errors.Wrap(err, "list exchange accounts")
 	}
 	return accounts, nil
 }
@@ -68,11 +68,11 @@ func (s *Service) ListByUser(ctx context.Context, userID uuid.UUID) ([]*Exchange
 // ListActiveByUser returns active accounts only.
 func (s *Service) ListActiveByUser(ctx context.Context, userID uuid.UUID) ([]*ExchangeAccount, error) {
 	if userID == uuid.Nil {
-		return nil, fmt.Errorf("list active exchange accounts: user id is required")
+		return nil, errors.ErrInvalidInput
 	}
 	accounts, err := s.repo.GetActiveByUser(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list active exchange accounts: %w", err)
+		return nil, errors.Wrap(err, "list active exchange accounts")
 	}
 	return accounts, nil
 }
@@ -80,13 +80,13 @@ func (s *Service) ListActiveByUser(ctx context.Context, userID uuid.UUID) ([]*Ex
 // Update persists account changes.
 func (s *Service) Update(ctx context.Context, account *ExchangeAccount) error {
 	if account == nil {
-		return fmt.Errorf("update exchange account: account is nil")
+		return errors.ErrInvalidInput
 	}
 	if account.ID == uuid.Nil {
-		return fmt.Errorf("update exchange account: id is required")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.Update(ctx, account); err != nil {
-		return fmt.Errorf("update exchange account: %w", err)
+		return errors.Wrap(err, "update exchange account")
 	}
 	return nil
 }
@@ -94,10 +94,10 @@ func (s *Service) Update(ctx context.Context, account *ExchangeAccount) error {
 // UpdateLastSync updates the last synchronization time.
 func (s *Service) UpdateLastSync(ctx context.Context, id uuid.UUID) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("update last sync: id is required")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.UpdateLastSync(ctx, id); err != nil {
-		return fmt.Errorf("update last sync: %w", err)
+		return errors.Wrap(err, "update last sync")
 	}
 	return nil
 }
@@ -105,10 +105,10 @@ func (s *Service) UpdateLastSync(ctx context.Context, id uuid.UUID) error {
 // Delete removes an exchange account.
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	if id == uuid.Nil {
-		return fmt.Errorf("delete exchange account: id is required")
+		return errors.ErrInvalidInput
 	}
 	if err := s.repo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete exchange account: %w", err)
+		return errors.Wrap(err, "delete exchange account")
 	}
 	return nil
 }

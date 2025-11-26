@@ -2,10 +2,11 @@ package indicators
 
 import (
 	"context"
-	"fmt"
 	"math"
 
 	"prometheus/internal/tools/shared"
+
+	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -21,7 +22,7 @@ func NewRSITool(deps shared.Deps) tool.Tool {
 		period := parseLimit(args["period"], 14)
 		closes := extractCloses(candles)
 		if len(closes) < period+1 {
-			return nil, fmt.Errorf("rsi: not enough data for period %d", period)
+			return nil, errors.Wrapf(errors.ErrInternal, "rsi: not enough data for period %d", period)
 		}
 
 		gains := 0.0

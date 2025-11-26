@@ -3,10 +3,10 @@ package templates
 import (
 	"bytes"
 	"embed"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"prometheus/pkg/errors"
 	"strings"
 	"sync"
 	"text/template"
@@ -28,7 +28,7 @@ type Template struct {
 func (t *Template) Render(data any) (string, error) {
 	var buf bytes.Buffer
 	if err := t.parsed.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("render template %s: %w", t.ID, err)
+		return "", errors.Wrapf(errors.ErrInternal, "render template %s: %w", t.ID, err)
 	}
 
 	return buf.String(), nil
@@ -46,7 +46,7 @@ type Registry struct {
 func NewRegistry(basePath string) (*Registry, error) {
 	absBase, err := filepath.Abs(basePath)
 	if err != nil {
-		return nil, fmt.Errorf("resolve template base path: %w", err)
+		return nil, errors.Wrap(err, "resolve template base path")
 	}
 
 	return NewRegistryFromFS(os.DirFS(absBase), absBase)
@@ -105,7 +105,7 @@ func (r *Registry) GetTemplate(id string) (*Template, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("template not found: %s", id)
+	return nil, errors.Wrapf(errors.ErrInternal, "template not found: %s", id)
 }
 
 // Render executes a template by ID using the provided data.
@@ -153,12 +153,12 @@ func (r *Registry) loadTemplate(path string) error {
 	id := r.pathToID(path)
 	content, err := fs.ReadFile(r.fs, path)
 	if err != nil {
-		return fmt.Errorf("read template %s: %w", id, err)
+		return errors.Wrapf(errors.ErrInternal, "read template %s: %w", id, err)
 	}
 
 	parsed, err := template.New(id).Parse(string(content))
 	if err != nil {
-		return fmt.Errorf("parse template %s: %w", id, err)
+		return errors.Wrapf(errors.ErrInternal, "parse template %s: %w", id, err)
 	}
 
 	r.mu.Lock()
@@ -182,7 +182,7 @@ func (r *Registry) pathToID(rel string) string {
 func newEmbeddedRegistry() (*Registry, error) {
 	subFS, err := fs.Sub(embeddedFS, "assets")
 	if err != nil {
-		return nil, fmt.Errorf("prepare embedded templates: %w", err)
+		return nil, errors.Wrap(err, "prepare embedded templates")
 	}
 
 	return NewRegistryFromFS(subFS, "assets")

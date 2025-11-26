@@ -2,9 +2,10 @@ package indicators
 
 import (
 	"context"
-	"fmt"
 
 	"prometheus/internal/tools/shared"
+
+	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -22,7 +23,7 @@ func NewMACDTool(deps shared.Deps) tool.Tool {
 		signal := parseLimit(args["signal"], 9)
 		closes := extractCloses(candles)
 		if len(closes) < slow+signal {
-			return nil, fmt.Errorf("macd: not enough data")
+			return nil, errors.Wrapf(errors.ErrInternal, "macd: not enough data")
 		}
 
 		emaFast := computeEMA(closes, fast)

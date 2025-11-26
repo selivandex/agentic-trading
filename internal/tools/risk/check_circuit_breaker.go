@@ -2,11 +2,12 @@ package risk
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 
 	"prometheus/internal/tools/shared"
+
+	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -39,7 +40,7 @@ func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
 
 		state, err := deps.RiskRepo.GetState(ctx, userID)
 		if err != nil {
-			return nil, fmt.Errorf("check_circuit_breaker: %w", err)
+			return nil, errors.Wrap(err, "check_circuit_breaker")
 		}
 		allowed := state == nil || !state.IsTriggered
 		reason := "ok"

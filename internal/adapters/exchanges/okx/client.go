@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,7 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/adapters/exchanges"
-	"prometheus/pkg/logger"
+	"prometheus/pkg/errors"
 )
 
 const (
@@ -45,15 +44,11 @@ func NewClient(cfg Config) (exchanges.Exchange, error) {
 	if cfg.Market == "" {
 		cfg.Market = exchanges.MarketTypeLinearPerp
 	}
-	
-	log := logger.Get().With("exchange", "okx", "market", cfg.Market)
-	
-	return &client{cfg: cfg, log: log}, nil
+	return &client{cfg: cfg}, nil
 }
 
 type client struct {
 	cfg Config
-	log *logger.Logger
 }
 
 func (c *client) Name() string {
@@ -61,8 +56,6 @@ func (c *client) Name() string {
 }
 
 func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticker, error) {
-	c.log.Debug("Fetching ticker", "symbol", symbol)
-	
 	params := url.Values{
 		"instId": []string{normalizeSymbol(symbol)},
 	}
@@ -82,15 +75,13 @@ func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticke
 		} `json:"data"`
 	}
 	if err := c.get(ctx, "/api/v5/market/ticker", params, &res); err != nil {
-		c.log.Error("Failed to fetch ticker", "symbol", symbol, "error", err)
 		return nil, err
 	}
 	if len(res.Data) == 0 {
-		c.log.Warn("Ticker not found", "symbol", symbol)
-		return nil, fmt.Errorf("ticker not found")
+		return nil, errors.ErrNotFound
 	}
 	item := res.Data[0]
-	ticker := &exchanges.Ticker{
+	return &exchanges.Ticker{
 		Symbol:       item.InstID,
 		LastPrice:    dec(item.Last),
 		BidPrice:     dec(item.BidPx),
@@ -101,10 +92,7 @@ func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticke
 		VolumeQuote:  dec(item.VolCcy24h),
 		Change24hPct: percentage(dec(item.Last), dec(item.Open24h)),
 		Timestamp:    time.UnixMilli(parseInt64(item.Ts)),
-	}
-	
-	c.log.Debug("Ticker fetched successfully", "symbol", symbol, "price", ticker.LastPrice)
-	return ticker, nil
+	}, nil
 }
 
 func (c *client) GetOrderBook(ctx context.Context, symbol string, depth int) (*exchanges.OrderBook, error) {
@@ -126,7 +114,7 @@ func (c *client) GetOrderBook(ctx context.Context, symbol string, depth int) (*e
 		return nil, err
 	}
 	if len(res.Data) == 0 {
-		return nil, fmt.Errorf("orderbook empty")
+		return nil, errors.ErrNotFound
 	}
 	data := res.Data[0]
 	book := &exchanges.OrderBook{
@@ -238,7 +226,7 @@ func (c *client) GetFundingRate(ctx context.Context, symbol string) (*exchanges.
 		return nil, err
 	}
 	if len(res.Data) == 0 {
-		return nil, fmt.Errorf("funding rate not found")
+		return nil, errors.ErrNotFound
 	}
 	item := res.Data[0]
 	return &exchanges.FundingRate{
@@ -267,7 +255,7 @@ func (c *client) GetOpenInterest(ctx context.Context, symbol string) (*exchanges
 		return nil, err
 	}
 	if len(res.Data) == 0 {
-		return nil, fmt.Errorf("open interest not found")
+		return nil, errors.ErrNotFound
 	}
 	item := res.Data[0]
 	return &exchanges.OpenInterest{
@@ -278,8 +266,6 @@ func (c *client) GetOpenInterest(ctx context.Context, symbol string) (*exchanges
 }
 
 func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
-	c.log.Debug("Fetching account balance")
-	
 	var res struct {
 		Data []struct {
 			TotalEq string `json:"totalEq"`
@@ -293,12 +279,10 @@ func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
 		} `json:"data"`
 	}
 	if err := c.request(ctx, http.MethodGet, "/api/v5/account/balance", nil, nil, &res); err != nil {
-		c.log.Error("Failed to fetch balance", "error", err)
 		return nil, err
 	}
 	if len(res.Data) == 0 {
-		c.log.Warn("Balance response empty")
-		return nil, fmt.Errorf("balance empty")
+		return nil, errors.ErrNotFound
 	}
 	entry := res.Data[0]
 	detail := make([]exchanges.BalanceDetail, 0, len(entry.Details))
@@ -310,19 +294,15 @@ func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
 			Borrowed:  dec(d.Borrowed),
 		})
 	}
-	balance := &exchanges.Balance{
+	return &exchanges.Balance{
 		Total:     dec(entry.TotalEq),
 		Available: sumAvailable(detail),
 		Currency:  "USD",
 		Details:   detail,
-	}
-	
-	c.log.Debug("Balance fetched successfully", "total", balance.Total, "available", balance.Available, "assets", len(detail))
-	return balance, nil
+	}, nil
 }
 
 func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error) {
-	c.log.Debug("Fetching open positions")
 	params := url.Values{}
 	if c.marketType() != exchanges.MarketTypeSpot {
 		params.Set("instType", c.instType())
@@ -342,7 +322,6 @@ func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error)
 		} `json:"data"`
 	}
 	if err := c.request(ctx, http.MethodGet, "/api/v5/account/positions", params, nil, &res); err != nil {
-		c.log.Error("Failed to fetch positions", "error", err)
 		return nil, err
 	}
 
@@ -366,8 +345,6 @@ func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error)
 			UpdatedAt:        time.UnixMilli(parseInt64(p.TS)),
 		})
 	}
-	
-	c.log.Debug("Positions fetched successfully", "count", len(positions))
 	return positions, nil
 }
 
@@ -430,9 +407,6 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 	if req == nil {
 		return nil, exchanges.ErrInvalidRequest
 	}
-	
-	c.log.Info("Placing order", "symbol", req.Symbol, "side", req.Side, "type", req.Type, "qty", req.Quantity)
-	
 	payload := map[string]string{
 		"instId":  normalizeSymbol(req.Symbol),
 		"tdMode":  tdMode(req.MarginMode),
@@ -460,15 +434,13 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 	}
 
 	if err := c.request(ctx, http.MethodPost, "/api/v5/trade/order", nil, payload, &res); err != nil {
-		c.log.Error("Failed to place order", "symbol", req.Symbol, "side", req.Side, "error", err)
 		return nil, err
 	}
 	if len(res.Data) == 0 {
-		c.log.Warn("Order response empty", "symbol", req.Symbol)
-		return nil, fmt.Errorf("order response empty")
+		return nil, errors.ErrNotFound
 	}
 	data := res.Data[0]
-	order := &exchanges.Order{
+	return &exchanges.Order{
 		ID:            data.OrdID,
 		ClientOrderID: data.ClOrdID,
 		Symbol:        normalizeSymbol(req.Symbol),
@@ -482,27 +454,15 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 		ReduceOnly:    req.ReduceOnly,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
-	}
-	
-	c.log.Info("Order placed successfully", "order_id", order.ID, "symbol", order.Symbol, "status", order.Status)
-	return order, nil
+	}, nil
 }
 
 func (c *client) CancelOrder(ctx context.Context, symbol, orderID string) error {
-	c.log.Info("Canceling order", "symbol", symbol, "order_id", orderID)
 	payload := map[string]string{
 		"instId": normalizeSymbol(symbol),
 		"ordId":  orderID,
 	}
-	
-	err := c.request(ctx, http.MethodPost, "/api/v5/trade/cancel-order", nil, payload, nil)
-	if err != nil {
-		c.log.Error("Failed to cancel order", "symbol", symbol, "order_id", orderID, "error", err)
-		return err
-	}
-	
-	c.log.Info("Order canceled successfully", "symbol", symbol, "order_id", orderID)
-	return nil
+	return c.request(ctx, http.MethodPost, "/api/v5/trade/cancel-order", nil, payload, nil)
 }
 
 func (c *client) SetLeverage(ctx context.Context, symbol string, leverage int) error {
@@ -525,7 +485,7 @@ func (c *client) SetMarginMode(ctx context.Context, symbol string, mode exchange
 
 func (c *client) get(ctx context.Context, path string, params url.Values, target interface{}) error {
 	reqURL := c.baseURL() + path
-	if params != nil && len(params) > 0 {
+	if len(params) > 0 {
 		reqURL += "?" + params.Encode()
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
@@ -542,14 +502,14 @@ func (c *client) get(ctx context.Context, path string, params url.Values, target
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("okx http %d: %s", resp.StatusCode, string(body))
+		return errors.Wrapf(errors.ErrInternal, "okx http %d: %s", resp.StatusCode, string(body))
 	}
 	return decodeEnvelope(body, target)
 }
 
 func (c *client) request(ctx context.Context, method, path string, params url.Values, payload interface{}, target interface{}) error {
 	if c.cfg.APIKey == "" || c.cfg.SecretKey == "" || c.cfg.Passphrase == "" {
-		return fmt.Errorf("okx private request requires credentials")
+		return errors.ErrUnauthorized
 	}
 
 	var body io.Reader
@@ -564,7 +524,7 @@ func (c *client) request(ctx context.Context, method, path string, params url.Va
 	}
 
 	requestPath := path
-	if params != nil && len(params) > 0 {
+	if len(params) > 0 {
 		requestPath += "?" + params.Encode()
 	}
 
@@ -578,7 +538,7 @@ func (c *client) request(ctx context.Context, method, path string, params url.Va
 
 	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
 	prehash := timestamp + strings.ToUpper(method) + path
-	if params != nil && len(params) > 0 {
+	if len(params) > 0 {
 		prehash += "?" + params.Encode()
 	}
 	prehash += bodyStr
@@ -603,9 +563,7 @@ func (c *client) request(ctx context.Context, method, path string, params url.Va
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		apiErr := fmt.Errorf("okx http %d: %s", resp.StatusCode, string(respBody))
-		c.log.Warn("OKX API error", "status", resp.StatusCode, "path", path, "error", apiErr)
-		return apiErr
+		return errors.Wrapf(errors.ErrInternal, "okx http %d: %s", resp.StatusCode, string(respBody))
 	}
 	return decodeEnvelope(respBody, target)
 }
@@ -622,7 +580,7 @@ func decodeEnvelope(body []byte, target interface{}) error {
 		return err
 	}
 	if env.Code != "0" {
-		return fmt.Errorf("okx error %s: %s", env.Code, env.Msg)
+		return errors.Wrapf(errors.ErrInternal, "okx error %s: %s", env.Code, env.Msg)
 	}
 	if target == nil {
 		return nil

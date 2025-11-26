@@ -9,16 +9,16 @@ import (
 
 // TradingPair represents a configured trading pair for a user
 type TradingPair struct {
-	ID                uuid.UUID       `db:"id"`
-	UserID            uuid.UUID       `db:"user_id"`
-	ExchangeAccountID uuid.UUID       `db:"exchange_account_id"`
-	Symbol            string          `db:"symbol"`      // BTC/USDT
-	MarketType        MarketType      `db:"market_type"` // spot, futures
+	ID                uuid.UUID  `db:"id"`
+	UserID            uuid.UUID  `db:"user_id"`
+	ExchangeAccountID uuid.UUID  `db:"exchange_account_id"`
+	Symbol            string     `db:"symbol"`      // BTC/USDT
+	MarketType        MarketType `db:"market_type"` // spot, futures
 
 	// Budget & Risk
-	Budget            decimal.Decimal `db:"budget"`             // USDT allocated
+	Budget            decimal.Decimal `db:"budget"` // USDT allocated
 	MaxPositionSize   decimal.Decimal `db:"max_position_size"`
-	MaxLeverage       int             `db:"max_leverage"`      // For futures
+	MaxLeverage       int             `db:"max_leverage"` // For futures
 	StopLossPercent   decimal.Decimal `db:"stop_loss_percent"`
 	TakeProfitPercent decimal.Decimal `db:"take_profit_percent"`
 
@@ -57,9 +57,9 @@ func (m MarketType) String() string {
 type StrategyMode string
 
 const (
-	StrategyAuto     StrategyMode = "auto"       // Full automation
-	StrategySemiAuto StrategyMode = "semi_auto"  // Needs confirmation
-	StrategySignals  StrategyMode = "signals"    // Signals only, no execution
+	StrategyAuto     StrategyMode = "auto"      // Full automation
+	StrategySemiAuto StrategyMode = "semi_auto" // Needs confirmation
+	StrategySignals  StrategyMode = "signals"   // Signals only, no execution
 )
 
 // Valid checks if strategy mode is valid

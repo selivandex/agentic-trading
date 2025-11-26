@@ -16,7 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/adapters/exchanges"
-	"prometheus/pkg/logger"
+	"prometheus/pkg/errors"
 )
 
 const (
@@ -42,10 +42,10 @@ type Config struct {
 // NewClient creates a new Binance adapter.
 func NewClient(cfg Config) (exchanges.Exchange, error) {
 	if cfg.APIKey == "" && cfg.SecretKey != "" {
-		return nil, fmt.Errorf("api key required when secret key provided")
+		return nil, errors.ErrInvalidInput
 	}
 	if cfg.SecretKey == "" && cfg.APIKey != "" {
-		return nil, fmt.Errorf("secret key required when api key provided")
+		return nil, errors.ErrInvalidInput
 	}
 	if cfg.Market == "" {
 		cfg.Market = exchanges.MarketTypeSpot
@@ -59,19 +59,15 @@ func NewClient(cfg Config) (exchanges.Exchange, error) {
 		httpClient = &http.Client{Timeout: defaultHTTPTimeout}
 	}
 
-	log := logger.Get().With("exchange", "binance", "market", cfg.Market)
-	
 	return &client{
 		cfg:        cfg,
 		httpClient: httpClient,
-		log:        log,
 	}, nil
 }
 
 type client struct {
 	cfg        Config
 	httpClient *http.Client
-	log        *logger.Logger
 }
 
 func (c *client) Name() string {
@@ -79,14 +75,11 @@ func (c *client) Name() string {
 }
 
 func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticker, error) {
-	c.log.Debug("Fetching ticker", "symbol", symbol)
-	
 	endpoint := c.apiPath("/api/v3/ticker/24hr", "/fapi/v1/ticker/24hr")
 	payload := url.Values{"symbol": []string{normalizeSymbol(symbol)}}
 
 	data, err := c.get(ctx, endpoint, payload)
 	if err != nil {
-		c.log.Error("Failed to fetch ticker", "symbol", symbol, "error", err)
 		return nil, err
 	}
 
@@ -107,7 +100,7 @@ func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticke
 		return nil, err
 	}
 
-	ticker := &exchanges.Ticker{
+	return &exchanges.Ticker{
 		Symbol:       res.Symbol,
 		LastPrice:    parseDecimal(res.LastPrice),
 		BidPrice:     parseDecimal(res.BidPrice),
@@ -118,10 +111,7 @@ func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticke
 		VolumeQuote:  parseDecimal(res.QuoteVolume),
 		Change24hPct: parseDecimal(res.PriceChangePercent),
 		Timestamp:    time.UnixMilli(res.CloseTime),
-	}
-	
-	c.log.Debug("Ticker fetched successfully", "symbol", symbol, "price", ticker.LastPrice)
-	return ticker, nil
+	}, nil
 }
 
 func (c *client) GetOrderBook(ctx context.Context, symbol string, depth int) (*exchanges.OrderBook, error) {
@@ -314,15 +304,12 @@ func (c *client) GetOpenInterest(ctx context.Context, symbol string) (*exchanges
 }
 
 func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
-	c.log.Debug("Fetching account balance")
-	
 	if c.isFutures() {
 		return c.getFuturesBalance(ctx)
 	}
 
 	data, err := c.signed(ctx, http.MethodGet, "/api/v3/account", url.Values{})
 	if err != nil {
-		c.log.Error("Failed to fetch balance", "error", err)
 		return nil, err
 	}
 
@@ -366,7 +353,6 @@ func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
 func (c *client) getFuturesBalance(ctx context.Context) (*exchanges.Balance, error) {
 	data, err := c.signed(ctx, http.MethodGet, "/fapi/v2/balance", url.Values{})
 	if err != nil {
-		c.log.Error("Failed to fetch futures balance", "error", err)
 		return nil, err
 	}
 
@@ -397,27 +383,21 @@ func (c *client) getFuturesBalance(ctx context.Context) (*exchanges.Balance, err
 		available = available.Add(avail)
 	}
 
-	balance := &exchanges.Balance{
+	return &exchanges.Balance{
 		Total:     total,
 		Available: available,
 		Details:   detail,
 		Currency:  "USD",
-	}
-	
-	c.log.Debug("Futures balance fetched successfully", "total", total, "available", available)
-	return balance, nil
+	}, nil
 }
 
 func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error) {
-	c.log.Debug("Fetching open positions")
-	
 	if !c.isFutures() {
 		return []exchanges.Position{}, nil
 	}
 
 	data, err := c.signed(ctx, http.MethodGet, "/fapi/v2/positionRisk", url.Values{})
 	if err != nil {
-		c.log.Error("Failed to fetch positions", "error", err)
 		return nil, err
 	}
 
@@ -463,7 +443,6 @@ func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error)
 		})
 	}
 
-	c.log.Debug("Positions fetched successfully", "count", len(positions))
 	return positions, nil
 }
 
@@ -524,8 +503,6 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 		return nil, exchanges.ErrInvalidRequest
 	}
 
-	c.log.Info("Placing order", "symbol", req.Symbol, "side", req.Side, "type", req.Type, "qty", req.Quantity)
-
 	params := url.Values{
 		"symbol": []string{normalizeSymbol(req.Symbol)},
 		"side":   []string{strings.ToUpper(string(req.Side))},
@@ -556,7 +533,6 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 	endpoint := c.apiPath("/api/v3/order", "/fapi/v1/order")
 	data, err := c.signed(ctx, http.MethodPost, endpoint, params)
 	if err != nil {
-		c.log.Error("Failed to place order", "symbol", req.Symbol, "side", req.Side, "error", err)
 		return nil, err
 	}
 
@@ -577,7 +553,7 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 		return nil, err
 	}
 
-	order := &exchanges.Order{
+	return &exchanges.Order{
 		ID:            strconv.FormatInt(res.OrderID, 10),
 		ClientOrderID: res.ClientOrderID,
 		Symbol:        res.Symbol,
@@ -592,14 +568,10 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 		CreatedAt:     time.UnixMilli(res.TransactTime),
 		UpdatedAt:     time.UnixMilli(res.TransactTime),
 		ReduceOnly:    req.ReduceOnly,
-	}
-	
-	c.log.Info("Order placed successfully", "order_id", order.ID, "symbol", order.Symbol, "status", order.Status)
-	return order, nil
+	}, nil
 }
 
 func (c *client) CancelOrder(ctx context.Context, symbol, orderID string) error {
-	c.log.Info("Canceling order", "symbol", symbol, "order_id", orderID)
 	params := url.Values{
 		"symbol": []string{normalizeSymbol(symbol)},
 	}
@@ -609,13 +581,7 @@ func (c *client) CancelOrder(ctx context.Context, symbol, orderID string) error 
 
 	endpoint := c.apiPath("/api/v3/order", "/fapi/v1/order")
 	_, err := c.signed(ctx, http.MethodDelete, endpoint, params)
-	if err != nil {
-		c.log.Error("Failed to cancel order", "symbol", symbol, "order_id", orderID, "error", err)
-		return err
-	}
-	
-	c.log.Info("Order canceled successfully", "symbol", symbol, "order_id", orderID)
-	return nil
+	return err
 }
 
 func (c *client) SetLeverage(ctx context.Context, symbol string, leverage int) error {
@@ -703,9 +669,7 @@ func (c *client) doRequest(ctx context.Context, method, path string, params url.
 	}
 
 	if resp.StatusCode >= 400 {
-		apiErr := parseAPIError(resp.StatusCode, payload)
-		c.log.Warn("Binance API error", "status", resp.StatusCode, "path", path, "error", apiErr)
-		return nil, apiErr
+		return nil, parseAPIError(resp.StatusCode, payload)
 	}
 
 	return payload, nil
@@ -749,11 +713,11 @@ func parseAPIError(status int, payload []byte) error {
 	}
 	if err := json.Unmarshal(payload, &apiErr); err == nil && apiErr.Code != 0 {
 		if apiErr.Code == -1003 {
-			return fmt.Errorf("%w: %s", exchanges.ErrRateLimited, apiErr.Msg)
+			return errors.Wrapf(exchanges.ErrRateLimited, "%s", apiErr.Msg)
 		}
-		return fmt.Errorf("binance error %d: %s", apiErr.Code, apiErr.Msg)
+		return errors.Wrapf(errors.ErrInternal, "binance error %d: %s", apiErr.Code, apiErr.Msg)
 	}
-	return fmt.Errorf("binance http %d: %s", status, string(payload))
+	return errors.Wrapf(errors.ErrInternal, "binance http %d: %s", status, string(payload))
 }
 
 func parseOrderBookEntry(values []interface{}) exchanges.OrderBookEntry {

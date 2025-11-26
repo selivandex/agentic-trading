@@ -90,13 +90,13 @@ type CryptoConfig struct {
 
 type MarketDataConfig struct {
 	// Central API keys for market data collection (not user-specific)
-	BinanceAPIKey    string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
-	BinanceSecret    string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
-	BybitAPIKey      string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
-	BybitSecret      string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
-	OKXAPIKey        string `envconfig:"OKX_MARKET_DATA_API_KEY"`
-	OKXSecret        string `envconfig:"OKX_MARKET_DATA_SECRET"`
-	OKXPassphrase    string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+	BinanceAPIKey string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
+	BinanceSecret string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
+	BybitAPIKey   string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
+	BybitSecret   string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
+	OKXAPIKey     string `envconfig:"OKX_MARKET_DATA_API_KEY"`
+	OKXSecret     string `envconfig:"OKX_MARKET_DATA_SECRET"`
+	OKXPassphrase string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
 }
 
 type ErrorTrackingConfig struct {
