@@ -1,48 +1,45 @@
-package tools
+package shared
 
 import (
 	"time"
 
 	"google.golang.org/adk/tool"
-
-	"prometheus/internal/tools/middleware"
-	"prometheus/internal/tools/shared"
 )
 
 // Factory provides fluent API for creating tools with middleware
-type Factory struct {
+type ToolBuilder struct {
 	name        string
 	description string
-	fn          middleware.ToolFunc
-	deps        shared.Deps
+	fn          ToolFunc
+	deps        Deps
 
 	// Middleware options
 	withRetry   bool
-	retryConfig middleware.RetryMiddleware
+	retryConfig RetryMiddleware
 
 	withTimeout   bool
-	timeoutConfig middleware.TimeoutMiddleware
+	timeoutConfig TimeoutMiddleware
 
 	withStats bool
 }
 
-// NewFactory creates a new factory for a tool
-func NewFactory(name, description string, fn middleware.ToolFunc, deps shared.Deps) *Factory {
-	return &Factory{
+// NewToolBuilder creates a new factory for a tool
+func NewToolBuilder(name, description string, fn ToolFunc, deps Deps) *ToolBuilder {
+	return &ToolBuilder{
 		name:        name,
 		description: description,
 		fn:          fn,
 		deps:        deps,
 		// Default configs
-		retryConfig:   middleware.RetryMiddleware{Attempts: 3, Backoff: 500 * time.Millisecond},
-		timeoutConfig: middleware.TimeoutMiddleware{Timeout: 30 * time.Second},
+		retryConfig:   RetryMiddleware{Attempts: 3, Backoff: 500 * time.Millisecond},
+		timeoutConfig: TimeoutMiddleware{Timeout: 30 * time.Second},
 	}
 }
 
 // WithRetry enables retry middleware
-func (b *Factory) WithRetry(attempts int, backoff time.Duration) *Factory {
+func (b *ToolBuilder) WithRetry(attempts int, backoff time.Duration) *ToolBuilder {
 	b.withRetry = true
-	b.retryConfig = middleware.RetryMiddleware{
+	b.retryConfig = RetryMiddleware{
 		Attempts: attempts,
 		Backoff:  backoff,
 	}
@@ -50,22 +47,22 @@ func (b *Factory) WithRetry(attempts int, backoff time.Duration) *Factory {
 }
 
 // WithTimeout enables timeout middleware
-func (b *Factory) WithTimeout(timeout time.Duration) *Factory {
+func (b *ToolBuilder) WithTimeout(timeout time.Duration) *ToolBuilder {
 	b.withTimeout = true
-	b.timeoutConfig = middleware.TimeoutMiddleware{
+	b.timeoutConfig = TimeoutMiddleware{
 		Timeout: timeout,
 	}
 	return b
 }
 
 // WithStats enables stats tracking middleware
-func (b *Factory) WithStats() *Factory {
+func (b *ToolBuilder) WithStats() *ToolBuilder {
 	b.withStats = true
 	return b
 }
 
 // Build creates the tool with configured middleware applied
-func (b *Factory) Build() tool.Tool {
+func (b *ToolBuilder) Build() tool.Tool {
 	fn := b.fn
 
 	// Apply middleware in order: retry -> timeout -> stats
@@ -83,8 +80,8 @@ func (b *Factory) Build() tool.Tool {
 
 	// 3. Stats (outermost - tracks everything including retries)
 	if b.withStats && b.deps.StatsRepo != nil {
-		statsMiddleware := middleware.NewStatsMiddleware(b.deps.StatsRepo)
-		return statsMiddleware.WrapFunc(b.name, b.description, fn)
+		statsMiddleware := NewStatsMiddleware(b.deps.StatsRepo)
+		return statsWrapFunc(b.name, b.description, fn)
 	}
 
 	// No stats, create tool directly
@@ -93,7 +90,7 @@ func (b *Factory) Build() tool.Tool {
 
 // Helper functions to apply middleware
 
-func wrapWithRetry(retry middleware.RetryMiddleware, fn middleware.ToolFunc) middleware.ToolFunc {
+func wrapWithRetry(retry RetryMiddleware, fn ToolFunc) ToolFunc {
 	return func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		var result map[string]interface{}
 		var err error
@@ -123,7 +120,7 @@ func wrapWithRetry(retry middleware.RetryMiddleware, fn middleware.ToolFunc) mid
 	}
 }
 
-func wrapWithTimeout(timeout middleware.TimeoutMiddleware, fn middleware.ToolFunc) middleware.ToolFunc {
+func wrapWithTimeout(timeout TimeoutMiddleware, fn ToolFunc) ToolFunc {
 	if timeout.Timeout <= 0 {
 		return fn
 	}
@@ -136,7 +133,7 @@ func wrapWithTimeout(timeout middleware.TimeoutMiddleware, fn middleware.ToolFun
 	}
 }
 
-func createToolFromFunc(name, description string, fn middleware.ToolFunc) tool.Tool {
+func createToolFromFunc(name, description string, fn ToolFunc) tool.Tool {
 	// Use timeout middleware with no timeout (passthrough) to create the tool
-	return middleware.TimeoutMiddleware{}.WrapFunc(name, description, fn)
+	return TimeoutMiddleware{}.WrapFunc(name, description, fn)
 }

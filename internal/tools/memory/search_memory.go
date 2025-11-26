@@ -12,7 +12,6 @@ import (
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // SearchMemoryArgs represents input parameters for memory search
@@ -46,11 +45,9 @@ type MemorySearchResponse struct {
 
 // NewSearchMemoryTool performs semantic memory search for a user.
 func NewSearchMemoryTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "search_memory",
-			Description: "Semantic memory search",
-		},
+	return shared.NewToolBuilder(
+		"search_memory",
+		"Semantic memory search",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.MemoryRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "search_memory: memory repository not configured")
@@ -80,8 +77,13 @@ func NewSearchMemoryTool(deps shared.Deps) tool.Tool {
 			return map[string]interface{}{
 				"memories": response.Memories,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // parseSearchMemoryArgs extracts and validates input arguments

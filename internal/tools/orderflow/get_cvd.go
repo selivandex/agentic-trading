@@ -3,20 +3,18 @@ package orderflow
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetCVDTool calculates Cumulative Volume Delta
 // CVD = running total of (buy volume - sell volume)
 // Rising CVD = accumulation, Falling CVD = distribution
 func NewGetCVDTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_cvd",
-			Description: "Get Cumulative Volume Delta (CVD)",
-		},
+	return shared.NewToolBuilder(
+		"get_cvd",
+		"Get Cumulative Volume Delta (CVD)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "market data repository not configured")
@@ -105,8 +103,13 @@ func NewGetCVDTool(deps shared.Deps) tool.Tool {
 				"signal":          signal,
 				"trades_analyzed": len(trades),
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 func absFloat(x float64) float64 {

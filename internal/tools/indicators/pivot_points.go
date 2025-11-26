@@ -1,97 +1,101 @@
 package indicators
 
 import (
+	"time"
+
 	"prometheus/internal/tools/shared"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewPivotPointsTool computes Pivot Points (Classic, Fibonacci, Woodie, Camarilla)
 // Pivot points are support/resistance levels calculated from previous period's high/low/close
 func NewPivotPointsTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "pivot_points",
-			Description: "Pivot Points Calculator",
-		},
+	return shared.NewToolBuilder(
+		"pivot_points",
+		"Pivot Points Calculator",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		// Load candles (need at least 1 previous day candle)
-		candles, err := loadCandles(ctx, deps, args, 10)
-		if err != nil {
-			return nil, err
-		}
+			// Load candles (need at least 1 previous day candle)
+			candles, err := loadCandles(ctx, deps, args, 10)
+			if err != nil {
+				return nil, err
+			}
 
-		if err := ValidateMinLength(candles, 2, "Pivot Points"); err != nil {
-			return nil, err
-		}
+			if err := ValidateMinLength(candles, 2, "Pivot Points"); err != nil {
+				return nil, err
+			}
 
-		// Use previous candle (yesterday's data) for calculation
-		prevCandle := candles[1]
-		currentPrice := candles[0].Close
+			// Use previous candle (yesterday's data) for calculation
+			prevCandle := candles[1]
+			currentPrice := candles[0].Close
 
-		// Get pivot type (classic, fibonacci, woodie, camarilla)
-		pivotType := "classic"
-		if pt, ok := args["type"].(string); ok {
-			pivotType = pt
-		}
+			// Get pivot type (classic, fibonacci, woodie, camarilla)
+			pivotType := "classic"
+			if pt, ok := args["type"].(string); ok {
+				pivotType = pt
+			}
 
-		var pivot, r1, r2, r3, s1, s2, s3 float64
+			var pivot, r1, r2, r3, s1, s2, s3 float64
 
-		switch pivotType {
-		case "fibonacci":
-			pivot, r1, r2, r3, s1, s2, s3 = calculateFibonacciPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
-		case "woodie":
-			pivot, r1, r2, r3, s1, s2, s3 = calculateWoodiePivots(prevCandle.High, prevCandle.Low, prevCandle.Close, candles[0].Open)
-		case "camarilla":
-			pivot, r1, r2, r3, s1, s2, s3 = calculateCamarillaPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
-		default: // classic
-			pivot, r1, r2, r3, s1, s2, s3 = calculateClassicPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
-		}
+			switch pivotType {
+			case "fibonacci":
+				pivot, r1, r2, r3, s1, s2, s3 = calculateFibonacciPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
+			case "woodie":
+				pivot, r1, r2, r3, s1, s2, s3 = calculateWoodiePivots(prevCandle.High, prevCandle.Low, prevCandle.Close, candles[0].Open)
+			case "camarilla":
+				pivot, r1, r2, r3, s1, s2, s3 = calculateCamarillaPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
+			default: // classic
+				pivot, r1, r2, r3, s1, s2, s3 = calculateClassicPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
+			}
 
-		// Determine current level
-		currentLevel := "between_pivots"
-		if currentPrice >= r3 {
-			currentLevel = "above_r3"
-		} else if currentPrice >= r2 {
-			currentLevel = "above_r2"
-		} else if currentPrice >= r1 {
-			currentLevel = "above_r1"
-		} else if currentPrice <= s3 {
-			currentLevel = "below_s3"
-		} else if currentPrice <= s2 {
-			currentLevel = "below_s2"
-		} else if currentPrice <= s1 {
-			currentLevel = "below_s1"
-		} else if currentPrice > pivot {
-			currentLevel = "above_pivot"
-		} else {
-			currentLevel = "below_pivot"
-		}
+			// Determine current level
+			currentLevel := "between_pivots"
+			if currentPrice >= r3 {
+				currentLevel = "above_r3"
+			} else if currentPrice >= r2 {
+				currentLevel = "above_r2"
+			} else if currentPrice >= r1 {
+				currentLevel = "above_r1"
+			} else if currentPrice <= s3 {
+				currentLevel = "below_s3"
+			} else if currentPrice <= s2 {
+				currentLevel = "below_s2"
+			} else if currentPrice <= s1 {
+				currentLevel = "below_s1"
+			} else if currentPrice > pivot {
+				currentLevel = "above_pivot"
+			} else {
+				currentLevel = "below_pivot"
+			}
 
-		// Generate signal
-		signal := "neutral"
-		if currentPrice > pivot && currentPrice < r1 {
-			signal = "bullish"
-		} else if currentPrice < pivot && currentPrice > s1 {
-			signal = "bearish"
-		}
+			// Generate signal
+			signal := "neutral"
+			if currentPrice > pivot && currentPrice < r1 {
+				signal = "bullish"
+			} else if currentPrice < pivot && currentPrice > s1 {
+				signal = "bearish"
+			}
 
-		return map[string]interface{}{
-			"pivot":         pivot,
-			"r1":            r1,
-			"r2":            r2,
-			"r3":            r3,
-			"s1":            s1,
-			"s2":            s2,
-			"s3":            s3,
-			"current_price": currentPrice,
-			"current_level": currentLevel,
-			"signal":        signal,
-			"type":          pivotType,
-		}, nil
-	})
-	return t
+			return map[string]interface{}{
+				"pivot":         pivot,
+				"r1":            r1,
+				"r2":            r2,
+				"r3":            r3,
+				"s1":            s1,
+				"s2":            s2,
+				"s3":            s3,
+				"current_price": currentPrice,
+				"current_level": currentLevel,
+				"signal":        signal,
+				"type":          pivotType,
+			}, nil
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // Classic Pivot Points

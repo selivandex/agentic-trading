@@ -1,22 +1,21 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewOBVTool computes On-Balance Volume using ta-lib
 func NewOBVTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "obv",
-			Description: "On-Balance Volume",
-		},
+	return shared.NewToolBuilder(
+		"obv",
+		"On-Balance Volume",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 100)
@@ -83,8 +82,13 @@ func NewOBVTool(deps shared.Deps) tool.Tool {
 				"divergence": divergence,
 				"signal":     signal,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // analyzeTrend determines trend from series of values

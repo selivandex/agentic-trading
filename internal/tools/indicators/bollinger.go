@@ -1,22 +1,21 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewBollingerTool computes Bollinger Bands using ta-lib
 func NewBollingerTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "bollinger",
-			Description: "Bollinger Bands",
-		},
+	return shared.NewToolBuilder(
+		"bollinger",
+		"Bollinger Bands",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 200)
@@ -84,8 +83,13 @@ func NewBollingerTool(deps shared.Deps) tool.Tool {
 				"position":      position,
 				"period":        period,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // parseFloat parses float64 from interface{} with default

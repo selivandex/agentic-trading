@@ -5,7 +5,6 @@ import (
 
 	"github.com/markcheno/go-talib"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
@@ -14,7 +13,7 @@ import (
 
 // NewCCITool computes Commodity Channel Index using ta-lib
 func NewCCITool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"cci",
 		"Commodity Channel Index",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {

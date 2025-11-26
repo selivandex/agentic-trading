@@ -3,9 +3,9 @@ package smc
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // SwingPoint represents a swing high or swing low
@@ -21,11 +21,9 @@ type SwingPoint struct {
 // Swing High: local maximum (higher than N candles before and after)
 // Swing Low: local minimum (lower than N candles before and after)
 func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_swing_points",
-			Description: "Get Swing Points (Highs/Lows)",
-		},
+	return shared.NewToolBuilder(
+		"get_swing_points",
+		"Get Swing Points (Highs/Lows)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 100)
@@ -133,6 +131,11 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 				"current_price": currentPrice,
 				"lookback":      lookback,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

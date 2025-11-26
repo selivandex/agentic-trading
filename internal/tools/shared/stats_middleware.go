@@ -1,4 +1,4 @@
-package middleware
+package shared
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"google.golang.org/adk/tool/functiontool"
 
 	"prometheus/internal/domain/stats"
-	toolctx "prometheus/internal/tools/shared"
 )
 
 // StatsMiddleware records tool usage metrics into the stats repository.
@@ -46,7 +45,7 @@ func (m *StatsMiddleware) WrapFunc(name, description string, fn ToolFunc) tool.T
 			result, err := fn(ctx, args)
 			duration := time.Since(start)
 
-			if meta, ok := toolctx.MetadataFromContext(ctx); ok {
+			if meta, ok := MetadataFromContext(ctx); ok {
 				usage := &stats.ToolUsageEvent{
 					UserID:     meta.UserID,
 					AgentID:    meta.AgentID,

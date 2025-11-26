@@ -5,7 +5,6 @@ import (
 
 	"github.com/markcheno/go-talib"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
@@ -14,7 +13,7 @@ import (
 
 // NewROCTool computes Rate of Change using ta-lib
 func NewROCTool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"roc",
 		"Rate of Change",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
@@ -75,7 +74,7 @@ func NewROCTool(deps shared.Deps) tool.Tool {
 		},
 		deps,
 	).
-		WithTimeout(15 * time.Second).
+		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
 		WithStats().
 		Build()

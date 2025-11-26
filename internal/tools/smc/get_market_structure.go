@@ -4,9 +4,9 @@ import (
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // MarketStructure represents the current market structure
@@ -35,11 +35,9 @@ type StructureBreak struct {
 // BOS (Break of Structure) = Continuation of trend
 // CHoCH (Change of Character) = Potential trend reversal
 func NewGetMarketStructureTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_market_structure",
-			Description: "Get Market Structure (BOS/CHoCH)",
-		},
+	return shared.NewToolBuilder(
+		"get_market_structure",
+		"Get Market Structure (BOS/CHoCH)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			candles, err := loadCandles(ctx, deps, args, 100)
 			if err != nil {
@@ -113,8 +111,13 @@ func NewGetMarketStructureTool(deps shared.Deps) tool.Tool {
 				"signal":    signal,
 				"trend":     trend,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 type swingPoint struct {

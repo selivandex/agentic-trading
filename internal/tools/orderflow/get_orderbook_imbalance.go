@@ -2,12 +2,12 @@ package orderflow
 
 import (
 	"encoding/json"
+	"time"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // OrderBookLevel represents a single price level in order book
@@ -18,11 +18,9 @@ type OrderBookLevel struct {
 
 // NewGetOrderbookImbalanceTool analyzes bid/ask imbalance in order book
 func NewGetOrderbookImbalanceTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_orderbook_imbalance",
-			Description: "Get OrderBook Imbalance (Bid/Ask Delta)",
-		},
+	return shared.NewToolBuilder(
+		"get_orderbook_imbalance",
+		"Get OrderBook Imbalance (Bid/Ask Delta)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "market data repository not configured")
@@ -114,6 +112,11 @@ func NewGetOrderbookImbalanceTool(deps shared.Deps) tool.Tool {
 				"largest_ask":    largestAsk,
 				"depth_analyzed": depth,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

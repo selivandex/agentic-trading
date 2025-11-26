@@ -1,10 +1,11 @@
 package indicators
 
 import (
+	"time"
+
 	"prometheus/internal/tools/shared"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewIchimokuTool computes Ichimoku Cloud indicator
@@ -15,11 +16,9 @@ import (
 // - Senkou Span B (Leading Span B): (52-period high + 52-period low) / 2, plotted 26 periods ahead
 // - Chikou Span (Lagging Span): Close price plotted 26 periods back
 func NewIchimokuTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "ichimoku",
-			Description: "Ichimoku Cloud",
-		},
+	return shared.NewToolBuilder(
+		"ichimoku",
+		"Ichimoku Cloud",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles (need at least 52 + 26 = 78 for full calculation)
 			candles, err := loadCandles(ctx, deps, args, 120)
@@ -93,8 +92,13 @@ func NewIchimokuTool(deps shared.Deps) tool.Tool {
 				"price_position": pricePosition,
 				"signal":         signal,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // calculateMidpoint calculates (highest high + lowest low) / 2 for a period

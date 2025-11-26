@@ -1,22 +1,21 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewSMATool computes Simple Moving Average using ta-lib
 func NewSMATool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "sma",
-			Description: "Simple Moving Average",
-		},
+	return shared.NewToolBuilder(
+		"sma",
+		"Simple Moving Average",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 200)
@@ -48,6 +47,11 @@ func NewSMATool(deps shared.Deps) tool.Tool {
 				"value":  value,
 				"period": period,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

@@ -3,7 +3,6 @@ package market
 import (
 	"time"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -13,7 +12,7 @@ import (
 
 // NewGetTradesTool streams recent trades.
 func NewGetTradesTool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"get_trades",
 		"Get recent trades tape",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
@@ -49,7 +48,7 @@ func NewGetTradesTool(deps shared.Deps) tool.Tool {
 		},
 		deps,
 	).
-		WithTimeout(10 * time.Second).
+		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
 		WithStats().
 		Build()

@@ -2,11 +2,11 @@ package indicators
 
 import (
 	"sort"
+	"time"
 
 	"prometheus/internal/tools/shared"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // VolumeProfileBin represents a price level with accumulated volume
@@ -18,11 +18,9 @@ type VolumeProfileBin struct {
 // NewVolumeProfileTool computes Volume Profile (Volume at Price levels)
 // Shows where most trading activity occurred
 func NewVolumeProfileTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "volume_profile",
-			Description: "Volume Profile (Volume by Price)",
-		},
+	return shared.NewToolBuilder(
+		"volume_profile",
+		"Volume Profile (Volume by Price)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 100)
@@ -174,6 +172,11 @@ func NewVolumeProfileTool(deps shared.Deps) tool.Tool {
 				"top_nodes":       topNodes,
 				"total_volume":    totalVolume,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

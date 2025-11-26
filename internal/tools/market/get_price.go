@@ -3,7 +3,6 @@ package market
 import (
 	"time"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -13,7 +12,7 @@ import (
 
 // NewGetPriceTool returns a tool that fetches the latest ticker snapshot.
 func NewGetPriceTool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"get_price",
 		"Fetch current price with bid/ask spread",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {

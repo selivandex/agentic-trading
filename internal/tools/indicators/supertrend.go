@@ -1,13 +1,14 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewSupertrendTool computes Supertrend indicator
@@ -17,11 +18,9 @@ import (
 // - Basic Lowerband = (HIGH + LOW) / 2 - (Multiplier * ATR)
 // - If close > prev supertrend, use lowerband, else use upperband
 func NewSupertrendTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "supertrend",
-			Description: "Supertrend Indicator",
-		},
+	return shared.NewToolBuilder(
+		"supertrend",
+		"Supertrend Indicator",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 200)
@@ -93,8 +92,13 @@ func NewSupertrendTool(deps shared.Deps) tool.Tool {
 				"multiplier":    multiplier,
 				"atr_period":    atrPeriod,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // calculateSupertrend computes supertrend values and trend direction

@@ -1,4 +1,4 @@
-package middleware
+package shared
 
 import "google.golang.org/adk/tool"
 

@@ -2,20 +2,18 @@ package trading
 
 import (
 	"prometheus/internal/tools/shared"
+	"time"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetBalanceTool lists active exchange accounts for the user.
 func NewGetBalanceTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_balance",
-			Description: "Retrieve account balances",
-		},
+	return shared.NewToolBuilder(
+		"get_balance",
+		"Retrieve account balances",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.ExchangeAccountRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_balance: exchange account repository not configured")
@@ -47,6 +45,11 @@ func NewGetBalanceTool(deps shared.Deps) tool.Tool {
 			}
 
 			return map[string]interface{}{"accounts": data}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

@@ -3,7 +3,6 @@ package indicators
 import (
 	"time"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -13,7 +12,7 @@ import (
 
 // NewMACDTool computes MACD (12,26,9 by default).
 func NewMACDTool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"macd",
 		"Moving Average Convergence Divergence",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
@@ -43,7 +42,7 @@ func NewMACDTool(deps shared.Deps) tool.Tool {
 		},
 		deps,
 	).
-		WithTimeout(15 * time.Second).
+		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
 		WithStats().
 		Build()

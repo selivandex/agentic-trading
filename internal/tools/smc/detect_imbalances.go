@@ -4,9 +4,9 @@ import (
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // Imbalance represents a price imbalance (similar to FVG but stricter)
@@ -25,11 +25,9 @@ type Imbalance struct {
 // Imbalance = Large candle with minimal overlap to previous candles
 // Indicates strong directional move with inefficient price discovery
 func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "detect_imbalances",
-			Description: "Detect Price Imbalances",
-		},
+	return shared.NewToolBuilder(
+		"detect_imbalances",
+		"Detect Price Imbalances",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			candles, err := loadCandles(ctx, deps, args, 100)
 			if err != nil {
@@ -133,8 +131,12 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 				"signal":         signal,
 				"current_price":  currentPrice,
 			}, nil
-		})
-	return t
+		},
+		deps).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 func calculateOverlap(c1, c2 market_data.OHLCV) float64 {

@@ -3,18 +3,16 @@ package orderflow
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetTradeImbalanceTool calculates buy vs sell pressure from recent trades
 func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_trade_imbalance",
-			Description: "Get Trade Imbalance (Buy vs Sell Pressure)",
-		},
+	return shared.NewToolBuilder(
+		"get_trade_imbalance",
+		"Get Trade Imbalance (Buy vs Sell Pressure)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "market data repository not configured")
@@ -90,8 +88,13 @@ func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 				"signal":          signal,
 				"trades_analyzed": len(trades),
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 func parseLimit(val interface{}, defaultVal int) int {

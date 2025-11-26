@@ -1,6 +1,8 @@
 package risk
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 
 	"prometheus/internal/tools/shared"
@@ -8,16 +10,13 @@ import (
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewCheckCircuitBreakerTool reports whether trading is allowed.
 func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "check_circuit_breaker",
-			Description: "Check if trading is allowed",
-		},
+	return shared.NewToolBuilder(
+		"check_circuit_breaker",
+		"Check if trading is allowed",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			userID := uuid.Nil
 			if idVal, ok := args["user_id"]; ok {
@@ -52,6 +51,11 @@ func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
 			}
 
 			return map[string]interface{}{"allowed": allowed, "reason": reason}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

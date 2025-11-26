@@ -3,19 +3,17 @@ package orderflow
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetTickSpeedTool calculates trade velocity (trades per minute)
 // High tick speed = high activity, potential breakout
 func NewGetTickSpeedTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_tick_speed",
-			Description: "Get Tick Speed (Trade Velocity)",
-		},
+	return shared.NewToolBuilder(
+		"get_tick_speed",
+		"Get Tick Speed (Trade Velocity)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "market data repository not configured")
@@ -123,6 +121,11 @@ func NewGetTickSpeedTool(deps shared.Deps) tool.Tool {
 				"time_span_minutes": timeSpan.Minutes(),
 				"trades_analyzed":   len(trades),
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

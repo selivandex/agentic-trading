@@ -3,9 +3,9 @@ package orderflow
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // WhaleTrade represents a large trade
@@ -20,11 +20,9 @@ type WhaleTrade struct {
 
 // NewGetWhaleTradesTool collects large transactions (whale activity)
 func NewGetWhaleTradesTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_whale_trades",
-			Description: "Get Whale Trades (Large Transactions)",
-		},
+	return shared.NewToolBuilder(
+		"get_whale_trades",
+		"Get Whale Trades (Large Transactions)",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "market data repository not configured")
@@ -110,8 +108,13 @@ func NewGetWhaleTradesTool(deps shared.Deps) tool.Tool {
 				"signal":              signal,
 				"min_threshold_usd":   minUSDValue,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 func min(a, b int) int {

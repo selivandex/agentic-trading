@@ -1,24 +1,23 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewKeltnerTool computes Keltner Channels
 // Keltner Channels = EMA +/- (ATR * multiplier)
 // Similar to Bollinger Bands but uses ATR instead of standard deviation
 func NewKeltnerTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "keltner",
-			Description: "Keltner Channels",
-		},
+	return shared.NewToolBuilder(
+		"keltner",
+		"Keltner Channels",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 200)
@@ -98,8 +97,13 @@ func NewKeltnerTool(deps shared.Deps) tool.Tool {
 				"position":      position,
 				"signal":        signal,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // max returns maximum of two integers

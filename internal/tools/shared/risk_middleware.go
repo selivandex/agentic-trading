@@ -1,11 +1,10 @@
-package middleware
+package shared
 
 import (
 	"github.com/google/uuid"
 
 	"google.golang.org/adk/tool"
 
-	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 )
 
@@ -14,7 +13,7 @@ type ToolExecutor func(ctx tool.Context, args map[string]interface{}) (map[strin
 
 // WithRiskCheck wraps a trading tool execution with risk engine checks
 // It ensures that the user is allowed to trade before executing the tool
-func WithRiskCheck(deps shared.Deps, executor ToolExecutor) ToolExecutor {
+func WithRiskCheck(deps Deps, executor ToolExecutor) ToolExecutor {
 	return func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Skip risk check if risk engine is not configured
 		if !deps.HasRiskEngine() {
@@ -25,7 +24,7 @@ func WithRiskCheck(deps shared.Deps, executor ToolExecutor) ToolExecutor {
 		var userID uuid.UUID
 		var err error
 
-		if meta, ok := shared.MetadataFromContext(ctx); ok {
+		if meta, ok := MetadataFromContext(ctx); ok {
 			userID = meta.UserID
 		} else {
 			// Try to extract from args
@@ -73,7 +72,7 @@ func WithRiskCheck(deps shared.Deps, executor ToolExecutor) ToolExecutor {
 }
 
 // WithRiskCheckMultiple applies risk check middleware to multiple tools
-func WithRiskCheckMultiple(deps shared.Deps, executors map[string]ToolExecutor) map[string]ToolExecutor {
+func WithRiskCheckMultiple(deps Deps, executors map[string]ToolExecutor) map[string]ToolExecutor {
 	wrapped := make(map[string]ToolExecutor)
 	for name, executor := range executors {
 		wrapped[name] = WithRiskCheck(deps, executor)

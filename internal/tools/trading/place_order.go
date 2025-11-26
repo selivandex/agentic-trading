@@ -1,6 +1,8 @@
 package trading
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/domain/order"
@@ -9,16 +11,13 @@ import (
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewPlaceOrderTool creates a pending order record.
 func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "place_order",
-			Description: "Place a market or limit order",
-		},
+	return shared.NewToolBuilder(
+		"place_order",
+		"Place a market or limit order",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.OrderRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "place_order: order repository not configured")
@@ -102,6 +101,11 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 				"side":     created.Side.String(),
 				"type":     created.Type.String(),
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

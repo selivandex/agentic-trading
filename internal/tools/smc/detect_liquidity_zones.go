@@ -4,9 +4,9 @@ import (
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // LiquidityZone represents a clustered area of swing points
@@ -24,11 +24,9 @@ type LiquidityZone struct {
 // Buy-side liquidity = above swing highs (where shorts have stops)
 // Sell-side liquidity = below swing lows (where longs have stops)
 func NewDetectLiquidityZonesTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "detect_liquidity_zones",
-			Description: "Detect Liquidity Zones",
-		},
+	return shared.NewToolBuilder(
+		"detect_liquidity_zones",
+		"Detect Liquidity Zones",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 200)
@@ -104,8 +102,13 @@ func NewDetectLiquidityZonesTool(deps shared.Deps) tool.Tool {
 				"target_zone":       targetZone,
 				"current_price":     currentPrice,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 // findSwingHighs finds all swing highs in candles

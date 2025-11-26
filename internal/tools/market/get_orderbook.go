@@ -3,7 +3,6 @@ package market
 import (
 	"time"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -13,7 +12,7 @@ import (
 
 // NewGetOrderBookTool returns an order book snapshot tool.
 func NewGetOrderBookTool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"get_orderbook",
 		"Get depth snapshot for a trading pair",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {

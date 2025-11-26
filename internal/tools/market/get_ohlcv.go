@@ -3,7 +3,6 @@ package market
 import (
 	"time"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -13,7 +12,7 @@ import (
 
 // NewGetOHLCVTool loads historical candles for a symbol/timeframe.
 func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"get_ohlcv",
 		"Retrieve historical OHLCV candles",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {

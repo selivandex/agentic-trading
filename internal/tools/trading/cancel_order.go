@@ -3,20 +3,18 @@ package trading
 import (
 	"prometheus/internal/domain/order"
 	"prometheus/internal/tools/shared"
+	"time"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewCancelOrderTool cancels an order by ID.
 func NewCancelOrderTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "cancel_order",
-			Description: "Cancel a specific order",
-		},
+	return shared.NewToolBuilder(
+		"cancel_order",
+		"Cancel a specific order",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.OrderRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "cancel_order: order repository not configured")
@@ -32,6 +30,11 @@ func NewCancelOrderTool(deps shared.Deps) tool.Tool {
 			}
 
 			return map[string]interface{}{"order_id": orderID.String(), "status": order.OrderStatusCanceled.String()}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

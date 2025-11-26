@@ -4,7 +4,6 @@ import (
 	"math"
 	"time"
 
-	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -14,7 +13,7 @@ import (
 
 // NewRSITool computes Relative Strength Index using closing prices.
 func NewRSITool(deps shared.Deps) tool.Tool {
-	return tools.NewFactory(
+	return shared.NewToolBuilder(
 		"rsi",
 		"Relative Strength Index",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
@@ -50,7 +49,7 @@ func NewRSITool(deps shared.Deps) tool.Tool {
 		},
 		deps,
 	).
-		WithTimeout(15 * time.Second).
+		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
 		WithStats().
 		Build()

@@ -1,6 +1,8 @@
 package risk
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 
 	riskpkg "prometheus/internal/risk"
@@ -9,16 +11,13 @@ import (
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewEmergencyCloseAllTool closes all open positions for the user using the kill switch.
 func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "emergency_close_all",
-			Description: "Kill switch to close all positions and cancel all orders immediately",
-		},
+	return shared.NewToolBuilder(
+		"emergency_close_all",
+		"Kill switch to close all positions and cancel all orders immediately",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.PositionRepo == nil || deps.OrderRepo == nil || deps.RiskRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "emergency_close_all: required repositories not configured")
@@ -78,6 +77,10 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 			}
 
 			return response, nil
-		})
-	return t
+		},
+		deps).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
