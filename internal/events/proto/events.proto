@@ -255,3 +255,54 @@ message OrderBlockDetectedEvent {
   double strength = 6;
 }
 
+// MarketAnalysisRequestEvent is published when market scanner requests analysis
+message MarketAnalysisRequestEvent {
+  BaseEvent base = 1;
+  string symbol = 2;
+  string market_type = 3;  // spot, futures
+  string strategy = 4;
+}
+
+// MarketScanCompleteEvent is published when market scanner completes a scan
+message MarketScanCompleteEvent {
+  BaseEvent base = 1;
+  int32 total_users = 2;
+  int32 errors_count = 3;
+  int64 duration_ms = 4;
+}
+
+// WhaleAlertEvent is published when a large trade is detected
+message WhaleAlertEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string trade_id = 4;
+  double price = 5;
+  double quantity = 6;
+  double value_usd = 7;
+  string side = 8;  // buy, sell
+  string sentiment = 9;  // bullish, bearish
+}
+
+// LiquidationAlertEvent is published when a large liquidation occurs
+message LiquidationAlertEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string side = 4;  // long, short
+  double price = 5;
+  double quantity = 6;
+  double value_usd = 7;
+}
+
+// StrategyWarningEvent is published when strategy performance is concerning
+message StrategyWarningEvent {
+  BaseEvent base = 1;
+  string strategy_id = 2;
+  string strategy_name = 3;
+  string reason = 4;
+  double win_rate = 5;
+  double profit_factor = 6;
+  int32 total_trades = 7;
+}
+

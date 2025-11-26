@@ -40,6 +40,24 @@ const (
 	// System events
 	TopicHealthCheckFailed = "system.health_check_failed"
 	TopicWorkerFailed      = "system.worker_failed"
+
+	// Worker-specific events
+	TopicPnLUpdated          = "user.pnl_updated"
+	TopicJournalEntryCreated = "journal.entry_created"
+	TopicDailyReport         = "report.daily"
+	TopicStrategyDisabled    = "strategy.disabled"
+	TopicStrategyWarning     = "strategy.warning"
+	TopicPositionPnLUpdated  = "position.pnl_updated"
+
+	// SMC (Smart Money Concepts) events
+	TopicFVGDetected        = "smc.fvg_detected"
+	TopicOrderBlockDetected = "smc.order_block_detected"
+
+	// Internal worker events
+	TopicAnalysisRequested = "market.analysis_requested"
+	TopicScanComplete      = "market.scan_complete"
+	TopicWhaleAlert        = "market.whale_alerts"
+	TopicLiquidationAlert  = "market.liquidations"
 )
 
 // NewBaseEvent creates a new base event with defaults
