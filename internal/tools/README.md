@@ -97,16 +97,16 @@ func NewMyTool(deps shared.Deps) tool.Tool {
 ## Middleware Order (Automatic via ToolBuilder!)
 
 ToolBuilder applies middleware in correct order automatically:
-1. **Stats** (outermost) — tracks everything including retries/timeouts
-2. **Timeout** — enforces deadline on tool + retries
-3. **Retry** (innermost) — retries core tool on failure
-4. **Core** — actual tool implementation
+1. **Timeout** (outer) — enforces deadline on tool + retries
+2. **Retry** (inner) — retries core tool on failure
+3. **Core** — actual tool implementation
+
+**Stats tracking** is handled by ADK callbacks (see `internal/agents/callbacks/tool.go`), not middleware.
 
 Configure via fluent API:
 ```go
 .WithRetry(attempts, backoff)  // Enable retry with N attempts
 .WithTimeout(duration)          // Enable timeout
-.WithStats()                    // Enable ClickHouse metrics
 ```
 
 Never bypass middleware unless explicitly required for specific tool.

@@ -1,10 +1,17 @@
 package tools
-
 import (
 	"encoding/json"
 	"sync"
 )
-
+// RiskLevel defines the risk level of a tool operation
+type RiskLevel string
+const (
+	RiskLevelNone     RiskLevel = "none"     // Read-only operations with no side effects
+	RiskLevelLow      RiskLevel = "low"      // Low-risk operations (queries, analysis)
+	RiskLevelMedium   RiskLevel = "medium"   // Medium-risk operations (single order placement)
+	RiskLevelHigh     RiskLevel = "high"     // High-risk operations (large orders, multiple actions)
+	RiskLevelCritical RiskLevel = "critical" // Critical operations (emergency actions, kill switches)
+)
 // ToolDefinition describes a tool's metadata
 type ToolDefinition struct {
 	Name         string                 `json:"name"`
@@ -14,14 +21,12 @@ type ToolDefinition struct {
 	OutputSchema map[string]interface{} `json:"output_schema,omitempty"`
 	RequiresAuth bool                   `json:"requires_auth"` // If tool needs user-specific credentials
 	RateLimit    int                    `json:"rate_limit"`    // Calls per minute (0 = unlimited)
+	RiskLevel    RiskLevel              `json:"risk_level"`    // Risk level of the operation
 }
-
 // Definition is an alias for backward compatibility
 type Definition = ToolDefinition
-
 // ToolCategory represents a category of tools
 type ToolCategory string
-
 const (
 	CategoryMarketData  ToolCategory = "market_data"
 	CategoryMomentum    ToolCategory = "momentum"
@@ -41,22 +46,18 @@ const (
 	CategoryMemory      ToolCategory = "memory"
 	CategoryEvaluation  ToolCategory = "evaluation"
 )
-
 var (
 	catalog     []ToolDefinition
 	catalogOnce sync.Once
 )
-
 // Definitions returns all tool definitions
 func Definitions() []ToolDefinition {
 	catalogOnce.Do(initCatalog)
 	return catalog
 }
-
 // DefinitionsByCategory returns tools filtered by category
 func DefinitionsByCategory(category ToolCategory) []ToolDefinition {
 	catalogOnce.Do(initCatalog)
-
 	var filtered []ToolDefinition
 	for _, def := range catalog {
 		if def.Category == string(category) {
@@ -65,11 +66,9 @@ func DefinitionsByCategory(category ToolCategory) []ToolDefinition {
 	}
 	return filtered
 }
-
 // DefinitionByName returns a tool definition by name
 func DefinitionByName(name string) (*ToolDefinition, bool) {
 	catalogOnce.Do(initCatalog)
-
 	for _, def := range catalog {
 		if def.Name == name {
 			return &def, true
@@ -77,7 +76,6 @@ func DefinitionByName(name string) (*ToolDefinition, bool) {
 	}
 	return nil, false
 }
-
 // initCatalog initializes the tool catalog
 func initCatalog() {
 	catalog = []ToolDefinition{
@@ -88,6 +86,7 @@ func initCatalog() {
 			Description:  "Get current price with bid/ask spread",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_ohlcv",
@@ -95,6 +94,7 @@ func initCatalog() {
 			Description:  "Get historical OHLCV candles",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_orderbook",
@@ -102,6 +102,7 @@ func initCatalog() {
 			Description:  "Get order book depth",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_trades",
@@ -109,8 +110,8 @@ func initCatalog() {
 			Description:  "Get recent trades (tape)",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Momentum Indicators
 		{
 			Name:         "rsi",
@@ -118,6 +119,7 @@ func initCatalog() {
 			Description:  "Calculate Relative Strength Index",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "macd",
@@ -125,6 +127,7 @@ func initCatalog() {
 			Description:  "Calculate MACD indicator",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "stochastic",
@@ -132,6 +135,7 @@ func initCatalog() {
 			Description:  "Calculate Stochastic Oscillator",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "cci",
@@ -139,6 +143,7 @@ func initCatalog() {
 			Description:  "Calculate Commodity Channel Index",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "roc",
@@ -146,8 +151,8 @@ func initCatalog() {
 			Description:  "Calculate Rate of Change",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Volatility Indicators
 		{
 			Name:         "atr",
@@ -155,6 +160,7 @@ func initCatalog() {
 			Description:  "Calculate Average True Range",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "bollinger",
@@ -162,6 +168,7 @@ func initCatalog() {
 			Description:  "Calculate Bollinger Bands",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "keltner",
@@ -169,8 +176,8 @@ func initCatalog() {
 			Description:  "Calculate Keltner Channels",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Trend Indicators
 		{
 			Name:         "ema",
@@ -178,6 +185,7 @@ func initCatalog() {
 			Description:  "Calculate Exponential Moving Average",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "sma",
@@ -185,6 +193,7 @@ func initCatalog() {
 			Description:  "Calculate Simple Moving Average",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "ema_ribbon",
@@ -192,6 +201,7 @@ func initCatalog() {
 			Description:  "Calculate multiple EMAs (9, 21, 55, 200)",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "supertrend",
@@ -199,6 +209,7 @@ func initCatalog() {
 			Description:  "Calculate Supertrend indicator",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "ichimoku",
@@ -206,6 +217,7 @@ func initCatalog() {
 			Description:  "Calculate Ichimoku Cloud",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "pivot_points",
@@ -213,8 +225,8 @@ func initCatalog() {
 			Description:  "Calculate pivot points and support/resistance",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Volume Indicators
 		{
 			Name:         "vwap",
@@ -222,6 +234,7 @@ func initCatalog() {
 			Description:  "Calculate Volume Weighted Average Price",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "obv",
@@ -229,6 +242,7 @@ func initCatalog() {
 			Description:  "Calculate On-Balance Volume",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "volume_profile",
@@ -236,6 +250,7 @@ func initCatalog() {
 			Description:  "Calculate Volume Profile histogram",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "delta_volume",
@@ -243,8 +258,8 @@ func initCatalog() {
 			Description:  "Calculate Buy vs Sell volume delta",
 			RequiresAuth: false,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Smart Money Concepts
 		{
 			Name:         "detect_fvg",
@@ -252,6 +267,7 @@ func initCatalog() {
 			Description:  "Detect Fair Value Gaps",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "detect_order_blocks",
@@ -259,6 +275,7 @@ func initCatalog() {
 			Description:  "Detect Order Blocks",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_swing_points",
@@ -266,6 +283,7 @@ func initCatalog() {
 			Description:  "Identify swing highs and lows",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "detect_liquidity_zones",
@@ -273,6 +291,7 @@ func initCatalog() {
 			Description:  "Detect liquidity zones and pools",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "detect_stop_hunt",
@@ -280,6 +299,7 @@ func initCatalog() {
 			Description:  "Detect stop hunts and liquidity sweeps",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "detect_imbalances",
@@ -287,6 +307,7 @@ func initCatalog() {
 			Description:  "Detect price imbalances",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_market_structure",
@@ -294,8 +315,8 @@ func initCatalog() {
 			Description:  "Analyze market structure (BOS, CHoCH)",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Order Flow
 		{
 			Name:         "get_trade_imbalance",
@@ -303,6 +324,7 @@ func initCatalog() {
 			Description:  "Get buy vs sell pressure",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_cvd",
@@ -310,6 +332,7 @@ func initCatalog() {
 			Description:  "Calculate Cumulative Volume Delta",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_whale_trades",
@@ -317,6 +340,7 @@ func initCatalog() {
 			Description:  "Detect large trades (whales)",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_orderbook_imbalance",
@@ -324,6 +348,7 @@ func initCatalog() {
 			Description:  "Calculate orderbook bid/ask imbalance",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_tick_speed",
@@ -331,8 +356,8 @@ func initCatalog() {
 			Description:  "Calculate trade velocity (ticks per second)",
 			RequiresAuth: false,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Sentiment
 		{
 			Name:         "get_fear_greed",
@@ -340,6 +365,7 @@ func initCatalog() {
 			Description:  "Get Fear & Greed Index",
 			RequiresAuth: false,
 			RateLimit:    10,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_news",
@@ -347,8 +373,8 @@ func initCatalog() {
 			Description:  "Get latest crypto news",
 			RequiresAuth: false,
 			RateLimit:    30,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// On-Chain
 		{
 			Name:         "get_whale_movements",
@@ -356,6 +382,7 @@ func initCatalog() {
 			Description:  "Get large wallet transfers",
 			RequiresAuth: false,
 			RateLimit:    30,
+			RiskLevel:    RiskLevelNone,
 		},
 		{
 			Name:         "get_exchange_flows",
@@ -363,8 +390,8 @@ func initCatalog() {
 			Description:  "Get exchange inflow/outflow",
 			RequiresAuth: false,
 			RateLimit:    30,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Macro
 		{
 			Name:         "get_economic_calendar",
@@ -372,8 +399,8 @@ func initCatalog() {
 			Description:  "Get economic events calendar",
 			RequiresAuth: false,
 			RateLimit:    10,
+			RiskLevel:    RiskLevelNone,
 		},
-
 		// Trading (requires user auth)
 		{
 			Name:         "get_balance",
@@ -381,6 +408,7 @@ func initCatalog() {
 			Description:  "Get account balance",
 			RequiresAuth: true,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "get_positions",
@@ -388,6 +416,7 @@ func initCatalog() {
 			Description:  "Get open positions",
 			RequiresAuth: true,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "place_order",
@@ -395,6 +424,7 @@ func initCatalog() {
 			Description:  "Place market/limit/stop order",
 			RequiresAuth: true,
 			RateLimit:    30,
+			RiskLevel:    RiskLevelMedium,
 		},
 		{
 			Name:         "cancel_order",
@@ -402,8 +432,8 @@ func initCatalog() {
 			Description:  "Cancel an order",
 			RequiresAuth: true,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelLow,
 		},
-
 		// Risk Management
 		{
 			Name:         "check_circuit_breaker",
@@ -411,6 +441,7 @@ func initCatalog() {
 			Description:  "Check if trading is allowed",
 			RequiresAuth: true,
 			RateLimit:    0,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "validate_trade",
@@ -418,6 +449,7 @@ func initCatalog() {
 			Description:  "Validate trade before execution",
 			RequiresAuth: true,
 			RateLimit:    0,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "emergency_close_all",
@@ -425,8 +457,8 @@ func initCatalog() {
 			Description:  "Emergency close all positions (kill switch)",
 			RequiresAuth: true,
 			RateLimit:    0,
+			RiskLevel:    RiskLevelCritical,
 		},
-
 		// Memory
 		{
 			Name:         "search_memory",
@@ -434,6 +466,7 @@ func initCatalog() {
 			Description:  "Semantic search past memories",
 			RequiresAuth: true,
 			RateLimit:    60,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "save_analysis",
@@ -441,6 +474,7 @@ func initCatalog() {
 			Description:  "Save analysis results to memory for future reference",
 			RequiresAuth: true,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "save_insight",
@@ -448,6 +482,7 @@ func initCatalog() {
 			Description:  "Save a learning, pattern, or insight to long-term memory",
 			RequiresAuth: true,
 			RateLimit:    120,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "record_reasoning",
@@ -455,8 +490,8 @@ func initCatalog() {
 			Description:  "Record a step in reasoning process for CoT logging",
 			RequiresAuth: true,
 			RateLimit:    180,
+			RiskLevel:    RiskLevelLow,
 		},
-
 		// Evaluation
 		{
 			Name:         "get_strategy_stats",
@@ -464,6 +499,7 @@ func initCatalog() {
 			Description:  "Get strategy statistics",
 			RequiresAuth: true,
 			RateLimit:    30,
+			RiskLevel:    RiskLevelLow,
 		},
 		{
 			Name:         "get_trade_journal",
@@ -471,16 +507,15 @@ func initCatalog() {
 			Description:  "Get trade journal entries",
 			RequiresAuth: true,
 			RateLimit:    30,
+			RiskLevel:    RiskLevelLow,
 		},
 	}
 }
-
 // ToJSON exports catalog to JSON
 func ToJSON() ([]byte, error) {
 	catalogOnce.Do(initCatalog)
 	return json.MarshalIndent(catalog, "", "  ")
 }
-
 // Categories returns all unique categories
 func Categories() []ToolCategory {
 	return []ToolCategory{

@@ -9,20 +9,21 @@ import (
 	"prometheus/internal/tools/shared"
 	"prometheus/internal/tools/smc"
 	"prometheus/internal/tools/trading"
+	"prometheus/pkg/logger"
+
+	"google.golang.org/adk/tool"
 )
 
 // RegisterAllTools registers all available tools in the registry
 func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	log := deps.Log.With("component", "tool_registration")
-
 	// Note: All tools now use shared.NewToolBuilder() fluent API with built-in middleware:
-	// - WithRetry(attempts, backoff) - automatic retry with exponential backoff
-	// - WithTimeout(duration) - execution timeout enforcement
-	// - WithStats() - usage metrics tracking to ClickHouse
+	// - .WithRetry(attempts, backoff) - automatic retry with exponential backoff
+	// - .WithTimeout(duration) - execution timeout enforcement
 	//
-	// Middleware is configured in each tool's NewXXXTool() constructor via ToolBuilder.
-	// Example: shared.NewToolBuilder(...).WithTimeout(10*time.Second).WithRetry(3, 500*time.Millisecond).WithStats().Build()
-
+	// Stats tracking is handled by ADK callbacks (see internal/agents/callbacks/tool.go)
+	// Middleware is configured in each tool's NewXXXTool() constructor via ToolBuilder
+	// Example: shared.NewToolBuilder(...).WithTimeout(10*time.Second).WithRetry(3, 500*time.Millisecond).Build()
 	// ========================================
 	// Market Data Tools
 	// ========================================
@@ -31,7 +32,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("get_orderbook", market.NewGetOrderBookTool(deps))
 	registry.Register("get_trades", market.NewGetTradesTool(deps))
 	log.Debug("Registered market data tools")
-
 	// ========================================
 	// Technical Indicators - Momentum
 	// ========================================
@@ -41,7 +41,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("cci", indicators.NewCCITool(deps))
 	registry.Register("roc", indicators.NewROCTool(deps))
 	log.Debug("Registered momentum indicator tools")
-
 	// ========================================
 	// Technical Indicators - Volatility
 	// ========================================
@@ -49,7 +48,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("bollinger", indicators.NewBollingerTool(deps))
 	registry.Register("keltner", indicators.NewKeltnerTool(deps))
 	log.Debug("Registered volatility indicator tools")
-
 	// ========================================
 	// Technical Indicators - Trend
 	// ========================================
@@ -60,7 +58,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("ichimoku", indicators.NewIchimokuTool(deps))
 	registry.Register("pivot_points", indicators.NewPivotPointsTool(deps))
 	log.Debug("Registered trend indicator tools")
-
 	// ========================================
 	// Technical Indicators - Volume
 	// ========================================
@@ -69,7 +66,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("volume_profile", indicators.NewVolumeProfileTool(deps))
 	registry.Register("delta_volume", indicators.NewDeltaVolumeTool(deps))
 	log.Debug("Registered volume indicator tools")
-
 	// ========================================
 	// Smart Money Concepts (SMC/ICT) Tools
 	// ========================================
@@ -81,7 +77,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("detect_imbalances", smc.NewDetectImbalancesTool(deps))
 	registry.Register("get_market_structure", smc.NewGetMarketStructureTool(deps))
 	log.Debug("Registered SMC/ICT tools")
-
 	// ========================================
 	// Order Flow Tools
 	// ========================================
@@ -91,7 +86,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("get_orderbook_imbalance", orderflow.NewGetOrderbookImbalanceTool(deps))
 	registry.Register("get_tick_speed", orderflow.NewGetTickSpeedTool(deps))
 	log.Debug("Registered order flow tools")
-
 	// ========================================
 	// Trading Tools (user-specific, requires exchange account)
 	// ========================================
@@ -100,7 +94,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("place_order", trading.NewPlaceOrderTool(deps))
 	registry.Register("cancel_order", trading.NewCancelOrderTool(deps))
 	log.Debug("Registered trading tools")
-
 	// ========================================
 	// Risk Management Tools
 	// ========================================
@@ -108,7 +101,6 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("validate_trade", toolrisk.NewValidateTradeTool(deps))
 	registry.Register("emergency_close_all", toolrisk.NewEmergencyCloseAllTool(deps))
 	log.Debug("Registered risk management tools")
-
 	// ========================================
 	// Memory Tools
 	// ========================================
@@ -117,6 +109,19 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	registry.Register("save_insight", toolmemory.NewSaveInsightTool(deps))
 	registry.Register("record_reasoning", toolmemory.NewRecordReasoningTool(deps))
 	log.Debug("Registered memory tools")
-
+	// Expert agent tools will be registered separately after agent factory initialization
 	log.Infof("Tool registration complete: %d tools available", len(registry.List()))
+}
+
+// RegisterExpertTools registers agent-as-tool expert consultants
+// Must be called after agent factory is created
+func RegisterExpertTools(registry *Registry, expertTools map[string]tool.Tool, log *logger.Logger) {
+	if len(expertTools) == 0 {
+		log.Warn("No expert tools provided for registration")
+		return
+	}
+	for name, t := range expertTools {
+		registry.Register(name, t)
+	}
+	log.Infof("✓ Registered %d expert agent tools", len(expertTools))
 }

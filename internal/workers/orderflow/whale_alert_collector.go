@@ -210,4 +210,3 @@ func (wac *WhaleAlertCollector) CalculateWhaleImpact(
 
 	return impact, priceImpact
 }
-

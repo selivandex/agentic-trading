@@ -1,13 +1,9 @@
 package indicators
-
 import (
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewPivotPointsTool computes Pivot Points (Classic, Fibonacci, Woodie, Camarilla)
 // Pivot points are support/resistance levels calculated from previous period's high/low/close
 func NewPivotPointsTool(deps shared.Deps) tool.Tool {
@@ -20,23 +16,18 @@ func NewPivotPointsTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			if err := ValidateMinLength(candles, 2, "Pivot Points"); err != nil {
 				return nil, err
 			}
-
 			// Use previous candle (yesterday's data) for calculation
 			prevCandle := candles[1]
 			currentPrice := candles[0].Close
-
 			// Get pivot type (classic, fibonacci, woodie, camarilla)
 			pivotType := "classic"
 			if pt, ok := args["type"].(string); ok {
 				pivotType = pt
 			}
-
 			var pivot, r1, r2, r3, s1, s2, s3 float64
-
 			switch pivotType {
 			case "fibonacci":
 				pivot, r1, r2, r3, s1, s2, s3 = calculateFibonacciPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
@@ -47,7 +38,6 @@ func NewPivotPointsTool(deps shared.Deps) tool.Tool {
 			default: // classic
 				pivot, r1, r2, r3, s1, s2, s3 = calculateClassicPivots(prevCandle.High, prevCandle.Low, prevCandle.Close)
 			}
-
 			// Determine current level
 			currentLevel := "between_pivots"
 			if currentPrice >= r3 {
@@ -67,7 +57,6 @@ func NewPivotPointsTool(deps shared.Deps) tool.Tool {
 			} else {
 				currentLevel = "below_pivot"
 			}
-
 			// Generate signal
 			signal := "neutral"
 			if currentPrice > pivot && currentPrice < r1 {
@@ -75,7 +64,6 @@ func NewPivotPointsTool(deps shared.Deps) tool.Tool {
 			} else if currentPrice < pivot && currentPrice > s1 {
 				signal = "bearish"
 			}
-
 			return map[string]interface{}{
 				"pivot":         pivot,
 				"r1":            r1,
@@ -94,10 +82,8 @@ func NewPivotPointsTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 // Classic Pivot Points
 func calculateClassicPivots(high, low, close float64) (pivot, r1, r2, r3, s1, s2, s3 float64) {
 	pivot = (high + low + close) / 3
@@ -109,7 +95,6 @@ func calculateClassicPivots(high, low, close float64) (pivot, r1, r2, r3, s1, s2
 	s3 = low - 2*(high-pivot)
 	return
 }
-
 // Fibonacci Pivot Points
 func calculateFibonacciPivots(high, low, close float64) (pivot, r1, r2, r3, s1, s2, s3 float64) {
 	pivot = (high + low + close) / 3
@@ -122,7 +107,6 @@ func calculateFibonacciPivots(high, low, close float64) (pivot, r1, r2, r3, s1, 
 	s3 = pivot - 1.000*range_
 	return
 }
-
 // Woodie Pivot Points
 func calculateWoodiePivots(high, low, close, open float64) (pivot, r1, r2, r3, s1, s2, s3 float64) {
 	pivot = (high + low + 2*close) / 4
@@ -134,7 +118,6 @@ func calculateWoodiePivots(high, low, close, open float64) (pivot, r1, r2, r3, s
 	s3 = low - 2*(high-pivot)
 	return
 }
-
 // Camarilla Pivot Points
 func calculateCamarillaPivots(high, low, close float64) (pivot, r1, r2, r3, s1, s2, s3 float64) {
 	pivot = (high + low + close) / 3

@@ -1,17 +1,12 @@
 package indicators
-
 import (
 	"math"
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewRSITool computes Relative Strength Index using closing prices.
+// NewRSITool computes Relative Strength Index using closing prices
 func NewRSITool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"rsi",
@@ -26,7 +21,6 @@ func NewRSITool(deps shared.Deps) tool.Tool {
 			if len(closes) < period+1 {
 				return nil, errors.Wrapf(errors.ErrInternal, "rsi: not enough data for period %d", period)
 			}
-
 			gains := 0.0
 			losses := 0.0
 			for i := 1; i <= period; i++ {
@@ -44,13 +38,11 @@ func NewRSITool(deps shared.Deps) tool.Tool {
 				rs = avgGain / avgLoss
 			}
 			rsi := 100.0 - (100.0 / (1 + rs))
-
 			return map[string]interface{}{"value": rsi}, nil
 		},
 		deps,
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

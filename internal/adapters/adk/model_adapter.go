@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"iter"
+	"strings"
 
 	"google.golang.org/adk/model"
 	"google.golang.org/genai"
@@ -41,18 +42,21 @@ func (m *ModelAdapter) GenerateContent(
 	stream bool,
 ) iter.Seq2[*model.LLMResponse, error] {
 	if stream {
-		// Streaming not implemented yet
-		return func(yield func(*model.LLMResponse, error) bool) {
-			yield(nil, errors.Wrap(errors.ErrNotImplemented, "streaming not implemented"))
-		}
+		return m.streamingGenerateContent(ctx, req)
 	}
+	return m.nonStreamingGenerateContent(ctx, req)
+}
 
-	// Non-streaming implementation
+// nonStreamingGenerateContent handles non-streaming LLM calls
+func (m *ModelAdapter) nonStreamingGenerateContent(
+	ctx context.Context,
+	req *model.LLMRequest,
+) iter.Seq2[*model.LLMResponse, error] {
 	return func(yield func(*model.LLMResponse, error) bool) {
 		// Convert ADK request to our ChatRequest
 		chatReq := m.convertToChatRequest(req)
 
-		m.log.Debug("Calling LLM", "messages", len(chatReq.Messages), "tools", len(chatReq.Tools))
+		m.log.Debug("Calling LLM (non-streaming)", "messages", len(chatReq.Messages), "tools", len(chatReq.Tools))
 
 		// Call our provider
 		resp, err := m.provider.Chat(ctx, chatReq)
@@ -70,6 +74,57 @@ func (m *ModelAdapter) GenerateContent(
 		// Convert response back to ADK format
 		adkResp := m.convertToADKResponse(resp)
 		yield(adkResp, nil)
+	}
+}
+
+// streamingGenerateContent handles streaming LLM calls
+func (m *ModelAdapter) streamingGenerateContent(
+	ctx context.Context,
+	req *model.LLMRequest,
+) iter.Seq2[*model.LLMResponse, error] {
+	return func(yield func(*model.LLMResponse, error) bool) {
+		chatReq := m.convertToChatRequest(req)
+
+		m.log.Debug("Calling LLM (streaming)", "messages", len(chatReq.Messages), "tools", len(chatReq.Tools))
+
+		// Get streaming response from provider
+		chunkCh, errCh := m.provider.ChatStream(ctx, chatReq)
+
+		aggregator := NewStreamAggregator()
+
+		for {
+			select {
+			case chunk, ok := <-chunkCh:
+				if !ok {
+					// Stream completed - send final response with full token counts
+					finalResp := aggregator.GetFinal()
+					finalResp.TurnComplete = true
+					m.log.Debug("Stream completed", "tokens", finalResp.UsageMetadata.TotalTokenCount)
+					yield(finalResp, nil)
+					return
+				}
+
+				// Convert chunk to ADK response
+				partialResp := m.convertStreamChunkToADKResponse(&chunk)
+				partialResp.Partial = true
+				aggregator.AddChunk(partialResp)
+
+				if !yield(partialResp, nil) {
+					m.log.Debug("Stream cancelled by client")
+					return
+				}
+
+			case err := <-errCh:
+				m.log.Error("Stream error", "error", err)
+				yield(nil, errors.Wrap(err, "streaming failed"))
+				return
+
+			case <-ctx.Done():
+				m.log.Warn("Stream cancelled by context")
+				yield(nil, ctx.Err())
+				return
+			}
+		}
 	}
 }
 
@@ -216,6 +271,131 @@ func (m *ModelAdapter) convertToADKResponse(resp *ai.ChatResponse) *model.LLMRes
 	adkResp.TurnComplete = true
 
 	return adkResp
+}
+
+// StreamAggregator aggregates streaming chunks into a complete response
+type StreamAggregator struct {
+	textParts      []string
+	promptTokens   int32
+	responseTokens int32
+	finishReason   genai.FinishReason
+}
+
+// NewStreamAggregator creates a new stream aggregator
+func NewStreamAggregator() *StreamAggregator {
+	return &StreamAggregator{
+		textParts:    make([]string, 0, 10),
+		finishReason: genai.FinishReasonStop,
+	}
+}
+
+// AddChunk adds a streaming chunk to the aggregator
+func (a *StreamAggregator) AddChunk(resp *model.LLMResponse) {
+	if resp.Content != nil {
+		for _, part := range resp.Content.Parts {
+			if part.Text != "" {
+				a.textParts = append(a.textParts, part.Text)
+			}
+		}
+	}
+
+	if resp.UsageMetadata != nil {
+		a.promptTokens = resp.UsageMetadata.PromptTokenCount
+		a.responseTokens += resp.UsageMetadata.CandidatesTokenCount
+	}
+
+	if resp.FinishReason != genai.FinishReasonUnspecified {
+		a.finishReason = resp.FinishReason
+	}
+}
+
+// GetFinal returns the aggregated final response
+func (a *StreamAggregator) GetFinal() *model.LLMResponse {
+	// Combine all text parts
+	combinedText := strings.Join(a.textParts, "")
+
+	return &model.LLMResponse{
+		Content: &genai.Content{
+			Role: "model",
+			Parts: []*genai.Part{
+				{Text: combinedText},
+			},
+		},
+		FinishReason: a.finishReason,
+		UsageMetadata: &genai.GenerateContentResponseUsageMetadata{
+			PromptTokenCount:     a.promptTokens,
+			CandidatesTokenCount: a.responseTokens,
+			TotalTokenCount:      a.promptTokens + a.responseTokens,
+		},
+		TurnComplete: true,
+	}
+}
+
+// convertStreamChunkToADKResponse converts a streaming chunk to ADK response
+func (m *ModelAdapter) convertStreamChunkToADKResponse(chunk *ai.ChatStreamChunk) *model.LLMResponse {
+	resp := &model.LLMResponse{
+		Partial: true,
+	}
+
+	// Use first choice (streaming typically has one choice)
+	if len(chunk.Choices) == 0 {
+		return resp
+	}
+
+	choice := chunk.Choices[0]
+
+	// Convert delta content
+	if choice.Delta.Content != "" {
+		resp.Content = &genai.Content{
+			Role: "model",
+			Parts: []*genai.Part{
+				{Text: choice.Delta.Content},
+			},
+		}
+	}
+
+	// Handle tool calls in delta
+	if len(choice.Delta.ToolCalls) > 0 {
+		if resp.Content == nil {
+			resp.Content = &genai.Content{Role: "model", Parts: []*genai.Part{}}
+		}
+		for _, tc := range choice.Delta.ToolCalls {
+			var args map[string]interface{}
+			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+				m.log.Warn("Failed to parse tool call arguments in stream", "error", err)
+				continue
+			}
+			resp.Content.Parts = append(resp.Content.Parts, &genai.Part{
+				FunctionCall: &genai.FunctionCall{
+					Name: tc.Function.Name,
+					Args: args,
+				},
+			})
+		}
+	}
+
+	// Set finish reason if present
+	if choice.FinishReason != "" {
+		switch choice.FinishReason {
+		case ai.FinishReasonStop:
+			resp.FinishReason = genai.FinishReasonStop
+		case ai.FinishReasonLength:
+			resp.FinishReason = genai.FinishReasonMaxTokens
+		default:
+			resp.FinishReason = genai.FinishReasonStop
+		}
+	}
+
+	// Set token usage if available (usually only in final chunk)
+	if chunk.Usage != nil {
+		resp.UsageMetadata = &genai.GenerateContentResponseUsageMetadata{
+			PromptTokenCount:     int32(chunk.Usage.PromptTokens),
+			CandidatesTokenCount: int32(chunk.Usage.CompletionTokens),
+			TotalTokenCount:      int32(chunk.Usage.TotalTokens),
+		}
+	}
+
+	return resp
 }
 
 // Ensure ModelAdapter implements model.LLM

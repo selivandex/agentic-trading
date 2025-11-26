@@ -254,4 +254,3 @@ func (c *CustomCollector) collectMemoryUsage(ctx context.Context, ch chan<- prom
 func RegisterCustomCollector(collector *CustomCollector) {
 	prometheus.MustRegister(collector)
 }
-

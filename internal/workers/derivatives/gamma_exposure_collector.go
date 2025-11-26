@@ -14,9 +14,9 @@ import (
 // Monitors dealer positioning and gamma flip levels
 type GammaExposureCollector struct {
 	*workers.BaseWorker
-	derivRepo  derivatives.Repository
-	apiKey     string
-	symbols    []string
+	derivRepo derivatives.Repository
+	apiKey    string
+	symbols   []string
 }
 
 // NewGammaExposureCollector creates a new gamma exposure collector
@@ -83,24 +83,24 @@ func (gc *GammaExposureCollector) Run(ctx context.Context) error {
 // Deribit options book response (placeholder types - not currently used)
 // These types would be used if fetching from Deribit API directly
 type deribitBookResponse struct {
-	Jsonrpc string           `json:"jsonrpc"`
-	ID      int              `json:"id"`
-	Result  deribitBookData  `json:"result"`
+	Jsonrpc string          `json:"jsonrpc"`
+	ID      int             `json:"id"`
+	Result  deribitBookData `json:"result"`
 }
 
 type deribitBookData struct {
-	Asks          [][]float64 `json:"asks"`
-	Bids          [][]float64 `json:"bids"`
-	UnderlyingPrice float64   `json:"underlying_price"`
-	Stats         deribitStats `json:"stats"`
+	Asks            [][]float64  `json:"asks"`
+	Bids            [][]float64  `json:"bids"`
+	UnderlyingPrice float64      `json:"underlying_price"`
+	Stats           deribitStats `json:"stats"`
 }
 
 type deribitStats struct {
-	Volume          float64 `json:"volume"`
-	PriceChange     float64 `json:"price_change"`
-	OpenInterest    float64 `json:"open_interest"`
-	High            float64 `json:"high"`
-	Low             float64 `json:"low"`
+	Volume       float64 `json:"volume"`
+	PriceChange  float64 `json:"price_change"`
+	OpenInterest float64 `json:"open_interest"`
+	High         float64 `json:"high"`
+	Low          float64 `json:"low"`
 }
 
 // calculateGammaExposure calculates gamma exposure from the options chain
@@ -158,15 +158,15 @@ func (gc *GammaExposureCollector) calculateGammaExposure(ctx context.Context, sy
 
 // optionsInstrument represents a single options contract
 type optionsInstrument struct {
-	name     string
-	side     string  // call/put
-	strike   float64
-	expiry   time.Time
-	oi       float64 // open interest
-	volume   float64
-	price    float64
-	iv       float64 // implied volatility
-	spot     float64
+	name   string
+	side   string // call/put
+	strike float64
+	expiry time.Time
+	oi     float64 // open interest
+	volume float64
+	price  float64
+	iv     float64 // implied volatility
+	spot   float64
 }
 
 // fetchOptionsInstruments fetches all options instruments for a symbol
@@ -200,7 +200,7 @@ func (gc *GammaExposureCollector) calculateGEXFromInstruments(instruments []opti
 		// Calculate gamma for this contract
 		// Simplified Black-Scholes gamma calculation
 		gamma := gc.calculateGamma(inst.strike, spotPrice, inst.expiry, inst.iv)
-		
+
 		// Gamma exposure = OI * gamma * spot^2 / 100
 		// Dealers are short gamma, so we flip the sign
 		gex := -inst.oi * gamma * spotPrice * spotPrice / 100
@@ -243,7 +243,7 @@ func (gc *GammaExposureCollector) normalPDF(x float64) float64 {
 func (gc *GammaExposureCollector) findGammaFlip(gammaByStrike map[float64]float64, spotPrice float64) float64 {
 	// Find strikes above and below spot
 	var strikesAbove, strikesBelow []float64
-	
+
 	for strike := range gammaByStrike {
 		if strike > spotPrice {
 			strikesAbove = append(strikesAbove, strike)
@@ -269,7 +269,7 @@ func (gc *GammaExposureCollector) calculateMaxPain(instruments []optionsInstrume
 	// = strike where sum of (call_oi * max(0, spot-strike) + put_oi * max(0, strike-spot)) is minimized
 
 	painByStrike := make(map[float64]float64)
-	
+
 	// Get unique strikes
 	strikes := make(map[float64]bool)
 	for _, inst := range instruments {
@@ -279,7 +279,7 @@ func (gc *GammaExposureCollector) calculateMaxPain(instruments []optionsInstrume
 	// Calculate pain for each potential expiry price
 	for testStrike := range strikes {
 		pain := 0.0
-		
+
 		for _, inst := range instruments {
 			if inst.side == "call" && testStrike > inst.strike {
 				pain += inst.oi * (testStrike - inst.strike)
@@ -287,14 +287,14 @@ func (gc *GammaExposureCollector) calculateMaxPain(instruments []optionsInstrume
 				pain += inst.oi * (inst.strike - testStrike)
 			}
 		}
-		
+
 		painByStrike[testStrike] = pain
 	}
 
 	// Find strike with minimum pain
 	minPain := math.MaxFloat64
 	maxPainStrike := spotPrice
-	
+
 	for strike, pain := range painByStrike {
 		if pain < minPain {
 			minPain = pain
@@ -344,7 +344,7 @@ func (gc *GammaExposureCollector) calculateIVMetrics(instruments []optionsInstru
 func InterpretGammaExposure(gex float64) string {
 	// Negative GEX = dealers short gamma = resistance to price movement
 	// Positive GEX = dealers long gamma = acceleration of price movement
-	
+
 	if gex < -5_000_000_000 {
 		return "very_negative" // Strong resistance to moves
 	} else if gex < -1_000_000_000 {
@@ -356,4 +356,3 @@ func InterpretGammaExposure(gex float64) string {
 	}
 	return "neutral"
 }
-

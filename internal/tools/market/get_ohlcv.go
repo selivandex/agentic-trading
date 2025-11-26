@@ -1,16 +1,11 @@
 package market
-
 import (
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewGetOHLCVTool loads historical candles for a symbol/timeframe.
+// NewGetOHLCVTool loads historical candles for a symbol/timeframe
 func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"get_ohlcv",
@@ -19,7 +14,6 @@ func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_ohlcv: market data repository not configured")
 			}
-
 			exchange, _ := args["exchange"].(string)
 			symbol, _ := args["symbol"].(string)
 			timeframe, _ := args["timeframe"].(string)
@@ -27,12 +21,10 @@ func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
 			if exchange == "" || symbol == "" || timeframe == "" {
 				return nil, errors.ErrInvalidInput
 			}
-
 			candles, err := deps.MarketDataRepo.GetLatestOHLCV(ctx, exchange, symbol, timeframe, limit)
 			if err != nil {
 				return nil, errors.Wrap(err, "get_ohlcv: fetch candles")
 			}
-
 			data := make([]map[string]interface{}, 0, len(candles))
 			for _, c := range candles {
 				data = append(data, map[string]interface{}{
@@ -46,17 +38,14 @@ func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
 					"trades":       c.Trades,
 				})
 			}
-
 			return map[string]interface{}{"candles": data}, nil
 		},
 		deps,
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 func parseLimit(raw interface{}, fallback int) int {
 	switch v := raw.(type) {
 	case int:

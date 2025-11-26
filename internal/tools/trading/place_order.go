@@ -1,19 +1,13 @@
 package trading
-
 import (
 	"time"
-
 	"github.com/shopspring/decimal"
-
 	"prometheus/internal/domain/order"
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewPlaceOrderTool creates a pending order record.
+// NewPlaceOrderTool creates a pending order record
 func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"place_order",
@@ -22,7 +16,6 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 			if deps.OrderRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "place_order: order repository not configured")
 			}
-
 			userID, err := parseUUIDArg(args["user_id"], "user_id")
 			if err != nil {
 				if meta, ok := shared.MetadataFromContext(ctx); ok {
@@ -39,7 +32,6 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			symbol, _ := args["symbol"].(string)
 			marketType, _ := args["market_type"].(string)
 			sideStr, _ := args["side"].(string)
@@ -50,11 +42,9 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 			agentID, _ := args["agent_id"].(string)
 			reasoning, _ := args["reasoning"].(string)
 			reduceOnly, _ := args["reduce_only"].(bool)
-
 			if symbol == "" || sideStr == "" || typeStr == "" || amountStr == "" {
 				return nil, errors.ErrInvalidInput
 			}
-
 			amount, err := decimal.NewFromString(amountStr)
 			if err != nil {
 				return nil, errors.Wrap(err, "place_order: parse amount")
@@ -73,7 +63,6 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 					return nil, errors.Wrap(err, "place_order: parse stop price")
 				}
 			}
-
 			service := order.NewService(deps.OrderRepo)
 			created, err := service.Place(ctx, order.PlaceParams{
 				UserID:            userID,
@@ -93,7 +82,6 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			return map[string]interface{}{
 				"order_id": created.ID.String(),
 				"status":   created.Status.String(),
@@ -106,6 +94,5 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

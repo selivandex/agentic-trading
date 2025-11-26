@@ -1,13 +1,10 @@
 package smc
-
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 	"time"
-
 	"google.golang.org/adk/tool"
 )
-
 // SwingPoint represents a swing high or swing low
 type SwingPoint struct {
 	Type      string  `json:"type"`      // swing_high, swing_low
@@ -16,7 +13,6 @@ type SwingPoint struct {
 	Timestamp int64   `json:"timestamp"` // Unix timestamp
 	Strength  int     `json:"strength"`  // Number of candles on each side that confirm it
 }
-
 // NewGetSwingPointsTool identifies swing highs and swing lows
 // Swing High: local maximum (higher than N candles before and after)
 // Swing Low: local minimum (lower than N candles before and after)
@@ -30,20 +26,15 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			lookback := parseLimit(args["lookback"], 5) // Number of candles on each side
-
 			if len(candles) < lookback*2+1 {
 				return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least %d candles for swing detection", lookback*2+1)
 			}
-
 			swingHighs := make([]SwingPoint, 0)
 			swingLows := make([]SwingPoint, 0)
-
 			// Scan for swing points (skip first and last 'lookback' candles)
 			for i := lookback; i < len(candles)-lookback; i++ {
 				candle := candles[i]
-
 				// Check for swing high
 				isSwingHigh := true
 				for j := 1; j <= lookback; j++ {
@@ -58,7 +49,6 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 						break
 					}
 				}
-
 				if isSwingHigh {
 					swingHighs = append(swingHighs, SwingPoint{
 						Type:      "swing_high",
@@ -68,7 +58,6 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 						Strength:  lookback,
 					})
 				}
-
 				// Check for swing low
 				isSwingLow := true
 				for j := 1; j <= lookback; j++ {
@@ -83,7 +72,6 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 						break
 					}
 				}
-
 				if isSwingLow {
 					swingLows = append(swingLows, SwingPoint{
 						Type:      "swing_low",
@@ -94,12 +82,9 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 					})
 				}
 			}
-
 			currentPrice := candles[0].Close
-
 			// Find nearest swing high and low
 			var nearestHigh, nearestLow *SwingPoint
-
 			for i := range swingHighs {
 				if swingHighs[i].Price > currentPrice {
 					if nearestHigh == nil || swingHighs[i].Price < nearestHigh.Price {
@@ -107,7 +92,6 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 					}
 				}
 			}
-
 			for i := range swingLows {
 				if swingLows[i].Price < currentPrice {
 					if nearestLow == nil || swingLows[i].Price > nearestLow.Price {
@@ -115,13 +99,11 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 					}
 				}
 			}
-
 			// Calculate range
 			range_ := 0.0
 			if nearestHigh != nil && nearestLow != nil {
 				range_ = nearestHigh.Price - nearestLow.Price
 			}
-
 			return map[string]interface{}{
 				"swing_highs":   swingHighs,
 				"swing_lows":    swingLows,
@@ -136,6 +118,5 @@ func NewGetSwingPointsTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

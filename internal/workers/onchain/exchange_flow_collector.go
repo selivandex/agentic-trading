@@ -97,8 +97,8 @@ func (ec *ExchangeFlowCollector) Run(ctx context.Context) error {
 // CryptoQuant API response structures
 // Note: Actual CryptoQuant API structure may differ - this is a placeholder
 type cryptoquantFlowResponse struct {
-	Status string                 `json:"status"`
-	Data   cryptoquantFlowData    `json:"data"`
+	Status string              `json:"status"`
+	Data   cryptoquantFlowData `json:"data"`
 }
 
 type cryptoquantFlowData struct {
@@ -228,4 +228,3 @@ func InterpretNetFlow(netFlowUSD float64, token string) string {
 
 	return "neutral"
 }
-

@@ -1,14 +1,11 @@
 package smc
-
 import (
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 	"time"
-
 	"google.golang.org/adk/tool"
 )
-
 // Imbalance represents a price imbalance (similar to FVG but stricter)
 type Imbalance struct {
 	Type     string  `json:"type"` // bullish, bearish
@@ -20,7 +17,6 @@ type Imbalance struct {
 	Index    int     `json:"index"`
 	Filled   bool    `json:"filled"`
 }
-
 // NewDetectImbalancesTool detects price imbalances
 // Imbalance = Large candle with minimal overlap to previous candles
 // Indicates strong directional move with inefficient price discovery
@@ -33,50 +29,38 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			if len(candles) < 3 {
 				return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 3 candles")
 			}
-
 			minSizePct := parseFloat(args["min_size_pct"], 0.3)        // Min 0.3%
 			maxOverlapPct := parseFloat(args["max_overlap_pct"], 25.0) // Max 25% overlap
-
 			imbalances := make([]Imbalance, 0)
 			currentPrice := candles[0].Close
-
 			for i := 0; i < len(candles)-1; i++ {
 				curr := candles[i]
 				prev := candles[i+1]
-
 				currBody := absFloat(curr.Close - curr.Open)
 				currRange := curr.High - curr.Low
-
 				// Check for large candle (strong move)
 				if currRange == 0 {
 					continue
 				}
-
 				bodyPct := (currBody / currRange) * 100
-
 				// Strong candle = body > 70% of range
 				if bodyPct < 70 {
 					continue
 				}
-
 				// Check overlap with previous candle
 				overlap := calculateOverlap(curr, prev)
 				overlapPct := (overlap / currRange) * 100
-
 				if overlapPct > maxOverlapPct {
 					continue // Too much overlap
 				}
-
 				// Calculate gap size
 				gapSize := 0.0
 				gapStart := 0.0
 				gapEnd := 0.0
 				imbType := ""
-
 				// Bullish imbalance (gap up)
 				if curr.Low > prev.High {
 					gapStart = prev.High
@@ -90,10 +74,8 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 					gapSize = gapEnd - gapStart
 					imbType = "bearish"
 				}
-
 				if gapSize > 0 {
 					sizePct := (gapSize / gapStart) * 100
-
 					if sizePct >= minSizePct {
 						filled := false
 						if imbType == "bullish" {
@@ -101,7 +83,6 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 						} else {
 							filled = currentPrice >= gapEnd
 						}
-
 						imbalances = append(imbalances, Imbalance{
 							Type:     imbType,
 							Start:    gapStart,
@@ -115,7 +96,6 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 					}
 				}
 			}
-
 			signal := "no_imbalance"
 			if len(imbalances) > 0 && !imbalances[0].Filled {
 				if imbalances[0].Type == "bullish" {
@@ -124,7 +104,6 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 					signal = "bearish_imbalance"
 				}
 			}
-
 			return map[string]interface{}{
 				"imbalances":     imbalances,
 				"unfilled_count": countUnfilledImb(imbalances),
@@ -135,21 +114,16 @@ func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
 		deps).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 func calculateOverlap(c1, c2 market_data.OHLCV) float64 {
 	overlapHigh := min(c1.High, c2.High)
 	overlapLow := max(c1.Low, c2.Low)
-
 	if overlapHigh > overlapLow {
 		return overlapHigh - overlapLow
 	}
-
 	return 0
 }
-
 func countUnfilledImb(imbs []Imbalance) int {
 	count := 0
 	for _, imb := range imbs {

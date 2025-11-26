@@ -307,7 +307,7 @@ func (rd *RegimeDetector) publishRegimeEvent(
 	if err := rd.eventPublisher.PublishRegimeChange(
 		ctx,
 		symbol,
-		"",                   // old_regime - TODO: track previous regime
+		"",                  // old_regime - TODO: track previous regime
 		regimeType.String(), // new_regime
 		trend,
 		confidence,

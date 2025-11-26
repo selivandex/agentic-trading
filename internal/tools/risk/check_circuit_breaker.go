@@ -1,18 +1,12 @@
 package risk
-
 import (
 	"time"
-
 	"github.com/google/uuid"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewCheckCircuitBreakerTool reports whether trading is allowed.
+// NewCheckCircuitBreakerTool reports whether trading is allowed
 func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"check_circuit_breaker",
@@ -35,11 +29,9 @@ func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
 					userID = meta.UserID
 				}
 			}
-
 			if userID == uuid.Nil || deps.RiskRepo == nil {
 				return map[string]interface{}{"allowed": true, "reason": "no risk state configured"}, nil
 			}
-
 			state, err := deps.RiskRepo.GetState(ctx, userID)
 			if err != nil {
 				return nil, errors.Wrap(err, "check_circuit_breaker")
@@ -49,13 +41,11 @@ func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
 			if state != nil && state.IsTriggered {
 				reason = state.TriggerReason
 			}
-
 			return map[string]interface{}{"allowed": allowed, "reason": reason}, nil
 		},
 		deps,
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

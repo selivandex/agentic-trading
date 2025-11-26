@@ -1,13 +1,9 @@
 package indicators
-
 import (
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewIchimokuTool computes Ichimoku Cloud indicator
 // Ichimoku components:
 // - Tenkan-sen (Conversion Line): (9-period high + 9-period low) / 2
@@ -25,11 +21,9 @@ func NewIchimokuTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			if err := ValidateMinLength(candles, 78, "Ichimoku"); err != nil {
 				return nil, err
 			}
-
 			// Reverse to chronological order for easier calculation
 			reversed := make([]struct{ high, low, close float64 }, len(candles))
 			for i := range candles {
@@ -38,29 +32,22 @@ func NewIchimokuTool(deps shared.Deps) tool.Tool {
 				reversed[idx].low = candles[i].Low
 				reversed[idx].close = candles[i].Close
 			}
-
 			// Calculate components
 			tenkan := calculateMidpoint(reversed, len(reversed)-9, len(reversed), 9)
 			kijun := calculateMidpoint(reversed, len(reversed)-26, len(reversed), 26)
-
 			// Senkou Span A (leading span A)
 			senkouA := (tenkan + kijun) / 2
-
 			// Senkou Span B (leading span B)
 			senkouB := calculateMidpoint(reversed, len(reversed)-52, len(reversed), 52)
-
 			// Chikou Span (lagging span) - current close
 			chikouSpan := candles[0].Close
-
 			// Current price
 			currentPrice := candles[0].Close
-
 			// Determine cloud color and position
 			cloudColor := "green"
 			if senkouB > senkouA {
 				cloudColor = "red"
 			}
-
 			// Determine price position relative to cloud
 			pricePosition := "in_cloud"
 			if currentPrice > senkouA && currentPrice > senkouB {
@@ -68,7 +55,6 @@ func NewIchimokuTool(deps shared.Deps) tool.Tool {
 			} else if currentPrice < senkouA && currentPrice < senkouB {
 				pricePosition = "below_cloud"
 			}
-
 			// Generate signal
 			signal := "neutral"
 			if pricePosition == "above_cloud" && cloudColor == "green" {
@@ -80,7 +66,6 @@ func NewIchimokuTool(deps shared.Deps) tool.Tool {
 			} else if pricePosition == "below_cloud" && currentPrice < tenkan && currentPrice < kijun {
 				signal = "bearish"
 			}
-
 			return map[string]interface{}{
 				"tenkan":         tenkan,
 				"kijun":          kijun,
@@ -97,19 +82,15 @@ func NewIchimokuTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 // calculateMidpoint calculates (highest high + lowest low) / 2 for a period
 func calculateMidpoint(data []struct{ high, low, close float64 }, start, end, period int) float64 {
 	if start < 0 || end > len(data) || end-start < period {
 		return 0
 	}
-
 	highest := data[start].high
 	lowest := data[start].low
-
 	for i := start; i < end && i < start+period; i++ {
 		if data[i].high > highest {
 			highest = data[i].high
@@ -118,6 +99,5 @@ func calculateMidpoint(data []struct{ high, low, close float64 }, start, end, pe
 			lowest = data[i].low
 		}
 	}
-
 	return (highest + lowest) / 2
 }

@@ -1,19 +1,13 @@
 package risk
-
 import (
 	"time"
-
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewValidateTradeTool performs lightweight pre-trade checks.
+// NewValidateTradeTool performs lightweight pre-trade checks
 func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"validate_trade",
@@ -27,8 +21,7 @@ func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 			if err != nil || amount.LessThanOrEqual(decimal.Zero) {
 				return nil, errors.ErrInvalidInput
 			}
-
-			// Optional circuit breaker check when risk repository is present.
+			// Optional circuit breaker check when risk repository is present
 			userID := uuid.Nil
 			if meta, ok := shared.MetadataFromContext(ctx); ok {
 				userID = meta.UserID
@@ -41,13 +34,11 @@ func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 				}
 				allowed = state == nil || !state.IsTriggered
 			}
-
 			return map[string]interface{}{"valid": allowed, "amount": amount.String()}, nil
 		},
 		deps,
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

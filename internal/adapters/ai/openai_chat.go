@@ -182,4 +182,3 @@ func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest) (<-cha
 	close(errCh)
 	return nil, errCh
 }
-

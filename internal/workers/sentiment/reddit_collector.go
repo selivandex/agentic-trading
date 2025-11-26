@@ -328,4 +328,3 @@ func (rc *RedditCollector) aggregateSentiment(symbol string, posts []redditPostD
 		TrendingRank:        0, // Not tracked
 	}
 }
-

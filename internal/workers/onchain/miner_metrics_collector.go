@@ -279,7 +279,7 @@ func InterpretMPI(mpi float64) string {
 // CalculateMinerRevenue estimates daily mining revenue based on hash rate
 // Simplified calculation: revenue = hashRate * blockReward * blocksPerDay / networkHashRate
 func CalculateMinerRevenue(hashRateTH, networkHashRateTH, btcPrice float64) float64 {
-	blockReward := 6.25 // Current Bitcoin block reward
+	blockReward := 6.25   // Current Bitcoin block reward
 	blocksPerDay := 144.0 // ~10 min per block
 
 	if networkHashRateTH == 0 {
@@ -292,4 +292,3 @@ func CalculateMinerRevenue(hashRateTH, networkHashRateTH, btcPrice float64) floa
 
 	return dailyUSD
 }
-

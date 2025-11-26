@@ -13,13 +13,13 @@ var AgentToolCategories = map[AgentType][]string{
 	AgentOrderFlowAnalyst:   {"market_data", "order_flow", "memory"},
 	AgentDerivativesAnalyst: {"market_data", "derivatives", "memory"},
 	AgentCorrelationAnalyst: {"market_data", "correlation", "memory"},
-	
+
 	// Decision makers - also need memory for saving plans and decisions
-	AgentStrategyPlanner:    {"memory"},
-	AgentRiskManager:        {"account", "risk", "memory"},
-	AgentExecutor:           {"account", "execution", "memory"},
-	AgentPositionManager:    {"account", "execution", "memory"},
-	AgentSelfEvaluator:      {"evaluation", "memory"},
+	AgentStrategyPlanner: {"market_data", "memory", "expert_agents"}, // Strategy planner can consult experts
+	AgentRiskManager:     {"account", "risk", "memory"},
+	AgentExecutor:        {"account", "execution", "memory"},
+	AgentPositionManager: {"account", "execution", "memory"},
+	AgentSelfEvaluator:   {"evaluation", "memory"},
 }
 
 // AgentToolMap resolves tool names per agent by filtering the global catalog by category.

@@ -1,11 +1,8 @@
 package shared
-
 import (
 	"context"
 	"time"
-
 	"github.com/google/uuid"
-
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
@@ -13,21 +10,18 @@ import (
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/reasoning"
 	"prometheus/internal/domain/risk"
-	"prometheus/internal/domain/stats"
 	"prometheus/pkg/logger"
 )
-
 // RiskEngine interface to avoid circular dependency
 type RiskEngine interface {
 	CanTrade(ctx context.Context, userID uuid.UUID) (bool, error)
 }
-
 // EmbeddingService interface for generating text embeddings
 type EmbeddingService interface {
 	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
 }
-
-// Deps bundles dependencies required by concrete tool implementations.
+// Deps bundles dependencies required by concrete tool implementations
+// Note: Stats tracking is now handled by ADK callbacks, not tool middleware
 type Deps struct {
 	MarketDataRepo      market_data.Repository
 	OrderRepo           order.Repository
@@ -36,13 +30,11 @@ type Deps struct {
 	MemoryRepo          memory.Repository
 	ReasoningRepo       reasoning.Repository
 	RiskRepo            risk.Repository
-	StatsRepo           stats.Repository
 	RiskEngine          RiskEngine
 	EmbeddingService    EmbeddingService
 	Redis               RedisClient
 	Log                 *logger.Logger
 }
-
 // RedisClient interface to avoid circular dependency
 type RedisClient interface {
 	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
@@ -50,18 +42,15 @@ type RedisClient interface {
 	Delete(ctx context.Context, keys ...string) error
 	Exists(ctx context.Context, key string) (bool, error)
 }
-
-// HasMarketData reports whether the market data repository is available.
+// HasMarketData reports whether the market data repository is available
 func (d Deps) HasMarketData() bool {
 	return d.MarketDataRepo != nil
 }
-
-// HasTradingData reports whether trading repositories are wired.
+// HasTradingData reports whether trading repositories are wired
 func (d Deps) HasTradingData() bool {
 	return d.OrderRepo != nil && d.PositionRepo != nil && d.ExchangeAccountRepo != nil
 }
-
-// HasRiskEngine reports whether the risk engine is available.
+// HasRiskEngine reports whether the risk engine is available
 func (d Deps) HasRiskEngine() bool {
 	return d.RiskEngine != nil
 }

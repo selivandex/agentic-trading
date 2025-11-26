@@ -1,16 +1,11 @@
 package market
-
 import (
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewGetPriceTool returns a tool that fetches the latest ticker snapshot.
+// NewGetPriceTool returns a tool that fetches the latest ticker snapshot
 func NewGetPriceTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"get_price",
@@ -19,13 +14,11 @@ func NewGetPriceTool(deps shared.Deps) tool.Tool {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_price: market data repository not configured")
 			}
-
 			exchange, _ := args["exchange"].(string)
 			symbol, _ := args["symbol"].(string)
 			if exchange == "" || symbol == "" {
 				return nil, errors.ErrInvalidInput
 			}
-
 			ticker, err := deps.MarketDataRepo.GetLatestTicker(ctx, exchange, symbol)
 			if err != nil {
 				return nil, errors.Wrap(err, "get_price: fetch ticker")
@@ -33,7 +26,6 @@ func NewGetPriceTool(deps shared.Deps) tool.Tool {
 			if ticker == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_price: ticker not found")
 			}
-
 			return map[string]interface{}{
 				"exchange":     ticker.Exchange,
 				"symbol":       ticker.Symbol,
@@ -49,6 +41,5 @@ func NewGetPriceTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

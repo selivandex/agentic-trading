@@ -201,3 +201,20 @@ func (uct *UserCostTracker) ResetMonthlyCosts() {
 		uc.MonthlyCostUSD = 0
 	}
 }
+
+// ExceededDailyLimit checks if user exceeded daily cost limit
+func (ct *CostTracker) ExceededDailyLimit(userID string) bool {
+	// Simple implementation - check if total cost exceeds threshold
+	// In production, use UserCostTracker for per-user limits
+	const dailyLimit = 10.0 // $10 daily limit per user
+
+	ct.mu.RLock()
+	defer ct.mu.RUnlock()
+
+	var totalCost float64
+	for _, mc := range ct.costs {
+		totalCost += mc.TotalCostUSD
+	}
+
+	return totalCost > dailyLimit
+}

@@ -17,11 +17,11 @@ import (
 // Monitors Bitcoin hash rate, mempool, Ethereum gas prices, etc.
 type NetworkMetricsCollector struct {
 	*workers.BaseWorker
-	onchainRepo       onchain.Repository
-	httpClient        *http.Client
-	blockchainAPIKey  string // Blockchain.com API key
-	etherscanAPIKey   string // Etherscan API key
-	blockchains       []string
+	onchainRepo      onchain.Repository
+	httpClient       *http.Client
+	blockchainAPIKey string // Blockchain.com API key
+	etherscanAPIKey  string // Etherscan API key
+	blockchains      []string
 }
 
 // NewNetworkMetricsCollector creates a new network metrics collector
@@ -204,7 +204,7 @@ type etherscanNodeCountResponse struct {
 // collectEthereumMetrics fetches Ethereum network metrics
 func (nc *NetworkMetricsCollector) collectEthereumMetrics(ctx context.Context) (*onchain.NetworkMetrics, error) {
 	var gasPrice float64
-	
+
 	if nc.etherscanAPIKey == "" {
 		nc.Log().Debug("Etherscan API key not configured, using default gas price")
 		gasPrice = 30.0 // Default fallback value
@@ -219,8 +219,8 @@ func (nc *NetworkMetricsCollector) collectEthereumMetrics(ctx context.Context) (
 
 	// For now, use estimates for other metrics
 	// In production, you'd want to use Infura/Alchemy to query actual chain data
-	activeAddresses := uint32(500000) // Daily active addresses (estimated)
-	transactionCount := uint32(1200000) // Daily tx count (estimated)
+	activeAddresses := uint32(500000)       // Daily active addresses (estimated)
+	transactionCount := uint32(1200000)     // Daily tx count (estimated)
 	avgFeeUSD := gasPrice * 0.000021 * 2500 // 21000 gas * ETH price
 
 	nc.Log().Debug("Collected Ethereum metrics",
@@ -325,4 +325,3 @@ func InterpretHashRate(hashRateTH float64) string {
 	}
 	return "low" // Potential security concern
 }
-

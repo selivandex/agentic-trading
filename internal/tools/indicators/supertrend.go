@@ -1,16 +1,11 @@
 package indicators
-
 import (
 	"time"
-
 	"github.com/markcheno/go-talib"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewSupertrendTool computes Supertrend indicator
 // Supertrend = ATR-based trailing stop indicator
 // Formula:
@@ -27,44 +22,34 @@ func NewSupertrendTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			atrPeriod := parseLimit(args["atr_period"], 10)
 			multiplier := parseFloat(args["multiplier"], 3.0)
-
 			if err := ValidateMinLength(candles, atrPeriod+1, "Supertrend"); err != nil {
 				return nil, err
 			}
-
 			// Prepare data for ta-lib
 			data, err := PrepareData(candles)
 			if err != nil {
 				return nil, err
 			}
-
 			// Calculate ATR using ta-lib
 			atrValues := talib.Atr(data.High, data.Low, data.Close, atrPeriod)
-
 			// Calculate Supertrend
 			supertrend, trend := calculateSupertrend(data, atrValues, multiplier)
-
 			// Get latest values
 			supertrendValue, err := GetLastValue(supertrend)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get Supertrend value")
 			}
-
 			currentTrend, err := GetLastValue(trend)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get trend")
 			}
-
 			currentPrice := candles[0].Close
 			atr, _ := GetLastValue(atrValues)
-
 			// Determine signal
 			signal := "neutral"
 			trendName := "unknown"
-
 			if currentTrend > 0 {
 				trendName = "uptrend"
 				signal = "bullish"
@@ -72,7 +57,6 @@ func NewSupertrendTool(deps shared.Deps) tool.Tool {
 				trendName = "downtrend"
 				signal = "bearish"
 			}
-
 			// Check for trend change
 			if len(trend) >= 2 {
 				prevTrend := trend[len(trend)-2]
@@ -82,7 +66,6 @@ func NewSupertrendTool(deps shared.Deps) tool.Tool {
 					signal = "trend_reversal_bearish"
 				}
 			}
-
 			return map[string]interface{}{
 				"supertrend":    supertrendValue,
 				"current_price": currentPrice,
@@ -97,26 +80,21 @@ func NewSupertrendTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 // calculateSupertrend computes supertrend values and trend direction
 func calculateSupertrend(data *TalibData, atr []float64, multiplier float64) ([]float64, []float64) {
 	n := len(data.Close)
 	supertrend := make([]float64, n)
 	trend := make([]float64, n)
-
 	// Initialize
 	supertrend[0] = data.Close[0]
 	trend[0] = 1
-
 	for i := 1; i < n; i++ {
 		// Calculate basic bands
 		hl2 := (data.High[i] + data.Low[i]) / 2
 		upperBand := hl2 + (multiplier * atr[i])
 		lowerBand := hl2 - (multiplier * atr[i])
-
 		// Determine supertrend value and trend
 		if data.Close[i] > supertrend[i-1] {
 			// Uptrend
@@ -134,6 +112,5 @@ func calculateSupertrend(data *TalibData, atr []float64, multiplier float64) ([]
 			trend[i] = -1
 		}
 	}
-
 	return supertrend, trend
 }

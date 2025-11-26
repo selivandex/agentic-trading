@@ -1,16 +1,11 @@
 package indicators
-
 import (
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewMACDTool computes MACD (12,26,9 by default).
+// NewMACDTool computes MACD (12,26,9 by default)
 func NewMACDTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"macd",
@@ -27,13 +22,11 @@ func NewMACDTool(deps shared.Deps) tool.Tool {
 			if len(closes) < slow+signal {
 				return nil, errors.Wrapf(errors.ErrInternal, "macd: not enough data")
 			}
-
 			emaFast := computeEMA(closes, fast)
 			emaSlow := computeEMA(closes, slow)
 			macdLine := emaFast - emaSlow
 			signalLine := computeEMA([]float64{macdLine}, signal)
 			histogram := macdLine - signalLine
-
 			return map[string]interface{}{
 				"macd":      macdLine,
 				"signal":    signalLine,
@@ -44,10 +37,8 @@ func NewMACDTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 func computeEMA(series []float64, period int) float64 {
 	if len(series) == 0 || period <= 1 {
 		return 0

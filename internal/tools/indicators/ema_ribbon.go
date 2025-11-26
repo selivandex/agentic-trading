@@ -1,15 +1,10 @@
 package indicators
-
 import (
 	"time"
-
 	"github.com/markcheno/go-talib"
-
 	"prometheus/internal/tools/shared"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewEMARibbonTool computes multiple EMAs (EMA Ribbon)
 // Useful for trend strength and support/resistance levels
 // Default periods: 9, 21, 55, 200 (common Fibonacci numbers)
@@ -23,31 +18,25 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			if err := ValidateMinLength(candles, 200, "EMA Ribbon"); err != nil {
 				return nil, err
 			}
-
 			// Prepare data for ta-lib
 			closes, err := PrepareCloses(candles)
 			if err != nil {
 				return nil, err
 			}
-
 			// Calculate multiple EMAs
 			ema9 := talib.Ema(closes, 9)
 			ema21 := talib.Ema(closes, 21)
 			ema55 := talib.Ema(closes, 55)
 			ema200 := talib.Ema(closes, 200)
-
 			// Get latest values
 			e9, _ := GetLastValue(ema9)
 			e21, _ := GetLastValue(ema21)
 			e55, _ := GetLastValue(ema55)
 			e200, _ := GetLastValue(ema200)
-
 			currentPrice := candles[0].Close
-
 			// Analyze EMA alignment (bullish when 9 > 21 > 55 > 200)
 			alignment := "neutral"
 			if e9 > e21 && e21 > e55 && e55 > e200 {
@@ -59,7 +48,6 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 			} else if e9 < e21 && e21 < e55 {
 				alignment = "short_term_bearish"
 			}
-
 			// Price position relative to ribbon
 			pricePosition := "below_all"
 			if currentPrice > e9 {
@@ -74,7 +62,6 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 			if currentPrice > e200 {
 				pricePosition = "above_all"
 			}
-
 			// Trend strength based on EMA spacing
 			spacing := ((e9 - e200) / e200) * 100
 			trendStrength := "weak"
@@ -83,7 +70,6 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 			} else if spacing > 2 || spacing < -2 {
 				trendStrength = "moderate"
 			}
-
 			// Generate signal
 			signal := "neutral"
 			if alignment == "bullish" && pricePosition == "above_all" {
@@ -95,11 +81,9 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 			} else if currentPrice < e21 && e21 < e55 {
 				signal = "bearish"
 			}
-
 			// Find support/resistance levels
 			support := min4(e9, e21, e55, e200)
 			resistance := max4(e9, e21, e55, e200)
-
 			return map[string]interface{}{
 				"ema_9":          e9,
 				"ema_21":         e21,
@@ -118,10 +102,8 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(20*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 // Helper functions
 func min4(a, b, c, d float64) float64 {
 	min := a
@@ -136,7 +118,6 @@ func min4(a, b, c, d float64) float64 {
 	}
 	return min
 }
-
 func max4(a, b, c, d float64) float64 {
 	max := a
 	if b > max {

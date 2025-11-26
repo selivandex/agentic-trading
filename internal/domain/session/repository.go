@@ -38,4 +38,3 @@ type GetEventsOptions struct {
 	Limit int
 	After time.Time
 }
-

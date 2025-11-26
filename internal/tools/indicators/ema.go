@@ -1,16 +1,11 @@
 package indicators
-
 import (
 	"time"
-
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewEMATool computes the exponential moving average.
+// NewEMATool computes the exponential moving average
 func NewEMATool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"ema",
@@ -25,19 +20,16 @@ func NewEMATool(deps shared.Deps) tool.Tool {
 			if len(closes) < period {
 				return nil, errors.Wrapf(errors.ErrInternal, "ema: not enough data for period %d", period)
 			}
-
 			multiplier := 2.0 / (float64(period) + 1)
 			ema := closes[0]
 			for i := 1; i < len(closes); i++ {
 				ema = (closes[i]-ema)*multiplier + ema
 			}
-
 			return map[string]interface{}{"value": ema}, nil
 		},
 		deps,
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

@@ -1,18 +1,14 @@
 package indicators
-
 import (
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
 func loadCandles(ctx tool.Context, deps shared.Deps, args map[string]interface{}, defaultLimit int) ([]market_data.OHLCV, error) {
 	if !deps.HasMarketData() {
 		return nil, errors.Wrapf(errors.ErrInternal, "indicator: market data repository not configured")
 	}
-
 	exchange, _ := args["exchange"].(string)
 	symbol, _ := args["symbol"].(string)
 	timeframe, _ := args["timeframe"].(string)
@@ -20,7 +16,6 @@ func loadCandles(ctx tool.Context, deps shared.Deps, args map[string]interface{}
 	if exchange == "" || symbol == "" || timeframe == "" {
 		return nil, errors.ErrInvalidInput
 	}
-
 	candles, err := deps.MarketDataRepo.GetLatestOHLCV(ctx, exchange, symbol, timeframe, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "indicator: fetch candles")
@@ -30,7 +25,6 @@ func loadCandles(ctx tool.Context, deps shared.Deps, args map[string]interface{}
 	}
 	return candles, nil
 }
-
 func parseLimit(raw interface{}, fallback int) int {
 	switch v := raw.(type) {
 	case int:
@@ -44,7 +38,6 @@ func parseLimit(raw interface{}, fallback int) int {
 	}
 	return fallback
 }
-
 func extractCloses(candles []market_data.OHLCV) []float64 {
 	closes := make([]float64, 0, len(candles))
 	for i := len(candles) - 1; i >= 0; i-- { // ensure chronological order
@@ -52,7 +45,6 @@ func extractCloses(candles []market_data.OHLCV) []float64 {
 	}
 	return closes
 }
-
 func extractHighLow(candles []market_data.OHLCV) ([]float64, []float64, []float64) {
 	high := make([]float64, 0, len(candles))
 	low := make([]float64, 0, len(candles))

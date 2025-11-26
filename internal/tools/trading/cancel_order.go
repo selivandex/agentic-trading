@@ -1,16 +1,12 @@
 package trading
-
 import (
 	"prometheus/internal/domain/order"
 	"prometheus/internal/tools/shared"
 	"time"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewCancelOrderTool cancels an order by ID.
+// NewCancelOrderTool cancels an order by ID
 func NewCancelOrderTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"cancel_order",
@@ -23,18 +19,15 @@ func NewCancelOrderTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			service := order.NewService(deps.OrderRepo)
 			if err := service.Cancel(ctx, orderID); err != nil {
 				return nil, err
 			}
-
 			return map[string]interface{}{"order_id": orderID.String(), "status": order.OrderStatusCanceled.String()}, nil
 		},
 		deps,
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

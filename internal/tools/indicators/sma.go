@@ -1,16 +1,11 @@
 package indicators
-
 import (
 	"time"
-
 	"github.com/markcheno/go-talib"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewSMATool computes Simple Moving Average using ta-lib
 func NewSMATool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
@@ -22,27 +17,22 @@ func NewSMATool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			period := parseLimit(args["period"], 20)
 			if err := ValidateMinLength(candles, period, "SMA"); err != nil {
 				return nil, err
 			}
-
 			// Prepare data for ta-lib
 			closes, err := PrepareCloses(candles)
 			if err != nil {
 				return nil, err
 			}
-
 			// Calculate SMA using ta-lib
 			sma := talib.Sma(closes, period)
-
 			// Get latest value
 			value, err := GetLastValue(sma)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get SMA value")
 			}
-
 			return map[string]interface{}{
 				"value":  value,
 				"period": period,
@@ -52,6 +42,5 @@ func NewSMATool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

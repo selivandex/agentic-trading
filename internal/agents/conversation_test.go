@@ -33,7 +33,7 @@ func TestConversationManager_AddMessages(t *testing.T) {
 
 	// Add user message
 	cm.AddUserMessage("Analyze BTC")
-	
+
 	if cm.GetTurnCount() != 1 {
 		t.Errorf("Expected 1 turn, got %d", cm.GetTurnCount())
 	}
@@ -149,7 +149,7 @@ func TestConversationManager_TokenTracking(t *testing.T) {
 
 	// Add message
 	cm.AddUserMessage("Short message")
-	
+
 	afterUserMsg := cm.GetTokenCount()
 	if afterUserMsg <= initialTokens {
 		t.Error("Token count should increase after adding message")
@@ -192,7 +192,7 @@ func TestConversationManager_Compression(t *testing.T) {
 
 	// Should keep at least last 10 + summary
 	if afterCompression < 11 {
-		t.Errorf("Compression should keep at least 11 messages (summary + last 10), got %d", 
+		t.Errorf("Compression should keep at least 11 messages (summary + last 10), got %d",
 			afterCompression)
 	}
 }
@@ -268,4 +268,3 @@ func TestConversationManager_SetCompression(t *testing.T) {
 		t.Error("SetCompression(true) should enable compression")
 	}
 }
-

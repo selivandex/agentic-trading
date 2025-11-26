@@ -96,35 +96,35 @@ func (oc *OptionsFlowCollector) Run(ctx context.Context) error {
 
 // Deribit API response structures
 type deribitTradesResponse struct {
-	Jsonrpc string                `json:"jsonrpc"`
-	ID      int                   `json:"id"`
-	Result  deribitTradesResult   `json:"result"`
+	Jsonrpc string              `json:"jsonrpc"`
+	ID      int                 `json:"id"`
+	Result  deribitTradesResult `json:"result"`
 }
 
 type deribitTradesResult struct {
-	Trades []deribitTrade `json:"trades"`
-	HasMore bool          `json:"has_more"`
+	Trades  []deribitTrade `json:"trades"`
+	HasMore bool           `json:"has_more"`
 }
 
 type deribitTrade struct {
-	TradeID       string  `json:"trade_id"`
-	Timestamp     int64   `json:"timestamp"`
-	InstrumentName string `json:"instrument_name"`
-	Amount        float64 `json:"amount"`
-	Price         float64 `json:"price"`
-	Direction     string  `json:"direction"` // buy, sell
-	IndexPrice    float64 `json:"index_price"`
-	IV            float64 `json:"iv"`
+	TradeID        string  `json:"trade_id"`
+	Timestamp      int64   `json:"timestamp"`
+	InstrumentName string  `json:"instrument_name"`
+	Amount         float64 `json:"amount"`
+	Price          float64 `json:"price"`
+	Direction      string  `json:"direction"` // buy, sell
+	IndexPrice     float64 `json:"index_price"`
+	IV             float64 `json:"iv"`
 }
 
 // fetchOptionsFlows fetches recent large options trades from Deribit
 func (oc *OptionsFlowCollector) fetchOptionsFlows(ctx context.Context, symbol string) ([]derivatives.OptionsFlow, error) {
 	// Deribit API endpoint
 	// Docs: https://docs.deribit.com/
-	
+
 	// Get trades for options instruments (e.g., BTC-28DEC24-40000-C)
 	// We'll query recent trades and filter by size
-	
+
 	baseSymbol := symbol
 	if symbol == "BTC/USDT" {
 		baseSymbol = "BTC"
@@ -218,7 +218,7 @@ func (oc *OptionsFlowCollector) convertTrade(trade deribitTrade, symbol string) 
 func (oc *OptionsFlowCollector) parseInstrumentName(instrument string) (float64, time.Time, string) {
 	// Example: BTC-28DEC24-40000-C
 	// Parse using simple string operations
-	
+
 	var strike float64
 	var expiry time.Time
 	var side string
@@ -249,7 +249,7 @@ func (oc *OptionsFlowCollector) parseInstrumentName(instrument string) (float64,
 func (oc *OptionsFlowCollector) splitInstrument(instrument string) []string {
 	var parts []string
 	current := ""
-	
+
 	for _, char := range instrument {
 		if char == '-' {
 			parts = append(parts, current)
@@ -261,7 +261,7 @@ func (oc *OptionsFlowCollector) splitInstrument(instrument string) []string {
 	if current != "" {
 		parts = append(parts, current)
 	}
-	
+
 	return parts
 }
 
@@ -271,7 +271,7 @@ func (oc *OptionsFlowCollector) determineSentiment(direction, side string) strin
 	// Buy puts = bearish
 	// Sell calls = bearish (covered calls or bearish spread)
 	// Sell puts = bullish (cash-secured puts or bullish spread)
-	
+
 	if direction == "buy" && side == "call" {
 		return "bullish"
 	}
@@ -284,7 +284,7 @@ func (oc *OptionsFlowCollector) determineSentiment(direction, side string) strin
 	if direction == "sell" && side == "put" {
 		return "bullish"
 	}
-	
+
 	return "neutral"
 }
 
@@ -321,4 +321,3 @@ func InterpretPutCallRatio(ratio float64) string {
 	}
 	return "neutral"
 }
-

@@ -6,7 +6,8 @@ import (
 	"google.golang.org/adk/tool"
 )
 
-// Factory provides fluent API for creating tools with middleware
+// ToolBuilder provides fluent API for creating tools with middleware
+// Note: Stats tracking is now handled by ADK callbacks, not middleware
 type ToolBuilder struct {
 	name        string
 	description string
@@ -19,8 +20,6 @@ type ToolBuilder struct {
 
 	withTimeout   bool
 	timeoutConfig TimeoutMiddleware
-
-	withStats bool
 }
 
 // NewToolBuilder creates a new factory for a tool
@@ -55,20 +54,16 @@ func (b *ToolBuilder) WithTimeout(timeout time.Duration) *ToolBuilder {
 	return b
 }
 
-// WithStats enables stats tracking middleware
-func (b *ToolBuilder) WithStats() *ToolBuilder {
-	b.withStats = true
-	return b
-}
-
 // Build creates the tool with configured middleware applied
+// Note: Stats tracking is handled by ADK callbacks (see internal/agents/callbacks/tool.go)
 func (b *ToolBuilder) Build() tool.Tool {
 	// Apply middleware in layers:
 	// The order matters: we wrap from innermost (closest to business logic) to outermost
 	// 1. Base function (business logic)
 	// 2. Retry (retry the business logic on failure)
 	// 3. Timeout (timeout includes retries)
-	// 4. Stats (track everything including retries and timeouts)
+	//
+	// Stats tracking is now handled by ADK AfterToolCallback, not middleware
 
 	name := b.name
 	description := b.description
@@ -84,13 +79,7 @@ func (b *ToolBuilder) Build() tool.Tool {
 		fn = b.wrapWithTimeout(fn)
 	}
 
-	// Layer 3: Create final tool with or without stats
-	if b.withStats && b.deps.StatsRepo != nil {
-		statsMiddleware := NewStatsMiddleware(b.deps.StatsRepo)
-		return statsMiddleware.WrapFunc(name, description, fn)
-	}
-
-	// No stats - create tool directly via TimeoutMiddleware (passthrough)
+	// Layer 3: Create final tool via TimeoutMiddleware (may be passthrough if no timeout)
 	return TimeoutMiddleware{Timeout: 0}.WrapFunc(name, description, fn)
 }
 

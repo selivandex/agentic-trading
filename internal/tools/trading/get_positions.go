@@ -1,15 +1,11 @@
 package trading
-
 import (
 	"prometheus/internal/tools/shared"
 	"time"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewGetPositionsTool returns open positions for the user.
+// NewGetPositionsTool returns open positions for the user
 func NewGetPositionsTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"get_positions",
@@ -18,7 +14,6 @@ func NewGetPositionsTool(deps shared.Deps) tool.Tool {
 			if deps.PositionRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_positions: position repository not configured")
 			}
-
 			userID, err := parseUUIDArg(args["user_id"], "user_id")
 			if err != nil {
 				if meta, ok := shared.MetadataFromContext(ctx); ok {
@@ -27,12 +22,10 @@ func NewGetPositionsTool(deps shared.Deps) tool.Tool {
 					return nil, err
 				}
 			}
-
 			positions, err := deps.PositionRepo.GetOpenByUser(ctx, userID)
 			if err != nil {
 				return nil, errors.Wrap(err, "get_positions: fetch positions")
 			}
-
 			data := make([]map[string]interface{}, 0, len(positions))
 			for _, p := range positions {
 				data = append(data, map[string]interface{}{
@@ -46,13 +39,11 @@ func NewGetPositionsTool(deps shared.Deps) tool.Tool {
 					"status":         p.Status.String(),
 				})
 			}
-
 			return map[string]interface{}{"positions": data}, nil
 		},
 		deps,
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }

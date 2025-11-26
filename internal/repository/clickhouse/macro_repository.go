@@ -76,7 +76,7 @@ func (r *MacroRepository) GetUpcomingEvents(ctx context.Context, from time.Time,
 	for rows.Next() {
 		var e macro.MacroEvent
 		var eventType, impact string
-		
+
 		if err := rows.Scan(
 			&e.ID, &eventType, &e.Title, &e.Country, &e.Currency, &e.EventTime,
 			&e.Previous, &e.Forecast, &e.Actual, &impact,
@@ -84,7 +84,7 @@ func (r *MacroRepository) GetUpcomingEvents(ctx context.Context, from time.Time,
 		); err != nil {
 			return nil, errors.Wrap(err, "scan macro event")
 		}
-		
+
 		e.EventType = macro.EventType(eventType)
 		e.Impact = macro.ImpactLevel(impact)
 		events = append(events, e)
@@ -116,7 +116,7 @@ func (r *MacroRepository) GetEventsByType(ctx context.Context, eventType macro.E
 	for rows.Next() {
 		var e macro.MacroEvent
 		var eventTypeStr, impact string
-		
+
 		if err := rows.Scan(
 			&e.ID, &eventTypeStr, &e.Title, &e.Country, &e.Currency, &e.EventTime,
 			&e.Previous, &e.Forecast, &e.Actual, &impact,
@@ -124,7 +124,7 @@ func (r *MacroRepository) GetEventsByType(ctx context.Context, eventType macro.E
 		); err != nil {
 			return nil, errors.Wrap(err, "scan macro event")
 		}
-		
+
 		e.EventType = macro.EventType(eventTypeStr)
 		e.Impact = macro.ImpactLevel(impact)
 		events = append(events, e)
@@ -156,7 +156,7 @@ func (r *MacroRepository) GetHighImpactEvents(ctx context.Context, from time.Tim
 	for rows.Next() {
 		var e macro.MacroEvent
 		var eventType, impact string
-		
+
 		if err := rows.Scan(
 			&e.ID, &eventType, &e.Title, &e.Country, &e.Currency, &e.EventTime,
 			&e.Previous, &e.Forecast, &e.Actual, &impact,
@@ -164,7 +164,7 @@ func (r *MacroRepository) GetHighImpactEvents(ctx context.Context, from time.Tim
 		); err != nil {
 			return nil, errors.Wrap(err, "scan macro event")
 		}
-		
+
 		e.EventType = macro.EventType(eventType)
 		e.Impact = macro.ImpactLevel(impact)
 		events = append(events, e)
@@ -172,4 +172,3 @@ func (r *MacroRepository) GetHighImpactEvents(ctx context.Context, from time.Tim
 
 	return events, nil
 }
-

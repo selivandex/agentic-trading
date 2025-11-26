@@ -103,6 +103,16 @@ type AgentsConfig struct {
 	EnableCompression      bool          `envconfig:"AGENTS_ENABLE_COMPRESSION" default:"true"`      // Enable conversation compression
 	EnableMemory           bool          `envconfig:"AGENTS_ENABLE_MEMORY" default:"true"`           // Enable long-term memory
 	SelfReflectionInterval time.Duration `envconfig:"AGENTS_SELF_REFLECTION_INTERVAL" default:"30s"` // Self-reflection check interval
+
+	// ADK-specific configuration
+	EnablePersistentSessions bool          `envconfig:"AGENTS_ENABLE_PERSISTENT_SESSIONS" default:"true"` // Use database-backed sessions
+	EnableStreaming          bool          `envconfig:"AGENTS_ENABLE_STREAMING" default:"true"`           // Enable SSE streaming
+	EnableCallbacks          bool          `envconfig:"AGENTS_ENABLE_CALLBACKS" default:"true"`           // Enable lifecycle callbacks
+	EnableResponseCaching    bool          `envconfig:"AGENTS_ENABLE_RESPONSE_CACHING" default:"true"`    // Cache LLM responses in Redis
+	ResponseCacheTTL         time.Duration `envconfig:"AGENTS_RESPONSE_CACHE_TTL" default:"1h"`           // Cache TTL
+	EnableAgentTransfer      bool          `envconfig:"AGENTS_ENABLE_AGENT_TRANSFER" default:"true"`      // Allow agents to transfer control
+	EnableSchemaValidation   bool          `envconfig:"AGENTS_ENABLE_SCHEMA_VALIDATION" default:"true"`   // Validate I/O with schemas
+	EnableExpertTools        bool          `envconfig:"AGENTS_ENABLE_EXPERT_TOOLS" default:"true"`        // Enable agent-as-tool pattern
 }
 
 type CryptoConfig struct {

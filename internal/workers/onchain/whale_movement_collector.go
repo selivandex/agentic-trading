@@ -81,28 +81,28 @@ func (wc *WhaleMovementCollector) Run(ctx context.Context) error {
 
 // Whale Alert API response structures
 type whaleAlertResponse struct {
-	Result       string               `json:"result"`
-	Count        int                  `json:"count"`
-	Cursor       string               `json:"cursor"`
+	Result       string                  `json:"result"`
+	Count        int                     `json:"count"`
+	Cursor       string                  `json:"cursor"`
 	Transactions []whaleAlertTransaction `json:"transactions"`
 }
 
 type whaleAlertTransaction struct {
-	Blockchain  string                  `json:"blockchain"`
-	Symbol      string                  `json:"symbol"`
-	ID          string                  `json:"id"`
-	TransactionType string              `json:"transaction_type"`
-	Hash        string                  `json:"hash"`
-	From        whaleAlertAddress       `json:"from"`
-	To          whaleAlertAddress       `json:"to"`
-	Timestamp   int64                   `json:"timestamp"`
-	Amount      float64                 `json:"amount"`
-	AmountUSD   float64                 `json:"amount_usd"`
+	Blockchain      string            `json:"blockchain"`
+	Symbol          string            `json:"symbol"`
+	ID              string            `json:"id"`
+	TransactionType string            `json:"transaction_type"`
+	Hash            string            `json:"hash"`
+	From            whaleAlertAddress `json:"from"`
+	To              whaleAlertAddress `json:"to"`
+	Timestamp       int64             `json:"timestamp"`
+	Amount          float64           `json:"amount"`
+	AmountUSD       float64           `json:"amount_usd"`
 }
 
 type whaleAlertAddress struct {
-	Address string `json:"address"`
-	Owner   string `json:"owner"`
+	Address   string `json:"address"`
+	Owner     string `json:"owner"`
 	OwnerType string `json:"owner_type"`
 }
 
@@ -211,12 +211,12 @@ func (wc *WhaleMovementCollector) calculateMovementImpact(movement onchain.Whale
 	// Simple heuristic: impact = amount_usd / market_cap_factor
 	// >$10M = high impact, >$5M = medium, <$5M = low
 	impact := movement.AmountUSD / 10_000_000.0
-	
+
 	// Adjust based on direction (to exchange = potential sell pressure)
 	if movement.ToLabel != "" && wc.isExchangeLabel(movement.ToLabel) {
 		impact *= 1.5 // Increased impact for exchange deposits
 	}
-	
+
 	return impact
 }
 
@@ -226,13 +226,13 @@ func (wc *WhaleMovementCollector) isExchangeLabel(label string) bool {
 		"Binance", "Coinbase", "Kraken", "Bitfinex", "Huobi",
 		"OKX", "Bybit", "FTX", "Gemini", "Bitstamp",
 	}
-	
+
 	for _, exchange := range exchanges {
 		if label == exchange {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -242,12 +242,12 @@ func ParseBlockchainFromTxHash(txHash string) string {
 	if len(txHash) == 0 {
 		return "unknown"
 	}
-	
+
 	// Ethereum-style (0x prefix, 66 chars)
 	if txHash[:2] == "0x" && len(txHash) == 66 {
 		return "ethereum"
 	}
-	
+
 	// Bitcoin-style (64 hex chars, no prefix)
 	if len(txHash) == 64 {
 		_, err := strconv.ParseUint(txHash[:8], 16, 64)
@@ -255,7 +255,6 @@ func ParseBlockchainFromTxHash(txHash string) string {
 			return "bitcoin"
 		}
 	}
-	
+
 	return "unknown"
 }
-

@@ -608,4 +608,3 @@ func (r *OnChainRepository) GetLatestMinerMetrics(ctx context.Context) ([]onchai
 
 	return metrics, nil
 }
-

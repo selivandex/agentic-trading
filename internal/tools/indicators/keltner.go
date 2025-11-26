@@ -1,16 +1,11 @@
 package indicators
-
 import (
 	"time"
-
 	"github.com/markcheno/go-talib"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewKeltnerTool computes Keltner Channels
 // Keltner Channels = EMA +/- (ATR * multiplier)
 // Similar to Bollinger Bands but uses ATR instead of standard deviation
@@ -24,45 +19,36 @@ func NewKeltnerTool(deps shared.Deps) tool.Tool {
 			if err != nil {
 				return nil, err
 			}
-
 			emaPeriod := parseLimit(args["ema_period"], 20)
 			atrPeriod := parseLimit(args["atr_period"], 14)
 			multiplier := parseFloat(args["multiplier"], 2.0)
-
 			minLength := max(emaPeriod, atrPeriod)
 			if err := ValidateMinLength(candles, minLength, "Keltner Channels"); err != nil {
 				return nil, err
 			}
-
 			// Prepare data for ta-lib
 			data, err := PrepareData(candles)
 			if err != nil {
 				return nil, err
 			}
-
 			// Calculate EMA (middle line)
 			emaValues := talib.Ema(data.Close, emaPeriod)
 			middleLine, err := GetLastValue(emaValues)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get EMA value")
 			}
-
 			// Calculate ATR
 			atrValues := talib.Atr(data.High, data.Low, data.Close, atrPeriod)
 			atr, err := GetLastValue(atrValues)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get ATR value")
 			}
-
 			// Calculate upper and lower channels
 			upperChannel := middleLine + (atr * multiplier)
 			lowerChannel := middleLine - (atr * multiplier)
-
 			currentPrice := candles[0].Close
-
 			// Calculate channel width (similar to Bollinger bandwidth)
 			channelWidth := ((upperChannel - lowerChannel) / middleLine) * 100
-
 			// Determine position
 			position := "middle"
 			if currentPrice >= upperChannel {
@@ -74,7 +60,6 @@ func NewKeltnerTool(deps shared.Deps) tool.Tool {
 			} else {
 				position = "lower_half"
 			}
-
 			// Generate signal
 			signal := "neutral"
 			if position == "above_upper" {
@@ -86,7 +71,6 @@ func NewKeltnerTool(deps shared.Deps) tool.Tool {
 			} else {
 				signal = "bearish"
 			}
-
 			return map[string]interface{}{
 				"upper":         upperChannel,
 				"middle":        middleLine,
@@ -102,10 +86,8 @@ func NewKeltnerTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(15*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 // max returns maximum of two integers
 func max(a, b int) int {
 	if a > b {

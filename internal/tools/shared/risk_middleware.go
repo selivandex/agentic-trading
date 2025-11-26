@@ -1,16 +1,11 @@
 package shared
-
 import (
 	"github.com/google/uuid"
-
 	"google.golang.org/adk/tool"
-
 	"prometheus/pkg/errors"
 )
-
 // ToolExecutor is a function type that executes a tool with given arguments
 type ToolExecutor func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error)
-
 // WithRiskCheck wraps a trading tool execution with risk engine checks
 // It ensures that the user is allowed to trade before executing the tool
 func WithRiskCheck(deps Deps, executor ToolExecutor) ToolExecutor {
@@ -19,11 +14,9 @@ func WithRiskCheck(deps Deps, executor ToolExecutor) ToolExecutor {
 		if !deps.HasRiskEngine() {
 			return executor(ctx, args)
 		}
-
 		// Extract user ID from context metadata or args
 		var userID uuid.UUID
 		var err error
-
 		if meta, ok := MetadataFromContext(ctx); ok {
 			userID = meta.UserID
 		} else {
@@ -39,7 +32,6 @@ func WithRiskCheck(deps Deps, executor ToolExecutor) ToolExecutor {
 				return executor(ctx, args)
 			}
 		}
-
 		// Check if trading is allowed for this user
 		canTrade, err := deps.RiskEngine.CanTrade(ctx, userID)
 		if err != nil {
@@ -56,7 +48,6 @@ func WithRiskCheck(deps Deps, executor ToolExecutor) ToolExecutor {
 			// For other errors, wrap with context
 			return nil, errors.Wrap(err, "risk_check: failed to check trading permission")
 		}
-
 		if !canTrade {
 			deps.Log.Warn("Trading blocked by risk engine",
 				"user_id", userID,
@@ -64,13 +55,11 @@ func WithRiskCheck(deps Deps, executor ToolExecutor) ToolExecutor {
 			)
 			return nil, errors.ErrTradingBlocked
 		}
-
 		// Risk check passed, execute the tool
 		deps.Log.Debug("Risk check passed", "user_id", userID)
 		return executor(ctx, args)
 	}
 }
-
 // WithRiskCheckMultiple applies risk check middleware to multiple tools
 func WithRiskCheckMultiple(deps Deps, executors map[string]ToolExecutor) map[string]ToolExecutor {
 	wrapped := make(map[string]ToolExecutor)

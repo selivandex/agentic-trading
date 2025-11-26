@@ -10,6 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/adk/session"
+
+	"prometheus/internal/adapters/adk"
 	"prometheus/internal/adapters/ai"
 	chclient "prometheus/internal/adapters/clickhouse"
 	"prometheus/internal/adapters/config"
@@ -35,6 +38,7 @@ import (
 	"prometheus/internal/domain/regime"
 	domainRisk "prometheus/internal/domain/risk"
 	"prometheus/internal/domain/sentiment"
+	domainsession "prometheus/internal/domain/session"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
@@ -111,6 +115,7 @@ func main() {
 	memoryRepo := pgrepo.NewMemoryRepository(pgClient.DB())
 	journalRepo := pgrepo.NewJournalRepository(pgClient.DB())
 	riskRepo := pgrepo.NewRiskRepository(pgClient.DB())
+	sessionRepo := pgrepo.NewSessionRepository(pgClient.DB())
 	marketDataRepo := chrepo.NewMarketDataRepository(chClient.Conn())
 	regimeRepo := chrepo.NewRegimeRepository(chClient.Conn())
 	sentimentRepo := chrepo.NewSentimentRepository(chClient.Conn())
@@ -130,8 +135,12 @@ func main() {
 	positionService := position.NewService(positionRepo)
 	memoryService := memory.NewService(memoryRepo)
 	journalService := journal.NewService(journalRepo)
+	sessionDomainService := domainsession.NewService(sessionRepo)
 
 	log.Info("Services initialized")
+
+	// Create ADK session service adapter
+	adkSessionService := adk.NewSessionService(sessionDomainService)
 
 	// ========================================
 	// External Adapters (Kafka, Exchange, Crypto)
@@ -170,9 +179,14 @@ func main() {
 		log,
 	)
 
-	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, log)
+	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, log)
 	if err != nil {
 		log.Fatalf("failed to initialize agents: %v", err)
+	}
+
+	// Register expert agent tools (agent-as-tool pattern)
+	if err := registerExpertTools(agentFactory, toolRegistry, cfg.AI.DefaultProvider, "claude-sonnet-4", log); err != nil {
+		log.Warnf("Failed to register expert tools: %v", err)
 	}
 
 	// ========================================
@@ -206,6 +220,7 @@ func main() {
 		encryptor,
 		kafkaProducer,
 		agentFactory,
+		adkSessionService,
 		cfg,
 		log,
 	)
@@ -463,7 +478,7 @@ func provideToolRegistry(
 	return registry
 }
 
-func provideAgents(cfg *config.Config, toolRegistry *tools.Registry, log *logger.Logger) (*agents.Factory, *agents.Registry, error) {
+func provideAgents(cfg *config.Config, toolRegistry *tools.Registry, sessionService session.Service, log *logger.Logger) (*agents.Factory, *agents.Registry, error) {
 	log.Info("Initializing agents...")
 
 	aiRegistry, err := ai.BuildRegistry(cfg.AI)
@@ -477,9 +492,10 @@ func provideAgents(cfg *config.Config, toolRegistry *tools.Registry, log *logger
 	}
 
 	factory, err := agents.NewFactory(agents.FactoryDeps{
-		AIRegistry:   aiRegistry,
-		ToolRegistry: toolRegistry,
-		Templates:    templates.Get(),
+		AIRegistry:     aiRegistry,
+		ToolRegistry:   toolRegistry,
+		Templates:      templates.Get(),
+		SessionService: sessionService,
 	})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create agent factory")
@@ -519,6 +535,21 @@ func resolveProvider(registry *ai.ProviderRegistry, desired string) string {
 	return ai.NormalizeProviderName(providers[0].Name())
 }
 
+func registerExpertTools(agentFactory *agents.Factory, toolRegistry *tools.Registry, provider, model string, log *logger.Logger) error {
+	log.Info("Registering expert agent tools...")
+
+	// Create expert tools using agent-as-tool pattern
+	expertTools, err := agentFactory.CreateExpertTools(provider, model)
+	if err != nil {
+		return errors.Wrap(err, "failed to create expert tools")
+	}
+
+	// Register them in tool registry
+	tools.RegisterExpertTools(toolRegistry, expertTools, log)
+
+	return nil
+}
+
 func provideWorkers(
 	userRepo user.Repository,
 	tradingPairRepo trading_pair.Repository,
@@ -538,6 +569,7 @@ func provideWorkers(
 	encryptor *crypto.Encryptor,
 	kafkaProducer *kafka.Producer,
 	agentFactory *agents.Factory,
+	adkSessionService session.Service,
 	cfg *config.Config,
 	log *logger.Logger,
 ) *workers.Scheduler {
@@ -830,9 +862,9 @@ func provideWorkers(
 		tradingPairRepo,
 		agentFactory,
 		kafkaProducer,
-		cfg.Agents,             // Agent runtime config
+		adkSessionService,      // ADK session service
 		cfg.AI.DefaultProvider, // Default AI provider
-		"claude-sonnet-4",      // Default AI model (TODO: add to config)
+		"claude-sonnet-4",      // Default AI model
 		cfg.Workers.MarketScannerInterval,
 		cfg.Workers.MarketScannerMaxConcurrency,
 		true, // enabled

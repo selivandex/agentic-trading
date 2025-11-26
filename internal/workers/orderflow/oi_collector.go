@@ -182,4 +182,3 @@ func (oic *OICollector) AnalyzeOITrend(current, previous *market_data.OpenIntere
 
 	return trend, signal
 }
-

@@ -137,7 +137,7 @@ func (fa *FundingAggregator) calculateStats(rates map[string]float64) (float64, 
 	sum := 0.0
 	min := 999999.0
 	max := -999999.0
-	
+
 	for _, rate := range rates {
 		sum += rate
 		if rate < min {
@@ -147,7 +147,7 @@ func (fa *FundingAggregator) calculateStats(rates map[string]float64) (float64, 
 			max = rate
 		}
 	}
-	
+
 	avg := sum / float64(len(rates))
 
 	// Calculate standard deviation
@@ -156,7 +156,7 @@ func (fa *FundingAggregator) calculateStats(rates map[string]float64) (float64, 
 		diff := rate - avg
 		varianceSum += diff * diff
 	}
-	
+
 	stdDev := 0.0
 	if len(rates) > 1 {
 		stdDev = varianceSum / float64(len(rates))
@@ -292,4 +292,3 @@ func CalculateOptimalFundingStrategy(avgRate, spread float64) string {
 
 	return "neutral_funding"
 }
-

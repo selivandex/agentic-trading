@@ -6,14 +6,21 @@ import (
 	"sync"
 	"time"
 
-	"prometheus/internal/adapters/config"
+	"github.com/google/uuid"
+	"google.golang.org/adk/agent"
+	"google.golang.org/adk/runner"
+	"google.golang.org/adk/session"
+	"google.golang.org/genai"
+
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/agents"
+	"prometheus/internal/agents/workflows"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
+	"prometheus/pkg/logger"
 )
 
 // MarketScanner runs periodic agent analysis for all active users
@@ -23,13 +30,14 @@ type MarketScanner struct {
 	*workers.BaseWorker
 	userRepo        user.Repository
 	tradingPairRepo trading_pair.Repository
-	agentFactory    *agents.Factory
-	orchestrator    *agents.Orchestrator
+	pipeline        agent.Agent
+	sessionService  session.Service
 	kafka           *kafka.Producer
 	eventPublisher  *events.WorkerPublisher
 	maxConcurrency  int    // Maximum number of users to process concurrently
 	defaultProvider string // Default AI provider from config
 	defaultModel    string // Default AI model from config
+	log             *logger.Logger
 }
 
 // NewMarketScanner creates a new market scanner worker
@@ -38,7 +46,7 @@ func NewMarketScanner(
 	tradingPairRepo trading_pair.Repository,
 	agentFactory *agents.Factory,
 	kafka *kafka.Producer,
-	runtimeConfig config.AgentsConfig,
+	sessionService session.Service,
 	defaultProvider string,
 	defaultModel string,
 	interval time.Duration,
@@ -49,21 +57,32 @@ func NewMarketScanner(
 		maxConcurrency = 5 // Default: process 5 users concurrently
 	}
 
-	// Create orchestrator for agent pipeline coordination
-	costTracker := agents.NewCostTracker()
-	orchestrator := agents.NewOrchestrator(agentFactory, runtimeConfig, costTracker)
+	log := logger.Get().With("component", "market_scanner")
+
+	// Create workflow factory
+	workflowFactory := workflows.NewFactory(agentFactory, defaultProvider, defaultModel)
+
+	// Create trading pipeline workflow (replaces orchestrator)
+	pipeline, err := workflowFactory.CreateTradingPipeline()
+	if err != nil {
+		log.Errorf("Failed to create trading pipeline: %v", err)
+		panic(err) // Fatal error during initialization
+	}
+
+	log.Info("Market scanner initialized with ADK workflow pipeline")
 
 	return &MarketScanner{
 		BaseWorker:      workers.NewBaseWorker("market_scanner", interval, enabled),
 		userRepo:        userRepo,
 		tradingPairRepo: tradingPairRepo,
-		agentFactory:    agentFactory,
-		orchestrator:    orchestrator,
+		pipeline:        pipeline,
+		sessionService:  sessionService,
 		kafka:           kafka,
 		eventPublisher:  events.NewWorkerPublisher(kafka),
 		maxConcurrency:  maxConcurrency,
 		defaultProvider: defaultProvider,
 		defaultModel:    defaultModel,
+		log:             log,
 	}
 }
 
@@ -215,52 +234,60 @@ func (ms *MarketScanner) analyzeUserPair(ctx context.Context, usr *user.User, pa
 		"market_type", pair.MarketType,
 	)
 
-	// Get user's AI provider/model preferences, fallback to defaults
-	provider := ms.defaultProvider
-	model := ms.defaultModel
-
-	// Check user settings for custom AI preferences
-	if usr.Settings.DefaultAIProvider != "" {
-		provider = usr.Settings.DefaultAIProvider
-	}
-	if usr.Settings.DefaultAIModel != "" {
-		model = usr.Settings.DefaultAIModel
-	}
-
-	// Run full agent analysis pipeline via orchestrator
+	// Run full agent analysis pipeline using ADK workflow
 	// This executes:
 	// 1. Parallel analysis agents (market, SMC, order flow, etc.)
 	// 2. Strategy planner to synthesize results
-	// 3. Risk manager to validate (TODO)
-	plan, err := ms.orchestrator.RunAnalysisPipeline(
-		ctx,
-		usr.ID,
-		pair.Symbol,
-		pair.MarketType.String(),
-		provider,
-		model,
-	)
+	// 3. Risk manager to validate
+	sessionID := uuid.New().String()
 
+	// Create runner for this execution
+	runnerInstance, err := runner.New(runner.Config{
+		AppName:        "prometheus_market_scanner",
+		Agent:          ms.pipeline,
+		SessionService: ms.sessionService,
+	})
 	if err != nil {
-		ms.Log().Error("Agent pipeline failed",
-			"user_id", usr.ID,
-			"symbol", pair.Symbol,
-			"error", err,
-		)
-		return errors.Wrap(err, "agent pipeline execution failed")
+		ms.log.Errorf("Failed to create runner: %v", err)
+		return errors.Wrap(err, "failed to create ADK runner")
 	}
 
-	ms.Log().Info("Agent pipeline complete",
-		"user_id", usr.ID,
-		"symbol", pair.Symbol,
-		"analysis_count", len(plan.AnalysisInputs),
-		"strategy_tokens", plan.StrategyOutput.TokensUsed,
-		"strategy_cost", plan.StrategyOutput.CostUSD,
+	// Prepare user message
+	userMessage := genai.NewContentFromText(
+		fmt.Sprintf("Analyze %s (%s market) and provide trading recommendations. Consider market structure, order flow, sentiment, and macro factors.",
+			pair.Symbol,
+			pair.MarketType.String(),
+		),
+		genai.RoleUser,
 	)
 
-	// TODO: Extract trade signal from plan and publish to Kafka
-	// TODO: If auto-execution enabled, pass to executor agent
-	// TODO: Store plan in database for audit
+	// Run workflow pipeline
+	ms.log.Infof("Running trading pipeline for user=%s symbol=%s session=%s", usr.ID, pair.Symbol, sessionID)
+
+	var finalEvent *session.Event
+	eventCount := 0
+
+	for event, err := range runnerInstance.Run(ctx, usr.ID.String(), sessionID, userMessage, agent.RunConfig{
+		StreamingMode: agent.StreamingModeNone, // Use non-streaming for workers
+	}) {
+		if err != nil {
+			ms.log.Errorf("Pipeline execution error: %v", err)
+			return errors.Wrap(err, "pipeline execution failed")
+		}
+
+		if event != nil && !event.LLMResponse.Partial {
+			eventCount++
+			finalEvent = event
+			ms.log.Debugf("Pipeline event %d: author=%s", eventCount, event.Author)
+		}
+	}
+
+	if finalEvent == nil {
+		ms.log.Warn("Pipeline completed but no final event received")
+		return errors.New("no final response from pipeline")
+	}
+
+	ms.log.Infof("Pipeline complete: events=%d", eventCount)
 
 	// Publish analysis complete event
 	if err := ms.eventPublisher.PublishMarketAnalysisRequest(
@@ -270,7 +297,7 @@ func (ms *MarketScanner) analyzeUserPair(ctx context.Context, usr *user.User, pa
 		pair.MarketType.String(),
 		pair.StrategyMode.String(),
 	); err != nil {
-		ms.Log().Error("Failed to publish analysis event", "error", err)
+		ms.log.Errorf("Failed to publish analysis event: %v", err)
 	}
 
 	return nil

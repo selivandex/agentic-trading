@@ -1,13 +1,10 @@
 package orderflow
-
 import (
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 	"time"
-
 	"google.golang.org/adk/tool"
 )
-
 // NewGetTradeImbalanceTool calculates buy vs sell pressure from recent trades
 func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
@@ -17,31 +14,25 @@ func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "market data repository not configured")
 			}
-
 			exchange, _ := args["exchange"].(string)
 			symbol, _ := args["symbol"].(string)
 			limit := parseLimit(args["limit"], 100)
-
 			if exchange == "" || symbol == "" {
 				return nil, errors.Wrapf(errors.ErrInvalidInput, "exchange and symbol required")
 			}
-
 			// Get recent trades
 			trades, err := deps.MarketDataRepo.GetRecentTrades(ctx, exchange, symbol, limit)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get recent trades")
 			}
-
 			if len(trades) == 0 {
 				return nil, errors.Wrapf(errors.ErrNotFound, "no trades found")
 			}
-
 			// Calculate buy/sell volumes
 			buyVolume := 0.0
 			sellVolume := 0.0
 			buyCount := 0
 			sellCount := 0
-
 			for _, trade := range trades {
 				if trade.Side == "buy" {
 					buyVolume += trade.Quantity
@@ -51,11 +42,9 @@ func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 					sellCount++
 				}
 			}
-
 			totalVolume := buyVolume + sellVolume
 			delta := buyVolume - sellVolume
 			deltaPct := (delta / totalVolume) * 100
-
 			// Determine pressure
 			pressure := "balanced"
 			if deltaPct > 30 {
@@ -67,7 +56,6 @@ func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 			} else if deltaPct < -10 {
 				pressure = "sell"
 			}
-
 			// Signal
 			signal := "neutral"
 			if pressure == "strong_buy" {
@@ -75,7 +63,6 @@ func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 			} else if pressure == "strong_sell" {
 				signal = "bearish"
 			}
-
 			return map[string]interface{}{
 				"buy_volume":      buyVolume,
 				"sell_volume":     sellVolume,
@@ -93,15 +80,12 @@ func NewGetTradeImbalanceTool(deps shared.Deps) tool.Tool {
 	).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
-
 func parseLimit(val interface{}, defaultVal int) int {
 	if val == nil {
 		return defaultVal
 	}
-
 	switch v := val.(type) {
 	case int:
 		return v

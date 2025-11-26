@@ -59,7 +59,7 @@ func (tc *TwitterCollector) Run(ctx context.Context) error {
 	}
 
 	totalMentions := 0
-	
+
 	// Collect tweets for each tracked symbol
 	for _, symbol := range tc.symbols {
 		tweets, err := tc.collectTweets(ctx, symbol)
@@ -100,8 +100,8 @@ func (tc *TwitterCollector) Run(ctx context.Context) error {
 
 // Twitter API v2 response structures
 type twitterSearchResponse struct {
-	Data []twitterTweet       `json:"data"`
-	Meta twitterResponseMeta  `json:"meta"`
+	Data []twitterTweet      `json:"data"`
+	Meta twitterResponseMeta `json:"meta"`
 }
 
 type twitterTweet struct {
@@ -129,7 +129,7 @@ func (tc *TwitterCollector) collectTweets(ctx context.Context, symbol string) ([
 	// Build search query
 	// Example: "(BTC OR Bitcoin OR $BTC) -is:retweet lang:en"
 	query := tc.buildSearchQuery(symbol)
-	
+
 	// Twitter API v2 endpoint
 	url := fmt.Sprintf("https://api.twitter.com/2/tweets/search/recent?query=%s&max_results=100&tweet.fields=created_at,public_metrics,author_id",
 		query)
@@ -177,7 +177,7 @@ func (tc *TwitterCollector) collectTweets(ctx context.Context, symbol string) ([
 func (tc *TwitterCollector) buildSearchQuery(symbol string) string {
 	// Remove /USDT suffix if present
 	baseSymbol := strings.Split(symbol, "/")[0]
-	
+
 	// Common crypto terms for the symbol
 	var terms []string
 	switch baseSymbol {
@@ -193,7 +193,7 @@ func (tc *TwitterCollector) buildSearchQuery(symbol string) string {
 
 	// Build query: "(term1 OR term2) -is:retweet lang:en"
 	query := "(" + strings.Join(terms, " OR ") + ") -is:retweet lang:en"
-	
+
 	return query
 }
 
@@ -209,7 +209,7 @@ func (tc *TwitterCollector) aggregateSentiment(symbol string, tweets []twitterTw
 	// Analyze each tweet
 	for _, tweet := range tweets {
 		sentiment := tc.analyzeTweetSentiment(tweet.Text)
-		
+
 		switch {
 		case sentiment > 0.2:
 			positiveCount++
@@ -225,7 +225,7 @@ func (tc *TwitterCollector) aggregateSentiment(symbol string, tweets []twitterTw
 	}
 
 	totalMentions := uint32(len(tweets))
-	
+
 	// Calculate overall sentiment score: (positive - negative) / total
 	// Range: -1.0 (very bearish) to +1.0 (very bullish)
 	sentimentScore := 0.0
@@ -294,4 +294,3 @@ func (tc *TwitterCollector) analyzeTweetSentiment(text string) float64 {
 	score := float64(bullishCount-bearishCount) / float64(total)
 	return score
 }
-

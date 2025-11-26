@@ -11,7 +11,7 @@ import (
 	"github.com/pgvector/pgvector-go"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/runner"
-	"google.golang.org/adk/session"
+	adksession "google.golang.org/adk/session"
 	"google.golang.org/genai"
 
 	"prometheus/internal/adapters/ai"
@@ -55,12 +55,13 @@ type ExecutionOutput struct {
 
 // AgentRunner executes agents with full CoT logging, cost tracking, and memory integration
 type AgentRunner struct {
-	agent         agent.Agent
-	runner        *runner.Runner
-	agentType     AgentType
-	agentConfig   AgentConfig
-	modelInfo     *ai.ModelInfo
-	runtimeConfig config.AgentsConfig
+	agent          agent.Agent
+	runner         *runner.Runner
+	agentType      AgentType
+	agentConfig    AgentConfig
+	modelInfo      *ai.ModelInfo
+	runtimeConfig  config.AgentsConfig
+	sessionService adksession.Service
 
 	memoryService *memory.Service
 	reasoningRepo reasoning.Repository
@@ -76,15 +77,21 @@ func NewAgentRunner(
 	agentConfig AgentConfig,
 	modelInfo *ai.ModelInfo,
 	runtimeConfig config.AgentsConfig,
+	sessionService adksession.Service,
 	memoryService *memory.Service,
 	reasoningRepo reasoning.Repository,
 	costTracker *CostTracker,
 ) (*AgentRunner, error) {
+	// Use provided session service or fallback to in-memory
+	if sessionService == nil {
+		sessionService = adksession.InMemoryService()
+	}
+
 	// Create ADK runner for this agent
 	runnerInstance, err := runner.New(runner.Config{
 		AppName:        fmt.Sprintf("prometheus_%s", agentType),
 		Agent:          ag,
-		SessionService: session.InMemoryService(),
+		SessionService: sessionService,
 		// Note: We use our own memory and reasoning services, not ADK's built-in ones
 	})
 	if err != nil {
@@ -92,16 +99,17 @@ func NewAgentRunner(
 	}
 
 	return &AgentRunner{
-		agent:         ag,
-		runner:        runnerInstance,
-		agentType:     agentType,
-		agentConfig:   agentConfig,
-		modelInfo:     modelInfo,
-		runtimeConfig: runtimeConfig,
-		memoryService: memoryService,
-		reasoningRepo: reasoningRepo,
-		costTracker:   costTracker,
-		log:           logger.Get().With("component", "agent_runner", "agent", agentType),
+		agent:          ag,
+		runner:         runnerInstance,
+		agentType:      agentType,
+		agentConfig:    agentConfig,
+		modelInfo:      modelInfo,
+		runtimeConfig:  runtimeConfig,
+		sessionService: sessionService,
+		memoryService:  memoryService,
+		reasoningRepo:  reasoningRepo,
+		costTracker:    costTracker,
+		log:            logger.Get().With("component", "agent_runner", "agent", agentType),
 	}, nil
 }
 
@@ -229,11 +237,12 @@ func (e *AgentRunner) executeAgentLoop(
 	toolCallCount := 0
 	totalInputTokens := 0
 	totalOutputTokens := 0
-	var finalResponse *session.Event
+	var finalResponse *adksession.Event
 
 	// Run config for agent execution
 	runConfig := agent.RunConfig{
-		StreamingMode: agent.StreamingModeNone, // No streaming for now
+		StreamingMode:             agent.StreamingModeSSE, // Enable streaming
+		SaveInputBlobsAsArtifacts: false,                  // Can enable later with artifact service
 	}
 
 	// Iterate through events from the agent
@@ -246,6 +255,14 @@ func (e *AgentRunner) executeAgentLoop(
 			continue
 		}
 
+		// Handle partial events (streaming chunks)
+		if event.LLMResponse.Partial {
+			e.log.Debugf("Partial event received from streaming")
+			// TODO: Send partial updates to streaming channel if needed
+			// For now, we just skip partial events and wait for complete ones
+			continue
+		}
+
 		e.log.Debugf("Agent event: author=%s turn_complete=%v", event.Author, event.TurnComplete)
 
 		// Track token usage from response
@@ -255,12 +272,12 @@ func (e *AgentRunner) executeAgentLoop(
 		}
 
 		// Process event content
-		if event.Content != nil {
+		if event.LLMResponse.Content != nil {
 			assistantContent := ""
 			toolCalls := []ToolCall{}
 
 			// Extract all content from parts
-			for _, part := range event.Content.Parts {
+			for _, part := range event.LLMResponse.Content.Parts {
 				// Text content
 				if part.Text != "" {
 					assistantContent += part.Text
@@ -318,9 +335,9 @@ func (e *AgentRunner) executeAgentLoop(
 	}
 
 	// Extract final response
-	if finalResponse != nil && finalResponse.Content != nil {
+	if finalResponse != nil && finalResponse.LLMResponse.Content != nil {
 		rawResponse := ""
-		for _, part := range finalResponse.Content.Parts {
+		for _, part := range finalResponse.LLMResponse.Content.Parts {
 			if part.Text != "" {
 				rawResponse += part.Text
 			}

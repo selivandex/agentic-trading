@@ -1,19 +1,13 @@
 package risk
-
 import (
 	"time"
-
 	"github.com/google/uuid"
-
 	riskpkg "prometheus/internal/risk"
 	"prometheus/internal/tools/shared"
-
 	"prometheus/pkg/errors"
-
 	"google.golang.org/adk/tool"
 )
-
-// NewEmergencyCloseAllTool closes all open positions for the user using the kill switch.
+// NewEmergencyCloseAllTool closes all open positions for the user using the kill switch
 func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"emergency_close_all",
@@ -22,7 +16,6 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 			if deps.PositionRepo == nil || deps.OrderRepo == nil || deps.RiskRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "emergency_close_all: required repositories not configured")
 			}
-
 			// Extract user ID from context or args
 			var userID uuid.UUID
 			meta, ok := shared.MetadataFromContext(ctx)
@@ -40,13 +33,11 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 					return nil, errors.ErrInvalidInput
 				}
 			}
-
 			// Get reason from args
 			reason, _ := args["reason"].(string)
 			if reason == "" {
 				reason = "Emergency close all triggered by user"
 			}
-
 			// Create kill switch instance
 			killSwitch := riskpkg.NewKillSwitch(
 				deps.PositionRepo,
@@ -55,14 +46,12 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 				deps.Redis,
 				deps.Log,
 			)
-
 			// Activate kill switch
 			result, err := killSwitch.Activate(ctx, userID, reason)
 			if err != nil {
 				return nil, errors.Wrap(err, "emergency_close_all")
 			}
-
-			// Build response
+			// .Build response
 			response := map[string]interface{}{
 				"success":          true,
 				"positions_closed": result.PositionsClosed,
@@ -70,17 +59,14 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 				"circuit_breaker":  result.CircuitBreakerSet,
 				"activated_at":     result.ActivatedAt.Format("2006-01-02 15:04:05"),
 			}
-
 			if len(result.Errors) > 0 {
 				response["errors"] = result.Errors
 				response["partial_success"] = true
 			}
-
 			return response, nil
 		},
 		deps).
 		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
-		WithStats().
 		Build()
 }
