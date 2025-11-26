@@ -4,6 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"prometheus/internal/tools/indicators"
+	"prometheus/internal/tools/market"
+	memtools "prometheus/internal/tools/memory"
+	riskactions "prometheus/internal/tools/risk"
+	"prometheus/internal/tools/shared"
+	"prometheus/internal/tools/trading"
+
 	"google.golang.org/adk/tool/functiontool"
 )
 
@@ -103,8 +110,8 @@ var toolDefinitions = []Definition{
 	{Name: "gold_correlation", Description: "Correlation to gold", Category: "correlation"},
 	{Name: "get_session_volume", Description: "Volume by trading session", Category: "correlation"},
 
-        {Name: "get_balance", Description: "Retrieve account balances", Category: "account"},
-        {Name: "get_positions", Description: "List open positions", Category: "account"},
+	{Name: "get_balance", Description: "Retrieve account balances", Category: "account"},
+	{Name: "get_positions", Description: "List open positions", Category: "account"},
 	{Name: "place_order", Description: "Place a market or limit order", Category: "execution"},
 	{Name: "place_bracket_order", Description: "Place bracket order with SL/TP", Category: "execution"},
 	{Name: "place_ladder_order", Description: "Place laddered profit targets", Category: "execution"},
@@ -148,9 +155,35 @@ func Definitions() []Definition {
 	return defs
 }
 
-// RegisterAllTools registers placeholder implementations for every defined tool.
-func RegisterAllTools(registry *Registry) {
+type toolFactory func(deps shared.Deps) *functiontool.Tool
+
+var implementedTools = map[string]toolFactory{
+	"get_price":             market.NewGetPriceTool,
+	"get_ohlcv":             market.NewGetOHLCVTool,
+	"get_orderbook":         market.NewGetOrderBookTool,
+	"get_trades":            market.NewGetTradesTool,
+	"rsi":                   indicators.NewRSITool,
+	"ema":                   indicators.NewEMATool,
+	"macd":                  indicators.NewMACDTool,
+	"atr":                   indicators.NewATRTool,
+	"get_balance":           trading.NewGetBalanceTool,
+	"get_positions":         trading.NewGetPositionsTool,
+	"place_order":           trading.NewPlaceOrderTool,
+	"cancel_order":          trading.NewCancelOrderTool,
+	"check_circuit_breaker": riskactions.NewCheckCircuitBreakerTool,
+	"validate_trade":        riskactions.NewValidateTradeTool,
+	"emergency_close_all":   riskactions.NewEmergencyCloseAllTool,
+	"search_memory":         memtools.NewSearchMemoryTool,
+}
+
+// RegisterAllTools registers concrete implementations where available and placeholders elsewhere.
+func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	for _, def := range toolDefinitions {
+		if factory, ok := implementedTools[def.Name]; ok {
+			registry.Register(def.Name, factory(deps))
+			continue
+		}
+
 		definition := def
 		registry.Register(definition.Name, functiontool.New(definition.Name, definition.Description, func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			return nil, fmt.Errorf("tool %s not implemented", definition.Name)

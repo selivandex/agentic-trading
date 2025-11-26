@@ -1,0 +1,51 @@
+package risk
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+
+	"prometheus/internal/tools/shared"
+
+	"google.golang.org/adk/tool/functiontool"
+)
+
+// NewCheckCircuitBreakerTool reports whether trading is allowed.
+func NewCheckCircuitBreakerTool(deps shared.Deps) *functiontool.Tool {
+	return functiontool.New("check_circuit_breaker", "Check if trading is allowed", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+		userID := uuid.Nil
+		if idVal, ok := args["user_id"]; ok {
+			switch v := idVal.(type) {
+			case string:
+				parsed, err := uuid.Parse(v)
+				if err == nil {
+					userID = parsed
+				}
+			case uuid.UUID:
+				userID = v
+			}
+		}
+		if userID == uuid.Nil {
+			if meta, ok := shared.MetadataFromContext(ctx); ok {
+				userID = meta.UserID
+			}
+		}
+
+		if userID == uuid.Nil || deps.RiskRepo == nil {
+			return map[string]interface{}{"allowed": true, "reason": "no risk state configured"}, nil
+		}
+
+		state, err := deps.RiskRepo.GetState(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("check_circuit_breaker: %w", err)
+		}
+		allowed := state == nil || !state.IsTriggered
+		reason := "ok"
+		if state != nil && state.IsTriggered {
+			reason = state.TriggerReason
+		}
+
+		return map[string]interface{}{"allowed": allowed, "reason": reason}, nil
+	})
+}
