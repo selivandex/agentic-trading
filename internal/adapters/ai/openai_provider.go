@@ -47,6 +47,7 @@ func (p *OpenAIProvider) SupportsTools() bool { return true }
 func openAIModels() []ModelInfo {
 	return []ModelInfo{
 		{
+			Provider:          ProviderNameOpenAI,
 			Name:              "gpt-4o-mini",
 			Family:            "gpt-4o",
 			MaxTokens:         128000,
@@ -58,6 +59,7 @@ func openAIModels() []ModelInfo {
 			SupportsStreaming: true,
 		},
 		{
+			Provider:          ProviderNameOpenAI,
 			Name:              "gpt-4o",
 			Family:            "gpt-4o",
 			MaxTokens:         128000,
@@ -69,6 +71,7 @@ func openAIModels() []ModelInfo {
 			SupportsStreaming: true,
 		},
 		{
+			Provider:          ProviderNameOpenAI,
 			Name:              "o1-mini",
 			Family:            "o1",
 			MaxTokens:         65536,

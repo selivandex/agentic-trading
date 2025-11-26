@@ -7,15 +7,16 @@ import (
 	"prometheus/internal/adapters/ai"
 )
 
-// CostTracker tracks AI model usage costs
+// CostTracker tracks AI model usage costs per provider and model
 type CostTracker struct {
 	mu    sync.RWMutex
-	costs map[string]*ModelCost // model ID -> cost data
+	costs map[string]*ModelCost // "provider:model" -> cost data
 }
 
-// ModelCost tracks cost for a specific model
+// ModelCost tracks cost for a specific provider/model combination
 type ModelCost struct {
-	ModelID      string
+	Provider     string // anthropic, openai, google, etc.
+	ModelID      string // claude-sonnet-4, gpt-4, gemini-pro, etc.
 	InputTokens  int64
 	OutputTokens int64
 	TotalCostUSD float64
@@ -29,20 +30,24 @@ func NewCostTracker() *CostTracker {
 	}
 }
 
-// RecordUsage records token usage for a model
+// RecordUsage records token usage for a provider/model combination
 func (ct *CostTracker) RecordUsage(modelInfo *ai.ModelInfo, inputTokens, outputTokens int) float64 {
 	cost := CalculateCost(modelInfo, inputTokens, outputTokens)
 
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
 
-	if _, exists := ct.costs[modelInfo.Name]; !exists {
-		ct.costs[modelInfo.Name] = &ModelCost{
-			ModelID: modelInfo.Name,
+	// Use "provider:model" as key for granular tracking
+	key := string(modelInfo.Provider) + ":" + modelInfo.Name
+
+	if _, exists := ct.costs[key]; !exists {
+		ct.costs[key] = &ModelCost{
+			Provider: string(modelInfo.Provider),
+			ModelID:  modelInfo.Name,
 		}
 	}
 
-	mc := ct.costs[modelInfo.Name]
+	mc := ct.costs[key]
 	mc.InputTokens += int64(inputTokens)
 	mc.OutputTokens += int64(outputTokens)
 	mc.TotalCostUSD += cost
@@ -51,13 +56,33 @@ func (ct *CostTracker) RecordUsage(modelInfo *ai.ModelInfo, inputTokens, outputT
 	return cost
 }
 
-// GetCost returns cost data for a specific model
-func (ct *CostTracker) GetCost(modelID string) (*ModelCost, bool) {
+// GetCost returns cost data for a specific provider/model combination
+// Use format "provider:model" (e.g. "anthropic:claude-sonnet-4")
+func (ct *CostTracker) GetCost(key string) (*ModelCost, bool) {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
 
-	cost, ok := ct.costs[modelID]
+	cost, ok := ct.costs[key]
 	return cost, ok
+}
+
+// GetCostByProviderModel returns cost data for provider and model
+func (ct *CostTracker) GetCostByProviderModel(provider, model string) (*ModelCost, bool) {
+	key := provider + ":" + model
+	return ct.GetCost(key)
+}
+
+// GetProviderCosts returns total costs grouped by provider
+func (ct *CostTracker) GetProviderCosts() map[string]float64 {
+	ct.mu.RLock()
+	defer ct.mu.RUnlock()
+
+	providerCosts := make(map[string]float64)
+	for _, mc := range ct.costs {
+		providerCosts[mc.Provider] += mc.TotalCostUSD
+	}
+
+	return providerCosts
 }
 
 // GetAllCosts returns all cost data

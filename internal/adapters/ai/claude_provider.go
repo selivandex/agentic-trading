@@ -49,6 +49,7 @@ func (p *ClaudeProvider) SupportsTools() bool { return true }
 func claudeModels() []ModelInfo {
 	return []ModelInfo{
 		{
+			Provider:          ProviderNameAnthropic,
 			Name:              "claude-3-5-sonnet-latest",
 			Family:            "claude-3.5",
 			MaxTokens:         200000,
@@ -60,6 +61,7 @@ func claudeModels() []ModelInfo {
 			SupportsStreaming: true,
 		},
 		{
+			Provider:          ProviderNameAnthropic,
 			Name:              "claude-3-5-haiku-latest",
 			Family:            "claude-3.5",
 			MaxTokens:         200000,
@@ -71,6 +73,7 @@ func claudeModels() []ModelInfo {
 			SupportsStreaming: true,
 		},
 		{
+			Provider:          ProviderNameAnthropic,
 			Name:              "claude-3-opus",
 			Family:            "claude-3",
 			MaxTokens:         200000,

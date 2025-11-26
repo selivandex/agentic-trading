@@ -21,13 +21,14 @@ type Provider interface {
 
 // ModelInfo describes the capabilities and pricing of a model.
 type ModelInfo struct {
-	Name              string  // Provider-specific model identifier
-	Family            string  // Family/category name (e.g., "claude-3")
-	MaxTokens         int     // Maximum context length
-	InputCostPer1K    float64 // USD per 1K input tokens
-	OutputCostPer1K   float64 // USD per 1K output tokens
-	SupportsImages    bool    // Whether the model accepts image inputs
-	SupportsAudio     bool    // Whether the model accepts audio inputs
-	SupportsTools     bool    // Whether tool calling is supported
-	SupportsStreaming bool    // Whether streaming responses are available
+	Provider          ProviderName // Provider name (anthropic, openai, google, etc.)
+	Name              string       // Provider-specific model identifier
+	Family            string       // Family/category name (e.g., "claude-3")
+	MaxTokens         int          // Maximum context length
+	InputCostPer1K    float64      // USD per 1K input tokens
+	OutputCostPer1K   float64      // USD per 1K output tokens
+	SupportsImages    bool         // Whether the model accepts image inputs
+	SupportsAudio     bool         // Whether the model accepts audio inputs
+	SupportsTools     bool         // Whether tool calling is supported
+	SupportsStreaming bool         // Whether streaming responses are available
 }

@@ -47,6 +47,7 @@ func (p *GeminiProvider) SupportsTools() bool { return true }
 func geminiModels() []ModelInfo {
 	return []ModelInfo{
 		{
+			Provider:          ProviderNameGoogle,
 			Name:              "gemini-1.5-flash",
 			Family:            "gemini-1.5",
 			MaxTokens:         1000000,
@@ -58,6 +59,7 @@ func geminiModels() []ModelInfo {
 			SupportsStreaming: true,
 		},
 		{
+			Provider:          ProviderNameGoogle,
 			Name:              "gemini-1.5-pro",
 			Family:            "gemini-1.5",
 			MaxTokens:         2000000,

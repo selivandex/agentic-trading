@@ -47,6 +47,7 @@ func (p *DeepSeekProvider) SupportsTools() bool { return true }
 func deepSeekModels() []ModelInfo {
 	return []ModelInfo{
 		{
+			Provider:          ProviderNameDeepSeek,
 			Name:              "deepseek-reasoner",
 			Family:            "deepseek",
 			MaxTokens:         64000,
@@ -58,6 +59,7 @@ func deepSeekModels() []ModelInfo {
 			SupportsStreaming: true,
 		},
 		{
+			Provider:          ProviderNameDeepSeek,
 			Name:              "deepseek-chat",
 			Family:            "deepseek",
 			MaxTokens:         64000,

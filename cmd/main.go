@@ -123,6 +123,7 @@ func main() {
 	onchainRepo := chrepo.NewOnChainRepository(chClient.Conn())
 	derivRepo := chrepo.NewDerivativesRepository(chClient.Conn())
 	macroRepo := chrepo.NewMacroRepository(chClient.Conn())
+	aiUsageRepo := chrepo.NewAIUsageRepository(chClient.Conn())
 
 	log.Info("Repositories initialized")
 
@@ -182,7 +183,7 @@ func main() {
 		log,
 	)
 
-	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, log)
+	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, log)
 	if err != nil {
 		log.Fatalf("failed to initialize agents: %v", err)
 	}
@@ -300,6 +301,10 @@ func main() {
 	// ========================================
 	httpServer := provideHTTPServer(cfg, healthHandler, log)
 
+	// Start AI usage batch writer (background flush loop)
+	aiUsageRepo.Start(ctx)
+	log.Info("✓ AI usage batch writer started")
+
 	// Start HTTP server in background (tracked by wg)
 	wg.Add(1)
 	go func() {
@@ -354,6 +359,7 @@ func main() {
 		riskConsumer,
 		analyticsConsumer,
 		opportunityKafkaConsumer,
+		aiUsageRepo,
 		pgClient,
 		chClient,
 		redisClient,
@@ -488,7 +494,14 @@ func provideToolRegistry(
 	return registry
 }
 
-func provideAgents(cfg *config.Config, toolRegistry *tools.Registry, sessionService session.Service, log *logger.Logger) (*agents.Factory, *agents.Registry, error) {
+func provideAgents(
+	cfg *config.Config,
+	toolRegistry *tools.Registry,
+	sessionService session.Service,
+	redisClient *redisclient.Client,
+	riskEngine *riskengine.RiskEngine,
+	log *logger.Logger,
+) (*agents.Factory, *agents.Registry, error) {
 	log.Info("Initializing agents...")
 
 	aiRegistry, err := ai.BuildRegistry(cfg.AI)
@@ -501,11 +514,19 @@ func provideAgents(cfg *config.Config, toolRegistry *tools.Registry, sessionServ
 		return nil, nil, errors.ErrUnavailable
 	}
 
+	// Create cost tracker for monitoring AI spend across providers and models
+	costTracker := agents.NewCostTracker()
+
 	factory, err := agents.NewFactory(agents.FactoryDeps{
 		AIRegistry:     aiRegistry,
 		ToolRegistry:   toolRegistry,
 		Templates:      templates.Get(),
 		SessionService: sessionService,
+		CallbackDeps: &agents.CallbackDeps{
+			Redis:       redisClient.Client(),
+			CostTracker: costTracker,
+			RiskEngine:  riskEngine,
+		},
 	})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create agent factory")
@@ -988,6 +1009,7 @@ func gracefulShutdown(
 	riskConsumer *kafka.Consumer,
 	analyticsConsumer *kafka.Consumer,
 	opportunityKafkaConsumer *kafka.Consumer,
+	aiUsageRepo *chrepo.AIUsageRepository,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -1037,8 +1059,18 @@ func gracefulShutdown(
 		log.Warn("⚠ Some goroutines did not finish within 5s timeout")
 	}
 
-	// Step 4: Close Kafka clients
-	log.Info("[4/7] Closing Kafka clients...")
+	// Step 4: Flush AI usage batch writer
+	log.Info("[4/8] Flushing AI usage batch writer...")
+	flushCtx, flushCancel := context.WithTimeout(shutdownCtx, 10*time.Second)
+	defer flushCancel()
+	if err := aiUsageRepo.Stop(flushCtx); err != nil {
+		log.Error("AI usage batch writer stop failed", "error", err)
+	} else {
+		log.Info("✓ AI usage batch writer flushed and stopped")
+	}
+
+	// Step 5: Close Kafka clients
+	log.Info("[5/8] Closing Kafka clients...")
 	if kafkaProducer != nil {
 		if err := kafkaProducer.Close(); err != nil {
 			log.Error("Kafka producer close failed", "error", err)
@@ -1059,8 +1091,8 @@ func gracefulShutdown(
 	}
 	log.Info("✓ Kafka clients closed")
 
-	// Step 5: Flush error tracker
-	log.Info("[5/7] Flushing error tracker...")
+	// Step 6: Flush error tracker
+	log.Info("[6/8] Flushing error tracker...")
 	if errorTracker != nil {
 		flushCtx, flushCancel := context.WithTimeout(shutdownCtx, 3*time.Second)
 		defer flushCancel()
@@ -1071,8 +1103,8 @@ func gracefulShutdown(
 		}
 	}
 
-	// Step 6: Sync logs
-	log.Info("[6/7] Syncing logs...")
+	// Step 7: Sync logs
+	log.Info("[7/8] Syncing logs...")
 	if err := logger.Sync(); err != nil {
 		// Ignore "sync /dev/stderr: inappropriate ioctl for device" on Linux
 		log.Warn("Log sync completed with warnings")
@@ -1080,8 +1112,8 @@ func gracefulShutdown(
 		log.Info("✓ Logs synced")
 	}
 
-	// Step 7: Close database connections (LAST - other components may need them)
-	log.Info("[7/7] Closing database connections...")
+	// Step 8: Close database connections (LAST - other components may need them)
+	log.Info("[8/8] Closing database connections...")
 	var dbErrors []error
 	if pgClient != nil {
 		if err := pgClient.Close(); err != nil {

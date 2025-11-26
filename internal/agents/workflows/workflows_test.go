@@ -6,11 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/adk/agent"
+	"google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/functiontool"
 
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/agents"
-	"prometheus/internal/tools"
+	toolspkg "prometheus/internal/tools"
 	"prometheus/pkg/templates"
 )
 
@@ -45,7 +46,7 @@ func TestWorkflowFactory_CreateParallelAnalysts(t *testing.T) {
 	assert.Greater(t, len(subAgents), 0, "Should have at least one analyst")
 }
 
-func TestWorkflowFactory_CreateTradingPipeline(t *testing.T) {
+func TestWorkflowFactory_CreateMarketResearchWorkflow(t *testing.T) {
 	aiRegistry := createTestAIRegistry(t)
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register("test_tool", createDummyTool())
@@ -59,18 +60,18 @@ func TestWorkflowFactory_CreateTradingPipeline(t *testing.T) {
 
 	workflowFactory := NewFactory(agentFactory, "test_provider", "test_model")
 
-	// Create trading pipeline
-	pipeline, err := workflowFactory.CreateTradingPipeline()
+	// Create market research workflow
+	workflow, err := workflowFactory.CreateMarketResearchWorkflow()
 
-	assert.NotNil(t, pipeline)
-	assert.Equal(t, "TradingPipeline", pipeline.Name())
+	assert.NotNil(t, workflow)
+	assert.Equal(t, "MarketResearchWorkflow", workflow.Name())
 
-	// Should have 3 sub-agents: parallel analysts, strategy, risk
-	subAgents := pipeline.SubAgents()
-	assert.Equal(t, 3, len(subAgents), "Pipeline should have 3 steps")
+	// Should have 2 sub-agents: parallel analysts, synthesizer
+	subAgents := workflow.SubAgents()
+	assert.Equal(t, 2, len(subAgents), "Workflow should have 2 steps")
 }
 
-func TestWorkflowFactory_CreateExecutionPipeline(t *testing.T) {
+func TestWorkflowFactory_CreatePersonalTradingWorkflow(t *testing.T) {
 	aiRegistry := createTestAIRegistry(t)
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register("test_tool", createDummyTool())
@@ -84,11 +85,40 @@ func TestWorkflowFactory_CreateExecutionPipeline(t *testing.T) {
 
 	workflowFactory := NewFactory(agentFactory, "test_provider", "test_model")
 
-	// Create full execution pipeline
-	pipeline, err := workflowFactory.CreateExecutionPipeline()
+	// Create personal trading workflow
+	workflow, err := workflowFactory.CreatePersonalTradingWorkflow()
 
-	assert.NotNil(t, pipeline)
-	assert.Equal(t, "FullExecutionPipeline", pipeline.Name())
+	assert.NotNil(t, workflow)
+	assert.Equal(t, "PersonalTradingWorkflow", workflow.Name())
+
+	// Should have 3 sub-agents: strategy, risk, executor
+	subAgents := workflow.SubAgents()
+	assert.Equal(t, 3, len(subAgents), "Workflow should have 3 steps")
+}
+
+func TestWorkflowFactory_CreatePortfolioInitializationWorkflow(t *testing.T) {
+	aiRegistry := createTestAIRegistry(t)
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register("test_tool", createDummyTool())
+
+	agentFactory, err := agents.NewFactory(agents.FactoryDeps{
+		AIRegistry:   aiRegistry,
+		ToolRegistry: toolRegistry,
+		Templates:    templates.Get(),
+	})
+	require.NoError(t, err)
+
+	workflowFactory := NewFactory(agentFactory, "test_provider", "test_model")
+
+	// Create portfolio initialization workflow
+	workflow, err := workflowFactory.CreatePortfolioInitializationWorkflow()
+
+	assert.NotNil(t, workflow)
+	assert.Equal(t, "PortfolioInitializationWorkflow", workflow.Name())
+
+	// Should have 4 sub-agents: market, architect, risk, executor
+	subAgents := workflow.SubAgents()
+	assert.Equal(t, 4, len(subAgents), "Workflow should have 4 steps")
 }
 
 // Helper functions
