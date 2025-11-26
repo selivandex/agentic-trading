@@ -436,11 +436,25 @@ func initCatalog() {
 			RateLimit:    60,
 		},
 		{
-			Name:         "store_memory",
+			Name:         "save_analysis",
 			Category:     string(CategoryMemory),
-			Description:  "Store observation/decision",
+			Description:  "Save analysis results to memory for future reference",
 			RequiresAuth: true,
 			RateLimit:    120,
+		},
+		{
+			Name:         "save_insight",
+			Category:     string(CategoryMemory),
+			Description:  "Save a learning, pattern, or insight to long-term memory",
+			RequiresAuth: true,
+			RateLimit:    120,
+		},
+		{
+			Name:         "record_reasoning",
+			Category:     string(CategoryMemory),
+			Description:  "Record a step in reasoning process for CoT logging",
+			RequiresAuth: true,
+			RateLimit:    180,
 		},
 
 		// Evaluation

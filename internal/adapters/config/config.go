@@ -19,6 +19,7 @@ type Config struct {
 	Kafka         KafkaConfig
 	Telegram      TelegramConfig
 	AI            AIConfig
+	Agents        AgentsConfig
 	Crypto        CryptoConfig
 	MarketData    MarketDataConfig
 	ErrorTracking ErrorTrackingConfig
@@ -94,6 +95,16 @@ type AIConfig struct {
 	MaxCostPerExecution string `envconfig:"AI_MAX_COST_PER_EXECUTION" default:"1.00"`   // Max cost per single agent execution (USD)
 }
 
+// AgentsConfig contains configuration for agent execution
+type AgentsConfig struct {
+	MaxTokens              int           `envconfig:"AGENTS_MAX_TOKENS" default:"50000"`             // Max tokens for conversation history
+	ExecutionTimeout       time.Duration `envconfig:"AGENTS_EXECUTION_TIMEOUT" default:"5m"`         // Default timeout for agent execution
+	MaxToolCalls           int           `envconfig:"AGENTS_MAX_TOOL_CALLS" default:"25"`            // Max tool calls per agent run
+	EnableCompression      bool          `envconfig:"AGENTS_ENABLE_COMPRESSION" default:"true"`      // Enable conversation compression
+	EnableMemory           bool          `envconfig:"AGENTS_ENABLE_MEMORY" default:"true"`           // Enable long-term memory
+	SelfReflectionInterval time.Duration `envconfig:"AGENTS_SELF_REFLECTION_INTERVAL" default:"30s"` // Self-reflection check interval
+}
+
 type CryptoConfig struct {
 	EncryptionKey string `envconfig:"ENCRYPTION_KEY" required:"true"` // 32 bytes for AES-256
 }
@@ -125,7 +136,26 @@ type MarketDataConfig struct {
 	OKX     OKXConfig
 
 	// News/sentiment API keys
-	NewsAPIKey string `envconfig:"NEWS_API_KEY"` // CryptoPanic API key (optional for public endpoint)
+	NewsAPIKey         string `envconfig:"NEWS_API_KEY"`         // CryptoPanic API key (optional for public endpoint)
+	TwitterAPIKey      string `envconfig:"TWITTER_API_KEY"`      // Twitter API v2 bearer token
+	TwitterAPISecret   string `envconfig:"TWITTER_API_SECRET"`   // Twitter API secret
+	RedditClientID     string `envconfig:"REDDIT_CLIENT_ID"`     // Reddit OAuth client ID
+	RedditClientSecret string `envconfig:"REDDIT_CLIENT_SECRET"` // Reddit OAuth client secret
+
+	// On-chain API keys
+	WhaleAlertAPIKey  string `envconfig:"WHALE_ALERT_API_KEY"` // Whale Alert API (premium)
+	CryptoquantAPIKey string `envconfig:"CRYPTOQUANT_API_KEY"` // CryptoQuant API
+	GlassnodeAPIKey   string `envconfig:"GLASSNODE_API_KEY"`   // Glassnode API
+	EtherscanAPIKey   string `envconfig:"ETHERSCAN_API_KEY"`   // Etherscan API (free tier)
+	BlockchainAPIKey  string `envconfig:"BLOCKCHAIN_API_KEY"`  // Blockchain.com API
+
+	// Macro API keys
+	TradingEconomicsKey string `envconfig:"TRADING_ECONOMICS_KEY"` // Trading Economics API
+	AlphaVantageKey     string `envconfig:"ALPHA_VANTAGE_KEY"`     // Alpha Vantage API (free tier)
+
+	// Derivatives API keys
+	DeribitAPIKey    string `envconfig:"DERIBIT_API_KEY"`    // Deribit API key
+	DeribitAPISecret string `envconfig:"DERIBIT_API_SECRET"` // Deribit API secret
 }
 
 type ErrorTrackingConfig struct {
@@ -153,7 +183,25 @@ type WorkerConfig struct {
 	FundingCollectorInterval   time.Duration `envconfig:"WORKER_FUNDING_COLLECTOR_INTERVAL" default:"1m"`    // Collect funding rates every minute
 
 	// Sentiment workers (low frequency)
-	NewsCollectorInterval time.Duration `envconfig:"WORKER_NEWS_COLLECTOR_INTERVAL" default:"10m"` // Collect news every 10 minutes
+	NewsCollectorInterval      time.Duration `envconfig:"WORKER_NEWS_COLLECTOR_INTERVAL" default:"10m"`     // Collect news every 10 minutes
+	TwitterCollectorInterval   time.Duration `envconfig:"WORKER_TWITTER_COLLECTOR_INTERVAL" default:"5m"`   // Collect tweets every 5 minutes
+	RedditCollectorInterval    time.Duration `envconfig:"WORKER_REDDIT_COLLECTOR_INTERVAL" default:"10m"`   // Collect Reddit posts every 10 minutes
+	FearGreedCollectorInterval time.Duration `envconfig:"WORKER_FEARGREED_COLLECTOR_INTERVAL" default:"1h"` // Collect Fear & Greed index every hour
+
+	// On-chain workers (medium frequency)
+	WhaleMovementCollectorInterval  time.Duration `envconfig:"WORKER_WHALE_MOVEMENT_COLLECTOR_INTERVAL" default:"2m"`   // Track whale movements every 2 minutes
+	ExchangeFlowCollectorInterval   time.Duration `envconfig:"WORKER_EXCHANGE_FLOW_COLLECTOR_INTERVAL" default:"5m"`    // Track exchange flows every 5 minutes
+	NetworkMetricsCollectorInterval time.Duration `envconfig:"WORKER_NETWORK_METRICS_COLLECTOR_INTERVAL" default:"10m"` // Collect network metrics every 10 minutes
+	MinerMetricsCollectorInterval   time.Duration `envconfig:"WORKER_MINER_METRICS_COLLECTOR_INTERVAL" default:"15m"`   // Collect miner metrics every 15 minutes
+
+	// Macro workers (low frequency)
+	EconomicCalendarCollectorInterval  time.Duration `envconfig:"WORKER_ECONOMIC_CALENDAR_COLLECTOR_INTERVAL" default:"1h"`   // Check economic calendar every hour
+	MarketCorrelationCollectorInterval time.Duration `envconfig:"WORKER_MARKET_CORRELATION_COLLECTOR_INTERVAL" default:"30m"` // Calculate correlations every 30 minutes
+
+	// Derivatives workers (medium frequency)
+	OptionsFlowCollectorInterval   time.Duration `envconfig:"WORKER_OPTIONS_FLOW_COLLECTOR_INTERVAL" default:"5m"`    // Track large options trades every 5 minutes
+	GammaExposureCollectorInterval time.Duration `envconfig:"WORKER_GAMMA_EXPOSURE_COLLECTOR_INTERVAL" default:"10m"` // Calculate gamma exposure every 10 minutes
+	FundingAggregatorInterval      time.Duration `envconfig:"WORKER_FUNDING_AGGREGATOR_INTERVAL" default:"5m"`        // Aggregate funding rates every 5 minutes
 
 	// Analysis workers (core agentic system)
 	MarketScannerInterval     time.Duration `envconfig:"WORKER_MARKET_SCANNER_INTERVAL" default:"2m"`      // Full agent analysis every 2 minutes

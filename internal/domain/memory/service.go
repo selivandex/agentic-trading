@@ -93,3 +93,21 @@ func (s *Service) GetValidatedLessons(ctx context.Context, agentType string, min
 	}
 	return lessons, nil
 }
+
+// GetRecentByAgent retrieves recent memories for a specific agent.
+func (s *Service) GetRecentByAgent(ctx context.Context, userID uuid.UUID, agentID string, limit int) ([]*Memory, error) {
+	if userID == uuid.Nil {
+		return nil, errors.ErrInvalidInput
+	}
+	if agentID == "" {
+		return nil, errors.ErrInvalidInput
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	memories, err := s.repo.GetByAgent(ctx, userID, agentID, limit)
+	if err != nil {
+		return nil, errors.Wrap(err, "get memories by agent")
+	}
+	return memories, nil
+}

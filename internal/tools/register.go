@@ -113,6 +113,9 @@ func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	// Memory Tools
 	// ========================================
 	registry.Register("search_memory", toolmemory.NewSearchMemoryTool(deps))
+	registry.Register("save_analysis", toolmemory.NewSaveAnalysisTool(deps))
+	registry.Register("save_insight", toolmemory.NewSaveInsightTool(deps))
+	registry.Register("record_reasoning", toolmemory.NewRecordReasoningTool(deps))
 	log.Debug("Registered memory tools")
 
 	log.Infof("Tool registration complete: %d tools available", len(registry.List()))

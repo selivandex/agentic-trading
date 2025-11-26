@@ -62,6 +62,28 @@ OKX_MARKET_DATA_API_KEY=your_okx_api_key
 OKX_MARKET_DATA_SECRET=your_okx_secret
 OKX_MARKET_DATA_PASSPHRASE=your_okx_passphrase
 
+# Sentiment API Keys (Optional)
+NEWS_API_KEY=                          # CryptoPanic API key (optional, has free tier)
+TWITTER_API_KEY=                       # Twitter API v2 bearer token (optional, required for Twitter collector)
+TWITTER_API_SECRET=                    # Twitter API secret
+REDDIT_CLIENT_ID=                      # Reddit OAuth client ID (optional, free tier available)
+REDDIT_CLIENT_SECRET=                  # Reddit OAuth client secret
+
+# On-Chain Data API Keys (Optional)
+WHALE_ALERT_API_KEY=                   # Whale Alert API (premium, ~$50/month)
+CRYPTOQUANT_API_KEY=                   # CryptoQuant API (premium, plans from $49/month)
+GLASSNODE_API_KEY=                     # Glassnode API (premium, plans from $29/month)
+ETHERSCAN_API_KEY=                     # Etherscan API (free tier: 5 calls/sec, 100k calls/day)
+BLOCKCHAIN_API_KEY=                    # Blockchain.com API (free, no auth required for stats)
+
+# Macro/Traditional Markets API Keys (Optional)
+TRADING_ECONOMICS_KEY=                 # Trading Economics API (premium, ~$500/month)
+ALPHA_VANTAGE_KEY=                     # Alpha Vantage API (free tier: 25 calls/day)
+
+# Derivatives Data API Keys (Optional)
+DERIBIT_API_KEY=                       # Deribit API key (free, read-only for public endpoints)
+DERIBIT_API_SECRET=                    # Deribit API secret
+
 # Error Tracking Configuration (Sentry)
 ERROR_TRACKING_ENABLED=true
 ERROR_TRACKING_PROVIDER=sentry
@@ -76,6 +98,26 @@ WORKER_RISK_MONITOR_INTERVAL=30s       # Check risk every 30s
 
 # Market data workers (medium frequency)
 WORKER_OHLCV_COLLECTOR_INTERVAL=1m     # Collect candles every minute
+
+# Sentiment workers
+WORKER_TWITTER_COLLECTOR_INTERVAL=5m   # Collect tweets every 5 minutes
+WORKER_REDDIT_COLLECTOR_INTERVAL=10m   # Collect Reddit posts every 10 minutes
+WORKER_FEARGREED_COLLECTOR_INTERVAL=1h # Collect Fear & Greed index every hour
+
+# On-chain workers
+WORKER_WHALE_MOVEMENT_COLLECTOR_INTERVAL=2m   # Track whale movements every 2 minutes
+WORKER_EXCHANGE_FLOW_COLLECTOR_INTERVAL=5m    # Track exchange flows every 5 minutes
+WORKER_NETWORK_METRICS_COLLECTOR_INTERVAL=10m # Collect network metrics every 10 minutes
+WORKER_MINER_METRICS_COLLECTOR_INTERVAL=15m   # Collect miner metrics every 15 minutes
+
+# Macro workers
+WORKER_ECONOMIC_CALENDAR_COLLECTOR_INTERVAL=1h  # Check economic calendar every hour
+WORKER_MARKET_CORRELATION_COLLECTOR_INTERVAL=30m # Calculate correlations every 30 minutes
+
+# Derivatives workers
+WORKER_OPTIONS_FLOW_COLLECTOR_INTERVAL=5m   # Track options trades every 5 minutes
+WORKER_GAMMA_EXPOSURE_COLLECTOR_INTERVAL=10m # Calculate gamma exposure every 10 minutes
+WORKER_FUNDING_AGGREGATOR_INTERVAL=5m        # Aggregate funding rates every 5 minutes
 
 # Analysis workers (core agentic system)
 WORKER_MARKET_SCANNER_INTERVAL=2m      # Full agent analysis every 2 minutes
@@ -122,6 +164,47 @@ This key is used to encrypt/decrypt exchange API keys in the database.
 ### Market Data API Keys
 These are optional but recommended for better data collection performance.
 If not provided, some data sources may not be available.
+
+### Sentiment API Keys (Optional)
+- **CryptoPanic** (NEWS_API_KEY): Free tier available. Sign up at https://cryptopanic.com/developers/api/
+  - Free: 25 requests/day
+  - Pro: $10/month for 10k requests/day
+- **Twitter API** (TWITTER_API_KEY): Required for Twitter sentiment collector. Sign up at https://developer.twitter.com/
+  - Essential: $100/month (10k tweets/month)
+  - Elevated: Free tier available (500k tweets/month)
+- **Reddit API** (REDDIT_CLIENT_ID): Free tier available. Create app at https://www.reddit.com/prefs/apps
+  - Free: 60 requests/minute
+  - No paid plans needed for basic usage
+
+### On-Chain API Keys (Optional)
+- **Whale Alert** (WHALE_ALERT_API_KEY): Premium service for large transaction tracking
+  - Starter: $49/month (10k transactions/month)
+  - Sign up: https://whale-alert.io/
+- **CryptoQuant** (CRYPTOQUANT_API_KEY): Premium on-chain analytics
+  - Starter: $49/month
+  - Sign up: https://cryptoquant.com/
+- **Glassnode** (GLASSNODE_API_KEY): Advanced on-chain metrics
+  - Advanced: $29/month (limited metrics)
+  - Professional: $799/month (full access)
+  - Sign up: https://glassnode.com/
+- **Etherscan** (ETHERSCAN_API_KEY): Free Ethereum blockchain data
+  - Free: 5 calls/sec, 100k calls/day
+  - Sign up: https://etherscan.io/apis
+
+### Macro/Traditional Markets API Keys (Optional)
+- **Trading Economics** (TRADING_ECONOMICS_KEY): Economic calendar and indicators
+  - Individual: $500/month
+  - Sign up: https://tradingeconomics.com/api
+- **Alpha Vantage** (ALPHA_VANTAGE_KEY): Stock market and forex data
+  - Free: 25 API calls/day
+  - Premium: $49.99/month (75 calls/minute)
+  - Sign up: https://www.alphavantage.co/support/#api-key
+
+### Derivatives API Keys (Optional)
+- **Deribit** (DERIBIT_API_KEY): Crypto options and futures data
+  - Free for public market data endpoints
+  - Authentication required for historical data
+  - Sign up: https://www.deribit.com/
 
 ### Worker Intervals
 Worker intervals control how frequently background workers execute. All intervals accept duration strings like:

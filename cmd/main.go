@@ -23,10 +23,13 @@ import (
 	"prometheus/internal/agents"
 	"prometheus/internal/api/health"
 	"prometheus/internal/consumers"
+	"prometheus/internal/domain/derivatives"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/journal"
+	"prometheus/internal/domain/macro"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
+	"prometheus/internal/domain/onchain"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/regime"
@@ -43,8 +46,11 @@ import (
 	"prometheus/internal/tools/shared"
 	"prometheus/internal/workers"
 	"prometheus/internal/workers/analysis"
+	derivworkers "prometheus/internal/workers/derivatives"
 	"prometheus/internal/workers/evaluation"
+	macroworkers "prometheus/internal/workers/macro"
 	"prometheus/internal/workers/marketdata"
+	onchainworkers "prometheus/internal/workers/onchain"
 	sentimentworkers "prometheus/internal/workers/sentiment"
 	"prometheus/internal/workers/trading"
 	"prometheus/pkg/crypto"
@@ -108,6 +114,9 @@ func main() {
 	marketDataRepo := chrepo.NewMarketDataRepository(chClient.Conn())
 	regimeRepo := chrepo.NewRegimeRepository(chClient.Conn())
 	sentimentRepo := chrepo.NewSentimentRepository(chClient.Conn())
+	onchainRepo := chrepo.NewOnChainRepository(chClient.Conn())
+	derivRepo := chrepo.NewDerivativesRepository(chClient.Conn())
+	macroRepo := chrepo.NewMacroRepository(chClient.Conn())
 
 	log.Info("Repositories initialized")
 
@@ -187,6 +196,9 @@ func main() {
 		marketDataRepo,
 		regimeRepo,
 		sentimentRepo,
+		onchainRepo,
+		derivRepo,
+		macroRepo,
 		exchangeAccountRepo,
 		riskEngine,
 		exchFactory,
@@ -516,6 +528,9 @@ func provideWorkers(
 	marketDataRepo market_data.Repository,
 	regimeRepo regime.Repository,
 	sentimentRepo sentiment.Repository,
+	onchainRepo onchain.Repository,
+	derivRepo derivatives.Repository,
+	macroRepo macro.Repository,
 	exchangeAccountRepo exchange_account.Repository,
 	riskEngine *riskengine.RiskEngine,
 	exchFactory exchanges.Factory,
@@ -653,6 +668,148 @@ func provideWorkers(
 		true, // enabled
 	))
 
+	// Twitter collector: Collects tweets from crypto influencers
+	trackedAccounts := []string{"APompliano", "100trillionUSD", "saylor", "elonmusk"}
+	scheduler.RegisterWorker(sentimentworkers.NewTwitterCollector(
+		sentimentRepo,
+		cfg.MarketData.TwitterAPIKey,
+		cfg.MarketData.TwitterAPISecret,
+		trackedAccounts,
+		defaultSymbols,
+		cfg.Workers.TwitterCollectorInterval,
+		cfg.MarketData.TwitterAPIKey != "", // Enable only if API key provided
+	))
+
+	// Reddit collector: Collects sentiment from crypto subreddits
+	subreddits := []string{"CryptoCurrency", "Bitcoin", "ethereum", "ethtrader"}
+	scheduler.RegisterWorker(sentimentworkers.NewRedditCollector(
+		sentimentRepo,
+		cfg.MarketData.RedditClientID,
+		cfg.MarketData.RedditClientSecret,
+		subreddits,
+		defaultSymbols,
+		cfg.Workers.RedditCollectorInterval,
+		cfg.MarketData.RedditClientID != "", // Enable only if credentials provided
+	))
+
+	// Fear & Greed collector: Collects crypto Fear & Greed index (no auth required)
+	scheduler.RegisterWorker(sentimentworkers.NewFearGreedCollector(
+		sentimentRepo,
+		cfg.Workers.FearGreedCollectorInterval,
+		true, // Always enabled (free API)
+	))
+
+	// ========================================
+	// On-Chain Workers (medium frequency)
+	// ========================================
+
+	// Whale movement collector: Tracks large on-chain transfers
+	blockchains := []string{"bitcoin", "ethereum"}
+	scheduler.RegisterWorker(onchainworkers.NewWhaleMovementCollector(
+		onchainRepo,
+		cfg.MarketData.WhaleAlertAPIKey,
+		blockchains,
+		1_000_000, // Min $1M transfers
+		cfg.Workers.WhaleMovementCollectorInterval,
+		cfg.MarketData.WhaleAlertAPIKey != "",
+	))
+
+	// Exchange flow collector: Tracks BTC/ETH flows to/from exchanges
+	exchanges := []string{"binance", "coinbase", "kraken"}
+	tokens := []string{"BTC", "ETH"}
+	scheduler.RegisterWorker(onchainworkers.NewExchangeFlowCollector(
+		onchainRepo,
+		cfg.MarketData.CryptoquantAPIKey,
+		exchanges,
+		tokens,
+		cfg.Workers.ExchangeFlowCollectorInterval,
+		cfg.MarketData.CryptoquantAPIKey != "",
+	))
+
+	// Network metrics collector: Collects blockchain health metrics
+	scheduler.RegisterWorker(onchainworkers.NewNetworkMetricsCollector(
+		onchainRepo,
+		cfg.MarketData.BlockchainAPIKey,
+		cfg.MarketData.EtherscanAPIKey,
+		blockchains,
+		cfg.Workers.NetworkMetricsCollectorInterval,
+		true, // Always enabled (free APIs available)
+	))
+
+	// Miner metrics collector: Tracks Bitcoin mining activity
+	miningPools := []string{"AntPool", "Foundry USA", "F2Pool", "ViaBTC", "Binance Pool"}
+	scheduler.RegisterWorker(onchainworkers.NewMinerMetricsCollector(
+		onchainRepo,
+		cfg.MarketData.GlassnodeAPIKey,
+		miningPools,
+		cfg.Workers.MinerMetricsCollectorInterval,
+		cfg.MarketData.GlassnodeAPIKey != "",
+	))
+
+	// ========================================
+	// Macro Workers (low frequency)
+	// ========================================
+
+	// Economic calendar collector: Tracks CPI, NFP, FOMC, GDP releases
+	countries := []string{"United States", "Euro Area", "China"}
+	eventTypes := []macro.EventType{macro.EventCPI, macro.EventNFP, macro.EventFOMC, macro.EventGDP}
+	scheduler.RegisterWorker(macroworkers.NewEconomicCalendarCollector(
+		macroRepo,
+		cfg.MarketData.TradingEconomicsKey,
+		countries,
+		eventTypes,
+		cfg.Workers.EconomicCalendarCollectorInterval,
+		cfg.MarketData.TradingEconomicsKey != "",
+	))
+
+	// Market correlation collector: Tracks crypto correlation with SPX, Gold, DXY, Bonds
+	// Analyzes multiple crypto assets to understand risk-on/risk-off dynamics
+	cryptoSymbolsForCorr := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT"}
+	traditionalAssets := []string{"SPY", "GLD", "DXY", "TLT"}
+	scheduler.RegisterWorker(macroworkers.NewMarketCorrelationCollector(
+		marketDataRepo,
+		macroRepo,
+		cfg.MarketData.AlphaVantageKey,
+		cryptoSymbolsForCorr,
+		traditionalAssets,
+		cfg.Workers.MarketCorrelationCollectorInterval,
+		cfg.MarketData.AlphaVantageKey != "",
+	))
+
+	// ========================================
+	// Derivatives Workers (medium frequency)
+	// ========================================
+
+	// Options flow collector: Tracks large options trades from Deribit
+	optionsSymbols := []string{"BTC", "ETH"}
+	scheduler.RegisterWorker(derivworkers.NewOptionsFlowCollector(
+		derivRepo,
+		cfg.MarketData.DeribitAPIKey,
+		cfg.MarketData.DeribitAPISecret,
+		optionsSymbols,
+		100_000, // Min $100k premium
+		cfg.Workers.OptionsFlowCollectorInterval,
+		cfg.MarketData.DeribitAPIKey != "",
+	))
+
+	// Gamma exposure collector: Calculates gamma exposure and max pain
+	scheduler.RegisterWorker(derivworkers.NewGammaExposureCollector(
+		derivRepo,
+		cfg.MarketData.DeribitAPIKey,
+		optionsSymbols,
+		cfg.Workers.GammaExposureCollectorInterval,
+		cfg.MarketData.DeribitAPIKey != "",
+	))
+
+	// Funding aggregator: Aggregates funding rates from multiple exchanges
+	scheduler.RegisterWorker(derivworkers.NewFundingAggregator(
+		marketDataRepo,
+		exchanges,
+		defaultSymbols,
+		cfg.Workers.FundingAggregatorInterval,
+		true, // Always enabled (uses existing exchange connections)
+	))
+
 	log.Info("Worker intervals configured",
 		"position_monitor", cfg.Workers.PositionMonitorInterval,
 		"order_sync", cfg.Workers.OrderSyncInterval,
@@ -673,6 +830,9 @@ func provideWorkers(
 		tradingPairRepo,
 		agentFactory,
 		kafkaProducer,
+		cfg.Agents,             // Agent runtime config
+		cfg.AI.DefaultProvider, // Default AI provider
+		"claude-sonnet-4",      // Default AI model (TODO: add to config)
 		cfg.Workers.MarketScannerInterval,
 		cfg.Workers.MarketScannerMaxConcurrency,
 		true, // enabled

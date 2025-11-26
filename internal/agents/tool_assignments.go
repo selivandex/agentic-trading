@@ -4,18 +4,21 @@ import "prometheus/internal/tools"
 
 // AgentToolCategories defines the tool categories each agent can access.
 var AgentToolCategories = map[AgentType][]string{
-	AgentMarketAnalyst:      {"market_data", "momentum", "volatility", "trend", "volume", "smc"},
-	AgentSMCAnalyst:         {"market_data", "smc"},
-	AgentSentimentAnalyst:   {"sentiment"},
-	AgentOnChainAnalyst:     {"onchain"},
-	AgentMacroAnalyst:       {"macro"},
-	AgentOrderFlowAnalyst:   {"market_data", "order_flow"},
-	AgentDerivativesAnalyst: {"market_data", "derivatives"},
-	AgentCorrelationAnalyst: {"market_data", "correlation"},
+	// Analysts - get memory tools to save their analysis via CoT
+	AgentMarketAnalyst:      {"market_data", "momentum", "volatility", "trend", "volume", "smc", "memory"},
+	AgentSMCAnalyst:         {"market_data", "smc", "memory"},
+	AgentSentimentAnalyst:   {"sentiment", "memory"},
+	AgentOnChainAnalyst:     {"onchain", "memory"},
+	AgentMacroAnalyst:       {"macro", "memory"},
+	AgentOrderFlowAnalyst:   {"market_data", "order_flow", "memory"},
+	AgentDerivativesAnalyst: {"market_data", "derivatives", "memory"},
+	AgentCorrelationAnalyst: {"market_data", "correlation", "memory"},
+	
+	// Decision makers - also need memory for saving plans and decisions
 	AgentStrategyPlanner:    {"memory"},
-	AgentRiskManager:        {"account", "risk"},
-	AgentExecutor:           {"account", "execution"},
-	AgentPositionManager:    {"account", "execution"},
+	AgentRiskManager:        {"account", "risk", "memory"},
+	AgentExecutor:           {"account", "execution", "memory"},
+	AgentPositionManager:    {"account", "execution", "memory"},
 	AgentSelfEvaluator:      {"evaluation", "memory"},
 }
 

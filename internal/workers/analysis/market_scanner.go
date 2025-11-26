@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"prometheus/internal/adapters/config"
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/agents"
 	"prometheus/internal/domain/trading_pair"
@@ -23,9 +24,12 @@ type MarketScanner struct {
 	userRepo        user.Repository
 	tradingPairRepo trading_pair.Repository
 	agentFactory    *agents.Factory
+	orchestrator    *agents.Orchestrator
 	kafka           *kafka.Producer
 	eventPublisher  *events.WorkerPublisher
-	maxConcurrency  int // Maximum number of users to process concurrently
+	maxConcurrency  int    // Maximum number of users to process concurrently
+	defaultProvider string // Default AI provider from config
+	defaultModel    string // Default AI model from config
 }
 
 // NewMarketScanner creates a new market scanner worker
@@ -34,6 +38,9 @@ func NewMarketScanner(
 	tradingPairRepo trading_pair.Repository,
 	agentFactory *agents.Factory,
 	kafka *kafka.Producer,
+	runtimeConfig config.AgentsConfig,
+	defaultProvider string,
+	defaultModel string,
 	interval time.Duration,
 	maxConcurrency int,
 	enabled bool,
@@ -42,14 +49,21 @@ func NewMarketScanner(
 		maxConcurrency = 5 // Default: process 5 users concurrently
 	}
 
+	// Create orchestrator for agent pipeline coordination
+	costTracker := agents.NewCostTracker()
+	orchestrator := agents.NewOrchestrator(agentFactory, runtimeConfig, costTracker)
+
 	return &MarketScanner{
 		BaseWorker:      workers.NewBaseWorker("market_scanner", interval, enabled),
 		userRepo:        userRepo,
 		tradingPairRepo: tradingPairRepo,
 		agentFactory:    agentFactory,
+		orchestrator:    orchestrator,
 		kafka:           kafka,
 		eventPublisher:  events.NewWorkerPublisher(kafka),
 		maxConcurrency:  maxConcurrency,
+		defaultProvider: defaultProvider,
+		defaultModel:    defaultModel,
 	}
 }
 
@@ -195,45 +209,60 @@ func (ms *MarketScanner) scanUser(ctx context.Context, usr *user.User) error {
 // analyzeUserPair runs the full agent pipeline for a user's trading pair
 // Pipeline: Analysis Agents → Strategy Planner → Risk Manager → (Executor if approved)
 func (ms *MarketScanner) analyzeUserPair(ctx context.Context, usr *user.User, pair *trading_pair.TradingPair) error {
-	ms.Log().Debug("Analyzing pair",
+	ms.Log().Info("Analyzing pair",
 		"user_id", usr.ID,
 		"symbol", pair.Symbol,
 		"market_type", pair.MarketType,
 	)
 
-	// TODO: Implement full agent pipeline
-	// This is where the magic happens!
-	//
-	// 1. Run analysis agents in parallel:
-	//    - MarketAnalyst: Technical analysis
-	//    - SMCAnalyst: Smart Money Concepts
-	//    - SentimentAnalyst: News & social sentiment
-	//    - OnChainAnalyst: Blockchain metrics
-	//    - CorrelationAnalyst: Cross-market analysis
-	//    - MacroAnalyst: Economic events
-	//    - OrderFlowAnalyst: Tape reading
-	//    - DerivativesAnalyst: Options flow
-	//
-	// 2. Collect all analysis results
-	//
-	// 3. Run StrategyPlanner to synthesize analysis into trade plan
-	//
-	// 4. Run RiskManager to validate and size positions
-	//
-	// 5. If approved by risk manager:
-	//    - Publish signal to Kafka
-	//    - Optionally: Auto-execute via Executor agent
-	//
-	// 6. Log all reasoning steps to database (Chain-of-Thought)
+	// Get user's AI provider/model preferences, fallback to defaults
+	provider := ms.defaultProvider
+	model := ms.defaultModel
 
-	// For now, just log that we would analyze
-	ms.Log().Debug("Would run agent analysis pipeline",
-		"user_id", usr.ID,
-		"symbol", pair.Symbol,
-		"strategy", pair.StrategyMode,
+	// Check user settings for custom AI preferences
+	if usr.Settings.DefaultAIProvider != "" {
+		provider = usr.Settings.DefaultAIProvider
+	}
+	if usr.Settings.DefaultAIModel != "" {
+		model = usr.Settings.DefaultAIModel
+	}
+
+	// Run full agent analysis pipeline via orchestrator
+	// This executes:
+	// 1. Parallel analysis agents (market, SMC, order flow, etc.)
+	// 2. Strategy planner to synthesize results
+	// 3. Risk manager to validate (TODO)
+	plan, err := ms.orchestrator.RunAnalysisPipeline(
+		ctx,
+		usr.ID,
+		pair.Symbol,
+		pair.MarketType.String(),
+		provider,
+		model,
 	)
 
-	// Publish analysis request event using protobuf
+	if err != nil {
+		ms.Log().Error("Agent pipeline failed",
+			"user_id", usr.ID,
+			"symbol", pair.Symbol,
+			"error", err,
+		)
+		return errors.Wrap(err, "agent pipeline execution failed")
+	}
+
+	ms.Log().Info("Agent pipeline complete",
+		"user_id", usr.ID,
+		"symbol", pair.Symbol,
+		"analysis_count", len(plan.AnalysisInputs),
+		"strategy_tokens", plan.StrategyOutput.TokensUsed,
+		"strategy_cost", plan.StrategyOutput.CostUSD,
+	)
+
+	// TODO: Extract trade signal from plan and publish to Kafka
+	// TODO: If auto-execution enabled, pass to executor agent
+	// TODO: Store plan in database for audit
+
+	// Publish analysis complete event
 	if err := ms.eventPublisher.PublishMarketAnalysisRequest(
 		ctx,
 		usr.ID.String(),
@@ -241,7 +270,7 @@ func (ms *MarketScanner) analyzeUserPair(ctx context.Context, usr *user.User, pa
 		pair.MarketType.String(),
 		pair.StrategyMode.String(),
 	); err != nil {
-		ms.Log().Error("Failed to publish analysis request event", "error", err)
+		ms.Log().Error("Failed to publish analysis event", "error", err)
 	}
 
 	return nil

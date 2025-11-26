@@ -11,6 +11,7 @@ import (
 	"prometheus/internal/domain/memory"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/reasoning"
 	"prometheus/internal/domain/risk"
 	"prometheus/internal/domain/stats"
 	"prometheus/pkg/logger"
@@ -21,6 +22,11 @@ type RiskEngine interface {
 	CanTrade(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
+// EmbeddingService interface for generating text embeddings
+type EmbeddingService interface {
+	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+}
+
 // Deps bundles dependencies required by concrete tool implementations.
 type Deps struct {
 	MarketDataRepo      market_data.Repository
@@ -28,9 +34,11 @@ type Deps struct {
 	PositionRepo        position.Repository
 	ExchangeAccountRepo exchange_account.Repository
 	MemoryRepo          memory.Repository
+	ReasoningRepo       reasoning.Repository
 	RiskRepo            risk.Repository
 	StatsRepo           stats.Repository
 	RiskEngine          RiskEngine
+	EmbeddingService    EmbeddingService
 	Redis               RedisClient
 	Log                 *logger.Logger
 }

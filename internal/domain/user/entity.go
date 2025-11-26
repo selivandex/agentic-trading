@@ -25,6 +25,7 @@ type User struct {
 // This struct will be stored as JSONB in PostgreSQL
 type Settings struct {
 	DefaultAIProvider  string  `json:"default_ai_provider"` // claude, openai, etc.
+	DefaultAIModel     string  `json:"default_ai_model"`    // claude-sonnet-4, gpt-4, etc.
 	RiskLevel          string  `json:"risk_level"`          // conservative, moderate, aggressive
 	MaxPositions       int     `json:"max_positions"`
 	MaxPortfolioRisk   float64 `json:"max_portfolio_risk"`   // percentage
@@ -40,6 +41,7 @@ type Settings struct {
 func DefaultSettings() Settings {
 	return Settings{
 		DefaultAIProvider:  "claude",
+		DefaultAIModel:     "claude-sonnet-4",
 		RiskLevel:          "moderate",
 		MaxPositions:       3,
 		MaxPortfolioRisk:   10.0, // 10% max portfolio risk
