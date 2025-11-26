@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"prometheus/internal/domain/journal"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -20,10 +20,11 @@ import (
 // Runs once per day at midnight UTC
 type DailyReport struct {
 	*workers.BaseWorker
-	userRepo    user.Repository
-	posRepo     position.Repository
-	journalRepo journal.Repository
-	kafka       *kafka.Producer
+	userRepo       user.Repository
+	posRepo        position.Repository
+	journalRepo    journal.Repository
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
 }
 
 // NewDailyReport creates a new daily report worker
@@ -36,11 +37,12 @@ func NewDailyReport(
 	enabled bool,
 ) *DailyReport {
 	return &DailyReport{
-		BaseWorker:  workers.NewBaseWorker("daily_report", interval, enabled),
-		userRepo:    userRepo,
-		posRepo:     posRepo,
-		journalRepo: journalRepo,
-		kafka:       kafka,
+		BaseWorker:     workers.NewBaseWorker("daily_report", interval, enabled),
+		userRepo:       userRepo,
+		posRepo:        posRepo,
+		journalRepo:    journalRepo,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
 	}
 }
 
@@ -269,42 +271,20 @@ type DailyReportEvent struct {
 }
 
 func (dr *DailyReport) publishReportEvent(ctx context.Context, report DailyReportData) {
-	// Generate summary text
-	summary := fmt.Sprintf(
-		"Daily Report for %s\n"+
-			"Trades: %d (W: %d, L: %d)\n"+
-			"Win Rate: %.1f%%\n"+
-			"Total PnL: %s (%.2f%%)\n"+
-			"Profit Factor: %s",
-		report.Date.Format("2006-01-02"),
+	totalPnL, _ := report.TotalPnL.Float64()
+	totalPnLPct, _ := report.TotalPnLPct.Float64()
+
+	if err := dr.eventPublisher.PublishDailyReport(
+		ctx,
+		report.UserID.String(),
+		totalPnL,
+		totalPnLPct,
 		report.TotalTrades,
 		report.WinningTrades,
-		report.LosingTrades,
 		report.WinRate,
-		report.TotalPnL.StringFixed(2),
-		report.TotalPnLPct.InexactFloat64(),
-		report.ProfitFactor.StringFixed(2),
-	)
-
-	event := DailyReportEvent{
-		UserID:        report.UserID.String(),
-		Date:          report.Date.Format("2006-01-02"),
-		TotalTrades:   report.TotalTrades,
-		WinningTrades: report.WinningTrades,
-		LosingTrades:  report.LosingTrades,
-		WinRate:       report.WinRate,
-		TotalPnL:      report.TotalPnL.String(),
-		TotalPnLPct:   report.TotalPnLPct.String(),
-		BestTrade:     report.BestTrade.String(),
-		WorstTrade:    report.WorstTrade.String(),
-		AvgWin:        report.AvgWin.String(),
-		AvgLoss:       report.AvgLoss.String(),
-		ProfitFactor:  report.ProfitFactor.String(),
-		Summary:       summary,
-		Timestamp:     time.Now(),
-	}
-
-	if err := dr.kafka.Publish(ctx, "report.daily", report.UserID.String(), event); err != nil {
+		0.0, // sharpe_ratio not calculated yet
+		0.0, // max_drawdown not calculated yet
+	); err != nil {
 		dr.Log().Error("Failed to publish daily report event", "error", err)
 	}
 }

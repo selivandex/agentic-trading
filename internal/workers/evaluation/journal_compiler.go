@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +10,7 @@ import (
 	"prometheus/internal/domain/journal"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -19,10 +19,11 @@ import (
 // Runs every hour to create journal entries for closed positions
 type JournalCompiler struct {
 	*workers.BaseWorker
-	userRepo    user.Repository
-	posRepo     position.Repository
-	journalRepo journal.Repository
-	kafka       *kafka.Producer
+	userRepo       user.Repository
+	posRepo        position.Repository
+	journalRepo    journal.Repository
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
 }
 
 // NewJournalCompiler creates a new journal compiler worker
@@ -35,11 +36,12 @@ func NewJournalCompiler(
 	enabled bool,
 ) *JournalCompiler {
 	return &JournalCompiler{
-		BaseWorker:  workers.NewBaseWorker("journal_compiler", interval, enabled),
-		userRepo:    userRepo,
-		posRepo:     posRepo,
-		journalRepo: journalRepo,
-		kafka:       kafka,
+		BaseWorker:     workers.NewBaseWorker("journal_compiler", interval, enabled),
+		userRepo:       userRepo,
+		posRepo:        posRepo,
+		journalRepo:    journalRepo,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
 	}
 }
 
@@ -266,20 +268,21 @@ type JournalEntryEvent struct {
 }
 
 func (jc *JournalCompiler) publishJournalEvent(ctx context.Context, entry *journal.JournalEntry) {
-	event := JournalEntryEvent{
-		UserID:         entry.UserID.String(),
-		TradeID:        entry.TradeID.String(),
-		Symbol:         entry.Symbol,
-		Strategy:       entry.StrategyUsed,
-		Outcome:        "", // TODO: Calculate outcome from PnL
-		RealizedPnL:    entry.PnL.String(),
-		RealizedPnLPct: entry.PnLPercent.String(),
-		HoldDuration:   fmt.Sprintf("%ds", entry.HoldDuration),
-		Notes:          entry.LessonsLearned,
-		Timestamp:      time.Now(),
-	}
+	pnl, _ := entry.PnL.Float64()
+	pnlPercent, _ := entry.PnLPercent.Float64()
 
-	if err := jc.kafka.Publish(ctx, "journal.entry_created", entry.UserID.String(), event); err != nil {
+	sideStr := string(entry.Side)
+
+	if err := jc.eventPublisher.PublishJournalEntryCreated(
+		ctx,
+		entry.UserID.String(),
+		entry.ID.String(),
+		entry.Symbol,
+		sideStr,
+		entry.LessonsLearned,
+		pnl,
+		pnlPercent,
+	); err != nil {
 		jc.Log().Error("Failed to publish journal entry event", "error", err)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
@@ -20,12 +21,13 @@ import (
 // PositionMonitor monitors all open positions and updates their PnL
 type PositionMonitor struct {
 	*workers.BaseWorker
-	userRepo    user.Repository
-	posRepo     position.Repository
-	accountRepo exchange_account.Repository
-	exchFactory exchanges.Factory
-	encryptor   crypto.Encryptor
-	kafka       *kafka.Producer
+	userRepo       user.Repository
+	posRepo        position.Repository
+	accountRepo    exchange_account.Repository
+	exchFactory    exchanges.Factory
+	encryptor      crypto.Encryptor
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
 }
 
 // NewPositionMonitor creates a new position monitor worker
@@ -40,13 +42,14 @@ func NewPositionMonitor(
 	enabled bool,
 ) *PositionMonitor {
 	return &PositionMonitor{
-		BaseWorker:  workers.NewBaseWorker("position_monitor", interval, enabled),
-		userRepo:    userRepo,
-		posRepo:     posRepo,
-		accountRepo: accountRepo,
-		exchFactory: exchFactory,
-		encryptor:   encryptor,
-		kafka:       kafka,
+		BaseWorker:     workers.NewBaseWorker("position_monitor", interval, enabled),
+		userRepo:       userRepo,
+		posRepo:        posRepo,
+		accountRepo:    accountRepo,
+		exchFactory:    exchFactory,
+		encryptor:      encryptor,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
 	}
 }
 
@@ -276,19 +279,40 @@ type PnLUpdateEvent struct {
 }
 
 func (pm *PositionMonitor) sendStopLossEvent(ctx context.Context, pos *position.Position, currentPrice decimal.Decimal) {
-	event := StopLossEvent{
-		PositionID:    pos.ID.String(),
-		UserID:        pos.UserID.String(),
-		Symbol:        pos.Symbol,
-		Side:          pos.Side.String(),
-		EntryPrice:    pos.EntryPrice.String(),
-		StopLossPrice: pos.StopLossPrice.String(),
-		CurrentPrice:  currentPrice.String(),
-		Size:          pos.Size.String(),
-		Timestamp:     time.Now(),
+	// Get exchange from account
+	account, err := pm.accountRepo.GetByID(ctx, pos.ExchangeAccountID)
+	exchangeName := "unknown"
+	if err == nil && account != nil {
+		exchangeName = account.Exchange.String()
 	}
 
-	if err := pm.kafka.Publish(ctx, "position.sl_hit", event.PositionID, event); err != nil {
+	entryPrice, _ := pos.EntryPrice.Float64()
+	exitPrice, _ := currentPrice.Float64()
+	size, _ := pos.Size.Float64()
+	pnl, _ := pos.RealizedPnL.Float64()
+
+	// Calculate PnL percent
+	pnlDecimal := currentPrice.Sub(pos.EntryPrice).Div(pos.EntryPrice).Mul(decimal.NewFromInt(100))
+	if pos.Side == position.PositionShort {
+		pnlDecimal = pnlDecimal.Neg()
+	}
+	pnlPercent, _ := pnlDecimal.Float64()
+
+	if err := pm.eventPublisher.PublishPositionClosed(
+		ctx,
+		pos.UserID.String(),
+		pos.ID.String(),
+		pos.Symbol,
+		exchangeName,
+		pos.Side.String(),
+		"stop_loss",
+		entryPrice,
+		exitPrice,
+		size,
+		pnl,
+		pnlPercent,
+		0, // duration will be 0 if CreatedAt field doesn't exist
+	); err != nil {
 		pm.Log().Error("Failed to publish stop loss event", "error", err)
 	} else {
 		pm.Log().Info("Stop loss hit",
@@ -301,19 +325,40 @@ func (pm *PositionMonitor) sendStopLossEvent(ctx context.Context, pos *position.
 }
 
 func (pm *PositionMonitor) sendTakeProfitEvent(ctx context.Context, pos *position.Position, currentPrice decimal.Decimal) {
-	event := TakeProfitEvent{
-		PositionID:      pos.ID.String(),
-		UserID:          pos.UserID.String(),
-		Symbol:          pos.Symbol,
-		Side:            pos.Side.String(),
-		EntryPrice:      pos.EntryPrice.String(),
-		TakeProfitPrice: pos.TakeProfitPrice.String(),
-		CurrentPrice:    currentPrice.String(),
-		Size:            pos.Size.String(),
-		Timestamp:       time.Now(),
+	// Get exchange from account
+	account, err := pm.accountRepo.GetByID(ctx, pos.ExchangeAccountID)
+	exchangeName := "unknown"
+	if err == nil && account != nil {
+		exchangeName = account.Exchange.String()
 	}
 
-	if err := pm.kafka.Publish(ctx, "position.tp_hit", event.PositionID, event); err != nil {
+	entryPrice, _ := pos.EntryPrice.Float64()
+	exitPrice, _ := currentPrice.Float64()
+	size, _ := pos.Size.Float64()
+	pnl, _ := pos.RealizedPnL.Float64()
+
+	// Calculate PnL percent
+	pnlDecimal := currentPrice.Sub(pos.EntryPrice).Div(pos.EntryPrice).Mul(decimal.NewFromInt(100))
+	if pos.Side == position.PositionShort {
+		pnlDecimal = pnlDecimal.Neg()
+	}
+	pnlPercent, _ := pnlDecimal.Float64()
+
+	if err := pm.eventPublisher.PublishPositionClosed(
+		ctx,
+		pos.UserID.String(),
+		pos.ID.String(),
+		pos.Symbol,
+		exchangeName,
+		pos.Side.String(),
+		"take_profit",
+		entryPrice,
+		exitPrice,
+		size,
+		pnl,
+		pnlPercent,
+		0,
+	); err != nil {
 		pm.Log().Error("Failed to publish take profit event", "error", err)
 	} else {
 		pm.Log().Info("Take profit hit",
@@ -326,20 +371,24 @@ func (pm *PositionMonitor) sendTakeProfitEvent(ctx context.Context, pos *positio
 }
 
 func (pm *PositionMonitor) sendPnLUpdateEvent(ctx context.Context, pos *position.Position, currentPrice, unrealizedPnL, unrealizedPnLPct decimal.Decimal) {
-	event := PnLUpdateEvent{
-		PositionID:       pos.ID.String(),
-		UserID:           pos.UserID.String(),
-		Symbol:           pos.Symbol,
-		CurrentPrice:     currentPrice.String(),
-		UnrealizedPnL:    unrealizedPnL.String(),
-		UnrealizedPnLPct: unrealizedPnLPct.String(),
-		Timestamp:        time.Now(),
-	}
-
 	// Only publish significant PnL updates (to avoid spamming)
 	// For example, only publish if PnL changed by more than 1%
 	if unrealizedPnLPct.Abs().GreaterThan(decimal.NewFromFloat(1.0)) {
-		if err := pm.kafka.Publish(ctx, "position.pnl_updated", event.PositionID, event); err != nil {
+		currentPriceFloat, _ := currentPrice.Float64()
+		entryPriceFloat, _ := pos.EntryPrice.Float64()
+		unrealizedPnLFloat, _ := unrealizedPnL.Float64()
+		unrealizedPnLPctFloat, _ := unrealizedPnLPct.Float64()
+
+		if err := pm.eventPublisher.PublishPositionPnLUpdated(
+			ctx,
+			pos.UserID.String(),
+			pos.ID.String(),
+			pos.Symbol,
+			unrealizedPnLFloat,
+			unrealizedPnLPctFloat,
+			currentPriceFloat,
+			entryPriceFloat,
+		); err != nil {
 			pm.Log().Error("Failed to publish PnL update event", "error", err)
 		}
 	}

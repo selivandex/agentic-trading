@@ -10,6 +10,7 @@ import (
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/risk"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
@@ -18,10 +19,11 @@ import (
 // RiskMonitor monitors user risk levels and trips circuit breakers when needed
 type RiskMonitor struct {
 	*workers.BaseWorker
-	userRepo   user.Repository
-	riskEngine *risk.RiskEngine
-	posRepo    position.Repository
-	kafka      *kafka.Producer
+	userRepo       user.Repository
+	riskEngine     *risk.RiskEngine
+	posRepo        position.Repository
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
 }
 
 // NewRiskMonitor creates a new risk monitor worker
@@ -34,11 +36,12 @@ func NewRiskMonitor(
 	enabled bool,
 ) *RiskMonitor {
 	return &RiskMonitor{
-		BaseWorker: workers.NewBaseWorker("risk_monitor", interval, enabled),
-		userRepo:   userRepo,
-		riskEngine: riskEngine,
-		posRepo:    posRepo,
-		kafka:      kafka,
+		BaseWorker:     workers.NewBaseWorker("risk_monitor", interval, enabled),
+		userRepo:       userRepo,
+		riskEngine:     riskEngine,
+		posRepo:        posRepo,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
 	}
 }
 
@@ -182,17 +185,19 @@ type ConsecutiveLossesWarningEvent struct {
 }
 
 func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState) {
-	event := CircuitBreakerAlert{
-		UserID:            userID.String(),
-		Reason:            state.TripReason,
-		DailyPnL:          state.DailyPnL.String(),
-		DailyPnLPercent:   state.DailyPnLPercent.String(),
-		ConsecutiveLosses: state.ConsecutiveLosses,
-		MaxDrawdown:       state.MaxDrawdown.String(),
-		Timestamp:         time.Now(),
-	}
+	dailyPnL, _ := state.DailyPnL.Float64()
+	maxDrawdown, _ := state.MaxDrawdown.Float64()
+	threshold := maxDrawdown * 0.9 // Assuming 90% threshold
 
-	if err := rm.kafka.Publish(ctx, "risk.circuit_breaker_tripped", userID.String(), event); err != nil {
+	if err := rm.eventPublisher.PublishCircuitBreakerTripped(
+		ctx,
+		userID.String(),
+		state.TripReason,
+		dailyPnL,
+		threshold,
+		maxDrawdown,
+		true, // auto_resume after 24h
+	); err != nil {
 		rm.Log().Error("Failed to publish circuit breaker alert", "error", err)
 	} else {
 		rm.Log().Warn("Circuit breaker alert sent",
@@ -205,16 +210,20 @@ func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.
 func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState, currentDrawdown decimal.Decimal) {
 	percentage := currentDrawdown.Div(state.MaxDrawdown).Mul(decimal.NewFromInt(100))
 
-	event := DrawdownWarningEvent{
-		UserID:          userID.String(),
-		CurrentDrawdown: currentDrawdown.String(),
-		MaxDrawdown:     state.MaxDrawdown.String(),
-		Percentage:      percentage.StringFixed(1) + "%",
-		DailyPnL:        state.DailyPnL.String(),
-		Timestamp:       time.Now(),
-	}
+	currentDrawdownFloat, _ := currentDrawdown.Float64()
+	maxDrawdownFloat, _ := state.MaxDrawdown.Float64()
+	percentageFloat, _ := percentage.Float64()
+	dailyPnLFloat, _ := state.DailyPnL.Float64()
 
-	if err := rm.kafka.Publish(ctx, "risk.drawdown_warning", userID.String(), event); err != nil {
+	if err := rm.eventPublisher.PublishDrawdownAlert(
+		ctx,
+		userID.String(),
+		"approaching_limit",
+		currentDrawdownFloat,
+		maxDrawdownFloat,
+		percentageFloat,
+		dailyPnLFloat,
+	); err != nil {
 		rm.Log().Error("Failed to publish drawdown warning", "error", err)
 	} else {
 		rm.Log().Warn("Drawdown warning sent",
@@ -226,14 +235,12 @@ func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID
 }
 
 func (rm *RiskMonitor) sendConsecutiveLossesWarning(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState) {
-	event := ConsecutiveLossesWarningEvent{
-		UserID:            userID.String(),
-		ConsecutiveLosses: state.ConsecutiveLosses,
-		MaxAllowed:        state.MaxConsecutiveLoss,
-		Timestamp:         time.Now(),
-	}
-
-	if err := rm.kafka.Publish(ctx, "risk.consecutive_losses", userID.String(), event); err != nil {
+	if err := rm.eventPublisher.PublishConsecutiveLossesAlert(
+		ctx,
+		userID.String(),
+		state.ConsecutiveLosses,
+		state.MaxConsecutiveLoss,
+	); err != nil {
 		rm.Log().Error("Failed to publish consecutive losses warning", "error", err)
 	} else {
 		rm.Log().Warn("Consecutive losses warning sent",

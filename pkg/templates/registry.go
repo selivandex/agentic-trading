@@ -28,7 +28,7 @@ type Template struct {
 func (t *Template) Render(data any) (string, error) {
 	var buf bytes.Buffer
 	if err := t.parsed.Execute(&buf, data); err != nil {
-		return "", errors.Wrapf(errors.ErrInternal, "render template %s: %w", t.ID, err)
+		return "", errors.Wrapf(err, "render template %s", t.ID)
 	}
 
 	return buf.String(), nil
@@ -153,12 +153,12 @@ func (r *Registry) loadTemplate(path string) error {
 	id := r.pathToID(path)
 	content, err := fs.ReadFile(r.fs, path)
 	if err != nil {
-		return errors.Wrapf(err, "read template %s: %w", id)
+		return errors.Wrapf(err, "read template %s", id)
 	}
 
 	parsed, err := template.New(id).Parse(string(content))
 	if err != nil {
-		return errors.Wrapf(err, "parse template %s: %w", id)
+		return errors.Wrapf(err, "parse template %s", id)
 	}
 
 	r.mu.Lock()

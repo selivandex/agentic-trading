@@ -17,9 +17,7 @@ import (
 // NotificationConsumer consumes events and sends Telegram notifications
 type NotificationConsumer struct {
 	consumer *kafka.Consumer
-	// TODO: Add Telegram bot when implemented
-	// bot      *telegram.Bot
-	log *logger.Logger
+	log      *logger.Logger
 }
 
 // NewNotificationConsumer creates a new notification consumer

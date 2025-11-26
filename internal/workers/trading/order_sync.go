@@ -13,6 +13,7 @@ import (
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
@@ -21,13 +22,14 @@ import (
 // OrderSync synchronizes order status with exchanges
 type OrderSync struct {
 	*workers.BaseWorker
-	userRepo    user.Repository
-	orderRepo   order.Repository
-	posRepo     position.Repository
-	accountRepo exchange_account.Repository
-	exchFactory exchanges.Factory
-	encryptor   crypto.Encryptor
-	kafka       *kafka.Producer
+	userRepo       user.Repository
+	orderRepo      order.Repository
+	posRepo        position.Repository
+	accountRepo    exchange_account.Repository
+	exchFactory    exchanges.Factory
+	encryptor      crypto.Encryptor
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
 }
 
 // NewOrderSync creates a new order sync worker
@@ -43,14 +45,15 @@ func NewOrderSync(
 	enabled bool,
 ) *OrderSync {
 	return &OrderSync{
-		BaseWorker:  workers.NewBaseWorker("order_sync", interval, enabled),
-		userRepo:    userRepo,
-		orderRepo:   orderRepo,
-		posRepo:     posRepo,
-		accountRepo: accountRepo,
-		exchFactory: exchFactory,
-		encryptor:   encryptor,
-		kafka:       kafka,
+		BaseWorker:     workers.NewBaseWorker("order_sync", interval, enabled),
+		userRepo:       userRepo,
+		orderRepo:      orderRepo,
+		posRepo:        posRepo,
+		accountRepo:    accountRepo,
+		exchFactory:    exchFactory,
+		encryptor:      encryptor,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
 	}
 }
 
@@ -224,19 +227,22 @@ func (os *OrderSync) handleFilledOrder(ctx context.Context, ord *order.Order, fi
 		os.Log().Error("Failed to create/update position", "error", err)
 	}
 
-	// Send Kafka event
-	event := OrderFilledEvent{
-		OrderID:      ord.ID.String(),
-		UserID:       ord.UserID.String(),
-		Symbol:       ord.Symbol,
-		Side:         ord.Side.String(),
-		Type:         ord.Type.String(),
-		FilledAmount: filledAmount.String(),
-		AvgPrice:     avgPrice.String(),
-		Timestamp:    time.Now(),
-	}
+	// Send Kafka event (protobuf)
+	filledAmountFloat, _ := filledAmount.Float64()
+	avgPriceFloat, _ := avgPrice.Float64()
 
-	if err := os.kafka.Publish(ctx, "order.filled", event.OrderID, event); err != nil {
+	if err := os.eventPublisher.PublishOrderFilled(
+		ctx,
+		ord.UserID.String(),
+		ord.ID.String(),
+		ord.Symbol,
+		"", // exchange - TODO: get from accountRepo
+		ord.Side.String(),
+		avgPriceFloat,
+		filledAmountFloat,
+		0.0,    // fee - TODO: get from exchange response
+		"USDT", // fee_currency
+	); err != nil {
 		os.Log().Error("Failed to publish order filled event", "error", err)
 	}
 
@@ -255,16 +261,15 @@ func (os *OrderSync) handleCancelledOrder(ctx context.Context, ord *order.Order)
 		"symbol", ord.Symbol,
 	)
 
-	// Send Kafka event
-	event := OrderCancelledEvent{
-		OrderID:   ord.ID.String(),
-		UserID:    ord.UserID.String(),
-		Symbol:    ord.Symbol,
-		Side:      ord.Side.String(),
-		Timestamp: time.Now(),
-	}
-
-	if err := os.kafka.Publish(ctx, "order.cancelled", event.OrderID, event); err != nil {
+	// Send Kafka event (protobuf)
+	if err := os.eventPublisher.PublishOrderCancelled(
+		ctx,
+		ord.UserID.String(),
+		ord.ID.String(),
+		ord.Symbol,
+		"",               // exchange - TODO: get from accountRepo
+		"user_requested", // reason
+	); err != nil {
 		os.Log().Error("Failed to publish order cancelled event", "error", err)
 	}
 
@@ -290,19 +295,29 @@ func (os *OrderSync) handlePartiallyFilledOrder(ctx context.Context, ord *order.
 		os.Log().Error("Failed to create/update position", "error", err)
 	}
 
-	// Send Kafka event
-	event := OrderPartiallyFilledEvent{
-		OrderID:      ord.ID.String(),
-		UserID:       ord.UserID.String(),
-		Symbol:       ord.Symbol,
-		Side:         ord.Side.String(),
-		FilledAmount: filledAmount.String(),
-		TotalAmount:  ord.Amount.String(),
-		AvgPrice:     avgPrice.String(),
-		Timestamp:    time.Now(),
+	// Get exchange from account
+	account, err := os.accountRepo.GetByID(ctx, ord.ExchangeAccountID)
+	exchangeName := "unknown"
+	if err == nil && account != nil {
+		exchangeName = account.Exchange.String()
 	}
 
-	if err := os.kafka.Publish(ctx, "order.partially_filled", event.OrderID, event); err != nil {
+	// Send Kafka event (protobuf) - use OrderFilled with partial status
+	filledAmountFloat, _ := filledAmount.Float64()
+	avgPriceFloat, _ := avgPrice.Float64()
+
+	if err := os.eventPublisher.PublishOrderFilled(
+		ctx,
+		ord.UserID.String(),
+		ord.ID.String(),
+		ord.Symbol,
+		exchangeName,
+		ord.Side.String(),
+		avgPriceFloat,
+		filledAmountFloat,
+		0.0,
+		"USDT",
+	); err != nil {
 		os.Log().Error("Failed to publish order partially filled event", "error", err)
 	}
 

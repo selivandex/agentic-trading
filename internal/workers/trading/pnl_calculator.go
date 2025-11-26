@@ -10,6 +10,7 @@ import (
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/risk"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
@@ -19,10 +20,11 @@ import (
 // This worker runs periodically to aggregate closed positions and update risk metrics
 type PnLCalculator struct {
 	*workers.BaseWorker
-	userRepo   user.Repository
-	posRepo    position.Repository
-	riskEngine *risk.RiskEngine
-	kafka      *kafka.Producer
+	userRepo       user.Repository
+	posRepo        position.Repository
+	riskEngine     *risk.RiskEngine
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
 }
 
 // NewPnLCalculator creates a new PnL calculator worker
@@ -35,11 +37,12 @@ func NewPnLCalculator(
 	enabled bool,
 ) *PnLCalculator {
 	return &PnLCalculator{
-		BaseWorker: workers.NewBaseWorker("pnl_calculator", interval, enabled),
-		userRepo:   userRepo,
-		posRepo:    posRepo,
-		riskEngine: riskEngine,
-		kafka:      kafka,
+		BaseWorker:     workers.NewBaseWorker("pnl_calculator", interval, enabled),
+		userRepo:       userRepo,
+		posRepo:        posRepo,
+		riskEngine:     riskEngine,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
 	}
 }
 
@@ -170,18 +173,22 @@ func (pc *PnLCalculator) sendPnLUpdateEvent(
 	dailyRealizedPnL, totalUnrealizedPnL, totalPnL decimal.Decimal,
 	closedPositionCount int,
 ) {
-	event := UserPnLUpdateEvent{
-		UserID:              userID.String(),
-		DailyRealizedPnL:    dailyRealizedPnL.String(),
-		TotalUnrealizedPnL:  totalUnrealizedPnL.String(),
-		TotalPnL:            totalPnL.String(),
-		ClosedPositionCount: closedPositionCount,
-		Timestamp:           time.Now(),
-	}
-
 	// Only publish if there's significant activity (at least one closed position today)
 	if closedPositionCount > 0 || !totalPnL.IsZero() {
-		if err := pc.kafka.Publish(ctx, "user.pnl_updated", userID.String(), event); err != nil {
+		dailyPnLFloat, _ := dailyRealizedPnL.Float64()
+		totalPnLFloat, _ := totalPnL.Float64()
+
+		if err := pc.eventPublisher.PublishPnLUpdated(
+			ctx,
+			userID.String(),
+			dailyPnLFloat,
+			0.0, // daily_pnl_percent - TODO: calculate
+			totalPnLFloat,
+			closedPositionCount,
+			0,   // winning_trades - TODO: calculate
+			0,   // losing_trades - TODO: calculate
+			0.0, // win_rate - TODO: calculate
+		); err != nil {
 			pc.Log().Error("Failed to publish PnL update event", "error", err)
 		}
 	}

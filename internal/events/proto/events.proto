@@ -147,3 +147,111 @@ message WorkerFailedEvent {
   google.protobuf.Timestamp last_success = 5;
 }
 
+// Additional events for workers
+
+// DrawdownAlert is published when user approaches drawdown limit
+message DrawdownAlert {
+  BaseEvent base = 1;
+  string reason = 2;
+  double current_drawdown = 3;
+  double max_drawdown = 4;
+  double percentage = 5;
+  double daily_pnl = 6;
+}
+
+// ConsecutiveLossesAlert is published when user has multiple consecutive losses
+message ConsecutiveLossesAlert {
+  BaseEvent base = 1;
+  int32 consecutive_losses = 2;
+  int32 max_allowed = 3;
+}
+
+// PnLUpdatedEvent is published when user PnL is recalculated
+message PnLUpdatedEvent {
+  BaseEvent base = 1;
+  double daily_pnl = 2;
+  double daily_pnl_percent = 3;
+  double total_pnl = 4;
+  int32 trades_count = 5;
+  int32 winning_trades = 6;
+  int32 losing_trades = 7;
+  double win_rate = 8;
+}
+
+// JournalEntryCreatedEvent is published when a journal entry is created
+message JournalEntryCreatedEvent {
+  BaseEvent base = 1;
+  string entry_id = 2;
+  string symbol = 3;
+  string side = 4;
+  double pnl = 5;
+  double pnl_percent = 6;
+  string lesson_learned = 7;
+}
+
+// DailyReportEvent is published with daily performance summary
+message DailyReportEvent {
+  BaseEvent base = 1;
+  double daily_pnl = 2;
+  double daily_pnl_percent = 3;
+  int32 total_trades = 4;
+  int32 winning_trades = 5;
+  double win_rate = 6;
+  double sharpe_ratio = 7;
+  double max_drawdown = 8;
+}
+
+// StrategyDisabledEvent is published when a strategy is auto-disabled
+message StrategyDisabledEvent {
+  BaseEvent base = 1;
+  string strategy_id = 2;
+  string strategy_name = 3;
+  string reason = 4;
+  double win_rate = 5;
+  double profit_factor = 6;
+  int32 total_trades = 7;
+}
+
+// OrderCancelledEvent is published when an order is cancelled
+message OrderCancelledEvent {
+  BaseEvent base = 1;
+  string order_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  string reason = 5;
+}
+
+// PositionPnLUpdatedEvent is published when position PnL is updated
+message PositionPnLUpdatedEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  double unrealized_pnl = 4;
+  double unrealized_pnl_percent = 5;
+  double current_price = 6;
+  double entry_price = 7;
+}
+
+// SMC Pattern Events
+
+// FVGDetectedEvent is published when Fair Value Gap is detected
+message FVGDetectedEvent {
+  BaseEvent base = 1;
+  string symbol = 2;
+  string type = 3;  // bullish, bearish
+  double top_price = 4;
+  double bottom_price = 5;
+  double gap_percent = 6;
+  bool filled = 7;
+}
+
+// OrderBlockDetectedEvent is published when Order Block is detected
+message OrderBlockDetectedEvent {
+  BaseEvent base = 1;
+  string symbol = 2;
+  string type = 3;  // bullish, bearish
+  double top_price = 4;
+  double bottom_price = 5;
+  double strength = 6;
+}
+

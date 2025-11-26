@@ -6,12 +6,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/shopspring/decimal"
-
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/journal"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -24,6 +23,7 @@ type StrategyEvaluator struct {
 	tradingPairRepo trading_pair.Repository
 	journalRepo     journal.Repository
 	kafka           *kafka.Producer
+	eventPublisher  *events.WorkerPublisher
 
 	// Thresholds for strategy disabling
 	minTrades          int     // Minimum trades before evaluation (default: 10)
@@ -47,6 +47,7 @@ func NewStrategyEvaluator(
 		tradingPairRepo:    tradingPairRepo,
 		journalRepo:        journalRepo,
 		kafka:              kafka,
+		eventPublisher:     events.NewWorkerPublisher(kafka),
 		minTrades:          10,
 		minWinRate:         35.0,
 		minProfitFactor:    0.8,
@@ -283,20 +284,18 @@ func (se *StrategyEvaluator) publishStrategyDisabledEvent(
 	strategy, reason string,
 	stats *journal.StrategyStats,
 ) {
-	maxDrawdownFloat, _ := stats.MaxDrawdown.Float64()
-	event := StrategyDisabledEvent{
-		UserID:         userID.String(),
-		Strategy:       strategy,
-		Reason:         reason,
-		TotalTrades:    stats.TotalTrades,
-		WinRate:        stats.WinRate,
-		ProfitFactor:   stats.ProfitFactor.String(),
-		MaxDrawdownPct: maxDrawdownFloat,
-		TotalPnL:       decimal.Zero.String(), // TODO: Calculate total PnL
-		Timestamp:      time.Now(),
-	}
+	profitFactor, _ := stats.ProfitFactor.Float64()
 
-	if err := se.kafka.Publish(ctx, "strategy.disabled", userID.String(), event); err != nil {
+	if err := se.eventPublisher.PublishStrategyDisabled(
+		ctx,
+		userID.String(),
+		"", // strategy_id - TODO: add to trading_pair
+		strategy,
+		reason,
+		stats.WinRate,
+		profitFactor,
+		stats.TotalTrades,
+	); err != nil {
 		se.Log().Error("Failed to publish strategy disabled event", "error", err)
 	}
 }
@@ -307,19 +306,18 @@ func (se *StrategyEvaluator) publishStrategyWarningEvent(
 	strategy, reason string,
 	stats *journal.StrategyStats,
 ) {
-	maxDrawdownFloat, _ := stats.MaxDrawdown.Float64()
-	event := StrategyWarningEvent{
-		UserID:         userID.String(),
-		Strategy:       strategy,
-		Reason:         reason,
-		TotalTrades:    stats.TotalTrades,
-		WinRate:        stats.WinRate,
-		ProfitFactor:   stats.ProfitFactor.String(),
-		MaxDrawdownPct: maxDrawdownFloat,
-		Timestamp:      time.Now(),
-	}
+	profitFactor, _ := stats.ProfitFactor.Float64()
 
-	if err := se.kafka.Publish(ctx, "strategy.warning", userID.String(), event); err != nil {
+	// Use PublishJSON for warning (strategy.warning не в protobuf schema)
+	// TODO: Add StrategyWarningEvent to proto if needed
+	if err := se.eventPublisher.PublishJSON(ctx, "strategy.warning", userID.String(), map[string]interface{}{
+		"user_id":       userID.String(),
+		"strategy":      strategy,
+		"reason":        reason,
+		"total_trades":  stats.TotalTrades,
+		"win_rate":      stats.WinRate,
+		"profit_factor": profitFactor,
+	}); err != nil {
 		se.Log().Error("Failed to publish strategy warning event", "error", err)
 	}
 }

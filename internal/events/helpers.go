@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Event topic constants
+// All Kafka topic names MUST be defined here
 const (
 	// Market events
 	TopicOpportunityFound = "market.opportunity_found"

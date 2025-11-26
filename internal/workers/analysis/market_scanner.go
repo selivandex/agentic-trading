@@ -232,6 +232,7 @@ func (ms *MarketScanner) analyzeUserPair(ctx context.Context, usr *user.User, pa
 		Timestamp:  time.Now(),
 	}
 
+	// Internal event - keep as JSON for now
 	if err := ms.kafka.Publish(ctx, "market.analysis_requested", usr.ID.String(), event); err != nil {
 		ms.Log().Error("Failed to publish analysis request event", "error", err)
 	}
@@ -367,6 +368,7 @@ func (ms *MarketScanner) publishScanCompleteEvent(ctx context.Context, totalUser
 		ScanFinishTime: time.Now(),
 	}
 
+	// Internal event - keep as JSON for now
 	if err := ms.kafka.Publish(ctx, "market.scan_complete", "global", event); err != nil {
 		ms.Log().Error("Failed to publish scan complete event", "error", err)
 	}

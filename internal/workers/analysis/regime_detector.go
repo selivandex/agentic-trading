@@ -7,6 +7,7 @@ import (
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/regime"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -15,10 +16,11 @@ import (
 // This helps agents adapt their strategies based on market conditions
 type RegimeDetector struct {
 	*workers.BaseWorker
-	mdRepo     market_data.Repository
-	regimeRepo regime.Repository
-	kafka      *kafka.Producer
-	symbols    []string
+	mdRepo         market_data.Repository
+	regimeRepo     regime.Repository
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
+	symbols        []string
 }
 
 // NewRegimeDetector creates a new regime detector worker
@@ -31,11 +33,12 @@ func NewRegimeDetector(
 	enabled bool,
 ) *RegimeDetector {
 	return &RegimeDetector{
-		BaseWorker: workers.NewBaseWorker("regime_detector", interval, enabled),
-		mdRepo:     mdRepo,
-		regimeRepo: regimeRepo,
-		kafka:      kafka,
-		symbols:    symbols,
+		BaseWorker:     workers.NewBaseWorker("regime_detector", interval, enabled),
+		mdRepo:         mdRepo,
+		regimeRepo:     regimeRepo,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
+		symbols:        symbols,
 	}
 }
 
@@ -293,16 +296,23 @@ func (rd *RegimeDetector) publishRegimeEvent(
 	regimeType regime.RegimeType,
 	volatility, trendStrength float64,
 ) {
-	event := RegimeChangeEvent{
-		Symbol:        symbol,
-		RegimeType:    regimeType.String(),
-		Confidence:    rd.calculateConfidence(0, volatility, trendStrength),
-		Volatility:    volatility,
-		TrendStrength: trendStrength,
-		Timestamp:     time.Now(),
+	confidence := rd.calculateConfidence(0, volatility, trendStrength)
+	trend := "neutral"
+	if trendStrength > 0.6 {
+		trend = "bullish"
+	} else if trendStrength < -0.6 {
+		trend = "bearish"
 	}
 
-	if err := rd.kafka.Publish(ctx, "market.regime_change", symbol, event); err != nil {
+	if err := rd.eventPublisher.PublishRegimeChange(
+		ctx,
+		symbol,
+		"",                   // old_regime - TODO: track previous regime
+		regimeType.String(), // new_regime
+		trend,
+		confidence,
+		volatility,
+	); err != nil {
 		rd.Log().Error("Failed to publish regime change event", "error", err)
 	}
 }

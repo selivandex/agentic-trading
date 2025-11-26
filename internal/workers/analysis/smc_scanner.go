@@ -6,6 +6,7 @@ import (
 
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/market_data"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -18,9 +19,10 @@ import (
 // - Change of Character (CHoCH)
 type SMCScanner struct {
 	*workers.BaseWorker
-	mdRepo  market_data.Repository
-	kafka   *kafka.Producer
-	symbols []string
+	mdRepo         market_data.Repository
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
+	symbols        []string
 }
 
 // NewSMCScanner creates a new SMC scanner worker
@@ -32,10 +34,11 @@ func NewSMCScanner(
 	enabled bool,
 ) *SMCScanner {
 	return &SMCScanner{
-		BaseWorker: workers.NewBaseWorker("smc_scanner", interval, enabled),
-		mdRepo:     mdRepo,
-		kafka:      kafka,
-		symbols:    symbols,
+		BaseWorker:     workers.NewBaseWorker("smc_scanner", interval, enabled),
+		mdRepo:         mdRepo,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
+		symbols:        symbols,
 	}
 }
 
@@ -299,32 +302,28 @@ type OrderBlockEvent struct {
 }
 
 func (ss *SMCScanner) publishFVGEvent(ctx context.Context, symbol string, fvg FairValueGap) {
-	event := FVGEvent{
-		Symbol:      symbol,
-		Type:        fvg.Type,
-		TopPrice:    fvg.TopPrice,
-		BottomPrice: fvg.BottomPrice,
-		GapPercent:  fvg.GapPercent,
-		Filled:      fvg.Filled,
-		DetectedAt:  time.Now(),
-	}
-
-	if err := ss.kafka.Publish(ctx, "smc.fvg_detected", symbol, event); err != nil {
+	if err := ss.eventPublisher.PublishFVGDetected(
+		ctx,
+		symbol,
+		fvg.Type,
+		fvg.TopPrice,
+		fvg.BottomPrice,
+		fvg.GapPercent,
+		fvg.Filled,
+	); err != nil {
 		ss.Log().Error("Failed to publish FVG event", "error", err)
 	}
 }
 
 func (ss *SMCScanner) publishOrderBlockEvent(ctx context.Context, symbol string, ob OrderBlock) {
-	event := OrderBlockEvent{
-		Symbol:      symbol,
-		Type:        ob.Type,
-		TopPrice:    ob.TopPrice,
-		BottomPrice: ob.BottomPrice,
-		Strength:    ob.Strength,
-		DetectedAt:  time.Now(),
-	}
-
-	if err := ss.kafka.Publish(ctx, "smc.order_block_detected", symbol, event); err != nil {
+	if err := ss.eventPublisher.PublishOrderBlockDetected(
+		ctx,
+		symbol,
+		ob.Type,
+		ob.TopPrice,
+		ob.BottomPrice,
+		ob.Strength,
+	); err != nil {
 		ss.Log().Error("Failed to publish Order Block event", "error", err)
 	}
 }
