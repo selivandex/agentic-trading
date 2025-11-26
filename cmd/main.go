@@ -24,6 +24,7 @@ import (
 	"prometheus/internal/domain/memory"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/regime"
 	domainRisk "prometheus/internal/domain/risk"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
@@ -33,6 +34,8 @@ import (
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/internal/workers"
+	"prometheus/internal/workers/analysis"
+	"prometheus/internal/workers/evaluation"
 	"prometheus/internal/workers/marketdata"
 	"prometheus/internal/workers/trading"
 	"prometheus/pkg/errors"
@@ -76,6 +79,7 @@ type Repositories struct {
 	Memory          memory.Repository
 	Journal         journal.Repository
 	MarketData      market_data.Repository
+	Regime          regime.Repository
 	Risk            domainRisk.Repository
 }
 
@@ -134,7 +138,7 @@ func main() {
 	services := initServices(repos, log)
 
 	// Initialize Kafka
-	kafkaProducer := initKafka(cfg, log)
+	kafkaClients := initKafka(cfg, log)
 
 	// Initialize exchange factory
 	exchFactory := exchangefactory.NewFactory()
@@ -161,7 +165,9 @@ func main() {
 		repos,
 		riskEngine,
 		exchFactory,
-		kafkaProducer,
+		kafkaClients,
+		agentSystem.Factory,
+		cfg,
 		log,
 	)
 
@@ -257,6 +263,7 @@ func initRepositories(db *Database, log *logger.Logger) (*Repositories, error) {
 		Memory:          pgrepo.NewMemoryRepository(db.Postgres.DB()),
 		Journal:         pgrepo.NewJournalRepository(db.Postgres.DB()),
 		MarketData:      chrepo.NewMarketDataRepository(db.ClickHouse.Conn()),
+		Regime:          chrepo.NewRegimeRepository(db.ClickHouse.Conn()),
 		Risk:            pgrepo.NewRiskRepository(db.Postgres.DB()),
 	}
 
@@ -279,8 +286,13 @@ func initServices(repos *Repositories, log *logger.Logger) *Services {
 }
 
 // initKafka initializes Kafka producer
-func initKafka(cfg *config.Config, log *logger.Logger) *kafka.Producer {
-	log.Info("Initializing Kafka producer...")
+type KafkaClients struct {
+	Producer *kafka.Producer
+	Consumer *kafka.Consumer
+}
+
+func initKafka(cfg *config.Config, log *logger.Logger) *KafkaClients {
+	log.Info("Initializing Kafka...")
 
 	if len(cfg.Kafka.Brokers) == 0 {
 		log.Warn("Kafka brokers not configured, using default localhost:9092")
@@ -292,8 +304,18 @@ func initKafka(cfg *config.Config, log *logger.Logger) *kafka.Producer {
 		Async:   false,
 	})
 
-	log.Info("Kafka producer initialized")
-	return producer
+	// Create consumer for opportunity events (for event-driven market scanner)
+	consumer := kafka.NewConsumer(kafka.ConsumerConfig{
+		Brokers: cfg.Kafka.Brokers,
+		GroupID: cfg.Kafka.GroupID,
+		Topic:   "market.opportunity_found",
+	})
+
+	log.Info("Kafka initialized (producer + consumer)")
+	return &KafkaClients{
+		Producer: producer,
+		Consumer: consumer,
+	}
 }
 
 func initTools(repos *Repositories, redis *redisclient.Client, riskEngine *riskengine.RiskEngine, log *logger.Logger) *tools.Registry {
@@ -320,44 +342,165 @@ func initWorkers(
 	repos *Repositories,
 	riskEngine *riskengine.RiskEngine,
 	exchFactory exchanges.Factory,
-	kafkaProducer *kafka.Producer,
+	kafkaClients *KafkaClients,
+	agentFactory *agents.Factory,
+	cfg *config.Config,
 	log *logger.Logger,
 ) *workers.Scheduler {
 	log.Info("Initializing workers...")
 
 	scheduler := workers.NewScheduler()
 
-	// Trading workers
+	// Default monitored symbols
+	defaultSymbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"}
+
+	// ========================================
+	// Trading Workers (high frequency)
+	// ========================================
+
+	// Position monitor: Updates PnL and checks SL/TP
 	scheduler.RegisterWorker(trading.NewPositionMonitor(
 		repos.Position,
 		repos.ExchangeAccount,
 		exchFactory,
-		kafkaProducer,
+		kafkaClients.Producer,
+		cfg.Workers.PositionMonitorInterval,
 		true, // enabled
 	))
 
+	// Order sync: Syncs order status with exchanges
 	scheduler.RegisterWorker(trading.NewOrderSync(
 		repos.Order,
 		repos.Position,
 		repos.ExchangeAccount,
 		exchFactory,
-		kafkaProducer,
+		kafkaClients.Producer,
+		cfg.Workers.OrderSyncInterval,
 		true, // enabled
 	))
 
+	// Risk monitor: Checks circuit breakers and risk limits
 	scheduler.RegisterWorker(trading.NewRiskMonitor(
 		riskEngine,
 		repos.Position,
-		kafkaProducer,
+		kafkaClients.Producer,
+		cfg.Workers.RiskMonitorInterval,
 		true, // enabled
 	))
 
-	// Market data workers
+	// ========================================
+	// Market Data Workers (medium frequency)
+	// ========================================
+
+	// OHLCV collector: Collects candles
 	scheduler.RegisterWorker(marketdata.NewOHLCVCollector(
 		repos.MarketData,
 		exchFactory,
-		[]string{"BTC/USDT", "ETH/USDT", "SOL/USDT"},  // Default symbols
-		[]string{"1m", "5m", "15m", "1h", "4h", "1d"}, // Default timeframes
+		defaultSymbols,
+		[]string{"1m", "5m", "15m", "1h", "4h", "1d"}, // Timeframes
+		cfg.Workers.OHLCVCollectorInterval,
+		true, // enabled
+	))
+
+	log.Info("Worker intervals configured",
+		"position_monitor", cfg.Workers.PositionMonitorInterval,
+		"order_sync", cfg.Workers.OrderSyncInterval,
+		"risk_monitor", cfg.Workers.RiskMonitorInterval,
+		"market_scanner", cfg.Workers.MarketScannerInterval,
+		"opportunity_finder", cfg.Workers.OpportunityFinderInterval,
+	)
+
+	// ========================================
+	// Analysis Workers (core agentic system)
+	// ========================================
+
+	// Market scanner: Runs agent analysis for ALL active users
+	// This is the heart of the agentic trading system
+	// Operates in hybrid mode: scheduled scans + event-driven responses
+	marketScanner := analysis.NewMarketScanner(
+		repos.User,
+		repos.TradingPair,
+		agentFactory,
+		kafkaClients.Producer,
+		kafkaClients.Consumer,
+		cfg.Workers.MarketScannerInterval,
+		cfg.Workers.MarketScannerMaxConcurrency,
+		cfg.Workers.MarketScannerEventDriven,
+		true, // enabled
+	)
+	scheduler.RegisterWorker(marketScanner)
+
+	// Start event listener for market scanner if event-driven mode is enabled
+	if cfg.Workers.MarketScannerEventDriven {
+		go func() {
+			if err := marketScanner.Start(context.Background()); err != nil {
+				log.Error("Failed to start market scanner event listener", "error", err)
+			}
+		}()
+		log.Info("Market scanner event-driven mode enabled")
+	}
+
+	// Opportunity finder: Finds trading setups
+	scheduler.RegisterWorker(analysis.NewOpportunityFinder(
+		repos.MarketData,
+		repos.TradingPair,
+		exchFactory,
+		kafkaClients.Producer,
+		defaultSymbols,
+		cfg.Workers.OpportunityFinderInterval,
+		true, // enabled
+	))
+
+	// Regime detector: Detects market regime
+	scheduler.RegisterWorker(analysis.NewRegimeDetector(
+		repos.MarketData,
+		repos.Regime,
+		kafkaClients.Producer,
+		defaultSymbols,
+		cfg.Workers.RegimeDetectorInterval,
+		true, // enabled
+	))
+
+	// SMC scanner: Scans for Smart Money Concepts patterns
+	scheduler.RegisterWorker(analysis.NewSMCScanner(
+		repos.MarketData,
+		kafkaClients.Producer,
+		defaultSymbols,
+		cfg.Workers.SMCScannerInterval,
+		true, // enabled
+	))
+
+	// ========================================
+	// Evaluation Workers (low frequency)
+	// ========================================
+
+	// Strategy evaluator: Evaluates and disables underperforming strategies
+	scheduler.RegisterWorker(evaluation.NewStrategyEvaluator(
+		repos.User,
+		repos.TradingPair,
+		repos.Journal,
+		kafkaClients.Producer,
+		cfg.Workers.StrategyEvaluatorInterval,
+		true, // enabled
+	))
+
+	// Journal compiler: Creates journal entries from closed positions
+	scheduler.RegisterWorker(evaluation.NewJournalCompiler(
+		repos.User,
+		repos.Position,
+		repos.Journal,
+		kafkaClients.Producer,
+		cfg.Workers.JournalCompilerInterval,
+		true, // enabled
+	))
+
+	// Daily report: Generates daily performance reports
+	scheduler.RegisterWorker(evaluation.NewDailyReport(
+		repos.User,
+		repos.Position,
+		repos.Journal,
+		kafkaClients.Producer,
+		cfg.Workers.DailyReportInterval,
 		true, // enabled
 	))
 

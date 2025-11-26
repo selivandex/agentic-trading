@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -20,6 +21,7 @@ type Config struct {
 	Crypto        CryptoConfig
 	MarketData    MarketDataConfig
 	ErrorTracking ErrorTrackingConfig
+	Workers       WorkerConfig
 }
 
 type AppConfig struct {
@@ -104,6 +106,34 @@ type ErrorTrackingConfig struct {
 	Provider    string `envconfig:"ERROR_TRACKING_PROVIDER" default:"sentry"`
 	SentryDSN   string `envconfig:"SENTRY_DSN"`
 	Environment string `envconfig:"SENTRY_ENVIRONMENT" default:"production"`
+}
+
+// WorkerConfig contains intervals for all background workers
+// Intervals are optimized for production with reasonable defaults
+// that balance responsiveness with resource usage and API rate limits
+type WorkerConfig struct {
+	// Trading workers (high frequency - critical for execution)
+	PositionMonitorInterval time.Duration `envconfig:"WORKER_POSITION_MONITOR_INTERVAL" default:"1m"` // Check positions every minute
+	OrderSyncInterval       time.Duration `envconfig:"WORKER_ORDER_SYNC_INTERVAL" default:"30s"`      // Sync orders every 30s
+	RiskMonitorInterval     time.Duration `envconfig:"WORKER_RISK_MONITOR_INTERVAL" default:"30s"`    // Check risk every 30s
+
+	// Market data workers (medium frequency)
+	OHLCVCollectorInterval time.Duration `envconfig:"WORKER_OHLCV_COLLECTOR_INTERVAL" default:"1m"` // Collect candles every minute
+
+	// Analysis workers (core agentic system)
+	MarketScannerInterval     time.Duration `envconfig:"WORKER_MARKET_SCANNER_INTERVAL" default:"2m"`      // Full agent analysis every 2 minutes
+	OpportunityFinderInterval time.Duration `envconfig:"WORKER_OPPORTUNITY_FINDER_INTERVAL" default:"30s"` // Quick opportunity scan every 30s
+	RegimeDetectorInterval    time.Duration `envconfig:"WORKER_REGIME_DETECTOR_INTERVAL" default:"5m"`     // Regime detection every 5 minutes
+	SMCScannerInterval        time.Duration `envconfig:"WORKER_SMC_SCANNER_INTERVAL" default:"1m"`         // SMC patterns every minute
+
+	// Evaluation workers (low frequency)
+	StrategyEvaluatorInterval time.Duration `envconfig:"WORKER_STRATEGY_EVALUATOR_INTERVAL" default:"6h"` // Evaluate strategies every 6 hours
+	JournalCompilerInterval   time.Duration `envconfig:"WORKER_JOURNAL_COMPILER_INTERVAL" default:"1h"`   // Compile journal every hour
+	DailyReportInterval       time.Duration `envconfig:"WORKER_DAILY_REPORT_INTERVAL" default:"24h"`      // Daily report at midnight
+
+	// Worker concurrency settings
+	MarketScannerMaxConcurrency int  `envconfig:"WORKER_MARKET_SCANNER_MAX_CONCURRENCY" default:"5"` // Max users processed concurrently
+	MarketScannerEventDriven    bool `envconfig:"WORKER_MARKET_SCANNER_EVENT_DRIVEN" default:"true"` // Enable event-driven mode for opportunities
 }
 
 // Load reads configuration from environment variables

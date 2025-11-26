@@ -25,10 +25,11 @@ func NewOHLCVCollector(
 	exchFactory exchanges.Factory,
 	symbols []string,
 	timeframes []string,
+	interval time.Duration,
 	enabled bool,
 ) *OHLCVCollector {
 	return &OHLCVCollector{
-		BaseWorker:  workers.NewBaseWorker("ohlcv_collector", 1*time.Minute, enabled),
+		BaseWorker:  workers.NewBaseWorker("ohlcv_collector", interval, enabled),
 		mdRepo:      mdRepo,
 		exchFactory: exchFactory,
 		symbols:     symbols,

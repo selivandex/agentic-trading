@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -156,6 +157,26 @@ func (r *PositionRepository) Close(ctx context.Context, id uuid.UUID, exitPrice,
 
 	_, err := r.db.ExecContext(ctx, query, id, exitPrice, realizedPnL)
 	return err
+}
+
+// GetClosedInRange retrieves closed positions for a user within a time range
+func (r *PositionRepository) GetClosedInRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]*position.Position, error) {
+	var positions []*position.Position
+
+	query := `
+		SELECT * FROM positions
+		WHERE user_id = $1
+		  AND status = 'closed'
+		  AND closed_at >= $2
+		  AND closed_at < $3
+		ORDER BY closed_at DESC`
+
+	err := r.db.SelectContext(ctx, &positions, query, userID, start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	return positions, nil
 }
 
 // Delete deletes a position

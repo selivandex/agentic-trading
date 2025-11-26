@@ -90,6 +90,24 @@ func (r *TradingPairRepository) GetActiveByUser(ctx context.Context, userID uuid
 	return pairs, nil
 }
 
+// GetActiveBySymbol retrieves active trading pairs for a specific symbol across all users
+// This is used for event-driven analysis when an opportunity is detected on a symbol
+func (r *TradingPairRepository) GetActiveBySymbol(ctx context.Context, symbol string) ([]*trading_pair.TradingPair, error) {
+	var pairs []*trading_pair.TradingPair
+
+	query := `
+		SELECT * FROM trading_pairs 
+		WHERE symbol = $1 AND is_active = true AND is_paused = false
+		ORDER BY created_at DESC`
+
+	err := r.db.SelectContext(ctx, &pairs, query, symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	return pairs, nil
+}
+
 // FindAllActive retrieves ALL active trading pairs from ALL users
 func (r *TradingPairRepository) FindAllActive(ctx context.Context) ([]*trading_pair.TradingPair, error) {
 	var pairs []*trading_pair.TradingPair
@@ -145,6 +163,13 @@ func (r *TradingPairRepository) Pause(ctx context.Context, id uuid.UUID, reason 
 // Resume resumes a trading pair
 func (r *TradingPairRepository) Resume(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE trading_pairs SET is_paused = false, paused_reason = NULL, updated_at = NOW() WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+// Disable disables a trading pair (sets is_active to false)
+func (r *TradingPairRepository) Disable(ctx context.Context, id uuid.UUID) error {
+	query := `UPDATE trading_pairs SET is_active = false, updated_at = NOW() WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }

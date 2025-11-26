@@ -27,10 +27,11 @@ func NewRiskMonitor(
 	riskEngine *risk.RiskEngine,
 	posRepo position.Repository,
 	kafka *kafka.Producer,
+	interval time.Duration,
 	enabled bool,
 ) *RiskMonitor {
 	return &RiskMonitor{
-		BaseWorker: workers.NewBaseWorker("risk_monitor", 10*time.Second, enabled),
+		BaseWorker: workers.NewBaseWorker("risk_monitor", interval, enabled),
 		riskEngine: riskEngine,
 		posRepo:    posRepo,
 		kafka:      kafka,

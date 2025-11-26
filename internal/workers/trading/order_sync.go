@@ -33,10 +33,11 @@ func NewOrderSync(
 	accountRepo exchange_account.Repository,
 	exchFactory exchanges.Factory,
 	kafka *kafka.Producer,
+	interval time.Duration,
 	enabled bool,
 ) *OrderSync {
 	return &OrderSync{
-		BaseWorker:  workers.NewBaseWorker("order_sync", 10*time.Second, enabled),
+		BaseWorker:  workers.NewBaseWorker("order_sync", interval, enabled),
 		orderRepo:   orderRepo,
 		posRepo:     posRepo,
 		accountRepo: accountRepo,

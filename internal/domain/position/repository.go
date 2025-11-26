@@ -2,6 +2,7 @@ package position
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -12,6 +13,7 @@ type Repository interface {
 	Create(ctx context.Context, position *Position) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Position, error)
 	GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*Position, error)
+	GetClosedInRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]*Position, error)
 	GetByTradingPair(ctx context.Context, tradingPairID uuid.UUID) ([]*Position, error)
 	Update(ctx context.Context, position *Position) error
 	UpdatePnL(ctx context.Context, id uuid.UUID, currentPrice, unrealizedPnL, unrealizedPnLPct decimal.Decimal) error

@@ -30,10 +30,11 @@ func NewPositionMonitor(
 	accountRepo exchange_account.Repository,
 	exchFactory exchanges.Factory,
 	kafka *kafka.Producer,
+	interval time.Duration,
 	enabled bool,
 ) *PositionMonitor {
 	return &PositionMonitor{
-		BaseWorker:  workers.NewBaseWorker("position_monitor", 30*time.Second, enabled),
+		BaseWorker:  workers.NewBaseWorker("position_monitor", interval, enabled),
 		posRepo:     posRepo,
 		accountRepo: accountRepo,
 		exchFactory: exchFactory,

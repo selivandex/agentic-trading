@@ -138,3 +138,36 @@ func (r *JournalRepository) GetByStrategy(ctx context.Context, userID uuid.UUID,
 
 	return entries, nil
 }
+
+// GetByUserAndDateRange retrieves journal entries for a user within a date range
+func (r *JournalRepository) GetByUserAndDateRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]journal.JournalEntry, error) {
+	var entries []journal.JournalEntry
+
+	query := `
+		SELECT * FROM journal_entries
+		WHERE user_id = $1
+		  AND created_at >= $2
+		  AND created_at < $3
+		ORDER BY created_at DESC`
+
+	err := r.db.SelectContext(ctx, &entries, query, userID, start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+// ExistsForTrade checks if a journal entry already exists for a given trade
+func (r *JournalRepository) ExistsForTrade(ctx context.Context, tradeID uuid.UUID) (bool, error) {
+	var count int
+
+	query := `SELECT COUNT(*) FROM journal_entries WHERE trade_id = $1`
+
+	err := r.db.GetContext(ctx, &count, query, tradeID)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
