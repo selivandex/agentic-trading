@@ -2,9 +2,10 @@ package ai
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
+
+	"prometheus/pkg/errors"
 )
 
 // ClaudeProvider implements the Anthropic Claude integration metadata.
@@ -31,7 +32,7 @@ func (p *ClaudeProvider) GetModel(_ context.Context, model string) (ModelInfo, e
 			return m, nil
 		}
 	}
-	return ModelInfo{}, fmt.Errorf("claude model %s not found", model)
+	return ModelInfo{}, errors.Wrapf(errors.ErrNotFound, "claude model %s not found", model)
 }
 
 // ListModels lists available models.

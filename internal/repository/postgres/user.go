@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
 	"prometheus/internal/domain/user"
+	"prometheus/pkg/logger"
 )
 
 // Compile-time check that we implement the interface
@@ -16,12 +18,16 @@ var _ user.Repository = (*UserRepository)(nil)
 
 // UserRepository implements user.Repository using sqlx
 type UserRepository struct {
-	db *sqlx.DB
+	db  *sqlx.DB
+	log *logger.Logger
 }
 
 // NewUserRepository creates a new user repository
 func NewUserRepository(db *sqlx.DB) *UserRepository {
-	return &UserRepository{db: db}
+	return &UserRepository{
+		db:  db,
+		log: logger.Get().With("repository", "user"),
+	}
 }
 
 // Create inserts a new user
@@ -50,6 +56,14 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		if duration > 100*time.Millisecond {
+			r.log.Warn("Slow query detected", "method", "GetByID", "duration", duration, "user_id", id)
+		}
+	}()
+
 	var u user.User
 	var settingsJSON []byte
 
@@ -73,11 +87,20 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User,
 		u.Settings = user.DefaultSettings()
 	}
 
+	r.log.Debug("User retrieved successfully", "user_id", id, "telegram_id", u.TelegramID)
 	return &u, nil
 }
 
 // GetByTelegramID retrieves a user by Telegram ID
 func (r *UserRepository) GetByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		if duration > 100*time.Millisecond {
+			r.log.Warn("Slow query detected", "method", "GetByTelegramID", "duration", duration, "telegram_id", telegramID)
+		}
+	}()
+
 	var u user.User
 	var settingsJSON []byte
 
@@ -89,6 +112,7 @@ func (r *UserRepository) GetByTelegramID(ctx context.Context, telegramID int64) 
 		&u.LanguageCode, &u.IsActive, &u.IsPremium, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
+		r.log.Error("Failed to get user by telegram ID", "telegram_id", telegramID, "error", err)
 		return nil, err
 	}
 
@@ -101,11 +125,20 @@ func (r *UserRepository) GetByTelegramID(ctx context.Context, telegramID int64) 
 		u.Settings = user.DefaultSettings()
 	}
 
+	r.log.Debug("User retrieved by telegram ID", "user_id", u.ID, "telegram_id", telegramID)
 	return &u, nil
 }
 
 // Update updates user data
 func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		if duration > 100*time.Millisecond {
+			r.log.Warn("Slow query detected", "method", "Update", "duration", duration, "user_id", u.ID)
+		}
+	}()
+
 	// Marshal settings to JSON
 	settingsJSON, err := json.Marshal(u.Settings)
 	if err != nil {
@@ -129,7 +162,13 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		u.LanguageCode, u.IsActive, u.IsPremium, settingsJSON,
 	)
 
-	return err
+	if err != nil {
+		r.log.Error("Failed to update user", "user_id", u.ID, "error", err)
+		return err
+	}
+
+	r.log.Debug("User updated successfully", "user_id", u.ID)
+	return nil
 }
 
 // Delete deletes a user by ID

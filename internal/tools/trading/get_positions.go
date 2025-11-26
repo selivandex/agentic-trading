@@ -6,11 +6,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetPositionsTool returns open positions for the user.
-func NewGetPositionsTool(deps shared.Deps) *functiontool.Tool {
+func NewGetPositionsTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("get_positions", "List open positions", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if deps.PositionRepo == nil {
 			return nil, fmt.Errorf("get_positions: position repository not configured")

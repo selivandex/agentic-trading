@@ -16,6 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/adapters/exchanges"
+	"prometheus/pkg/logger"
 )
 
 const (
@@ -48,13 +49,17 @@ func NewClient(cfg Config) (exchanges.Exchange, error) {
 		cfg.HTTPClient = &http.Client{Timeout: defaultTimeout}
 	}
 
+	log := logger.Get().With("exchange", "bybit", "market", cfg.Market)
+	
 	return &client{
 		cfg: cfg,
+		log: log,
 	}, nil
 }
 
 type client struct {
 	cfg Config
+	log *logger.Logger
 }
 
 func (c *client) Name() string {
@@ -62,6 +67,8 @@ func (c *client) Name() string {
 }
 
 func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticker, error) {
+	c.log.Debug("Fetching ticker", "symbol", symbol)
+	
 	var res struct {
 		List []struct {
 			Symbol        string `json:"symbol"`
@@ -84,13 +91,15 @@ func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticke
 		"symbol":   []string{normalizeSymbol(symbol)},
 	}
 	if err := c.publicGet(ctx, "/v5/market/tickers", params, &res); err != nil {
+		c.log.Error("Failed to fetch ticker", "symbol", symbol, "error", err)
 		return nil, err
 	}
 	if len(res.List) == 0 {
+		c.log.Warn("Ticker not found", "symbol", symbol)
 		return nil, fmt.Errorf("ticker not found for %s", symbol)
 	}
 	item := res.List[0]
-	return &exchanges.Ticker{
+	ticker := &exchanges.Ticker{
 		Symbol:       item.Symbol,
 		LastPrice:    dec(item.LastPrice),
 		BidPrice:     dec(item.Bid1Price),
@@ -101,7 +110,10 @@ func (c *client) GetTicker(ctx context.Context, symbol string) (*exchanges.Ticke
 		VolumeQuote:  dec(item.Turnover24h),
 		Change24hPct: dec(item.Price24hPcnt).Mul(decimal.NewFromInt(100)),
 		Timestamp:    time.UnixMilli(item.CloseTime),
-	}, nil
+	}
+	
+	c.log.Debug("Ticker fetched successfully", "symbol", symbol, "price", ticker.LastPrice)
+	return ticker, nil
 }
 
 func (c *client) GetOrderBook(ctx context.Context, symbol string, depth int) (*exchanges.OrderBook, error) {
@@ -281,6 +293,8 @@ func (c *client) GetOpenInterest(ctx context.Context, symbol string) (*exchanges
 }
 
 func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
+	c.log.Debug("Fetching account balance")
+	
 	if err := c.ensureCredentials(); err != nil {
 		return nil, err
 	}
@@ -300,9 +314,11 @@ func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
 		} `json:"list"`
 	}
 	if err := c.privateRequest(ctx, http.MethodPost, "/v5/account/wallet-balance", nil, body, &res); err != nil {
+		c.log.Error("Failed to fetch balance", "error", err)
 		return nil, err
 	}
 	if len(res.List) == 0 {
+		c.log.Warn("Wallet response empty")
 		return nil, fmt.Errorf("wallet response empty")
 	}
 	entry := res.List[0]
@@ -315,15 +331,20 @@ func (c *client) GetBalance(ctx context.Context) (*exchanges.Balance, error) {
 			Borrowed:  dec(coin.BorrowAmount),
 		})
 	}
-	return &exchanges.Balance{
+	balance := &exchanges.Balance{
 		Total:     dec(entry.TotalEquity),
 		Available: dec(entry.TotalAvail),
 		Currency:  "USD",
 		Details:   detail,
-	}, nil
+	}
+	
+	c.log.Debug("Balance fetched successfully", "total", balance.Total, "available", balance.Available, "assets", len(detail))
+	return balance, nil
 }
 
 func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error) {
+	c.log.Debug("Fetching open positions")
+	
 	if err := c.ensureCredentials(); err != nil {
 		return nil, err
 	}
@@ -351,6 +372,7 @@ func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error)
 		} `json:"list"`
 	}
 	if err := c.privateRequest(ctx, http.MethodGet, "/v5/position/list", params, nil, &res); err != nil {
+		c.log.Error("Failed to fetch positions", "error", err)
 		return nil, err
 	}
 
@@ -375,6 +397,8 @@ func (c *client) GetPositions(ctx context.Context) ([]exchanges.Position, error)
 			UpdatedAt:        time.UnixMilli(parseInt64(p.Timestamp)),
 		})
 	}
+	
+	c.log.Debug("Positions fetched successfully", "count", len(positions))
 	return positions, nil
 }
 
@@ -442,6 +466,8 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 		return nil, exchanges.ErrInvalidRequest
 	}
 
+	c.log.Info("Placing order", "symbol", req.Symbol, "side", req.Side, "type", req.Type, "qty", req.Quantity)
+
 	payload := map[string]interface{}{
 		"category":    c.category(),
 		"symbol":      normalizeSymbol(req.Symbol),
@@ -470,10 +496,11 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 	}
 
 	if err := c.privateRequest(ctx, http.MethodPost, "/v5/order/create", nil, payload, &res); err != nil {
+		c.log.Error("Failed to place order", "symbol", req.Symbol, "side", req.Side, "error", err)
 		return nil, err
 	}
 
-	return &exchanges.Order{
+	order := &exchanges.Order{
 		ID:            res.OrderID,
 		ClientOrderID: res.OrderLinkID,
 		Symbol:        normalizeSymbol(req.Symbol),
@@ -487,10 +514,15 @@ func (c *client) PlaceOrder(ctx context.Context, req *exchanges.OrderRequest) (*
 		ReduceOnly:    req.ReduceOnly,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
-	}, nil
+	}
+	
+	c.log.Info("Order placed successfully", "order_id", order.ID, "symbol", order.Symbol, "status", order.Status)
+	return order, nil
 }
 
 func (c *client) CancelOrder(ctx context.Context, symbol, orderID string) error {
+	c.log.Info("Canceling order", "symbol", symbol, "order_id", orderID)
+	
 	if err := c.ensureCredentials(); err != nil {
 		return err
 	}
@@ -502,7 +534,14 @@ func (c *client) CancelOrder(ctx context.Context, symbol, orderID string) error 
 		payload["orderId"] = orderID
 	}
 
-	return c.privateRequest(ctx, http.MethodPost, "/v5/order/cancel", nil, payload, nil)
+	err := c.privateRequest(ctx, http.MethodPost, "/v5/order/cancel", nil, payload, nil)
+	if err != nil {
+		c.log.Error("Failed to cancel order", "symbol", symbol, "order_id", orderID, "error", err)
+		return err
+	}
+	
+	c.log.Info("Order canceled successfully", "symbol", symbol, "order_id", orderID)
+	return nil
 }
 
 func (c *client) SetLeverage(ctx context.Context, symbol string, leverage int) error {

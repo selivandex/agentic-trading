@@ -5,6 +5,8 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+
+	"prometheus/pkg/errors"
 )
 
 type Config struct {
@@ -112,7 +114,7 @@ func Load() (*Config, error) {
 
 	var cfg Config
 	if err := envconfig.Process("", &cfg); err != nil {
-		return nil, fmt.Errorf("failed to process env config: %w", err)
+		return nil, errors.Wrap(err, "failed to process env config")
 	}
 
 	return &cfg, nil

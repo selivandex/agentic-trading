@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"prometheus/pkg/errors"
 )
 
 // AgentModelConfig represents model selection for a specific agent type.
@@ -67,10 +69,10 @@ func (s *ModelSelector) Get(ctx context.Context, agent string, defaultProvider s
 	if modelName == "" {
 		models, err := provider.ListModels(ctx)
 		if err != nil {
-			return AgentModelConfig{}, ModelInfo{}, fmt.Errorf("failed to list models for provider %s: %w", providerName, err)
+			return AgentModelConfig{}, ModelInfo{}, errors.Wrapf(err, "failed to list models for provider %s", providerName)
 		}
 		if len(models) == 0 {
-			return AgentModelConfig{}, ModelInfo{}, fmt.Errorf("provider %s has no available models", providerName)
+			return AgentModelConfig{}, ModelInfo{}, errors.Wrapf(errors.ErrUnavailable, "provider %s has no available models", providerName)
 		}
 		modelName = models[0].Name
 	}

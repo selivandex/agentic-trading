@@ -2,13 +2,13 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // PostgreSQL driver
 
 	"prometheus/internal/adapters/config"
+	"prometheus/pkg/errors"
 )
 
 // Client wraps sqlx.DB for PostgreSQL operations
@@ -20,7 +20,7 @@ type Client struct {
 func NewClient(cfg config.PostgresConfig) (*Client, error) {
 	db, err := sqlx.Connect("postgres", cfg.DSN())
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+		return nil, errors.Wrap(err, "failed to connect to postgres")
 	}
 
 	// Configure connection pool
@@ -31,7 +31,7 @@ func NewClient(cfg config.PostgresConfig) (*Client, error) {
 
 	// Verify connection
 	if err := db.PingContext(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to ping postgres: %w", err)
+		return nil, errors.Wrap(err, "failed to ping postgres")
 	}
 
 	return &Client{db: db}, nil

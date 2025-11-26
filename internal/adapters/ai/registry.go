@@ -4,25 +4,31 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"prometheus/pkg/errors"
+	"prometheus/pkg/logger"
 )
 
 // ProviderRegistry stores all available AI providers.
 type ProviderRegistry struct {
 	providers map[string]Provider
 	mu        sync.RWMutex
+	log       *logger.Logger
 }
 
 // NewProviderRegistry creates an empty registry.
 func NewProviderRegistry() *ProviderRegistry {
 	return &ProviderRegistry{
 		providers: make(map[string]Provider),
+		log:       logger.Get().With("component", "ai_registry"),
 	}
 }
 
 // Register adds a provider to the registry.
 func (r *ProviderRegistry) Register(provider Provider) error {
 	if provider == nil {
-		return fmt.Errorf("provider is nil")
+		r.log.Error("Attempted to register nil AI provider")
+		return errors.ErrInvalidInput
 	}
 
 	r.mu.Lock()
@@ -30,10 +36,12 @@ func (r *ProviderRegistry) Register(provider Provider) error {
 
 	name := provider.Name()
 	if _, exists := r.providers[name]; exists {
-		return fmt.Errorf("provider %s already registered", name)
+		r.log.Warn("AI provider already registered", "provider", name)
+		return errors.Wrapf(errors.ErrAlreadyExists, "provider %s already registered", name)
 	}
 
 	r.providers[name] = provider
+	r.log.Info("AI provider registered successfully", "provider", name)
 	return nil
 }
 
@@ -44,17 +52,21 @@ func (r *ProviderRegistry) Get(name string) (Provider, error) {
 
 	provider, ok := r.providers[name]
 	if !ok {
-		return nil, fmt.Errorf("provider %s not found", name)
+		r.log.Warn("AI provider not found", "provider", name, "available", len(r.providers))
+		return nil, errors.Wrapf(errors.ErrNotFound, "provider %s not found", name)
 	}
 
 	return provider, nil
 }
 
 // MustGet returns the provider by name and panics if missing.
+// Deprecated: Use Get instead and handle errors properly.
 func (r *ProviderRegistry) MustGet(name string) Provider {
 	provider, err := r.Get(name)
 	if err != nil {
-		panic(err)
+		// This should never happen in production if registry is properly initialized
+		// Log the error before panicking to ensure it's captured
+		panic(fmt.Errorf("critical: AI provider '%s' not found in registry: %w", name, err))
 	}
 
 	return provider
@@ -82,11 +94,13 @@ func (r *ProviderRegistry) ListModels(ctx context.Context) (map[string][]ModelIn
 	for name, provider := range r.providers {
 		models, err := provider.ListModels(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list models for provider %s: %w", name, err)
+			r.log.Error("Failed to list models for provider", "provider", name, "error", err)
+			return nil, errors.Wrapf(err, "failed to list models for provider %s", name)
 		}
 		result[name] = models
 	}
 
+	r.log.Debug("Listed models from all providers", "providers", len(result))
 	return result, nil
 }
 
@@ -94,8 +108,16 @@ func (r *ProviderRegistry) ListModels(ctx context.Context) (map[string][]ModelIn
 func (r *ProviderRegistry) ResolveModel(ctx context.Context, providerName string, model string) (ModelInfo, error) {
 	provider, err := r.Get(providerName)
 	if err != nil {
+		r.log.Error("Failed to resolve model - provider not found", "provider", providerName, "model", model, "error", err)
 		return ModelInfo{}, err
 	}
 
-	return provider.GetModel(ctx, model)
+	modelInfo, err := provider.GetModel(ctx, model)
+	if err != nil {
+		r.log.Error("Failed to get model info", "provider", providerName, "model", model, "error", err)
+		return ModelInfo{}, err
+	}
+
+	r.log.Debug("Model resolved successfully", "provider", providerName, "model", model)
+	return modelInfo, nil
 }

@@ -2,9 +2,10 @@ package ai
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
+
+	"prometheus/pkg/errors"
 )
 
 // OpenAIProvider implements OpenAI metadata.
@@ -29,7 +30,7 @@ func (p *OpenAIProvider) GetModel(_ context.Context, model string) (ModelInfo, e
 			return m, nil
 		}
 	}
-	return ModelInfo{}, fmt.Errorf("openai model %s not found", model)
+	return ModelInfo{}, errors.Wrapf(errors.ErrNotFound, "openai model %s not found", model)
 }
 
 // ListModels lists available models.

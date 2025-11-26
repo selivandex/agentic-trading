@@ -2,7 +2,6 @@ package agents
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -13,6 +12,7 @@ import (
 
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/tools"
+	"prometheus/pkg/errors"
 	"prometheus/pkg/templates"
 )
 
@@ -33,11 +33,11 @@ type Factory struct {
 // NewFactory builds an agent factory with required dependencies.
 func NewFactory(deps FactoryDeps) (*Factory, error) {
 	if deps.ToolRegistry == nil {
-		return nil, fmt.Errorf("tool registry is required")
+		return nil, errors.ErrInvalidInput
 	}
 
 	if deps.AIRegistry == nil {
-		return nil, fmt.Errorf("AI provider registry is required")
+		return nil, errors.ErrInvalidInput
 	}
 
 	if deps.Templates == nil {
@@ -51,7 +51,7 @@ func NewFactory(deps FactoryDeps) (*Factory, error) {
 func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 	modelInfo, err := f.aiRegistry.ResolveModel(context.Background(), cfg.AIProvider, cfg.Model)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve model %s/%s: %w", cfg.AIProvider, cfg.Model, err)
+		return nil, errors.Wrapf(err, "failed to resolve model %s/%s", cfg.AIProvider, cfg.Model)
 	}
 
 	llmModel := adkmodel.BasicModel{ID: modelInfo.Name, ProviderID: cfg.AIProvider, Tokens: modelInfo.MaxTokens}
@@ -66,7 +66,7 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 	for _, toolName := range cfg.Tools {
 		t, ok := f.toolRegistry.Get(toolName)
 		if !ok {
-			return nil, fmt.Errorf("tool not found: %s", toolName)
+			return nil, errors.Wrapf(errors.ErrNotFound, "tool not found: %s", toolName)
 		}
 		agentTools = append(agentTools, t)
 		if def, ok := definitionByName[toolName]; ok {
@@ -86,7 +86,7 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 		}
 		instruction, err = f.templates.Render(cfg.SystemPromptTemplate, data)
 		if err != nil {
-			return nil, fmt.Errorf("render prompt for %s: %w", cfg.Name, err)
+			return nil, errors.Wrapf(err, "render prompt for %s", cfg.Name)
 		}
 	}
 

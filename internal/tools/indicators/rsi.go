@@ -7,11 +7,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewRSITool computes Relative Strength Index using closing prices.
-func NewRSITool(deps shared.Deps) *functiontool.Tool {
+func NewRSITool(deps shared.Deps) tool.Tool {
 	return functiontool.New("rsi", "Relative Strength Index", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		candles, err := loadCandles(ctx, deps, args, 100)
 		if err != nil {

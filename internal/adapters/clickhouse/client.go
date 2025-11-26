@@ -8,6 +8,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"prometheus/internal/adapters/config"
+	"prometheus/pkg/errors"
 )
 
 // Client wraps ClickHouse connection
@@ -29,12 +30,12 @@ func NewClient(cfg config.ClickHouseConfig) (*Client, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to clickhouse: %w", err)
+		return nil, errors.Wrap(err, "failed to connect to clickhouse")
 	}
 
 	// Verify connection
 	if err := conn.Ping(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to ping clickhouse: %w", err)
+		return nil, errors.Wrap(err, "failed to ping clickhouse")
 	}
 
 	return &Client{conn: conn}, nil

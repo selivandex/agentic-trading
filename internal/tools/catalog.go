@@ -11,6 +11,7 @@ import (
 	"prometheus/internal/tools/shared"
 	"prometheus/internal/tools/trading"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
@@ -155,7 +156,7 @@ func Definitions() []Definition {
 	return defs
 }
 
-type toolFactory func(deps shared.Deps) *functiontool.Tool
+type toolFactory func(deps shared.Deps) tool.Tool
 
 var implementedTools = map[string]toolFactory{
 	"get_price":             market.NewGetPriceTool,

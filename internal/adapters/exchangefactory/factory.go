@@ -12,6 +12,7 @@ import (
 	"prometheus/internal/adapters/exchanges/okx"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/pkg/crypto"
+	"prometheus/pkg/errors"
 )
 
 // Option customizes factory behavior.
@@ -50,10 +51,10 @@ type factory struct {
 
 func (f *factory) CreateClient(account *exchange_account.ExchangeAccount, encryptor *crypto.Encryptor) (exchanges.Exchange, error) {
 	if account == nil {
-		return nil, fmt.Errorf("account is nil")
+		return nil, errors.ErrInvalidInput
 	}
 	if encryptor == nil {
-		return nil, fmt.Errorf("encryptor is nil")
+		return nil, errors.ErrInvalidInput
 	}
 
 	key := fmt.Sprintf("%s:%s", account.Exchange, account.ID)
@@ -67,18 +68,18 @@ func (f *factory) CreateClient(account *exchange_account.ExchangeAccount, encryp
 
 	apiKey, err := encryptor.Decrypt(account.APIKeyEncrypted)
 	if err != nil {
-		return nil, fmt.Errorf("decrypt api key: %w", err)
+		return nil, errors.Wrap(err, "decrypt api key")
 	}
 	secret, err := encryptor.Decrypt(account.SecretEncrypted)
 	if err != nil {
-		return nil, fmt.Errorf("decrypt secret: %w", err)
+		return nil, errors.Wrap(err, "decrypt secret")
 	}
 
 	var passphrase string
 	if len(account.Passphrase) > 0 {
 		passphrase, err = encryptor.Decrypt(account.Passphrase)
 		if err != nil {
-			return nil, fmt.Errorf("decrypt passphrase: %w", err)
+			return nil, errors.Wrap(err, "decrypt passphrase")
 		}
 	}
 
@@ -110,7 +111,7 @@ func (f *factory) GetClient(exchangeType exchange_account.ExchangeType) (exchang
 
 	cred, ok := f.systemCreds[exchangeType]
 	if !ok {
-		return nil, fmt.Errorf("no shared credentials configured for %s", exchangeType)
+		return nil, errors.Wrapf(errors.ErrNotFound, "no shared credentials configured for %s", exchangeType)
 	}
 
 	client, err := instantiateClient(exchangeType, credentialBundle{
@@ -172,7 +173,7 @@ func instantiateClient(exchangeType exchange_account.ExchangeType, cred credenti
 			Testnet:    cred.testnet,
 		})
 	default:
-		return nil, fmt.Errorf("unsupported exchange: %s", exchangeType)
+		return nil, errors.Wrapf(errors.ErrInvalidInput, "unsupported exchange: %s", exchangeType)
 	}
 }
 
@@ -236,7 +237,7 @@ func (f *centralFactory) GetClient(exchange string) (exchanges.Exchange, error) 
 			Market:     exchanges.MarketTypeSpot,
 		})
 	default:
-		return nil, fmt.Errorf("unsupported exchange: %s", exchange)
+		return nil, errors.Wrapf(errors.ErrInvalidInput, "unsupported exchange: %s", exchange)
 	}
 
 	if err != nil {

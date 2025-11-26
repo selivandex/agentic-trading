@@ -6,11 +6,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewEMATool computes the exponential moving average.
-func NewEMATool(deps shared.Deps) *functiontool.Tool {
+func NewEMATool(deps shared.Deps) tool.Tool {
 	return functiontool.New("ema", "Exponential Moving Average", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		candles, err := loadCandles(ctx, deps, args, 120)
 		if err != nil {

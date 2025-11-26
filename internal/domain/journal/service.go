@@ -32,8 +32,8 @@ func (s *Service) Create(ctx context.Context, entry *JournalEntry) error {
 	if entry.ID == uuid.Nil {
 		entry.ID = uuid.New()
 	}
-	if entry.Timestamp.IsZero() {
-		entry.Timestamp = time.Now().UTC()
+	if entry.CreatedAt.IsZero() {
+		entry.CreatedAt = time.Now().UTC()
 	}
 
 	if err := s.repo.Create(ctx, entry); err != nil {

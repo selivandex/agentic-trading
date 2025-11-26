@@ -7,11 +7,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewATRTool computes Average True Range.
-func NewATRTool(deps shared.Deps) *functiontool.Tool {
+func NewATRTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("atr", "Average True Range", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		candles, err := loadCandles(ctx, deps, args, 100)
 		if err != nil {

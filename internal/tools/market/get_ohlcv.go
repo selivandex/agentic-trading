@@ -7,11 +7,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetOHLCVTool loads historical candles for a symbol/timeframe.
-func NewGetOHLCVTool(deps shared.Deps) *functiontool.Tool {
+func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("get_ohlcv", "Retrieve historical OHLCV candles", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if !deps.HasMarketData() {
 			return nil, fmt.Errorf("get_ohlcv: market data repository not configured")

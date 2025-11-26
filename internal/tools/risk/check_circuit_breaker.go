@@ -8,11 +8,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewCheckCircuitBreakerTool reports whether trading is allowed.
-func NewCheckCircuitBreakerTool(deps shared.Deps) *functiontool.Tool {
+func NewCheckCircuitBreakerTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("check_circuit_breaker", "Check if trading is allowed", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		userID := uuid.Nil
 		if idVal, ok := args["user_id"]; ok {

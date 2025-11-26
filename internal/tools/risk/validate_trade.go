@@ -9,11 +9,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewValidateTradeTool performs lightweight pre-trade checks.
-func NewValidateTradeTool(deps shared.Deps) *functiontool.Tool {
+func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("validate_trade", "Pre-trade validation checks", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		amountStr, _ := args["amount"].(string)
 		if amountStr == "" {

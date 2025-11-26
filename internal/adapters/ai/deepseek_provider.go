@@ -2,9 +2,10 @@ package ai
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
+
+	"prometheus/pkg/errors"
 )
 
 // DeepSeekProvider implements DeepSeek metadata.
@@ -29,7 +30,7 @@ func (p *DeepSeekProvider) GetModel(_ context.Context, model string) (ModelInfo,
 			return m, nil
 		}
 	}
-	return ModelInfo{}, fmt.Errorf("deepseek model %s not found", model)
+	return ModelInfo{}, errors.Wrapf(errors.ErrNotFound, "deepseek model %s not found", model)
 }
 
 // ListModels lists available models.

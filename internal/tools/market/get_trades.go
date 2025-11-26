@@ -7,11 +7,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetTradesTool returns a tool fetching recent trades from storage.
-func NewGetTradesTool(deps shared.Deps) *functiontool.Tool {
+func NewGetTradesTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("get_trades", "Fetch recent trades", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if !deps.HasMarketData() {
 			return nil, fmt.Errorf("get_trades: market data repository not configured")

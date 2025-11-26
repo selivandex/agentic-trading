@@ -6,11 +6,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewMACDTool computes MACD (12,26,9 by default).
-func NewMACDTool(deps shared.Deps) *functiontool.Tool {
+func NewMACDTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("macd", "Moving Average Convergence Divergence", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		candles, err := loadCandles(ctx, deps, args, 200)
 		if err != nil {

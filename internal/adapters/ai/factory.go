@@ -1,11 +1,11 @@
 package ai
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"prometheus/internal/adapters/config"
+	"prometheus/pkg/errors"
 )
 
 // BuildRegistry initializes a ProviderRegistry with all enabled providers based on configuration.
@@ -37,7 +37,7 @@ func BuildRegistry(cfg config.AIConfig) (*ProviderRegistry, error) {
 	}
 
 	if len(registry.List()) == 0 {
-		return nil, fmt.Errorf("no AI providers registered: ensure API keys are set")
+		return nil, errors.ErrUnavailable
 	}
 
 	return registry, nil

@@ -6,11 +6,12 @@ import (
 
 	"prometheus/internal/tools/shared"
 
+	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetOrderBookTool returns an order book snapshot tool.
-func NewGetOrderBookTool(deps shared.Deps) *functiontool.Tool {
+func NewGetOrderBookTool(deps shared.Deps) tool.Tool {
 	return functiontool.New("get_orderbook", "Get depth snapshot for a trading pair", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if !deps.HasMarketData() {
 			return nil, fmt.Errorf("get_orderbook: market data repository not configured")
