@@ -1,14 +1,14 @@
 package indicators
 
 import (
-	"context"
-
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+
+	"google.golang.org/adk/tool"
 )
 
-func loadCandles(ctx context.Context, deps shared.Deps, args map[string]interface{}, defaultLimit int) ([]market_data.OHLCV, error) {
+func loadCandles(ctx tool.Context, deps shared.Deps, args map[string]interface{}, defaultLimit int) ([]market_data.OHLCV, error) {
 	if !deps.HasMarketData() {
 		return nil, errors.Wrapf(errors.ErrInternal, "indicator: market data repository not configured")
 	}

@@ -2,11 +2,12 @@ package orderflow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
+	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/market_data"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/logger"
 )
@@ -20,18 +21,14 @@ const (
 // Runs every 10 seconds to analyze recent trades
 type WhaleAlertCollector struct {
 	*workers.BaseWorker
-	mdRepo            market_data.Repository
-	symbols           []string
-	exchanges         []string
-	thresholdUSD      float64
-	kafkaProducer     KafkaProducer
-	whaleTradesCache  map[string]bool // Prevents duplicate alerts
-	log               *logger.Logger
-}
-
-// KafkaProducer interface for publishing whale alerts
-type KafkaProducer interface {
-	Publish(ctx context.Context, topic string, key []byte, value []byte) error
+	mdRepo           market_data.Repository
+	symbols          []string
+	exchanges        []string
+	thresholdUSD     float64
+	kafka            *kafka.Producer
+	eventPublisher   *events.WorkerPublisher
+	whaleTradesCache map[string]bool // Prevents duplicate alerts
+	log              *logger.Logger
 }
 
 // NewWhaleAlertCollector creates a new whale alert collector
@@ -40,7 +37,7 @@ func NewWhaleAlertCollector(
 	symbols []string,
 	exchanges []string,
 	thresholdUSD float64,
-	kafkaProducer KafkaProducer,
+	kafka *kafka.Producer,
 	interval time.Duration,
 	enabled bool,
 ) *WhaleAlertCollector {
@@ -54,7 +51,8 @@ func NewWhaleAlertCollector(
 		symbols:          symbols,
 		exchanges:        exchanges,
 		thresholdUSD:     thresholdUSD,
-		kafkaProducer:    kafkaProducer,
+		kafka:            kafka,
+		eventPublisher:   events.NewWorkerPublisher(kafka),
 		whaleTradesCache: make(map[string]bool),
 		log:              logger.Get().With("component", "whale_alert_collector"),
 	}
@@ -148,7 +146,7 @@ func (wac *WhaleAlertCollector) analyzeSymbol(ctx context.Context, exchange, sym
 	return whaleCount, nil
 }
 
-// publishWhaleAlert publishes whale trade alert to Kafka
+// publishWhaleAlert publishes whale trade alert to Kafka using protobuf
 func (wac *WhaleAlertCollector) publishWhaleAlert(
 	ctx context.Context,
 	exchange, symbol string,
@@ -156,36 +154,22 @@ func (wac *WhaleAlertCollector) publishWhaleAlert(
 	valueUSD float64,
 	sentiment string,
 ) error {
-	if wac.kafkaProducer == nil {
+	if wac.eventPublisher == nil {
 		return nil // Kafka not configured
 	}
 
-	// Create alert payload
-	alert := map[string]interface{}{
-		"type":       "whale_trade",
-		"exchange":   exchange,
-		"symbol":     symbol,
-		"trade_id":   trade.TradeID,
-		"price":      trade.Price,
-		"quantity":   trade.Quantity,
-		"value_usd":  valueUSD,
-		"side":       trade.Side,
-		"sentiment":  sentiment,
-		"timestamp":  trade.Timestamp.Unix(),
-		"detected_at": time.Now().Unix(),
-	}
-
-	// Marshal to JSON
-	payload, err := json.Marshal(alert)
-	if err != nil {
-		return err
-	}
-
-	// Publish to Kafka topic
-	topic := "market.whale_alerts"
-	key := []byte(fmt.Sprintf("%s:%s", exchange, symbol))
-
-	return wac.kafkaProducer.Publish(ctx, topic, key, payload)
+	// Publish using protobuf event
+	return wac.eventPublisher.PublishWhaleAlert(
+		ctx,
+		exchange,
+		symbol,
+		trade.TradeID,
+		trade.Side,
+		sentiment,
+		trade.Price,
+		trade.Quantity,
+		valueUSD,
+	)
 }
 
 // cleanCache removes old entries from cache (keep only last hour)

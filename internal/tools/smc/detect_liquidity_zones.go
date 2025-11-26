@@ -1,8 +1,6 @@
 package smc
 
 import (
-	"context"
-
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
@@ -26,82 +24,88 @@ type LiquidityZone struct {
 // Buy-side liquidity = above swing highs (where shorts have stops)
 // Sell-side liquidity = below swing lows (where longs have stops)
 func NewDetectLiquidityZonesTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("detect_liquidity_zones", "Detect Liquidity Zones", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		// Load candles
-		candles, err := loadCandles(ctx, deps, args, 200)
-		if err != nil {
-			return nil, err
-		}
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "detect_liquidity_zones",
+			Description: "Detect Liquidity Zones",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+			// Load candles
+			candles, err := loadCandles(ctx, deps, args, 200)
+			if err != nil {
+				return nil, err
+			}
 
-		if len(candles) < 20 {
-			return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 20 candles")
-		}
+			if len(candles) < 20 {
+				return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 20 candles")
+			}
 
-		lookback := parseLimit(args["lookback"], 5)
-		clusterThreshold := parseFloat(args["cluster_threshold_pct"], 0.5) // 0.5% price range for clustering
+			lookback := parseLimit(args["lookback"], 5)
+			clusterThreshold := parseFloat(args["cluster_threshold_pct"], 0.5) // 0.5% price range for clustering
 
-		// Find swing points first
-		swingHighs := findSwingHighs(candles, lookback)
-		swingLows := findSwingLows(candles, lookback)
+			// Find swing points first
+			swingHighs := findSwingHighs(candles, lookback)
+			swingLows := findSwingLows(candles, lookback)
 
-		// Cluster swing points into liquidity zones
-		buySideLiquidity := clusterSwingPoints(swingHighs, clusterThreshold)
-		sellSideLiquidity := clusterSwingPoints(swingLows, clusterThreshold)
+			// Cluster swing points into liquidity zones
+			buySideLiquidity := clusterSwingPoints(swingHighs, clusterThreshold)
+			sellSideLiquidity := clusterSwingPoints(swingLows, clusterThreshold)
 
-		currentPrice := candles[0].Close
+			currentPrice := candles[0].Close
 
-		// Add type and distance to zones
-		for i := range buySideLiquidity {
-			buySideLiquidity[i].Type = "buy_side"
-			buySideLiquidity[i].Distance = buySideLiquidity[i].PriceCenter - currentPrice
-		}
+			// Add type and distance to zones
+			for i := range buySideLiquidity {
+				buySideLiquidity[i].Type = "buy_side"
+				buySideLiquidity[i].Distance = buySideLiquidity[i].PriceCenter - currentPrice
+			}
 
-		for i := range sellSideLiquidity {
-			sellSideLiquidity[i].Type = "sell_side"
-			sellSideLiquidity[i].Distance = currentPrice - sellSideLiquidity[i].PriceCenter
-		}
+			for i := range sellSideLiquidity {
+				sellSideLiquidity[i].Type = "sell_side"
+				sellSideLiquidity[i].Distance = currentPrice - sellSideLiquidity[i].PriceCenter
+			}
 
-		// Find nearest zones
-		var nearestBuySide, nearestSellSide *LiquidityZone
+			// Find nearest zones
+			var nearestBuySide, nearestSellSide *LiquidityZone
 
-		for i := range buySideLiquidity {
-			if buySideLiquidity[i].Distance > 0 {
-				if nearestBuySide == nil || buySideLiquidity[i].Distance < nearestBuySide.Distance {
-					nearestBuySide = &buySideLiquidity[i]
+			for i := range buySideLiquidity {
+				if buySideLiquidity[i].Distance > 0 {
+					if nearestBuySide == nil || buySideLiquidity[i].Distance < nearestBuySide.Distance {
+						nearestBuySide = &buySideLiquidity[i]
+					}
 				}
 			}
-		}
 
-		for i := range sellSideLiquidity {
-			if sellSideLiquidity[i].Distance > 0 {
-				if nearestSellSide == nil || sellSideLiquidity[i].Distance < nearestSellSide.Distance {
-					nearestSellSide = &sellSideLiquidity[i]
+			for i := range sellSideLiquidity {
+				if sellSideLiquidity[i].Distance > 0 {
+					if nearestSellSide == nil || sellSideLiquidity[i].Distance < nearestSellSide.Distance {
+						nearestSellSide = &sellSideLiquidity[i]
+					}
 				}
 			}
-		}
 
-		// Generate signal - smart money often targets liquidity
-		signal := "no_nearby_liquidity"
-		targetZone := "none"
+			// Generate signal - smart money often targets liquidity
+			signal := "no_nearby_liquidity"
+			targetZone := "none"
 
-		if nearestSellSide != nil && nearestSellSide.Distance/currentPrice*100 < 2 {
-			signal = "sell_side_liquidity_near"
-			targetZone = "below"
-		} else if nearestBuySide != nil && nearestBuySide.Distance/currentPrice*100 < 2 {
-			signal = "buy_side_liquidity_near"
-			targetZone = "above"
-		}
+			if nearestSellSide != nil && nearestSellSide.Distance/currentPrice*100 < 2 {
+				signal = "sell_side_liquidity_near"
+				targetZone = "below"
+			} else if nearestBuySide != nil && nearestBuySide.Distance/currentPrice*100 < 2 {
+				signal = "buy_side_liquidity_near"
+				targetZone = "above"
+			}
 
-		return map[string]interface{}{
-			"buy_side_zones":    buySideLiquidity,
-			"sell_side_zones":   sellSideLiquidity,
-			"nearest_buy_side":  nearestBuySide,
-			"nearest_sell_side": nearestSellSide,
-			"signal":            signal,
-			"target_zone":       targetZone,
-			"current_price":     currentPrice,
-		}, nil
-	})
+			return map[string]interface{}{
+				"buy_side_zones":    buySideLiquidity,
+				"sell_side_zones":   sellSideLiquidity,
+				"nearest_buy_side":  nearestBuySide,
+				"nearest_sell_side": nearestSellSide,
+				"signal":            signal,
+				"target_zone":       targetZone,
+				"current_price":     currentPrice,
+			}, nil
+		})
+	return t
 }
 
 // findSwingHighs finds all swing highs in candles

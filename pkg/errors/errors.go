@@ -31,6 +31,12 @@ var (
 
 	// ErrUnavailable indicates a service is unavailable
 	ErrUnavailable = errors.New("service unavailable")
+
+	// ErrExternal indicates an error from external API or service
+	ErrExternal = errors.New("external service error")
+
+	// ErrNotImplemented indicates functionality is not yet implemented
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 // Risk-specific errors

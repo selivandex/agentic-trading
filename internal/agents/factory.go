@@ -5,14 +5,14 @@ import (
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
-	parallelagent "google.golang.org/adk/agent/workflowagents/parallelagent"
-	sequentialagent "google.golang.org/adk/agent/workflowagents/sequentialagent"
-	adkmodel "google.golang.org/adk/model"
-	adktool "google.golang.org/adk/tool"
+	"google.golang.org/adk/tool"
+	"google.golang.org/adk/tool/functiontool"
 
+	"prometheus/internal/adapters/adk"
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/tools"
 	"prometheus/pkg/errors"
+	"prometheus/pkg/logger"
 	"prometheus/pkg/templates"
 )
 
@@ -23,11 +23,12 @@ type FactoryDeps struct {
 	Templates    *templates.Registry
 }
 
-// Factory creates configured agents and registries.
+// Factory creates configured ADK agents.
 type Factory struct {
 	aiRegistry   *ai.ProviderRegistry
 	toolRegistry *tools.Registry
 	templates    *templates.Registry
+	log          *logger.Logger
 }
 
 // NewFactory builds an agent factory with required dependencies.
@@ -44,19 +45,39 @@ func NewFactory(deps FactoryDeps) (*Factory, error) {
 		deps.Templates = templates.Get()
 	}
 
-	return &Factory{aiRegistry: deps.AIRegistry, toolRegistry: deps.ToolRegistry, templates: deps.Templates}, nil
+	return &Factory{
+		aiRegistry:   deps.AIRegistry,
+		toolRegistry: deps.ToolRegistry,
+		templates:    deps.Templates,
+		log:          logger.Get().With("component", "agent_factory"),
+	}, nil
 }
 
-// CreateAgent constructs a single ADK agent instance from a config.
+// CreateAgent constructs a pure ADK agent instance from a config.
 func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
+	// Resolve model info
 	modelInfo, err := f.aiRegistry.ResolveModel(context.Background(), cfg.AIProvider, cfg.Model)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve model %s/%s", cfg.AIProvider, cfg.Model)
 	}
 
-	llmModel := adkmodel.BasicModel{ID: modelInfo.Name, ProviderID: cfg.AIProvider, Tokens: modelInfo.MaxTokens}
+	// Get AI provider (must support chat)
+	provider, err := f.aiRegistry.Get(cfg.AIProvider)
+	if err != nil {
+		return nil, errors.Wrapf(err, "AI provider %s not found", cfg.AIProvider)
+	}
 
-	agentTools := make([]adktool.Tool, 0, len(cfg.Tools))
+	chatProvider, ok := provider.(ai.ChatProvider)
+	if !ok {
+		return nil, errors.Wrapf(errors.ErrInvalidInput,
+			"provider %s does not support chat completions", cfg.AIProvider)
+	}
+
+	// Create ADK model adapter (bridges our AI provider to ADK model interface)
+	adkModel := adk.NewModelAdapter(chatProvider, modelInfo.Name)
+
+	// Collect and convert tools to ADK format
+	adkTools := make([]tool.Tool, 0, len(cfg.Tools))
 	toolInfo := make([]tools.Definition, 0, len(cfg.Tools))
 	definitionByName := map[string]tools.Definition{}
 	for _, def := range tools.Definitions() {
@@ -68,7 +89,25 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 		if !ok {
 			return nil, errors.Wrapf(errors.ErrNotFound, "tool not found: %s", toolName)
 		}
-		agentTools = append(agentTools, t)
+
+		// Wrap our tool as ADK functiontool using proper generics
+		toolImpl := t
+		adkTool, err := functiontool.New(
+			functiontool.Config{
+				Name:        toolImpl.Name(),
+				Description: toolImpl.Description(),
+			},
+			// Generic function with map[string]interface{} as both input and output types
+			func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+				return toolImpl.Execute(ctx, args)
+			},
+		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "create functiontool for %s", toolName)
+		}
+
+		adkTools = append(adkTools, adkTool)
+
 		if def, ok := definitionByName[toolName]; ok {
 			toolInfo = append(toolInfo, def)
 		} else {
@@ -76,6 +115,7 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 		}
 	}
 
+	// Render system prompt from template
 	instruction := ""
 	if cfg.SystemPromptTemplate != "" {
 		data := map[string]interface{}{
@@ -90,13 +130,16 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 		}
 	}
 
+	f.log.Debugf("Creating ADK agent: %s with model %s and %d tools",
+		cfg.Name, modelInfo.Name, len(adkTools))
+
+	// Create REAL Google ADK LLM agent
 	return llmagent.New(llmagent.Config{
 		Name:        cfg.Name,
 		Description: cfg.Description,
-		Model:       llmModel,
-		Tools:       agentTools,
+		Model:       adkModel,
+		Tools:       adkTools,
 		Instruction: instruction,
-		OutputKey:   cfg.OutputKey,
 	})
 }
 
@@ -104,88 +147,49 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 func (f *Factory) CreateDefaultRegistry(provider, model string) (*Registry, error) {
 	reg := NewRegistry()
 
-	for _, cfg := range DefaultAgentConfigs {
+	f.log.Infof("Creating default agent registry with provider=%s model=%s", provider, model)
+
+	for agentType, cfg := range DefaultAgentConfigs {
 		cfg.AIProvider = provider
 		cfg.Model = model
+
 		ag, err := f.CreateAgent(cfg)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "create agent %s", agentType)
 		}
+
 		reg.Register(cfg.Type, ag)
+		f.log.Debugf("Registered agent: %s (%s)", cfg.Name, agentType)
 	}
 
+	f.log.Infof("Agent registry created with %d agents", len(reg.List()))
 	return reg, nil
 }
 
-// CreateTradingPipeline creates the full trading workflow using default configs.
+// CreateTradingPipeline creates a strategy planner agent.
+// TODO: Extend to multi-agent workflow using ADK workflow agents when needed.
 func (f *Factory) CreateTradingPipeline(userCfg UserAgentConfig) (agent.Agent, error) {
-	marketCfg := DefaultAgentConfigs[AgentMarketAnalyst]
-	marketCfg.AIProvider, marketCfg.Model = userCfg.AIProvider, userCfg.Model
-	marketAnalyst, err := f.CreateAgent(marketCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	sentimentCfg := DefaultAgentConfigs[AgentSentimentAnalyst]
-	sentimentCfg.AIProvider, sentimentCfg.Model = userCfg.AIProvider, userCfg.Model
-	sentimentAnalyst, err := f.CreateAgent(sentimentCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	onchainCfg := DefaultAgentConfigs[AgentOnChainAnalyst]
-	onchainCfg.AIProvider, onchainCfg.Model = userCfg.AIProvider, userCfg.Model
-	onchainAnalyst, err := f.CreateAgent(onchainCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	parallelAnalysis, err := parallelagent.New(parallelagent.Config{Config: agent.Config{
-		Name:        "ParallelAnalysis",
-		Description: "Concurrent market, sentiment, and on-chain analysis",
-		SubAgents:   []agent.Agent{marketAnalyst, sentimentAnalyst, onchainAnalyst},
-	}})
-	if err != nil {
-		return nil, err
-	}
-
-	correlationCfg := DefaultAgentConfigs[AgentCorrelationAnalyst]
-	correlationCfg.AIProvider, correlationCfg.Model = userCfg.AIProvider, userCfg.Model
-	correlationAnalyst, err := f.CreateAgent(correlationCfg)
-	if err != nil {
-		return nil, err
-	}
-
+	// For now, create a strategy planner that can orchestrate via tools
 	strategyCfg := DefaultAgentConfigs[AgentStrategyPlanner]
-	strategyCfg.AIProvider, strategyCfg.Model = userCfg.AIProvider, userCfg.Model
-	strategyPlanner, err := f.CreateAgent(strategyCfg)
-	if err != nil {
-		return nil, err
+	strategyCfg.AIProvider = userCfg.AIProvider
+	strategyCfg.Model = userCfg.Model
+
+	return f.CreateAgent(strategyCfg)
+}
+
+// CreateAgentForUser creates a specific agent for a user with custom config.
+func (f *Factory) CreateAgentForUser(
+	agentType AgentType,
+	provider string,
+	model string,
+) (agent.Agent, error) {
+	cfg, ok := DefaultAgentConfigs[agentType]
+	if !ok {
+		return nil, errors.Wrapf(errors.ErrNotFound, "agent type %s not found", agentType)
 	}
 
-	riskCfg := DefaultAgentConfigs[AgentRiskManager]
-	riskCfg.AIProvider, riskCfg.Model = userCfg.AIProvider, userCfg.Model
-	riskManager, err := f.CreateAgent(riskCfg)
-	if err != nil {
-		return nil, err
-	}
+	cfg.AIProvider = provider
+	cfg.Model = model
 
-	executorCfg := DefaultAgentConfigs[AgentExecutor]
-	executorCfg.AIProvider, executorCfg.Model = userCfg.AIProvider, userCfg.Model
-	executor, err := f.CreateAgent(executorCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	return sequentialagent.New(sequentialagent.Config{Config: agent.Config{
-		Name:        "TradingPipeline",
-		Description: "Complete trading analysis and execution workflow",
-		SubAgents: []agent.Agent{
-			parallelAnalysis,
-			correlationAnalyst,
-			strategyPlanner,
-			riskManager,
-			executor,
-		},
-	}})
+	return f.CreateAgent(cfg)
 }

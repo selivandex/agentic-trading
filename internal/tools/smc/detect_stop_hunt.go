@@ -1,8 +1,6 @@
 package smc
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
@@ -25,7 +23,12 @@ type StopHunt struct {
 // Stop Hunt = Price briefly exceeds swing high/low then reverses sharply
 // Indicates smart money triggering retail stops before reversing
 func NewDetectStopHuntTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("detect_stop_hunt", "Detect Stop Hunts", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "detect_stop_hunt",
+			Description: "Detect Stop Hunts",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		candles, err := loadCandles(ctx, deps, args, 100)
 		if err != nil {
 			return nil, err
@@ -135,6 +138,7 @@ func NewDetectStopHuntTool(deps shared.Deps) tool.Tool {
 			"current_price": candles[0].Close,
 		}, nil
 	})
+	return t
 }
 
 func min(a, b float64) float64 {

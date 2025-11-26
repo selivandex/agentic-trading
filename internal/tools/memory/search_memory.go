@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,40 +46,46 @@ type MemorySearchResponse struct {
 
 // NewSearchMemoryTool performs semantic memory search for a user.
 func NewSearchMemoryTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("search_memory", "Semantic memory search", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		if deps.MemoryRepo == nil {
-			return nil, errors.Wrapf(errors.ErrInternal, "search_memory: memory repository not configured")
-		}
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "search_memory",
+			Description: "Semantic memory search",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+			if deps.MemoryRepo == nil {
+				return nil, errors.Wrapf(errors.ErrInternal, "search_memory: memory repository not configured")
+			}
 
-		// Parse and validate input arguments with strong typing
-		searchArgs, err := parseSearchMemoryArgs(ctx, args)
-		if err != nil {
-			return nil, errors.Wrap(err, "search_memory")
-		}
+			// Parse and validate input arguments with strong typing
+			searchArgs, err := parseSearchMemoryArgs(ctx, args)
+			if err != nil {
+				return nil, errors.Wrap(err, "search_memory")
+			}
 
-		// Create vector from embedding
-		vector := pgvector.NewVector(searchArgs.Embedding)
+			// Create vector from embedding
+			vector := pgvector.NewVector(searchArgs.Embedding)
 
-		// Execute search with typed parameters
-		service := memorydomain.NewService(deps.MemoryRepo)
-		results, err := service.SearchSimilar(ctx, searchArgs.UserID, vector, searchArgs.Limit)
-		if err != nil {
-			return nil, err
-		}
+			// Execute search with typed parameters
+			service := memorydomain.NewService(deps.MemoryRepo)
+			results, err := service.SearchSimilar(ctx, searchArgs.UserID, vector, searchArgs.Limit)
+			if err != nil {
+				return nil, err
+			}
 
-		// Build strongly-typed response
-		response := buildMemorySearchResponse(results)
+			// Build strongly-typed response
+			response := buildMemorySearchResponse(results)
 
-		// Convert to map[string]interface{} for ADK compatibility
-		// This is the only place where we lose type safety
-		return map[string]interface{}{
-			"memories": response.Memories,
-		}, nil
-	})
+			// Convert to map[string]interface{} for ADK compatibility
+			// This is the only place where we lose type safety
+			return map[string]interface{}{
+				"memories": response.Memories,
+			}, nil
+		})
+	return t
 }
 
 // parseSearchMemoryArgs extracts and validates input arguments
-func parseSearchMemoryArgs(ctx context.Context, args map[string]interface{}) (*SearchMemoryArgs, error) {
+func parseSearchMemoryArgs(ctx tool.Context, args map[string]interface{}) (*SearchMemoryArgs, error) {
 	result := &SearchMemoryArgs{
 		Limit: 5, // default
 	}

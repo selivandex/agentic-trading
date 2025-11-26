@@ -1,8 +1,6 @@
 package indicators
 
 import (
-	"context"
-
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
@@ -15,7 +13,12 @@ import (
 // Useful for trend strength and support/resistance levels
 // Default periods: 9, 21, 55, 200 (common Fibonacci numbers)
 func NewEMARibbonTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("ema_ribbon", "EMA Ribbon (Multiple EMAs)", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "ema_ribbon",
+			Description: "EMA Ribbon (Multiple EMAs)",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Load candles (need enough for 200 EMA)
 		candles, err := loadCandles(ctx, deps, args, 250)
 		if err != nil {
@@ -112,6 +115,7 @@ func NewEMARibbonTool(deps shared.Deps) tool.Tool {
 			"resistance":     resistance,
 		}, nil
 	})
+	return t
 }
 
 // Helper functions
@@ -142,4 +146,3 @@ func max4(a, b, c, d float64) float64 {
 	}
 	return max
 }
-

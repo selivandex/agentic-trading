@@ -1,8 +1,6 @@
 package smc
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
@@ -26,7 +24,12 @@ type FairValueGap struct {
 // Bullish FVG: candle[i-2].low > candle[i].high (gap between them, candle i-1 created it)
 // Bearish FVG: candle[i-2].high < candle[i].low
 func NewDetectFVGTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("detect_fvg", "Detect Fair Value Gaps", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "detect_fvg",
+			Description: "Detect Fair Value Gaps",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Load candles
 		candles, err := loadCandles(ctx, deps, args, 100)
 		if err != nil {
@@ -140,6 +143,7 @@ func NewDetectFVGTool(deps shared.Deps) tool.Tool {
 			"current_price":  currentPrice,
 		}, nil
 	})
+	return t
 }
 
 // Helper functions

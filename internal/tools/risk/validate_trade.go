@@ -1,8 +1,6 @@
 package risk
 
 import (
-	"context"
-
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
@@ -15,7 +13,12 @@ import (
 
 // NewValidateTradeTool performs lightweight pre-trade checks.
 func NewValidateTradeTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("validate_trade", "Pre-trade validation checks", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "validate_trade",
+			Description: "Pre-trade validation checks",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		amountStr, _ := args["amount"].(string)
 		if amountStr == "" {
 			return nil, errors.ErrInvalidInput
@@ -41,4 +44,5 @@ func NewValidateTradeTool(deps shared.Deps) tool.Tool {
 
 		return map[string]interface{}{"valid": allowed, "amount": amount.String()}, nil
 	})
+	return t
 }

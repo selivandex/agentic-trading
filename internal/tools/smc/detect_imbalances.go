@@ -1,8 +1,6 @@
 package smc
 
 import (
-	"context"
-
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
@@ -27,110 +25,116 @@ type Imbalance struct {
 // Imbalance = Large candle with minimal overlap to previous candles
 // Indicates strong directional move with inefficient price discovery
 func NewDetectImbalancesTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("detect_imbalances", "Detect Price Imbalances", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		candles, err := loadCandles(ctx, deps, args, 100)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(candles) < 3 {
-			return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 3 candles")
-		}
-
-		minSizePct := parseFloat(args["min_size_pct"], 0.3)        // Min 0.3%
-		maxOverlapPct := parseFloat(args["max_overlap_pct"], 25.0) // Max 25% overlap
-
-		imbalances := make([]Imbalance, 0)
-		currentPrice := candles[0].Close
-
-		for i := 0; i < len(candles)-1; i++ {
-			curr := candles[i]
-			prev := candles[i+1]
-
-			currBody := absFloat(curr.Close - curr.Open)
-			currRange := curr.High - curr.Low
-
-			// Check for large candle (strong move)
-			if currRange == 0 {
-				continue
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "detect_imbalances",
+			Description: "Detect Price Imbalances",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+			candles, err := loadCandles(ctx, deps, args, 100)
+			if err != nil {
+				return nil, err
 			}
 
-			bodyPct := (currBody / currRange) * 100
-
-			// Strong candle = body > 70% of range
-			if bodyPct < 70 {
-				continue
+			if len(candles) < 3 {
+				return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 3 candles")
 			}
 
-			// Check overlap with previous candle
-			overlap := calculateOverlap(curr, prev)
-			overlapPct := (overlap / currRange) * 100
+			minSizePct := parseFloat(args["min_size_pct"], 0.3)        // Min 0.3%
+			maxOverlapPct := parseFloat(args["max_overlap_pct"], 25.0) // Max 25% overlap
 
-			if overlapPct > maxOverlapPct {
-				continue // Too much overlap
-			}
+			imbalances := make([]Imbalance, 0)
+			currentPrice := candles[0].Close
 
-			// Calculate gap size
-			gapSize := 0.0
-			gapStart := 0.0
-			gapEnd := 0.0
-			imbType := ""
+			for i := 0; i < len(candles)-1; i++ {
+				curr := candles[i]
+				prev := candles[i+1]
 
-			// Bullish imbalance (gap up)
-			if curr.Low > prev.High {
-				gapStart = prev.High
-				gapEnd = curr.Low
-				gapSize = gapEnd - gapStart
-				imbType = "bullish"
-			} else if curr.High < prev.Low {
-				// Bearish imbalance (gap down)
-				gapStart = curr.High
-				gapEnd = prev.Low
-				gapSize = gapEnd - gapStart
-				imbType = "bearish"
-			}
+				currBody := absFloat(curr.Close - curr.Open)
+				currRange := curr.High - curr.Low
 
-			if gapSize > 0 {
-				sizePct := (gapSize / gapStart) * 100
+				// Check for large candle (strong move)
+				if currRange == 0 {
+					continue
+				}
 
-				if sizePct >= minSizePct {
-					filled := false
-					if imbType == "bullish" {
-						filled = currentPrice <= gapStart
-					} else {
-						filled = currentPrice >= gapEnd
+				bodyPct := (currBody / currRange) * 100
+
+				// Strong candle = body > 70% of range
+				if bodyPct < 70 {
+					continue
+				}
+
+				// Check overlap with previous candle
+				overlap := calculateOverlap(curr, prev)
+				overlapPct := (overlap / currRange) * 100
+
+				if overlapPct > maxOverlapPct {
+					continue // Too much overlap
+				}
+
+				// Calculate gap size
+				gapSize := 0.0
+				gapStart := 0.0
+				gapEnd := 0.0
+				imbType := ""
+
+				// Bullish imbalance (gap up)
+				if curr.Low > prev.High {
+					gapStart = prev.High
+					gapEnd = curr.Low
+					gapSize = gapEnd - gapStart
+					imbType = "bullish"
+				} else if curr.High < prev.Low {
+					// Bearish imbalance (gap down)
+					gapStart = curr.High
+					gapEnd = prev.Low
+					gapSize = gapEnd - gapStart
+					imbType = "bearish"
+				}
+
+				if gapSize > 0 {
+					sizePct := (gapSize / gapStart) * 100
+
+					if sizePct >= minSizePct {
+						filled := false
+						if imbType == "bullish" {
+							filled = currentPrice <= gapStart
+						} else {
+							filled = currentPrice >= gapEnd
+						}
+
+						imbalances = append(imbalances, Imbalance{
+							Type:     imbType,
+							Start:    gapStart,
+							End:      gapEnd,
+							Size:     gapSize,
+							SizePct:  sizePct,
+							FormTime: curr.OpenTime.Unix(),
+							Index:    i,
+							Filled:   filled,
+						})
 					}
-
-					imbalances = append(imbalances, Imbalance{
-						Type:     imbType,
-						Start:    gapStart,
-						End:      gapEnd,
-						Size:     gapSize,
-						SizePct:  sizePct,
-						FormTime: curr.OpenTime.Unix(),
-						Index:    i,
-						Filled:   filled,
-					})
 				}
 			}
-		}
 
-		signal := "no_imbalance"
-		if len(imbalances) > 0 && !imbalances[0].Filled {
-			if imbalances[0].Type == "bullish" {
-				signal = "bullish_imbalance"
-			} else {
-				signal = "bearish_imbalance"
+			signal := "no_imbalance"
+			if len(imbalances) > 0 && !imbalances[0].Filled {
+				if imbalances[0].Type == "bullish" {
+					signal = "bullish_imbalance"
+				} else {
+					signal = "bearish_imbalance"
+				}
 			}
-		}
 
-		return map[string]interface{}{
-			"imbalances":     imbalances,
-			"unfilled_count": countUnfilledImb(imbalances),
-			"signal":         signal,
-			"current_price":  currentPrice,
-		}, nil
-	})
+			return map[string]interface{}{
+				"imbalances":     imbalances,
+				"unfilled_count": countUnfilledImb(imbalances),
+				"signal":         signal,
+				"current_price":  currentPrice,
+			}, nil
+		})
+	return t
 }
 
 func calculateOverlap(c1, c2 market_data.OHLCV) float64 {

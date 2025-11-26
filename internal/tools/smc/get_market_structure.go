@@ -1,8 +1,6 @@
 package smc
 
 import (
-	"context"
-
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
@@ -37,80 +35,86 @@ type StructureBreak struct {
 // BOS (Break of Structure) = Continuation of trend
 // CHoCH (Change of Character) = Potential trend reversal
 func NewGetMarketStructureTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("get_market_structure", "Get Market Structure (BOS/CHoCH)", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		candles, err := loadCandles(ctx, deps, args, 100)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(candles) < 20 {
-			return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 20 candles")
-		}
-
-		lookback := parseLimit(args["lookback"], 5)
-
-		// Find swing points
-		swingHighs := findSwingHighsWithIndex(candles, lookback)
-		swingLows := findSwingLowsWithIndex(candles, lookback)
-
-		// Determine trend by analyzing swing point progression
-		trend, hh, hl, lh, ll := analyzeSwingProgression(swingHighs, swingLows)
-
-		// Detect BOS and CHoCH
-		var lastBOS, lastCHoCH *StructureBreak
-
-		// BOS: price breaks previous high (in uptrend) or previous low (in downtrend)
-		// CHoCH: price fails to make HH/HL (uptrend) or LH/LL (downtrend)
-
-		if trend == "uptrend" && len(hh) >= 2 {
-			// Last BOS in uptrend = breaking previous high
-			lastBOS = &StructureBreak{
-				Type:      "BOS",
-				Direction: "bullish",
-				Price:     hh[len(hh)-2],
-				Index:     0, // Simplified
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "get_market_structure",
+			Description: "Get Market Structure (BOS/CHoCH)",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+			candles, err := loadCandles(ctx, deps, args, 100)
+			if err != nil {
+				return nil, err
 			}
-		} else if trend == "downtrend" && len(ll) >= 2 {
-			// Last BOS in downtrend = breaking previous low
-			lastBOS = &StructureBreak{
-				Type:      "BOS",
-				Direction: "bearish",
-				Price:     ll[len(ll)-2],
-				Index:     0,
+
+			if len(candles) < 20 {
+				return nil, errors.Wrapf(errors.ErrInvalidInput, "need at least 20 candles")
 			}
-		}
 
-		structure := MarketStructure{
-			Trend:       trend,
-			HigherHighs: hh,
-			HigherLows:  hl,
-			LowerHighs:  lh,
-			LowerLows:   ll,
-			LastBOS:     lastBOS,
-			LastCHoCH:   lastCHoCH,
-			CurrentHigh: candles[0].High,
-			CurrentLow:  candles[0].Low,
-		}
+			lookback := parseLimit(args["lookback"], 5)
 
-		signal := "neutral"
-		if trend == "uptrend" && lastBOS != nil {
-			signal = "bullish_bos"
-		} else if trend == "downtrend" && lastBOS != nil {
-			signal = "bearish_bos"
-		}
+			// Find swing points
+			swingHighs := findSwingHighsWithIndex(candles, lookback)
+			swingLows := findSwingLowsWithIndex(candles, lookback)
 
-		// CHoCH detection: trend changed from up to down or vice versa
-		if trend == "ranging" && (len(hh) > 0 || len(ll) > 0) {
-			// Possible trend change
-			signal = "potential_trend_change"
-		}
+			// Determine trend by analyzing swing point progression
+			trend, hh, hl, lh, ll := analyzeSwingProgression(swingHighs, swingLows)
 
-		return map[string]interface{}{
-			"structure": structure,
-			"signal":    signal,
-			"trend":     trend,
-		}, nil
-	})
+			// Detect BOS and CHoCH
+			var lastBOS, lastCHoCH *StructureBreak
+
+			// BOS: price breaks previous high (in uptrend) or previous low (in downtrend)
+			// CHoCH: price fails to make HH/HL (uptrend) or LH/LL (downtrend)
+
+			if trend == "uptrend" && len(hh) >= 2 {
+				// Last BOS in uptrend = breaking previous high
+				lastBOS = &StructureBreak{
+					Type:      "BOS",
+					Direction: "bullish",
+					Price:     hh[len(hh)-2],
+					Index:     0, // Simplified
+				}
+			} else if trend == "downtrend" && len(ll) >= 2 {
+				// Last BOS in downtrend = breaking previous low
+				lastBOS = &StructureBreak{
+					Type:      "BOS",
+					Direction: "bearish",
+					Price:     ll[len(ll)-2],
+					Index:     0,
+				}
+			}
+
+			structure := MarketStructure{
+				Trend:       trend,
+				HigherHighs: hh,
+				HigherLows:  hl,
+				LowerHighs:  lh,
+				LowerLows:   ll,
+				LastBOS:     lastBOS,
+				LastCHoCH:   lastCHoCH,
+				CurrentHigh: candles[0].High,
+				CurrentLow:  candles[0].Low,
+			}
+
+			signal := "neutral"
+			if trend == "uptrend" && lastBOS != nil {
+				signal = "bullish_bos"
+			} else if trend == "downtrend" && lastBOS != nil {
+				signal = "bearish_bos"
+			}
+
+			// CHoCH detection: trend changed from up to down or vice versa
+			if trend == "ranging" && (len(hh) > 0 || len(ll) > 0) {
+				// Possible trend change
+				signal = "potential_trend_change"
+			}
+
+			return map[string]interface{}{
+				"structure": structure,
+				"signal":    signal,
+				"trend":     trend,
+			}, nil
+		})
+	return t
 }
 
 type swingPoint struct {

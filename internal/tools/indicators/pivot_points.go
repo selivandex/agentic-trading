@@ -1,8 +1,6 @@
 package indicators
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 
 	"google.golang.org/adk/tool"
@@ -12,7 +10,12 @@ import (
 // NewPivotPointsTool computes Pivot Points (Classic, Fibonacci, Woodie, Camarilla)
 // Pivot points are support/resistance levels calculated from previous period's high/low/close
 func NewPivotPointsTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("pivot_points", "Pivot Points Calculator", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "pivot_points",
+			Description: "Pivot Points Calculator",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Load candles (need at least 1 previous day candle)
 		candles, err := loadCandles(ctx, deps, args, 10)
 		if err != nil {
@@ -88,6 +91,7 @@ func NewPivotPointsTool(deps shared.Deps) tool.Tool {
 			"type":          pivotType,
 		}, nil
 	})
+	return t
 }
 
 // Classic Pivot Points
@@ -139,4 +143,3 @@ func calculateCamarillaPivots(high, low, close float64) (pivot, r1, r2, r3, s1, 
 	s3 = close - range_*1.1/4
 	return
 }
-

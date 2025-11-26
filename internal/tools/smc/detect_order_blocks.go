@@ -1,8 +1,6 @@
 package smc
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
@@ -28,7 +26,12 @@ type OrderBlock struct {
 // Order Block = The last candle before a strong move in opposite direction
 // Acts as support (bullish OB) or resistance (bearish OB)
 func NewDetectOrderBlocksTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("detect_order_blocks", "Detect Order Blocks (ICT)", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "detect_order_blocks",
+			Description: "Detect Order Blocks (ICT)",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Load candles
 		candles, err := loadCandles(ctx, deps, args, 100)
 		if err != nil {
@@ -151,6 +154,7 @@ func NewDetectOrderBlocksTool(deps shared.Deps) tool.Tool {
 			"current_price":   currentPrice,
 		}, nil
 	})
+	return t
 }
 
 func calculateOBStrength(volume, movePct float64) string {

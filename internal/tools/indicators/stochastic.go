@@ -1,8 +1,6 @@
 package indicators
 
 import (
-	"context"
-
 	"github.com/markcheno/go-talib"
 
 	"prometheus/internal/tools/shared"
@@ -14,7 +12,12 @@ import (
 
 // NewStochasticTool computes Stochastic Oscillator using ta-lib
 func NewStochasticTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("stochastic", "Stochastic Oscillator", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "stochastic",
+			Description: "Stochastic Oscillator",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Load candles
 		candles, err := loadCandles(ctx, deps, args, 200)
 		if err != nil {
@@ -81,5 +84,6 @@ func NewStochasticTool(deps shared.Deps) tool.Tool {
 			"d_period":     dPeriod,
 		}, nil
 	})
+	return t
 }
 

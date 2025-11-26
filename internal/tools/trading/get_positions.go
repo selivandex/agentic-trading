@@ -1,8 +1,6 @@
 package trading
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 
 	"google.golang.org/adk/tool"
@@ -12,7 +10,12 @@ import (
 
 // NewGetPositionsTool returns open positions for the user.
 func NewGetPositionsTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("get_positions", "List open positions", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "get_positions",
+			Description: "List open positions",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		if deps.PositionRepo == nil {
 			return nil, errors.Wrapf(errors.ErrInternal, "get_positions: position repository not configured")
 		}
@@ -47,4 +50,5 @@ func NewGetPositionsTool(deps shared.Deps) tool.Tool {
 
 		return map[string]interface{}{"positions": data}, nil
 	})
+	return t
 }

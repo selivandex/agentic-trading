@@ -208,7 +208,7 @@ func (wp *WorkerPublisher) PublishPnLUpdated(
 	winRate float64,
 ) error {
 	event := &eventspb.PnLUpdatedEvent{
-		Base:            NewBaseEvent("user.pnl_updated", "pnl_calculator", userID),
+		Base:            NewBaseEvent(TopicPnLUpdated, "pnl_calculator", userID),
 		DailyPnl:        dailyPnL,
 		DailyPnlPercent: dailyPnLPercent,
 		TotalPnl:        totalPnL,
@@ -218,7 +218,7 @@ func (wp *WorkerPublisher) PublishPnLUpdated(
 		WinRate:         winRate,
 	}
 
-	return wp.publishProto(ctx, "user.pnl_updated", userID, event)
+	return wp.publishProto(ctx, TopicPnLUpdated, userID, event)
 }
 
 // PublishJournalEntryCreated publishes journal entry created event
@@ -228,7 +228,7 @@ func (wp *WorkerPublisher) PublishJournalEntryCreated(
 	pnl, pnlPercent float64,
 ) error {
 	event := &eventspb.JournalEntryCreatedEvent{
-		Base:          NewBaseEvent("journal.entry_created", "journal_compiler", userID),
+		Base:          NewBaseEvent(TopicJournalEntryCreated, "journal_compiler", userID),
 		EntryId:       entryID,
 		Symbol:        symbol,
 		Side:          side,
@@ -237,7 +237,7 @@ func (wp *WorkerPublisher) PublishJournalEntryCreated(
 		LessonLearned: lessonLearned,
 	}
 
-	return wp.publishProto(ctx, "journal.entry_created", userID, event)
+	return wp.publishProto(ctx, TopicJournalEntryCreated, userID, event)
 }
 
 // PublishDailyReport publishes daily performance report
@@ -249,7 +249,7 @@ func (wp *WorkerPublisher) PublishDailyReport(
 	winRate, sharpeRatio, maxDrawdown float64,
 ) error {
 	event := &eventspb.DailyReportEvent{
-		Base:            NewBaseEvent("report.daily", "daily_report", userID),
+		Base:            NewBaseEvent(TopicDailyReport, "daily_report", userID),
 		DailyPnl:        dailyPnL,
 		DailyPnlPercent: dailyPnLPercent,
 		TotalTrades:     int32(totalTrades),
@@ -259,7 +259,7 @@ func (wp *WorkerPublisher) PublishDailyReport(
 		MaxDrawdown:     maxDrawdown,
 	}
 
-	return wp.publishProto(ctx, "report.daily", userID, event)
+	return wp.publishProto(ctx, TopicDailyReport, userID, event)
 }
 
 // PublishStrategyDisabled publishes strategy disabled event
@@ -270,7 +270,7 @@ func (wp *WorkerPublisher) PublishStrategyDisabled(
 	totalTrades int,
 ) error {
 	event := &eventspb.StrategyDisabledEvent{
-		Base:         NewBaseEvent("strategy.disabled", "strategy_evaluator", userID),
+		Base:         NewBaseEvent(TopicStrategyDisabled, "strategy_evaluator", userID),
 		StrategyId:   strategyID,
 		StrategyName: strategyName,
 		Reason:       reason,
@@ -279,7 +279,7 @@ func (wp *WorkerPublisher) PublishStrategyDisabled(
 		TotalTrades:  int32(totalTrades),
 	}
 
-	return wp.publishProto(ctx, "strategy.disabled", userID, event)
+	return wp.publishProto(ctx, TopicStrategyDisabled, userID, event)
 }
 
 // PublishOrderCancelled publishes order cancelled event
@@ -305,7 +305,7 @@ func (wp *WorkerPublisher) PublishPositionPnLUpdated(
 	unrealizedPnL, unrealizedPnLPercent, currentPrice, entryPrice float64,
 ) error {
 	event := &eventspb.PositionPnLUpdatedEvent{
-		Base:                 NewBaseEvent("position.pnl_updated", "position_monitor", userID),
+		Base:                 NewBaseEvent(TopicPositionPnLUpdated, "position_monitor", userID),
 		PositionId:           positionID,
 		Symbol:               symbol,
 		UnrealizedPnl:        unrealizedPnL,
@@ -314,7 +314,7 @@ func (wp *WorkerPublisher) PublishPositionPnLUpdated(
 		EntryPrice:           entryPrice,
 	}
 
-	return wp.publishProto(ctx, "position.pnl_updated", positionID, event)
+	return wp.publishProto(ctx, TopicPositionPnLUpdated, positionID, event)
 }
 
 // PublishFVGDetected publishes Fair Value Gap detected event
@@ -325,7 +325,7 @@ func (wp *WorkerPublisher) PublishFVGDetected(
 	filled bool,
 ) error {
 	event := &eventspb.FVGDetectedEvent{
-		Base:        NewBaseEvent("smc.fvg_detected", "smc_scanner", ""),
+		Base:        NewBaseEvent(TopicFVGDetected, "smc_scanner", ""),
 		Symbol:      symbol,
 		Type:        fvgType,
 		TopPrice:    topPrice,
@@ -334,7 +334,7 @@ func (wp *WorkerPublisher) PublishFVGDetected(
 		Filled:      filled,
 	}
 
-	return wp.publishProto(ctx, "smc.fvg_detected", symbol, event)
+	return wp.publishProto(ctx, TopicFVGDetected, symbol, event)
 }
 
 // PublishOrderBlockDetected publishes Order Block detected event
@@ -344,7 +344,7 @@ func (wp *WorkerPublisher) PublishOrderBlockDetected(
 	topPrice, bottomPrice, strength float64,
 ) error {
 	event := &eventspb.OrderBlockDetectedEvent{
-		Base:        NewBaseEvent("smc.order_block_detected", "smc_scanner", ""),
+		Base:        NewBaseEvent(TopicOrderBlockDetected, "smc_scanner", ""),
 		Symbol:      symbol,
 		Type:        obType,
 		TopPrice:    topPrice,
@@ -352,7 +352,7 @@ func (wp *WorkerPublisher) PublishOrderBlockDetected(
 		Strength:    strength,
 	}
 
-	return wp.publishProto(ctx, "smc.order_block_detected", symbol, event)
+	return wp.publishProto(ctx, TopicOrderBlockDetected, symbol, event)
 }
 
 // CreateWorkerFailedEvent creates a worker failed event
@@ -364,4 +364,95 @@ func CreateWorkerFailedEvent(workerName, errorMsg string, failCount int, lastSuc
 		FailCount:   int32(failCount),
 		LastSuccess: lastSuccess,
 	}
+}
+
+// PublishMarketAnalysisRequest publishes market analysis request event
+func (wp *WorkerPublisher) PublishMarketAnalysisRequest(
+	ctx context.Context,
+	userID, symbol, marketType, strategy string,
+) error {
+	event := &eventspb.MarketAnalysisRequestEvent{
+		Base:       NewBaseEvent(TopicAnalysisRequested, "market_scanner", userID),
+		Symbol:     symbol,
+		MarketType: marketType,
+		Strategy:   strategy,
+	}
+
+	return wp.publishProto(ctx, TopicAnalysisRequested, userID, event)
+}
+
+// PublishMarketScanComplete publishes market scan complete event
+func (wp *WorkerPublisher) PublishMarketScanComplete(
+	ctx context.Context,
+	totalUsers, errorsCount int,
+	durationMs int64,
+) error {
+	event := &eventspb.MarketScanCompleteEvent{
+		Base:        NewBaseEvent(TopicScanComplete, "market_scanner", ""),
+		TotalUsers:  int32(totalUsers),
+		ErrorsCount: int32(errorsCount),
+		DurationMs:  durationMs,
+	}
+
+	return wp.publishProto(ctx, TopicScanComplete, "global", event)
+}
+
+// PublishWhaleAlert publishes whale trade alert event
+func (wp *WorkerPublisher) PublishWhaleAlert(
+	ctx context.Context,
+	exchange, symbol, tradeID, side, sentiment string,
+	price, quantity, valueUSD float64,
+) error {
+	event := &eventspb.WhaleAlertEvent{
+		Base:      NewBaseEvent(TopicWhaleAlert, "whale_alert_collector", ""),
+		Exchange:  exchange,
+		Symbol:    symbol,
+		TradeId:   tradeID,
+		Price:     price,
+		Quantity:  quantity,
+		ValueUsd:  valueUSD,
+		Side:      side,
+		Sentiment: sentiment,
+	}
+
+	return wp.publishProto(ctx, TopicWhaleAlert, symbol, event)
+}
+
+// PublishLiquidationAlert publishes liquidation alert event
+func (wp *WorkerPublisher) PublishLiquidationAlert(
+	ctx context.Context,
+	exchange, symbol, side string,
+	price, quantity, valueUSD float64,
+) error {
+	event := &eventspb.LiquidationAlertEvent{
+		Base:     NewBaseEvent(TopicLiquidationAlert, "liquidation_collector", ""),
+		Exchange: exchange,
+		Symbol:   symbol,
+		Side:     side,
+		Price:    price,
+		Quantity: quantity,
+		ValueUsd: valueUSD,
+	}
+
+	return wp.publishProto(ctx, TopicLiquidationAlert, symbol, event)
+}
+
+// PublishStrategyWarning publishes strategy performance warning event
+func (wp *WorkerPublisher) PublishStrategyWarning(
+	ctx context.Context,
+	userID, strategyID, strategyName, reason string,
+	winRate, profitFactor float64,
+	totalTrades int,
+) error {
+	event := &eventspb.StrategyWarningEvent{
+		Base:         NewBaseEvent(TopicStrategyWarning, "strategy_evaluator", userID),
+		StrategyId:   strategyID,
+		StrategyName: strategyName,
+		Reason:       reason,
+		WinRate:      winRate,
+		ProfitFactor: profitFactor,
+		TotalTrades:  int32(totalTrades),
+	}
+
+	return wp.publishProto(ctx, TopicStrategyWarning, userID, event)
 }

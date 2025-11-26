@@ -10,6 +10,7 @@ import (
 	"prometheus/internal/agents"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -23,6 +24,7 @@ type MarketScanner struct {
 	tradingPairRepo trading_pair.Repository
 	agentFactory    *agents.Factory
 	kafka           *kafka.Producer
+	eventPublisher  *events.WorkerPublisher
 	maxConcurrency  int // Maximum number of users to process concurrently
 }
 
@@ -46,6 +48,7 @@ func NewMarketScanner(
 		tradingPairRepo: tradingPairRepo,
 		agentFactory:    agentFactory,
 		kafka:           kafka,
+		eventPublisher:  events.NewWorkerPublisher(kafka),
 		maxConcurrency:  maxConcurrency,
 	}
 }
@@ -124,8 +127,15 @@ func (ms *MarketScanner) Run(ctx context.Context) error {
 		"duration", duration,
 	)
 
-	// Publish scan complete event
-	ms.publishScanCompleteEvent(ctx, len(users), len(scanErrors), duration)
+	// Publish scan complete event using protobuf
+	if err := ms.eventPublisher.PublishMarketScanComplete(
+		ctx,
+		len(users),
+		len(scanErrors),
+		duration.Milliseconds(),
+	); err != nil {
+		ms.Log().Error("Failed to publish scan complete event", "error", err)
+	}
 
 	return nil
 }
@@ -223,17 +233,14 @@ func (ms *MarketScanner) analyzeUserPair(ctx context.Context, usr *user.User, pa
 		"strategy", pair.StrategyMode,
 	)
 
-	// Publish analysis request event (for future implementation)
-	event := MarketAnalysisRequestEvent{
-		UserID:     usr.ID.String(),
-		Symbol:     pair.Symbol,
-		MarketType: pair.MarketType.String(),
-		Strategy:   pair.StrategyMode.String(),
-		Timestamp:  time.Now(),
-	}
-
-	// Internal event - keep as JSON for now
-	if err := ms.kafka.Publish(ctx, "market.analysis_requested", usr.ID.String(), event); err != nil {
+	// Publish analysis request event using protobuf
+	if err := ms.eventPublisher.PublishMarketAnalysisRequest(
+		ctx,
+		usr.ID.String(),
+		pair.Symbol,
+		pair.MarketType.String(),
+		pair.StrategyMode.String(),
+	); err != nil {
 		ms.Log().Error("Failed to publish analysis request event", "error", err)
 	}
 
@@ -339,37 +346,4 @@ func (ms *MarketScanner) runAgent(
 	}, nil
 }
 
-// Event structures
-
-type MarketAnalysisRequestEvent struct {
-	UserID     string    `json:"user_id"`
-	Symbol     string    `json:"symbol"`
-	MarketType string    `json:"market_type"` // spot, futures
-	Strategy   string    `json:"strategy"`
-	Timestamp  time.Time `json:"timestamp"`
-}
-
-type MarketScanCompleteEvent struct {
-	TotalUsers     int           `json:"total_users"`
-	ErrorsCount    int           `json:"errors_count"`
-	Duration       time.Duration `json:"duration"`
-	DurationMs     int64         `json:"duration_ms"`
-	ScanStartTime  time.Time     `json:"scan_start_time"`
-	ScanFinishTime time.Time     `json:"scan_finish_time"`
-}
-
-func (ms *MarketScanner) publishScanCompleteEvent(ctx context.Context, totalUsers, errorsCount int, duration time.Duration) {
-	event := MarketScanCompleteEvent{
-		TotalUsers:     totalUsers,
-		ErrorsCount:    errorsCount,
-		Duration:       duration,
-		DurationMs:     duration.Milliseconds(),
-		ScanStartTime:  time.Now().Add(-duration),
-		ScanFinishTime: time.Now(),
-	}
-
-	// Internal event - keep as JSON for now
-	if err := ms.kafka.Publish(ctx, "market.scan_complete", "global", event); err != nil {
-		ms.Log().Error("Failed to publish scan complete event", "error", err)
-	}
-}
+// Event structures removed - now using protobuf events via WorkerPublisher

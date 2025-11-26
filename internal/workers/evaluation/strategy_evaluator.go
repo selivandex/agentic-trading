@@ -308,16 +308,17 @@ func (se *StrategyEvaluator) publishStrategyWarningEvent(
 ) {
 	profitFactor, _ := stats.ProfitFactor.Float64()
 
-	// Use PublishJSON for warning (strategy.warning не в protobuf schema)
-	// TODO: Add StrategyWarningEvent to proto if needed
-	if err := se.eventPublisher.PublishJSON(ctx, "strategy.warning", userID.String(), map[string]interface{}{
-		"user_id":       userID.String(),
-		"strategy":      strategy,
-		"reason":        reason,
-		"total_trades":  stats.TotalTrades,
-		"win_rate":      stats.WinRate,
-		"profit_factor": profitFactor,
-	}); err != nil {
+	// Use protobuf for strategy warning
+	if err := se.eventPublisher.PublishStrategyWarning(
+		ctx,
+		userID.String(),
+		"", // strategy_id - TODO: add to trading_pair
+		strategy,
+		reason,
+		stats.WinRate,
+		profitFactor,
+		stats.TotalTrades,
+	); err != nil {
 		se.Log().Error("Failed to publish strategy warning event", "error", err)
 	}
 }

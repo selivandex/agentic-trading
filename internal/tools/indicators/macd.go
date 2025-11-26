@@ -1,8 +1,6 @@
 package indicators
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
@@ -13,31 +11,37 @@ import (
 
 // NewMACDTool computes MACD (12,26,9 by default).
 func NewMACDTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("macd", "Moving Average Convergence Divergence", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
-		candles, err := loadCandles(ctx, deps, args, 200)
-		if err != nil {
-			return nil, err
-		}
-		fast := parseLimit(args["fast"], 12)
-		slow := parseLimit(args["slow"], 26)
-		signal := parseLimit(args["signal"], 9)
-		closes := extractCloses(candles)
-		if len(closes) < slow+signal {
-			return nil, errors.Wrapf(errors.ErrInternal, "macd: not enough data")
-		}
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "macd",
+			Description: "Moving Average Convergence Divergence",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+			candles, err := loadCandles(ctx, deps, args, 200)
+			if err != nil {
+				return nil, err
+			}
+			fast := parseLimit(args["fast"], 12)
+			slow := parseLimit(args["slow"], 26)
+			signal := parseLimit(args["signal"], 9)
+			closes := extractCloses(candles)
+			if len(closes) < slow+signal {
+				return nil, errors.Wrapf(errors.ErrInternal, "macd: not enough data")
+			}
 
-		emaFast := computeEMA(closes, fast)
-		emaSlow := computeEMA(closes, slow)
-		macdLine := emaFast - emaSlow
-		signalLine := computeEMA([]float64{macdLine}, signal)
-		histogram := macdLine - signalLine
+			emaFast := computeEMA(closes, fast)
+			emaSlow := computeEMA(closes, slow)
+			macdLine := emaFast - emaSlow
+			signalLine := computeEMA([]float64{macdLine}, signal)
+			histogram := macdLine - signalLine
 
-		return map[string]interface{}{
-			"macd":      macdLine,
-			"signal":    signalLine,
-			"histogram": histogram,
-		}, nil
-	})
+			return map[string]interface{}{
+				"macd":      macdLine,
+				"signal":    signalLine,
+				"histogram": histogram,
+			}, nil
+		})
+	return t
 }
 
 func computeEMA(series []float64, period int) float64 {

@@ -1,8 +1,6 @@
 package indicators
 
 import (
-	"context"
-
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
@@ -14,7 +12,12 @@ import (
 // Requires trades data (tape) to determine actual buy/sell volume
 // Falls back to heuristic if trades data unavailable
 func NewDeltaVolumeTool(deps shared.Deps) tool.Tool {
-	return functiontool.New("delta_volume", "Buy/Sell Volume Delta", func(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
+	t, _ := functiontool.New(
+		functiontool.Config{
+			Name:        "delta_volume",
+			Description: "Buy/Sell Volume Delta",
+		},
+		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Get symbol and exchange
 		symbol, ok := args["symbol"].(string)
 		if !ok || symbol == "" {
@@ -87,10 +90,11 @@ func NewDeltaVolumeTool(deps shared.Deps) tool.Tool {
 			"data_source":  "trades",
 		}, nil
 	})
+	return t
 }
 
 // calculateDeltaFromCandles estimates delta from candle data (less accurate)
-func calculateDeltaFromCandles(ctx context.Context, deps shared.Deps, args map[string]interface{}) (map[string]interface{}, error) {
+func calculateDeltaFromCandles(ctx tool.Context, deps shared.Deps, args map[string]interface{}) (map[string]interface{}, error) {
 	candles, err := loadCandles(ctx, deps, args, 50)
 	if err != nil {
 		return nil, err
@@ -145,4 +149,3 @@ func calculateDeltaFromCandles(ctx context.Context, deps shared.Deps, args map[s
 		"note":         "Using candle-based estimation. For accurate data, use trades stream.",
 	}, nil
 }
-

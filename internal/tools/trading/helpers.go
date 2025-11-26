@@ -1,8 +1,9 @@
 package trading
 
 import (
-	"github.com/google/uuid"
 	"prometheus/pkg/errors"
+
+	"github.com/google/uuid"
 )
 
 func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
@@ -13,7 +14,7 @@ func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
 		}
 		id, err := uuid.Parse(v)
 		if err != nil {
-			return uuid.Nil, errors.Wrapf(errors.ErrInternal, "%s is invalid: %w", name, err)
+			return uuid.Nil, errors.Wrapf(err, "%s is invalid", name)
 		}
 		return id, nil
 	case uuid.UUID:

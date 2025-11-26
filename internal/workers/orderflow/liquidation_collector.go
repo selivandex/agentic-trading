@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"prometheus/internal/adapters/exchanges/websocket"
+	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/liquidation"
+	"prometheus/internal/events"
 	"prometheus/internal/workers"
 )
 
@@ -13,27 +15,32 @@ import (
 // Runs every 5 seconds or uses WebSocket for real-time updates
 type LiquidationCollector struct {
 	*workers.BaseWorker
-	liqRepo  liquidation.Repository
-	wsClient websocket.WebSocketClient
-	symbols  []string
-	useWS    bool // Use WebSocket vs polling
+	liqRepo        liquidation.Repository
+	wsClient       websocket.WebSocketClient
+	kafka          *kafka.Producer
+	eventPublisher *events.WorkerPublisher
+	symbols        []string
+	useWS          bool // Use WebSocket vs polling
 }
 
 // NewLiquidationCollector creates a new liquidation collector
 func NewLiquidationCollector(
 	liqRepo liquidation.Repository,
 	wsClient websocket.WebSocketClient,
+	kafka *kafka.Producer,
 	symbols []string,
 	useWS bool,
 	interval time.Duration,
 	enabled bool,
 ) *LiquidationCollector {
 	return &LiquidationCollector{
-		BaseWorker: workers.NewBaseWorker("liquidation_collector", interval, enabled),
-		liqRepo:    liqRepo,
-		wsClient:   wsClient,
-		symbols:    symbols,
-		useWS:      useWS,
+		BaseWorker:     workers.NewBaseWorker("liquidation_collector", interval, enabled),
+		liqRepo:        liqRepo,
+		wsClient:       wsClient,
+		kafka:          kafka,
+		eventPublisher: events.NewWorkerPublisher(kafka),
+		symbols:        symbols,
+		useWS:          useWS,
 	}
 }
 
@@ -102,9 +109,30 @@ func (lc *LiquidationCollector) runPollingMode(ctx context.Context) error {
 	return nil
 }
 
-// publishLiquidationAlert publishes large liquidation event to Kafka
+// publishLiquidationAlert publishes large liquidation event to Kafka using protobuf
 func (lc *LiquidationCollector) publishLiquidationAlert(ctx context.Context, liq *liquidation.Liquidation) {
-	// TODO: Publish to Kafka topic "market.liquidations"
-	lc.Log().Infof("Large liquidation alert: %s %s $%.0f",
-		liq.Symbol, liq.Side, liq.Value)
+	if lc.eventPublisher == nil {
+		lc.Log().Warn("Event publisher not configured, skipping liquidation alert")
+		return
+	}
+
+	// Publish using protobuf event
+	if err := lc.eventPublisher.PublishLiquidationAlert(
+		ctx,
+		liq.Exchange,
+		liq.Symbol,
+		liq.Side,
+		liq.Price,
+		liq.Quantity,
+		liq.Value,
+	); err != nil {
+		lc.Log().Error("Failed to publish liquidation alert", "error", err)
+		return
+	}
+
+	lc.Log().Info("Large liquidation alert published",
+		"symbol", liq.Symbol,
+		"side", liq.Side,
+		"value_usd", liq.Value,
+	)
 }
