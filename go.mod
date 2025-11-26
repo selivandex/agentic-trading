@@ -3,22 +3,22 @@ module prometheus
 go 1.25.3
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.41.0
-	github.com/getsentry/sentry-go v0.27.0
-	github.com/google/uuid v1.6.0
+github.com/ClickHouse/clickhouse-go/v2 v2.41.0
+github.com/getsentry/sentry-go v0.27.0
+github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/pgvector/pgvector-go v0.3.0
         github.com/redis/go-redis/v9 v9.17.0
-        github.com/segmentio/kafka-go v0.4.49
-        github.com/shopspring/decimal v1.4.0
-        google.golang.org/adk v0.0.0
-        go.uber.org/zap v1.27.0
+github.com/segmentio/kafka-go v0.4.49
+github.com/shopspring/decimal v1.4.0
+google.golang.org/adk v0.0.0
+go.uber.org/zap v1.27.0
 )
 
-replace google.golang.org/adk => ./internal/adapters/adk
+replace google.golang.org/adk => ./internal/agents/adk
 
 require (
 	github.com/ClickHouse/ch-go v0.69.0 // indirect
