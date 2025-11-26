@@ -12,7 +12,7 @@ import (
 	"text/template"
 )
 
-//go:embed assets/**/*.tmpl
+//go:embed prompts/**/*.tmpl
 var embeddedFS embed.FS
 
 // Template represents a parsed template loaded from disk.
@@ -68,7 +68,7 @@ func NewRegistryFromFS(filesystem fs.FS, rootPath string) (*Registry, error) {
 	return r, nil
 }
 
-// Get returns a lazily initialized default registry rooted at embedded assets.
+// Get returns a lazily initialized default registry rooted at embedded prompts.
 func Get() *Registry {
 	defaultOnce.Do(func() {
 		defaultRegistry, defaultErr = newEmbeddedRegistry()
@@ -180,12 +180,12 @@ func (r *Registry) pathToID(rel string) string {
 }
 
 func newEmbeddedRegistry() (*Registry, error) {
-	subFS, err := fs.Sub(embeddedFS, "assets")
+	subFS, err := fs.Sub(embeddedFS, "prompts")
 	if err != nil {
 		return nil, errors.Wrap(err, "prepare embedded templates")
 	}
 
-	return NewRegistryFromFS(subFS, "assets")
+	return NewRegistryFromFS(subFS, "prompts")
 }
 
 var (

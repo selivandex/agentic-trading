@@ -152,14 +152,19 @@ gracefulShutdown(wg, httpServer, workers, kafka, db, log)
     - Exit their goroutines
     - scheduler.Stop() waits for wg.Wait()
 
-[3/7] Auxiliary Goroutines (5s timeout)
+[3/7] Event Consumers + Auxiliary Goroutines (5s timeout)
+    - Notification consumer (Kafka → Telegram)
+    - Risk consumer (automated risk actions)
+    - Analytics consumer (metrics tracking)
     - Market scanner event listener
-    - Other background tasks
+    - All consumers see ctx.Done() in their select loops
+    - Finish processing current message
     - wg.Wait() for completion
 
 [4/7] Kafka Clients
     - Flush producer buffers
-    - Close consumer connections
+    - Close all consumer connections (notification, risk, analytics)
+    - Ensure no data loss
 
 [5/7] Error Tracker (3s timeout)
     - Flush pending errors to Sentry
@@ -171,7 +176,7 @@ gracefulShutdown(wg, httpServer, workers, kafka, db, log)
     - Close PostgreSQL pool
     - Close ClickHouse connection
     - Close Redis client
-    - Why last? Other components may need DB during shutdown
+    - Why last? Consumers may need DB during final message processing
 ```
 
 ---

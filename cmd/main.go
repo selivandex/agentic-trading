@@ -22,6 +22,7 @@ import (
 	redisclient "prometheus/internal/adapters/redis"
 	"prometheus/internal/agents"
 	"prometheus/internal/api/health"
+	"prometheus/internal/consumers"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/journal"
 	"prometheus/internal/domain/market_data"
@@ -33,6 +34,7 @@ import (
 	"prometheus/internal/domain/sentiment"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	"prometheus/internal/metrics"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
@@ -126,7 +128,12 @@ func main() {
 	// External Adapters (Kafka, Exchange, Crypto)
 	// ========================================
 	kafkaProducer := provideKafkaProducer(cfg, log)
-	kafkaConsumer := provideKafkaConsumer(cfg, log)
+
+	// Create multiple consumers for different consumer groups
+	notificationConsumer := provideKafkaConsumer(cfg, "notifications", log)
+	riskConsumer := provideKafkaConsumer(cfg, "risk_events", log)
+	analyticsConsumer := provideKafkaConsumer(cfg, "analytics", log)
+	opportunityConsumer := provideKafkaConsumer(cfg, events.TopicOpportunityFound, log)
 
 	encryptor, err := crypto.NewEncryptor(cfg.Crypto.EncryptionKey)
 	if err != nil {
@@ -165,11 +172,13 @@ func main() {
 	// Create application context - will be cancelled on shutdown signal
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// WaitGroup for tracking all goroutines
+	var wg sync.WaitGroup
+
 	// ========================================
 	// Background Workers
 	// ========================================
 	workerScheduler := provideWorkers(
-		ctx, // Pass context for event-driven workers
 		userRepo,
 		tradingPairRepo,
 		orderRepo,
@@ -184,11 +193,54 @@ func main() {
 		marketDataFactory,
 		encryptor,
 		kafkaProducer,
-		kafkaConsumer,
 		agentFactory,
 		cfg,
 		log,
 	)
+
+	// ========================================
+	// Event Consumers (Background Processing)
+	// ========================================
+	notificationSvc := consumers.NewNotificationConsumer(notificationConsumer, log)
+	riskSvc := consumers.NewRiskConsumer(riskConsumer, riskEngine, log)
+	analyticsSvc := consumers.NewAnalyticsConsumer(analyticsConsumer, log)
+	opportunitySvc := consumers.NewOpportunityConsumer(
+		opportunityConsumer,
+		userRepo,
+		tradingPairRepo,
+		agentFactory,
+		cfg.Workers.MarketScannerMaxConcurrency,
+		log,
+	)
+
+	// Start consumers in background (all tracked by WaitGroup)
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		if err := notificationSvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Notification consumer failed", "error", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if err := riskSvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Risk consumer failed", "error", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if err := analyticsSvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Analytics consumer failed", "error", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if err := opportunitySvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Opportunity consumer failed", "error", err)
+		}
+	}()
+
+	log.Info("✓ Event consumers started (notification, risk, analytics, opportunity)")
 
 	log.With("tools", len(toolRegistry.List())).Info("System initialized successfully")
 
@@ -214,9 +266,7 @@ func main() {
 	// ========================================
 	httpServer := provideHTTPServer(cfg, healthHandler, log)
 
-	var wg sync.WaitGroup
-
-	// Start HTTP server in background (with proper error handling)
+	// Start HTTP server in background (tracked by wg)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -264,8 +314,12 @@ func main() {
 		&wg,
 		httpServer,
 		workerScheduler,
+		marketDataFactory,
 		kafkaProducer,
-		kafkaConsumer,
+		notificationConsumer,
+		riskConsumer,
+		analyticsConsumer,
+		opportunityConsumer,
 		pgClient,
 		chClient,
 		redisClient,
@@ -351,8 +405,8 @@ func provideKafkaProducer(cfg *config.Config, log *logger.Logger) *kafka.Produce
 	return producer
 }
 
-func provideKafkaConsumer(cfg *config.Config, log *logger.Logger) *kafka.Consumer {
-	log.Info("Initializing Kafka consumer...")
+func provideKafkaConsumer(cfg *config.Config, topic string, log *logger.Logger) *kafka.Consumer {
+	log.Info("Initializing Kafka consumer", "topic", topic)
 	if len(cfg.Kafka.Brokers) == 0 {
 		cfg.Kafka.Brokers = []string{"localhost:9092"}
 	}
@@ -360,9 +414,9 @@ func provideKafkaConsumer(cfg *config.Config, log *logger.Logger) *kafka.Consume
 	consumer := kafka.NewConsumer(kafka.ConsumerConfig{
 		Brokers: cfg.Kafka.Brokers,
 		GroupID: cfg.Kafka.GroupID,
-		Topic:   "market.opportunity_found",
+		Topic:   topic,
 	})
-	log.Info("✓ Kafka consumer initialized")
+	log.Info("✓ Kafka consumer initialized", "topic", topic)
 	return consumer
 }
 
@@ -454,7 +508,6 @@ func resolveProvider(registry *ai.ProviderRegistry, desired string) string {
 }
 
 func provideWorkers(
-	ctx context.Context,
 	userRepo user.Repository,
 	tradingPairRepo trading_pair.Repository,
 	orderRepo order.Repository,
@@ -469,7 +522,6 @@ func provideWorkers(
 	marketDataFactory exchanges.CentralFactory,
 	encryptor *crypto.Encryptor,
 	kafkaProducer *kafka.Producer,
-	kafkaConsumer *kafka.Consumer,
 	agentFactory *agents.Factory,
 	cfg *config.Config,
 	log *logger.Logger,
@@ -614,32 +666,17 @@ func provideWorkers(
 	// Analysis Workers (core agentic system)
 	// ========================================
 
-	// Market scanner: Runs agent analysis for ALL active users
-	// This is the heart of the agentic trading system
-	// Operates in hybrid mode: scheduled scans + event-driven responses
-	marketScanner := analysis.NewMarketScanner(
+	// Market scanner: Runs SCHEDULED agent analysis for ALL active users
+	// For event-driven analysis, see OpportunityConsumer in consumers
+	scheduler.RegisterWorker(analysis.NewMarketScanner(
 		userRepo,
 		tradingPairRepo,
 		agentFactory,
 		kafkaProducer,
-		kafkaConsumer,
 		cfg.Workers.MarketScannerInterval,
 		cfg.Workers.MarketScannerMaxConcurrency,
-		cfg.Workers.MarketScannerEventDriven,
 		true, // enabled
-	)
-	scheduler.RegisterWorker(marketScanner)
-
-	// Start event listener for market scanner if event-driven mode is enabled
-	if cfg.Workers.MarketScannerEventDriven {
-		// IMPORTANT: Pass application context so event listener stops on shutdown
-		go func() {
-			if err := marketScanner.Start(ctx); err != nil && ctx.Err() == nil {
-				log.Error("Market scanner event listener failed", "error", err)
-			}
-		}()
-		log.Info("Market scanner event-driven mode enabled")
-	}
+	))
 
 	// Opportunity finder: Finds trading setups
 	scheduler.RegisterWorker(analysis.NewOpportunityFinder(
@@ -750,8 +787,12 @@ func gracefulShutdown(
 	wg *sync.WaitGroup,
 	httpServer *http.Server,
 	workerScheduler *workers.Scheduler,
+	marketDataFactory exchanges.CentralFactory,
 	kafkaProducer *kafka.Producer,
-	kafkaConsumer *kafka.Consumer,
+	notificationConsumer *kafka.Consumer,
+	riskConsumer *kafka.Consumer,
+	analyticsConsumer *kafka.Consumer,
+	opportunityConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -808,9 +849,17 @@ func gracefulShutdown(
 			log.Error("Kafka producer close failed", "error", err)
 		}
 	}
-	if kafkaConsumer != nil {
-		if err := kafkaConsumer.Close(); err != nil {
-			log.Error("Kafka consumer close failed", "error", err)
+	// Close all consumers
+	for name, consumer := range map[string]*kafka.Consumer{
+		"notification": notificationConsumer,
+		"risk":         riskConsumer,
+		"analytics":    analyticsConsumer,
+		"opportunity":  opportunityConsumer,
+	} {
+		if consumer != nil {
+			if err := consumer.Close(); err != nil {
+				log.Error("Kafka consumer close failed", "consumer", name, "error", err)
+			}
 		}
 	}
 	log.Info("✓ Kafka clients closed")

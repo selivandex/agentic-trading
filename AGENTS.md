@@ -47,7 +47,7 @@ Guidance for AI agents working in this codebase. Follow idiomatic Go, Clean Arch
 ├── pkg/                    # Shared utilities (logger, templates, errors, etc.)
 ├── docs/                   # Specs, environment/setup docs, roadmap
 ├── migrations/             # Postgres & ClickHouse migrations
-├── templates/              # Prompt/template assets (Phase 5 focus)
+├── templates/              # Prompt/template prompts (Phase 5 focus)
 └── Makefile                # Canonical local workflow commands
 ```
 

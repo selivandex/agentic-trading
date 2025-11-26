@@ -2,14 +2,19 @@ package analysis
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"prometheus/internal/adapters/exchanges"
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/trading_pair"
+	"prometheus/internal/events"
+	eventspb "prometheus/internal/events/proto"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // OpportunityFinder scans markets for trading setups and opportunities
@@ -178,24 +183,77 @@ func (of *OpportunityFinder) publishOpportunityEvent(
 	symbol, opportunityType string,
 	priceChange, volumeRatio float64,
 ) {
-	direction := "up"
+	direction := "long"
 	if priceChange < 0 {
-		direction = "down"
+		direction = "short"
 	}
 
-	event := OpportunityEvent{
-		Symbol:       symbol,
-		Type:         opportunityType,
-		Direction:    direction,
-		PriceChange:  priceChange,
-		VolumeRatio:  volumeRatio,
-		CurrentPrice: 0, // TODO: Get from latest candle
-		Timestamp:    time.Now(),
+	// Create protobuf event
+	event := &eventspb.OpportunityFoundEvent{
+		Base:       events.NewBaseEvent(events.TopicOpportunityFound, "opportunity_finder", ""),
+		Symbol:     symbol,
+		Exchange:   "binance", // TODO: Make configurable
+		Direction:  direction,
+		Confidence: calculateConfidence(priceChange, volumeRatio),
+		Entry:      0, // TODO: Get from latest candle
+		StopLoss:   0, // TODO: Calculate based on ATR
+		TakeProfit: 0, // TODO: Calculate R:R ratio
+		Timeframe:  "1m",
+		Strategy:   opportunityType,
+		Reasoning:  formatReasoning(priceChange, volumeRatio),
+		Indicators: make(map[string]string),
 	}
 
-	if err := of.kafka.Publish(ctx, "market.opportunity_found", symbol, event); err != nil {
+	// Serialize to protobuf
+	data, err := proto.Marshal(event)
+	if err != nil {
+		of.Log().Error("Failed to marshal opportunity event", "error", err)
+		return
+	}
+
+	// Publish binary data to Kafka
+	if err := of.kafka.PublishBinary(ctx, events.TopicOpportunityFound, []byte(symbol), data); err != nil {
 		of.Log().Error("Failed to publish opportunity event", "error", err)
 	}
+}
+
+// calculateConfidence calculates opportunity confidence based on signals
+func calculateConfidence(priceChange, volumeRatio float64) float64 {
+	// Simple heuristic - improve with ML later
+	confidence := 0.5 // Base confidence
+
+	// Stronger price movement → higher confidence
+	if abs(priceChange) >= 5.0 {
+		confidence += 0.2
+	} else if abs(priceChange) >= 3.0 {
+		confidence += 0.1
+	}
+
+	// Higher volume confirmation → higher confidence
+	if volumeRatio >= 3.0 {
+		confidence += 0.2
+	} else if volumeRatio >= 2.0 {
+		confidence += 0.1
+	}
+
+	// Cap at 0.95 (never 100% certain)
+	if confidence > 0.95 {
+		confidence = 0.95
+	}
+
+	return confidence
+}
+
+// formatReasoning generates human-readable reasoning
+func formatReasoning(priceChange, volumeRatio float64) string {
+	direction := "upward"
+	if priceChange < 0 {
+		direction = "downward"
+		priceChange = -priceChange
+	}
+
+	return fmt.Sprintf("Strong %s movement (%.2f%%) with %.1fx volume confirmation",
+		direction, priceChange, volumeRatio)
 }
 
 func abs(x float64) float64 {

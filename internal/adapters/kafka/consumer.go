@@ -75,6 +75,11 @@ func (c *Consumer) Consume(ctx context.Context, handler MessageHandler) error {
 	}
 }
 
+// ReadMessage reads the next message (blocking until message available or ctx cancelled)
+func (c *Consumer) ReadMessage(ctx context.Context) (kafka.Message, error) {
+	return c.reader.ReadMessage(ctx)
+}
+
 // Close closes the consumer
 func (c *Consumer) Close() error {
 	return c.reader.Close()

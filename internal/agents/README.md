@@ -15,12 +15,12 @@ Agents use Google ADK for LLM orchestration and tool calling.
 
 ## Available Agents
 
-| Agent | Purpose | Key Tools |
-|-------|---------|-----------|
-| Market Analysis | Analyze conditions, detect regimes | Market data, indicators |
-| Risk Manager | Validate trades, manage risk | Risk validation, circuit breaker |
-| Trade Executor | Execute orders | Place/cancel orders, positions |
-| Portfolio Manager | Portfolio optimization | Balances, positions |
+| Agent             | Purpose                            | Key Tools                        |
+| ----------------- | ---------------------------------- | -------------------------------- |
+| Market Analysis   | Analyze conditions, detect regimes | Market data, indicators          |
+| Risk Manager      | Validate trades, manage risk       | Risk validation, circuit breaker |
+| Trade Executor    | Execute orders                     | Place/cancel orders, positions   |
+| Portfolio Manager | Portfolio optimization             | Balances, positions              |
 
 ## Adding New Agent
 
@@ -29,7 +29,7 @@ Agents use Google ADK for LLM orchestration and tool calling.
 3. Register in `registry.go` with name, description, version, enabled status
 4. Wire in `factory.go` switch case to instantiate with dependencies
 5. Assign tools in `tool_assignments.go` map
-6. Create prompt template in `pkg/templates/assets/<agent>_system.tmpl`
+6. Create prompt template in `pkg/templates/prompts/<agent>_system.tmpl`
 7. Update `docs/DEVELOPMENT_PLAN.md` with agent purpose and phase
 
 ## Core Rules
@@ -57,6 +57,7 @@ Agents call tools via ADK runtime. Tools return structured data (maps). Agent pr
 ## Memory & State
 
 **Stateless agents** — use services for persistence:
+
 - **Journal service**: Store reasoning, decisions, actions with timestamps
 - **Memory service**: Store insights, learnings, context with embeddings for semantic search
 - **Order/Position services**: Query current state, don't cache in agent
@@ -71,6 +72,7 @@ Agents call tools via ADK runtime. Tools return structured data (maps). Agent pr
 ## Configuration
 
 Load from env vars in `internal/adapters/config/config.go`:
+
 - `<AGENT>_ENABLED` — enable/disable
 - `<AGENT>_MODEL` — LLM model name
 - `<AGENT>_TEMPERATURE` — creativity (0-1)
@@ -79,6 +81,7 @@ Load from env vars in `internal/adapters/config/config.go`:
 ## Monitoring
 
 Track metrics via OpenTelemetry:
+
 - Invocation count per agent
 - Success/failure rate
 - Latency (p50, p95, p99)

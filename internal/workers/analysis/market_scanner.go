@@ -2,12 +2,9 @@ package analysis
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
-
-	kafkago "github.com/segmentio/kafka-go"
 
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/agents"
@@ -17,21 +14,16 @@ import (
 	"prometheus/pkg/errors"
 )
 
-// MarketScanner runs agent analysis for all active users
-// This is the core worker that drives the agentic trading system
-// It operates in two modes:
-// 1. Scheduled: periodic full scan of all users (every 2 minutes)
-// 2. Event-driven: immediate analysis on opportunity events (< 30s response time)
+// MarketScanner runs periodic agent analysis for all active users
+// This is the SCHEDULED mode of the agentic trading system
+// For event-driven analysis, see internal/consumers/opportunity_consumer.go
 type MarketScanner struct {
 	*workers.BaseWorker
 	userRepo        user.Repository
 	tradingPairRepo trading_pair.Repository
 	agentFactory    *agents.Factory
 	kafka           *kafka.Producer
-	kafkaConsumer   *kafka.Consumer
-	maxConcurrency  int                   // Maximum number of users to process concurrently
-	opportunityChan chan OpportunityEvent // Channel for urgent opportunity events
-	eventDriven     bool                  // Enable event-driven mode
+	maxConcurrency  int // Maximum number of users to process concurrently
 }
 
 // NewMarketScanner creates a new market scanner worker
@@ -40,10 +32,8 @@ func NewMarketScanner(
 	tradingPairRepo trading_pair.Repository,
 	agentFactory *agents.Factory,
 	kafka *kafka.Producer,
-	kafkaConsumer *kafka.Consumer,
 	interval time.Duration,
 	maxConcurrency int,
-	eventDriven bool,
 	enabled bool,
 ) *MarketScanner {
 	if maxConcurrency <= 0 {
@@ -56,22 +46,8 @@ func NewMarketScanner(
 		tradingPairRepo: tradingPairRepo,
 		agentFactory:    agentFactory,
 		kafka:           kafka,
-		kafkaConsumer:   kafkaConsumer,
 		maxConcurrency:  maxConcurrency,
-		opportunityChan: make(chan OpportunityEvent, 100), // Buffer for 100 events
-		eventDriven:     eventDriven,
 	}
-}
-
-// Start initializes the worker and starts event listener if enabled
-func (ms *MarketScanner) Start(ctx context.Context) error {
-	// Start event listener for opportunity events if event-driven mode is enabled
-	if ms.eventDriven && ms.kafkaConsumer != nil {
-		go ms.listenForOpportunities(ctx)
-		ms.Log().Info("Market scanner: event-driven mode enabled, listening for opportunities")
-	}
-
-	return nil
 }
 
 // Run executes one iteration of market scanning for ALL active users
@@ -152,129 +128,6 @@ func (ms *MarketScanner) Run(ctx context.Context) error {
 	ms.publishScanCompleteEvent(ctx, len(users), len(scanErrors), duration)
 
 	return nil
-}
-
-// listenForOpportunities listens for opportunity events from Kafka
-// This is the EVENT-DRIVEN mode - immediate response to market opportunities
-func (ms *MarketScanner) listenForOpportunities(ctx context.Context) {
-	ms.Log().Info("Starting opportunity event listener")
-
-	// Consume messages from opportunity topic
-	go func() {
-		err := ms.kafkaConsumer.Consume(ctx, func(ctx context.Context, msg kafkago.Message) error {
-			var event OpportunityEvent
-			if err := json.Unmarshal(msg.Value, &event); err != nil {
-				ms.Log().Error("Failed to unmarshal opportunity event", "error", err)
-				return err
-			}
-
-			ms.Log().Info("Received opportunity event",
-				"symbol", event.Symbol,
-				"type", event.Type,
-				"direction", event.Direction,
-				"price_change", event.PriceChange,
-			)
-
-			// Send to processing channel (non-blocking)
-			select {
-			case ms.opportunityChan <- event:
-				// Event queued successfully
-			default:
-				ms.Log().Warn("Opportunity channel full, dropping event", "symbol", event.Symbol)
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			ms.Log().Error("Kafka consumer stopped", "error", err)
-		}
-	}()
-
-	// Process opportunities from channel
-	for {
-		select {
-		case <-ctx.Done():
-			ms.Log().Info("Opportunity listener shutting down")
-			return
-		case event := <-ms.opportunityChan:
-			// Process opportunity immediately (event-driven analysis)
-			ms.handleOpportunity(ctx, event)
-		}
-	}
-}
-
-// handleOpportunity processes a single opportunity event
-// Triggers immediate agent analysis for users monitoring this symbol
-func (ms *MarketScanner) handleOpportunity(ctx context.Context, event OpportunityEvent) {
-	start := time.Now()
-	ms.Log().Info("Processing opportunity",
-		"symbol", event.Symbol,
-		"type", event.Type,
-		"direction", event.Direction,
-	)
-
-	// Get all users with active trading pairs for this symbol
-	pairs, err := ms.tradingPairRepo.GetActiveBySymbol(ctx, event.Symbol)
-	if err != nil {
-		ms.Log().Error("Failed to get trading pairs for symbol",
-			"symbol", event.Symbol,
-			"error", err,
-		)
-		return
-	}
-
-	if len(pairs) == 0 {
-		ms.Log().Debug("No users monitoring this symbol", "symbol", event.Symbol)
-		return
-	}
-
-	ms.Log().Info("Found users monitoring symbol",
-		"symbol", event.Symbol,
-		"users_count", len(pairs),
-	)
-
-	// Run agent analysis for each user interested in this symbol
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, ms.maxConcurrency)
-
-	for _, pair := range pairs {
-		// Get user for this trading pair
-		usr, err := ms.userRepo.GetByID(ctx, pair.UserID)
-		if err != nil {
-			ms.Log().Error("Failed to get user", "user_id", pair.UserID, "error", err)
-			continue
-		}
-
-		if !usr.IsActive || !usr.Settings.CircuitBreakerOn {
-			continue
-		}
-
-		wg.Add(1)
-		go func(u *user.User, p *trading_pair.TradingPair) {
-			defer wg.Done()
-
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			if err := ms.analyzeUserPair(ctx, u, p); err != nil {
-				ms.Log().Error("Failed to analyze pair for opportunity",
-					"user_id", u.ID,
-					"symbol", p.Symbol,
-					"error", err,
-				)
-			}
-		}(usr, pair)
-	}
-
-	wg.Wait()
-
-	duration := time.Since(start)
-	ms.Log().Info("Opportunity processing complete",
-		"symbol", event.Symbol,
-		"users_processed", len(pairs),
-		"duration", duration,
-	)
 }
 
 // scanUser runs agent analysis for a single user

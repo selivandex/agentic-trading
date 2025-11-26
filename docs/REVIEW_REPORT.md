@@ -202,7 +202,7 @@ type ModelSelector struct {
 **Файлы промптов:**
 
 ```
-pkg/templates/assets/agents/
+pkg/templates/prompts/agents/
 ├── market_analyst.tmpl
 ├── smc_analyst.tmpl
 ├── sentiment_analyst.tmpl
