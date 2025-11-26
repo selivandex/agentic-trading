@@ -3,21 +3,19 @@ package market
 import (
 	"time"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetTradesTool streams recent trades.
 func NewGetTradesTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_trades",
-			Description: "Get recent trades tape",
-		},
+	return tools.NewFactory(
+		"get_trades",
+		"Get recent trades tape",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_trades: market data repository not configured")
@@ -49,6 +47,10 @@ func NewGetTradesTool(deps shared.Deps) tool.Tool {
 
 			return map[string]interface{}{"trades": data}, nil
 		},
-	)
-	return t
+		deps,
+	).
+		WithTimeout(10 * time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

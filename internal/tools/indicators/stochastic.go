@@ -1,22 +1,22 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewStochasticTool computes Stochastic Oscillator using ta-lib
 func NewStochasticTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "stochastic",
-			Description: "Stochastic Oscillator",
-		},
+	return tools.NewFactory(
+		"stochastic",
+		"Stochastic Oscillator",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 		// Load candles
 		candles, err := loadCandles(ctx, deps, args, 200)
@@ -83,7 +83,12 @@ func NewStochasticTool(deps shared.Deps) tool.Tool {
 			"k_period":     kPeriod,
 			"d_period":     dPeriod,
 		}, nil
-	})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15 * time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 

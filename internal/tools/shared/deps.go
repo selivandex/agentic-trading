@@ -12,6 +12,7 @@ import (
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/risk"
+	"prometheus/internal/domain/stats"
 	"prometheus/pkg/logger"
 )
 
@@ -28,6 +29,7 @@ type Deps struct {
 	ExchangeAccountRepo exchange_account.Repository
 	MemoryRepo          memory.Repository
 	RiskRepo            risk.Repository
+	StatsRepo           stats.Repository
 	RiskEngine          RiskEngine
 	Redis               RedisClient
 	Log                 *logger.Logger

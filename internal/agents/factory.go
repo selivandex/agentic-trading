@@ -6,7 +6,6 @@ import (
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 
 	"prometheus/internal/adapters/adk"
 	"prometheus/internal/adapters/ai"
@@ -76,7 +75,7 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 	// Create ADK model adapter (bridges our AI provider to ADK model interface)
 	adkModel := adk.NewModelAdapter(chatProvider, modelInfo.Name)
 
-	// Collect and convert tools to ADK format
+	// Collect tools for ADK agent
 	adkTools := make([]tool.Tool, 0, len(cfg.Tools))
 	toolInfo := make([]tools.Definition, 0, len(cfg.Tools))
 	definitionByName := map[string]tools.Definition{}
@@ -90,23 +89,9 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 			return nil, errors.Wrapf(errors.ErrNotFound, "tool not found: %s", toolName)
 		}
 
-		// Wrap our tool as ADK functiontool using proper generics
-		toolImpl := t
-		adkTool, err := functiontool.New(
-			functiontool.Config{
-				Name:        toolImpl.Name(),
-				Description: toolImpl.Description(),
-			},
-			// Generic function with map[string]interface{} as both input and output types
-			func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
-				return toolImpl.Execute(ctx, args)
-			},
-		)
-		if err != nil {
-			return nil, errors.Wrapf(err, "create functiontool for %s", toolName)
-		}
-
-		adkTools = append(adkTools, adkTool)
+		// Our tools are already properly typed ADK tool.Tool instances
+		// They were created via functiontool.New() with tool.Context signature
+		adkTools = append(adkTools, t)
 
 		if def, ok := definitionByName[toolName]; ok {
 			toolInfo = append(toolInfo, def)

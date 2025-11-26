@@ -2,22 +2,21 @@ package indicators
 
 import (
 	"math"
+	"time"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewRSITool computes Relative Strength Index using closing prices.
 func NewRSITool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "rsi",
-			Description: "Relative Strength Index",
-		},
+	return tools.NewFactory(
+		"rsi",
+		"Relative Strength Index",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			candles, err := loadCandles(ctx, deps, args, 100)
 			if err != nil {
@@ -48,6 +47,11 @@ func NewRSITool(deps shared.Deps) tool.Tool {
 			rsi := 100.0 - (100.0 / (1 + rs))
 
 			return map[string]interface{}{"value": rsi}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15 * time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

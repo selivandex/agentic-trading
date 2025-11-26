@@ -1,22 +1,22 @@
 package indicators
 
 import (
+	"time"
+
 	"github.com/markcheno/go-talib"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewCCITool computes Commodity Channel Index using ta-lib
 func NewCCITool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "cci",
-			Description: "Commodity Channel Index",
-		},
+	return tools.NewFactory(
+		"cci",
+		"Commodity Channel Index",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			// Load candles
 			candles, err := loadCandles(ctx, deps, args, 200)
@@ -64,6 +64,11 @@ func NewCCITool(deps shared.Deps) tool.Tool {
 				"signal": signal,
 				"period": period,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

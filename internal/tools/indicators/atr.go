@@ -2,22 +2,21 @@ package indicators
 
 import (
 	"math"
+	"time"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewATRTool computes Average True Range.
 func NewATRTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "atr",
-			Description: "Average True Range",
-		},
+	return tools.NewFactory(
+		"atr",
+		"Average True Range",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			candles, err := loadCandles(ctx, deps, args, 100)
 			if err != nil {
@@ -48,6 +47,11 @@ func NewATRTool(deps shared.Deps) tool.Tool {
 			atr = atr / float64(period)
 
 			return map[string]interface{}{"value": atr}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15 * time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

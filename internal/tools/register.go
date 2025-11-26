@@ -15,6 +15,15 @@ import (
 func RegisterAllTools(registry *Registry, deps shared.Deps) {
 	log := deps.Log.With("component", "tool_registration")
 
+	// Note: Middleware available in internal/tools/middleware/ for wrapping tool functions:
+	// - RetryMiddleware.WrapFunc() - retry with exponential backoff
+	// - TimeoutMiddleware.WrapFunc() - execution timeout enforcement
+	// - StatsMiddleware.WrapFunc() - usage metrics tracking to ClickHouse
+	// - WithRiskCheck() - pre-execution risk engine validation
+	//
+	// To apply middleware, refactor NewXXXTool() constructors to use WrapFunc pattern.
+	// Currently tools use functiontool.New() directly and return tool.Tool.
+
 	// ========================================
 	// Market Data Tools
 	// ========================================

@@ -3,21 +3,19 @@ package market
 import (
 	"time"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetOHLCVTool loads historical candles for a symbol/timeframe.
 func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_ohlcv",
-			Description: "Retrieve historical OHLCV candles",
-		},
+	return tools.NewFactory(
+		"get_ohlcv",
+		"Retrieve historical OHLCV candles",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_ohlcv: market data repository not configured")
@@ -52,8 +50,12 @@ func NewGetOHLCVTool(deps shared.Deps) tool.Tool {
 
 			return map[string]interface{}{"candles": data}, nil
 		},
-	)
-	return t
+		deps,
+	).
+		WithTimeout(15*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 func parseLimit(raw interface{}, fallback int) int {

@@ -1,21 +1,21 @@
 package market
 
 import (
+	"time"
+
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetOrderBookTool returns an order book snapshot tool.
 func NewGetOrderBookTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_orderbook",
-			Description: "Get depth snapshot for a trading pair",
-		},
+	return tools.NewFactory(
+		"get_orderbook",
+		"Get depth snapshot for a trading pair",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_orderbook: market data repository not configured")
@@ -45,6 +45,10 @@ func NewGetOrderBookTool(deps shared.Deps) tool.Tool {
 				"ask_depth": snapshot.AskDepth,
 			}, nil
 		},
-	)
-	return t
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }

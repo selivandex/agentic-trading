@@ -1,21 +1,21 @@
 package indicators
 
 import (
+	"time"
+
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewMACDTool computes MACD (12,26,9 by default).
 func NewMACDTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "macd",
-			Description: "Moving Average Convergence Divergence",
-		},
+	return tools.NewFactory(
+		"macd",
+		"Moving Average Convergence Divergence",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			candles, err := loadCandles(ctx, deps, args, 200)
 			if err != nil {
@@ -40,8 +40,13 @@ func NewMACDTool(deps shared.Deps) tool.Tool {
 				"signal":    signalLine,
 				"histogram": histogram,
 			}, nil
-		})
-	return t
+		},
+		deps,
+	).
+		WithTimeout(15 * time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
 
 func computeEMA(series []float64, period int) float64 {

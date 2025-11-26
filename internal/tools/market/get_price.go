@@ -3,21 +3,19 @@ package market
 import (
 	"time"
 
+	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 
 	"prometheus/pkg/errors"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
 )
 
 // NewGetPriceTool returns a tool that fetches the latest ticker snapshot.
 func NewGetPriceTool(deps shared.Deps) tool.Tool {
-	t, _ := functiontool.New(
-		functiontool.Config{
-			Name:        "get_price",
-			Description: "Fetch current price with bid/ask spread",
-		},
+	return tools.NewFactory(
+		"get_price",
+		"Fetch current price with bid/ask spread",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if !deps.HasMarketData() {
 				return nil, errors.Wrapf(errors.ErrInternal, "get_price: market data repository not configured")
@@ -48,6 +46,10 @@ func NewGetPriceTool(deps shared.Deps) tool.Tool {
 				"timestamp":    ticker.Timestamp.Format(time.RFC3339),
 			}, nil
 		},
-	)
-	return t
+		deps,
+	).
+		WithTimeout(10*time.Second).
+		WithRetry(3, 500*time.Millisecond).
+		WithStats().
+		Build()
 }
