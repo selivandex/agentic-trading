@@ -472,8 +472,8 @@ prometheus/
 
 ### 3.1 Agent layering with ADK
 
-- **`internal/agents/adk`** — vendored copy of the Google ADK Go interfaces and reference agents kept alongside our agent implementations to avoid framework drift. It supplies the minimal agent, tool, and model contracts plus workflow helpers without any business logic.
-- **`internal/agents`** — domain-level orchestration that uses the ADK types directly. This layer wires prompts, tool registries, model selection, and middleware, then instantiates concrete analysts/execution agents through factories while relying on the in-repo ADK copy.
+- **`internal/adapters/adk`** — vendored copy of the Google ADK Go interfaces and reference agents to avoid framework drift. It supplies the minimal agent, tool, and model contracts plus workflow helpers without any business logic.
+- **`internal/agents`** — domain-level orchestration that uses the ADK types directly. This layer wires prompts, tool registries, model selection, and middleware, then instantiates concrete analysts/execution agents through factories while relying on the in-repo ADK copy under `internal/adapters/adk`.
 
 ---
 
@@ -6853,176 +6853,45 @@ func (s *MemoryService) SearchMemory(ctx context.Context, userID uuid.UUID, quer
 // internal/agents/tool_assignments.go
 package agents
 
-// Tool assignments per agent type
-var AgentToolMap = map[AgentType][]string{
-    AgentMarketAnalyst: {
-        // Price data
-        "get_price",
-        "get_ohlcv",
-        "get_orderbook",
-        "get_trades",
+import "prometheus/internal/tools"
 
-        // Technical indicators - Momentum
-        "rsi",
-        "stochastic",
-        "cci",
-        "roc",
+// Tool categories per agent type (resolved dynamically from the global catalog)
+var AgentToolCategories = map[AgentType][]string{
+    AgentMarketAnalyst:    {"market_data", "momentum", "volatility", "trend", "volume", "smc"},
+    AgentSMCAnalyst:       {"market_data", "smc"},
+    AgentSentimentAnalyst: {"sentiment"},
+    AgentOnChainAnalyst:   {"onchain"},
+    AgentMacroAnalyst:     {"macro"},
+    AgentOrderFlowAnalyst: {"market_data", "order_flow"},
+    AgentDerivativesAnalyst: {"market_data", "derivatives"},
+    AgentCorrelationAnalyst: {"market_data", "correlation"},
+    AgentStrategyPlanner:  {"memory"},
+    AgentRiskManager:      {"account", "risk"},
+    AgentExecutor:         {"account", "execution"},
+    AgentPositionManager:  {"account", "execution"},
+    AgentSelfEvaluator:    {"evaluation", "memory"},
+}
 
-        // Technical indicators - Volatility
-        "atr",
-        "bollinger",
-        "keltner",
+var AgentToolMap = buildAgentToolMap()
 
-        // Technical indicators - Trend
-        "sma",
-        "ema",
-        "ema_ribbon",
-        "macd",
-        "supertrend",
-        "ichimoku",
+func buildAgentToolMap() map[AgentType][]string {
+    result := make(map[AgentType][]string, len(AgentToolCategories))
+    defs := tools.Definitions()
 
-        // Technical indicators - Volume
-        "vwap",
-        "obv",
-        "volume_profile",
-        "delta_volume",
+    for agentType, categories := range AgentToolCategories {
+        categorySet := make(map[string]struct{}, len(categories))
+        for _, category := range categories {
+            categorySet[category] = struct{}{}
+        }
 
-        // Chart analysis
-        "fibonacci",
-        "pivot_points",
-        "get_swing_points",
-    },
+        for _, def := range defs {
+            if _, ok := categorySet[def.Category]; ok {
+                result[agentType] = append(result[agentType], def.Name)
+            }
+        }
+    }
 
-    AgentSMCAnalyst: {
-        // SMC/ICT specific tools
-        "get_ohlcv",
-        "get_orderbook",
-        "detect_fvg",
-        "detect_order_blocks",
-        "detect_liquidity_zones",
-        "detect_stop_hunt",
-        "get_market_structure",
-        "detect_imbalances",
-        "get_swing_points",
-    },
-
-    AgentSentimentAnalyst: {
-        // Sentiment data
-        "get_fear_greed",
-        "get_social_sentiment",
-        "get_news",
-        "get_trending",
-        "get_funding_sentiment",
-    },
-
-    AgentOnChainAnalyst: {
-        // On-chain data
-        "get_whale_movements",
-        "get_exchange_flows",
-        "get_miner_reserves",
-        "get_active_addresses",
-        "get_nvt_ratio",
-        "get_sopr",
-        "get_mvrv",
-        "get_realized_pnl",
-        "get_stablecoin_flows",
-    },
-
-    AgentMacroAnalyst: {
-        // Macro data
-        "get_economic_calendar",
-        "get_fed_rate",
-        "get_fed_watch",
-        "get_cpi",
-        "get_pmi",
-        "get_macro_impact",
-    },
-
-    AgentOrderFlowAnalyst: {
-        // Order flow analysis
-        "get_orderbook",
-        "get_trades",
-        "get_trade_imbalance",
-        "get_cvd",
-        "get_whale_trades",
-        "get_tick_speed",
-        "get_orderbook_imbalance",
-        "detect_iceberg",
-        "detect_spoofing",
-        "get_absorption_zones",
-    },
-
-    AgentDerivativesAnalyst: {
-        // Derivatives data
-        "get_options_oi",
-        "get_max_pain",
-        "get_put_call_ratio",
-        "get_gamma_exposure",
-        "get_options_flow",
-        "get_iv_surface",
-    },
-
-    AgentCorrelationAnalyst: {
-        // Cross-market analysis
-        "btc_dominance",
-        "usdt_dominance",
-        "altcoin_correlation",
-        "stock_correlation",
-        "dxy_correlation",
-        "gold_correlation",
-        "get_session_volume",
-    },
-
-    AgentStrategyPlanner: {
-        // Synthesis + memory
-        "search_memory",           // Semantic search past decisions
-        "get_trade_history",       // User's past trades
-        "get_market_regime",       // Current market regime
-        "get_strategy_stats",      // Performance of strategies
-    },
-
-    AgentRiskManager: {
-        // Risk assessment
-        "get_positions",           // Current positions
-        "get_balance",             // Available balance
-        "get_daily_pnl",           // Today's PnL
-        "get_max_drawdown",        // Current drawdown
-        "get_exposure",            // Total exposure
-        "calculate_position_size", // Position sizing
-        "validate_trade",          // Pre-trade checks
-        "check_circuit_breaker",   // Trading allowed?
-    },
-
-    AgentExecutor: {
-        // Order execution (user-specific API keys)
-        "get_balance",
-        "get_positions",
-        "place_order",
-        "place_bracket_order",     // Entry + SL + TP
-        "place_ladder_order",      // Multiple TP levels
-        "cancel_order",
-        "set_leverage",
-        "set_margin_mode",
-    },
-
-    AgentPositionManager: {
-        // Position management
-        "get_positions",
-        "get_balance",
-        "move_sl_to_breakeven",
-        "set_trailing_stop",
-        "close_position",
-        "add_to_position",         // DCA
-    },
-
-    AgentSelfEvaluator: {
-        // Performance analysis
-        "get_strategy_stats",
-        "get_trade_journal",
-        "evaluate_last_trades",
-        "get_best_strategies",
-        "get_worst_strategies",
-    },
+    return result
 }
 ```
 

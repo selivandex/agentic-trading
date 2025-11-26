@@ -103,8 +103,8 @@ var toolDefinitions = []Definition{
 	{Name: "gold_correlation", Description: "Correlation to gold", Category: "correlation"},
 	{Name: "get_session_volume", Description: "Volume by trading session", Category: "correlation"},
 
-	{Name: "get_balance", Description: "Retrieve account balances", Category: "execution"},
-	{Name: "get_positions", Description: "List open positions", Category: "execution"},
+        {Name: "get_balance", Description: "Retrieve account balances", Category: "account"},
+        {Name: "get_positions", Description: "List open positions", Category: "account"},
 	{Name: "place_order", Description: "Place a market or limit order", Category: "execution"},
 	{Name: "place_bracket_order", Description: "Place bracket order with SL/TP", Category: "execution"},
 	{Name: "place_ladder_order", Description: "Place laddered profit targets", Category: "execution"},
