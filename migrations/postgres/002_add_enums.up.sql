@@ -58,8 +58,17 @@ ALTER TABLE exchange_accounts
     ALTER COLUMN exchange TYPE exchange_type USING exchange::exchange_type;
 
 ALTER TABLE trading_pairs
-    ALTER COLUMN market_type TYPE market_type USING market_type::market_type,
+    ALTER COLUMN market_type TYPE market_type USING market_type::market_type;
+
+-- Handle strategy_mode separately due to default value
+ALTER TABLE trading_pairs
+    ALTER COLUMN strategy_mode DROP DEFAULT;
+
+ALTER TABLE trading_pairs
     ALTER COLUMN strategy_mode TYPE strategy_mode USING strategy_mode::strategy_mode;
+
+ALTER TABLE trading_pairs
+    ALTER COLUMN strategy_mode SET DEFAULT 'signals'::strategy_mode;
 
 ALTER TABLE orders
     ALTER COLUMN side TYPE order_side USING side::order_side,
