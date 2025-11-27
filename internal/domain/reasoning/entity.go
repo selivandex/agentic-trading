@@ -8,10 +8,11 @@ import (
 
 // LogEntry represents an agent's reasoning log with Chain-of-Thought steps
 type LogEntry struct {
-	ID        uuid.UUID `db:"id"`
-	UserID    uuid.UUID `db:"user_id"`
-	AgentID   string    `db:"agent_id"`
-	SessionID string    `db:"session_id"`
+	ID        uuid.UUID  `db:"id"`
+	UserID    *uuid.UUID `db:"user_id"`
+	AgentID   string     `db:"agent_id"`
+	AgentType string     `db:"agent_type"`
+	SessionID string     `db:"session_id"`
 
 	// Context
 	Symbol        string     `db:"symbol"`

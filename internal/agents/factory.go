@@ -15,6 +15,7 @@ import (
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/agents/callbacks"
 	"prometheus/internal/agents/schemas"
+	"prometheus/internal/domain/reasoning"
 	"prometheus/internal/events"
 	"prometheus/internal/tools"
 	"prometheus/pkg/errors"
@@ -42,6 +43,7 @@ type CallbackDeps struct {
 	CostCheckFunc  callbacks.CostCheckFunc // Function to check daily cost limits
 	RiskEngine     interface{}
 	StatsRepo      interface{}
+	ReasoningRepo  reasoning.Repository // Repository for saving structured reasoning traces
 }
 
 // Factory creates configured ADK agents.
@@ -203,6 +205,8 @@ func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
 		return nil, schemas.StrategyPlannerOutputSchema
 	case AgentMarketAnalyst:
 		return nil, schemas.MarketAnalystOutputSchema
+	case AgentOpportunitySynthesizer:
+		return nil, schemas.OpportunitySynthesizerOutputSchema
 	default:
 		return nil, nil
 	}
@@ -243,8 +247,10 @@ func (f *Factory) buildAgentCallbacks(agentType string) agentCallbacksSet {
 		// Metrics
 		after = append(after, callbacks.MetricsAfterCallback(nil)) // TODO: pass stats repo
 
-		// Reasoning log
-		after = append(after, callbacks.ReasoningLogAfterCallback())
+		// Structured reasoning log (saves to DB for audit)
+		if f.callbackDeps.ReasoningRepo != nil {
+			after = append(after, callbacks.SaveStructuredReasoningCallback(f.callbackDeps.ReasoningRepo))
+		}
 	}
 
 	return agentCallbacksSet{Before: before, After: after}

@@ -117,6 +117,7 @@ func main() {
 	journalRepo := pgrepo.NewJournalRepository(pgClient.DB())
 	riskRepo := pgrepo.NewRiskRepository(pgClient.DB())
 	sessionRepo := pgrepo.NewSessionRepository(pgClient.DB())
+	reasoningRepo := pgrepo.NewReasoningRepository(pgClient.DB())
 	marketDataRepo := chrepo.NewMarketDataRepository(chClient.Conn())
 	regimeRepo := chrepo.NewRegimeRepository(chClient.Conn())
 	sentimentRepo := chrepo.NewSentimentRepository(chClient.Conn())
@@ -558,6 +559,7 @@ func provideAgents(
 			EventPublisher: eventPublisher,
 			CostCheckFunc:  costCheckFunc,
 			RiskEngine:     riskEngine,
+			ReasoningRepo:  reasoningRepo,
 		},
 	})
 	if err != nil {
@@ -918,6 +920,7 @@ func provideWorkers(
 	opportunityFinder, err := analysis.NewOpportunityFinder(
 		workflowFactory,
 		adkSessionService,
+		templates.Get(),
 		defaultSymbols,
 		"binance", // Primary exchange
 		cfg.Workers.OpportunityFinderInterval,

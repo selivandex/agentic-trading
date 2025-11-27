@@ -3,8 +3,9 @@
 CREATE TABLE
   agent_reasoning_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4 (),
-    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users (id) ON DELETE CASCADE,
     agent_id VARCHAR(100) NOT NULL,
+    agent_type VARCHAR(100) NOT NULL,
     session_id VARCHAR(255),
     -- Context
     symbol VARCHAR(50),

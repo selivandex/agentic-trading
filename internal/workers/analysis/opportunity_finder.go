@@ -15,6 +15,7 @@ import (
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	"prometheus/pkg/templates"
 )
 
 // OpportunityFinder runs market research workflow to find trading opportunities
@@ -22,11 +23,12 @@ import (
 // for each monitored symbol, publishing high-quality signals to Kafka for user consumption.
 type OpportunityFinder struct {
 	*workers.BaseWorker
-	workflow       agent.Agent     // MarketResearchWorkflow (ADK)
-	runner         *runner.Runner  // ADK runner
-	sessionService session.Service // Session persistence
-	symbols        []string        // List of symbols to monitor
-	exchange       string          // Primary exchange for analysis
+	workflow       agent.Agent         // MarketResearchWorkflow (ADK)
+	runner         *runner.Runner      // ADK runner
+	sessionService session.Service     // Session persistence
+	templates      *templates.Registry // Template registry for workflow prompts
+	symbols        []string            // List of symbols to monitor
+	exchange       string              // Primary exchange for analysis
 	log            *logger.Logger
 }
 
@@ -34,6 +36,7 @@ type OpportunityFinder struct {
 func NewOpportunityFinder(
 	workflowFactory *workflows.Factory,
 	sessionService session.Service,
+	templates *templates.Registry,
 	symbols []string,
 	exchange string,
 	interval time.Duration,
@@ -64,6 +67,7 @@ func NewOpportunityFinder(
 		workflow:       workflow,
 		runner:         runnerInstance,
 		sessionService: sessionService,
+		templates:      templates,
 		symbols:        symbols,
 		exchange:       exchange,
 		log:            log,
@@ -204,27 +208,20 @@ func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (
 }
 
 // buildResearchPrompt creates the input prompt for market research workflow
+// Uses template system for centralized prompt management
 func (of *OpportunityFinder) buildResearchPrompt(symbol string) string {
-	return fmt.Sprintf(`Conduct comprehensive market research for %s on %s exchange.
+	// Render workflow input template with context
+	prompt, err := of.templates.Render("workflows/market_research_input", map[string]interface{}{
+		"Symbol":    symbol,
+		"Exchange":  of.exchange,
+		"Timestamp": time.Now().Format(time.RFC3339),
+	})
 
-**Your task:**
-1. Analyze ALL dimensions (technical, SMC, sentiment, orderflow, derivatives, macro, onchain, correlation)
-2. Synthesize findings into a coherent market view
-3. Determine if there is a high-confidence (>65%%) trading opportunity
-4. If YES → publish via publish_opportunity tool
-5. If NO → explain why the signal is not strong enough
+	if err != nil {
+		of.log.Errorf("Failed to render workflow input template: %v", err)
+		// Fallback to basic prompt if template rendering fails
+		return fmt.Sprintf("Analyze %s on %s exchange for trading opportunities. Use all available analyst agents, synthesize findings, and publish if high-quality opportunity found (>65%% confidence, clear levels, R:R >2:1).", symbol, of.exchange)
+	}
 
-**Analysis requirements:**
-- Use available tools to gather market data
-- Think step-by-step and show your reasoning
-- Be rigorous: only publish high-quality opportunities
-- Ensure clear entry, stop-loss, and take-profit levels
-- Verify R:R ratio > 2:1
-
-**Consensus requirement:**
-- 5+ analysts must agree on direction
-- Weighted confidence > 65%%
-- No major conflicts
-
-Think comprehensively. Be thorough.`, symbol, of.exchange)
+	return prompt
 }
