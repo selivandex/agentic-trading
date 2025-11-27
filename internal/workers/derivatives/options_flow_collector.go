@@ -56,24 +56,50 @@ func (oc *OptionsFlowCollector) Run(ctx context.Context) error {
 	}
 
 	totalFlows := 0
+	processedSymbols := 0
 
 	// Collect options flows for each symbol
 	for _, symbol := range oc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			oc.Log().Info("Options flow collector interrupted by shutdown",
+				"symbols_processed", processedSymbols,
+				"symbols_remaining", len(oc.symbols)-processedSymbols,
+				"flows_saved", totalFlows,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		flows, err := oc.fetchOptionsFlows(ctx, symbol)
 		if err != nil {
 			oc.Log().Error("Failed to fetch options flows",
 				"symbol", symbol,
 				"error", err,
 			)
+			processedSymbols++
 			continue
 		}
 
 		if len(flows) == 0 {
+			processedSymbols++
 			continue
 		}
 
 		// Store each flow
 		for _, flow := range flows {
+			// Check for context cancellation in inner loop (if many flows)
+			select {
+			case <-ctx.Done():
+				oc.Log().Info("Options flow saving interrupted by shutdown",
+					"symbol", symbol,
+					"flows_saved", totalFlows,
+				)
+				return ctx.Err()
+			default:
+			}
+
 			if err := oc.derivRepo.InsertOptionsFlow(ctx, &flow); err != nil {
 				oc.Log().Error("Failed to save options flow",
 					"symbol", symbol,
@@ -83,6 +109,7 @@ func (oc *OptionsFlowCollector) Run(ctx context.Context) error {
 			}
 			totalFlows++
 		}
+		processedSymbols++
 	}
 
 	oc.Log().Info("Options flows collected",

@@ -53,10 +53,34 @@ func (ec *ExchangeFlowCollector) Run(ctx context.Context) error {
 	}
 
 	totalFlows := 0
+	processedTokens := 0
 
 	// Collect flows for each token and exchange
 	for _, token := range ec.tokens {
+		// Check for context cancellation (graceful shutdown) - outer loop
+		select {
+		case <-ctx.Done():
+			ec.Log().Info("Exchange flow collector interrupted by shutdown",
+				"tokens_processed", processedTokens,
+				"tokens_remaining", len(ec.tokens)-processedTokens,
+				"flows_saved", totalFlows,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		for _, exchange := range ec.exchanges {
+			// Check for context cancellation in inner loop (if many exchanges)
+			select {
+			case <-ctx.Done():
+				ec.Log().Info("Exchange flow collector interrupted by shutdown",
+					"current_token", token,
+					"flows_saved", totalFlows,
+				)
+				return ctx.Err()
+			default:
+			}
+
 			flow, err := ec.fetchExchangeFlow(ctx, exchange, token)
 			if err != nil {
 				ec.Log().Error("Failed to fetch exchange flow",
@@ -83,6 +107,7 @@ func (ec *ExchangeFlowCollector) Run(ctx context.Context) error {
 
 			totalFlows++
 		}
+		processedTokens++
 	}
 
 	ec.Log().Info("Exchange flows collected",

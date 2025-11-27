@@ -45,17 +45,31 @@ func (gc *GammaExposureCollector) Run(ctx context.Context) error {
 	}
 
 	// Calculate gamma exposure for each symbol
+	processedCount := 0
 	for _, symbol := range gc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			gc.Log().Info("Gamma exposure collector interrupted by shutdown",
+				"symbols_processed", processedCount,
+				"symbols_remaining", len(gc.symbols)-processedCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		snapshot, err := gc.calculateGammaExposure(ctx, symbol)
 		if err != nil {
 			gc.Log().Error("Failed to calculate gamma exposure",
 				"symbol", symbol,
 				"error", err,
 			)
+			processedCount++
 			continue
 		}
 
 		if snapshot == nil {
+			processedCount++
 			continue
 		}
 
@@ -65,6 +79,7 @@ func (gc *GammaExposureCollector) Run(ctx context.Context) error {
 				"symbol", symbol,
 				"error", err,
 			)
+			processedCount++
 			continue
 		}
 
@@ -73,6 +88,7 @@ func (gc *GammaExposureCollector) Run(ctx context.Context) error {
 			"gex", snapshot.GammaExposure,
 			"gamma_flip", snapshot.GammaFlip,
 		)
+		processedCount++
 	}
 
 	gc.Log().Info("Gamma exposure collection complete", "symbols", len(gc.symbols))

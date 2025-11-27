@@ -58,9 +58,22 @@ func (mc *MarketCorrelationCollector) Run(ctx context.Context) error {
 	}
 
 	totalCorrelations := 0
+	processedSymbols := 0
 
 	// Calculate correlations for each crypto symbol
 	for _, cryptoSymbol := range mc.cryptoSymbols {
+		// Check for context cancellation (graceful shutdown) - outer loop
+		select {
+		case <-ctx.Done():
+			mc.Log().Info("Market correlation collector interrupted by shutdown",
+				"symbols_processed", processedSymbols,
+				"symbols_remaining", len(mc.cryptoSymbols)-processedSymbols,
+				"total_correlations", totalCorrelations,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		// Fetch crypto price history (30 days)
 		cryptoPrices, err := mc.fetchCryptoPrices(ctx, cryptoSymbol, 30)
 		if err != nil {
@@ -68,6 +81,7 @@ func (mc *MarketCorrelationCollector) Run(ctx context.Context) error {
 				"symbol", cryptoSymbol,
 				"error", err,
 			)
+			processedSymbols++
 			continue
 		}
 
@@ -75,12 +89,24 @@ func (mc *MarketCorrelationCollector) Run(ctx context.Context) error {
 			mc.Log().Warn("Insufficient crypto price data for correlation",
 				"symbol", cryptoSymbol,
 			)
+			processedSymbols++
 			continue
 		}
 
 		// Calculate correlations with each traditional asset
 		correlations := make(map[string]float64)
 		for _, asset := range mc.assets {
+			// Check for context cancellation in inner loop (if many assets)
+			select {
+			case <-ctx.Done():
+				mc.Log().Info("Market correlation collector interrupted by shutdown",
+					"current_symbol", cryptoSymbol,
+					"total_correlations", totalCorrelations,
+				)
+				return ctx.Err()
+			default:
+			}
+
 			assetPrices, err := mc.fetchAssetPrices(ctx, asset, 30)
 			if err != nil {
 				mc.Log().Error("Failed to fetch asset prices",
@@ -110,6 +136,7 @@ func (mc *MarketCorrelationCollector) Run(ctx context.Context) error {
 
 		// Store correlation data for this crypto symbol
 		mc.storeCorrelations(ctx, cryptoSymbol, correlations)
+		processedSymbols++
 	}
 
 	mc.Log().Info("Market correlations calculated",

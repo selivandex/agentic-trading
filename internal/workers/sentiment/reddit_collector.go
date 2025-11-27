@@ -66,22 +66,38 @@ func (rc *RedditCollector) Run(ctx context.Context) error {
 	}
 
 	totalPosts := 0
+	processedCount := 0
 
 	// Collect posts for each symbol
 	for _, symbol := range rc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			rc.Log().Info("Reddit collector interrupted by shutdown",
+				"symbols_processed", processedCount,
+				"symbols_remaining", len(rc.symbols)-processedCount,
+				"total_posts", totalPosts,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		posts, err := rc.collectPosts(ctx, symbol)
 		if err != nil {
 			rc.Log().Error("Failed to collect Reddit posts", "symbol", symbol, "error", err)
+			processedCount++
 			continue
 		}
 
 		if len(posts) == 0 {
+			processedCount++
 			continue
 		}
 
 		// Aggregate sentiment
 		aggregated := rc.aggregateSentiment(symbol, posts)
 		if aggregated == nil {
+			processedCount++
 			continue
 		}
 
@@ -91,10 +107,12 @@ func (rc *RedditCollector) Run(ctx context.Context) error {
 				"symbol", symbol,
 				"error", err,
 			)
+			processedCount++
 			continue
 		}
 
 		totalPosts += len(posts)
+		processedCount++
 	}
 
 	rc.Log().Info("Reddit collection complete",

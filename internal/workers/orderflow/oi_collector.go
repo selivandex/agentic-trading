@@ -44,9 +44,22 @@ func (oic *OICollector) Run(ctx context.Context) error {
 
 	totalOI := 0
 	errorCount := 0
+	processedExchanges := 0
 
 	// Collect OI from each exchange
 	for _, exchangeName := range oic.exchanges {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			oic.Log().Info("OI collector interrupted by shutdown",
+				"exchanges_processed", processedExchanges,
+				"exchanges_remaining", len(oic.exchanges)-processedExchanges,
+				"total_oi_snapshots", totalOI,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		exchangeClient, err := oic.exchFactory.GetClient(exchangeName)
 		if err != nil {
 			oic.Log().Error("Failed to get exchange client",
@@ -54,6 +67,7 @@ func (oic *OICollector) Run(ctx context.Context) error {
 				"error", err,
 			)
 			errorCount++
+			processedExchanges++
 			continue
 		}
 
@@ -63,6 +77,7 @@ func (oic *OICollector) Run(ctx context.Context) error {
 			oic.Log().Debug("Exchange does not support futures, skipping",
 				"exchange", exchangeName,
 			)
+			processedExchanges++
 			continue
 		}
 
@@ -74,10 +89,12 @@ func (oic *OICollector) Run(ctx context.Context) error {
 				"error", err,
 			)
 			errorCount++
+			processedExchanges++
 			continue
 		}
 
 		totalOI += oiCount
+		processedExchanges++
 	}
 
 	oic.Log().Info("OI collection complete",

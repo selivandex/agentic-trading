@@ -59,22 +59,38 @@ func (tc *TwitterCollector) Run(ctx context.Context) error {
 	}
 
 	totalMentions := 0
+	processedCount := 0
 
 	// Collect tweets for each tracked symbol
 	for _, symbol := range tc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			tc.Log().Info("Twitter collector interrupted by shutdown",
+				"symbols_processed", processedCount,
+				"symbols_remaining", len(tc.symbols)-processedCount,
+				"total_mentions", totalMentions,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		tweets, err := tc.collectTweets(ctx, symbol)
 		if err != nil {
 			tc.Log().Error("Failed to collect tweets", "symbol", symbol, "error", err)
+			processedCount++
 			continue
 		}
 
 		if len(tweets) == 0 {
+			processedCount++
 			continue
 		}
 
 		// Aggregate sentiment for this symbol
 		aggregated := tc.aggregateSentiment(symbol, tweets)
 		if aggregated == nil {
+			processedCount++
 			continue
 		}
 
@@ -84,10 +100,12 @@ func (tc *TwitterCollector) Run(ctx context.Context) error {
 				"symbol", symbol,
 				"error", err,
 			)
+			processedCount++
 			continue
 		}
 
 		totalMentions += int(aggregated.Mentions)
+		processedCount++
 	}
 
 	tc.Log().Info("Twitter collection complete",

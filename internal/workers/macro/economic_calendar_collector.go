@@ -69,6 +69,18 @@ func (ec *EconomicCalendarCollector) Run(ctx context.Context) error {
 	// Store events in database
 	savedCount := 0
 	for _, event := range events {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			ec.Log().Info("Economic calendar saving interrupted by shutdown",
+				"total_events", len(events),
+				"saved", savedCount,
+				"remaining", len(events)-savedCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		if err := ec.macroRepo.InsertEvent(ctx, &event); err != nil {
 			ec.Log().Error("Failed to save economic event",
 				"event", event.Title,
