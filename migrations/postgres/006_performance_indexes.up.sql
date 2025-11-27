@@ -1,156 +1,131 @@
 -- migrations/postgres/006_performance_indexes.up.sql
 -- Performance indexes for frequently queried tables
-
 -- ==================================================
 -- Orders table indexes
 -- ==================================================
-
 -- Index for querying open/partial orders by user
-CREATE INDEX IF NOT EXISTS idx_orders_user_status 
-    ON orders(user_id, status) 
-    WHERE status IN ('open', 'partial');
+CREATE INDEX IF NOT EXISTS idx_orders_user_status ON orders (user_id, status)
+WHERE
+    status IN ('open', 'partial');
 
 -- Index for looking up orders by exchange order ID
-CREATE INDEX IF NOT EXISTS idx_orders_exchange_id 
-    ON orders(exchange_order_id) 
-    WHERE exchange_order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_exchange_id ON orders (exchange_order_id)
+WHERE
+    exchange_order_id IS NOT NULL;
 
 -- Index for querying orders by trading pair
-CREATE INDEX IF NOT EXISTS idx_orders_trading_pair 
-    ON orders(trading_pair_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_trading_pair ON orders (trading_pair_id, created_at DESC);
 
 -- ==================================================
 -- Positions table indexes
 -- ==================================================
-
 -- Index for querying open positions by user
-CREATE INDEX IF NOT EXISTS idx_positions_user_open 
-    ON positions(user_id, status) 
-    WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS idx_positions_user_open ON positions (user_id, status)
+WHERE
+    status = 'open';
 
 -- Index for querying open positions by symbol
-CREATE INDEX IF NOT EXISTS idx_positions_symbol_open 
-    ON positions(symbol, status) 
-    WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS idx_positions_symbol_open ON positions (symbol, status)
+WHERE
+    status = 'open';
 
 -- Index for querying positions by trading pair
-CREATE INDEX IF NOT EXISTS idx_positions_trading_pair 
-    ON positions(trading_pair_id, opened_at DESC);
+CREATE INDEX IF NOT EXISTS idx_positions_trading_pair ON positions (trading_pair_id, opened_at DESC);
 
 -- ==================================================
 -- Memories table indexes (pgvector semantic search)
 -- ==================================================
-
--- GiST index for cosine similarity search on embeddings
-CREATE INDEX IF NOT EXISTS idx_memories_embedding_gist 
-    ON memories 
-    USING gist(embedding vector_cosine_ops);
+-- IVFFlat index for cosine similarity search on embeddings (pgvector)
+CREATE INDEX IF NOT EXISTS idx_memories_embedding_ivfflat ON memories USING ivfflat (embedding vector_cosine_ops)
+WITH
+    (lists = 100);
 
 -- Index for querying memories by user and type
-CREATE INDEX IF NOT EXISTS idx_memories_user_type 
-    ON memories(user_id, type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_user_type ON memories (user_id, type, created_at DESC);
 
 -- Index for querying by session
-CREATE INDEX IF NOT EXISTS idx_memories_session 
-    ON memories(session_id, created_at DESC) 
-    WHERE session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_memories_session ON memories (session_id, created_at DESC)
+WHERE
+    session_id IS NOT NULL;
 
 -- ==================================================
 -- Collective memory indexes
 -- ==================================================
-
--- Index for querying collective memories by pattern
-CREATE INDEX IF NOT EXISTS idx_collective_memory_pattern 
-    ON collective_memory(pattern_type, validation_score DESC);
-
--- GiST index for semantic search
-CREATE INDEX IF NOT EXISTS idx_collective_memory_embedding 
-    ON collective_memory 
-    USING gist(embedding vector_cosine_ops);
+-- Removed: idx_collective_memory_pattern - collective_memories doesn't have pattern_type column
+-- IVFFlat index for semantic search (pgvector)
+CREATE INDEX IF NOT EXISTS idx_collective_memories_embedding_ivfflat ON collective_memories USING ivfflat (embedding vector_cosine_ops)
+WITH
+    (lists = 100);
 
 -- ==================================================
 -- Journal entries indexes
 -- ==================================================
-
 -- Index for querying user's journal entries chronologically
-CREATE INDEX IF NOT EXISTS idx_journal_user_time 
-    ON journal_entries(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_journal_user_time ON journal_entries (user_id, created_at DESC);
 
 -- Index for analyzing strategy performance
-CREATE INDEX IF NOT EXISTS idx_journal_strategy 
-    ON journal_entries(strategy_used, created_at DESC) 
-    WHERE strategy_used IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_journal_strategy ON journal_entries (strategy_used, created_at DESC)
+WHERE
+    strategy_used IS NOT NULL;
 
 -- Index for querying profitable/unprofitable trades
-CREATE INDEX IF NOT EXISTS idx_journal_pnl 
-    ON journal_entries(user_id, pnl DESC) 
-    WHERE pnl IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_journal_pnl ON journal_entries (user_id, pnl DESC)
+WHERE
+    pnl IS NOT NULL;
 
 -- ==================================================
--- Circuit breaker state indexes
+-- Circuit breaker states indexes
 -- ==================================================
-
 -- Index for fast user lookups (heavily queried in risk checks)
-CREATE INDEX IF NOT EXISTS idx_circuit_breaker_user 
-    ON circuit_breaker_state(user_id);
+CREATE INDEX IF NOT EXISTS idx_circuit_breaker_states_user ON circuit_breaker_states (user_id);
 
 -- Index for querying triggered circuit breakers
-CREATE INDEX IF NOT EXISTS idx_circuit_breaker_triggered 
-    ON circuit_breaker_state(is_triggered, triggered_at DESC) 
-    WHERE is_triggered = true;
+CREATE INDEX IF NOT EXISTS idx_circuit_breaker_states_triggered ON circuit_breaker_states (is_triggered, triggered_at DESC)
+WHERE
+    is_triggered = true;
 
 -- ==================================================
 -- Risk events indexes
 -- ==================================================
-
 -- Index for querying risk events by user
-CREATE INDEX IF NOT EXISTS idx_risk_events_user 
-    ON risk_events(user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_events_user ON risk_events (user_id, timestamp DESC);
 
 -- Index for unacknowledged events
-CREATE INDEX IF NOT EXISTS idx_risk_events_unacknowledged 
-    ON risk_events(user_id, event_type) 
-    WHERE acknowledged = false;
+CREATE INDEX IF NOT EXISTS idx_risk_events_unacknowledged ON risk_events (user_id, event_type)
+WHERE
+    acknowledged = false;
 
 -- ==================================================
 -- Trading pairs indexes
 -- ==================================================
-
 -- Index for active trading pairs by user
-CREATE INDEX IF NOT EXISTS idx_trading_pairs_user_active 
-    ON trading_pairs(user_id, is_active) 
-    WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_trading_pairs_user_active ON trading_pairs (user_id, is_active)
+WHERE
+    is_active = true;
 
 -- Index for non-paused trading pairs
-CREATE INDEX IF NOT EXISTS idx_trading_pairs_not_paused 
-    ON trading_pairs(user_id, is_paused) 
-    WHERE is_paused = false;
+CREATE INDEX IF NOT EXISTS idx_trading_pairs_not_paused ON trading_pairs (user_id, is_paused)
+WHERE
+    is_paused = false;
 
 -- ==================================================
 -- Exchange accounts indexes
 -- ==================================================
-
 -- Index for active exchange accounts
-CREATE INDEX IF NOT EXISTS idx_exchange_accounts_active 
-    ON exchange_accounts(user_id, is_active) 
-    WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_exchange_accounts_active ON exchange_accounts (user_id, is_active)
+WHERE
+    is_active = true;
 
 -- ==================================================
 -- Agent reasoning logs indexes (for debugging/analysis)
 -- ==================================================
-
 -- Index for querying recent reasoning by user
-CREATE INDEX IF NOT EXISTS idx_reasoning_user_time 
-    ON agent_reasoning_logs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reasoning_user_time ON agent_reasoning_logs (user_id, created_at DESC);
 
 -- Index for querying by agent type
-CREATE INDEX IF NOT EXISTS idx_reasoning_agent 
-    ON agent_reasoning_logs(agent_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON agent_reasoning_logs (agent_type, created_at DESC);
 
 -- Index for expensive reasoning (high token usage)
-CREATE INDEX IF NOT EXISTS idx_reasoning_cost 
-    ON agent_reasoning_logs(tokens_used DESC, cost_usd DESC) 
-    WHERE tokens_used > 10000;
-
-
-
+CREATE INDEX IF NOT EXISTS idx_reasoning_cost ON agent_reasoning_logs (tokens_used DESC, cost_usd DESC)
+WHERE
+    tokens_used > 10000;

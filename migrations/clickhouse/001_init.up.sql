@@ -6,7 +6,7 @@ CREATE TABLE
     exchange LowCardinality (String),
     symbol LowCardinality (String),
     timeframe LowCardinality (String),
-    open_time DateTime64 (3),
+    open_time DateTime,
     open Float64,
     high Float64,
     low Float64,
@@ -25,7 +25,7 @@ CREATE TABLE
   IF NOT EXISTS tickers (
     exchange LowCardinality (String),
     symbol LowCardinality (String),
-    timestamp DateTime64 (3),
+    timestamp DateTime,
     price Float64,
     bid Float64,
     ask Float64,
@@ -46,9 +46,9 @@ CREATE TABLE
   IF NOT EXISTS orderbook_snapshots (
     exchange LowCardinality (String),
     symbol LowCardinality (String),
-    timestamp DateTime64 (3),
-    bids String, -- JSON array
-    asks String, -- JSON array
+    timestamp DateTime,
+    bids String,
+    asks String,
     bid_depth Float64,
     ask_depth Float64
   ) ENGINE = MergeTree ()
@@ -62,7 +62,7 @@ CREATE TABLE
   IF NOT EXISTS trades (
     exchange LowCardinality (String),
     symbol LowCardinality (String),
-    timestamp DateTime64 (3),
+    timestamp DateTime,
     trade_id String,
     price Float64,
     quantity Float64,
@@ -84,8 +84,8 @@ CREATE TABLE
     url String,
     sentiment Float32,
     symbols Array (LowCardinality (String)),
-    published_at DateTime64 (3),
-    collected_at DateTime64 (3) DEFAULT now64 (3)
+    published_at DateTime,
+    collected_at DateTime DEFAULT now ()
   ) ENGINE = MergeTree ()
 PARTITION BY
   toYYYYMM (published_at)
@@ -97,7 +97,7 @@ CREATE TABLE
   IF NOT EXISTS social_sentiment (
     platform LowCardinality (String),
     symbol LowCardinality (String),
-    timestamp DateTime64 (3),
+    timestamp DateTime,
     mentions UInt32,
     sentiment_score Float32,
     positive_count UInt32,
@@ -116,11 +116,11 @@ CREATE TABLE
   IF NOT EXISTS liquidations (
     exchange LowCardinality (String),
     symbol LowCardinality (String),
-    timestamp DateTime64 (3),
-    side LowCardinality (String), -- long, short
+    timestamp DateTime,
+    side LowCardinality (String),
     price Float64,
     quantity Float64,
-    value Float64 -- USD value
+    value Float64
   ) ENGINE = MergeTree ()
 PARTITION BY
   toYYYYMMDD (timestamp)

@@ -4,8 +4,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"errors"
+	"encoding/base64"
 	"io"
+
+	"prometheus/pkg/errors"
 )
 
 // Encryptor handles AES-256-GCM encryption/decryption
@@ -13,12 +15,22 @@ type Encryptor struct {
 	key []byte // 32 bytes for AES-256
 }
 
-// NewEncryptor creates a new encryptor with a 32-byte key
-func NewEncryptor(key string) (*Encryptor, error) {
-	keyBytes := []byte(key)
-	if len(keyBytes) != 32 {
-		return nil, errors.New("encryption key must be exactly 32 bytes for AES-256")
+// NewEncryptor creates a new encryptor with a base64-encoded 32-byte key
+func NewEncryptor(base64Key string) (*Encryptor, error) {
+	if base64Key == "" {
+		return nil, errors.New("encryption key cannot be empty")
 	}
+
+	// Decode base64 key to raw bytes
+	keyBytes, err := base64.StdEncoding.DecodeString(base64Key)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode base64 encryption key")
+	}
+
+	if len(keyBytes) != 32 {
+		return nil, errors.Newf("encryption key must be exactly 32 bytes for AES-256, got %d bytes", len(keyBytes))
+	}
+
 	return &Encryptor{key: keyBytes}, nil
 }
 

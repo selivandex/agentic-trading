@@ -20,9 +20,33 @@ import (
 // - "insight": learning/pattern (text)
 // - "observation": market observation (text)
 func NewSaveMemoryTool(deps shared.Deps) tool.Tool {
+	description := `Save valuable insights, patterns, and learnings to long-term memory for future retrieval.
+
+WHEN TO SAVE:
+- Discovered patterns (with success rates/data)
+- Lessons learned from mistakes  
+- Validated strategies with R:R ratios
+- Market regime changes
+
+HOW TO FORMULATE:
+- Be specific: include numbers, timeframes, conditions
+- Be searchable: use technical terms clearly
+- Include context: symbol, timeframe, market conditions
+- State outcome: success rate, R:R, what happened
+
+IMPORTANCE SCALE:
+- 0.9-1.0: Critical lesson, validated pattern
+- 0.7-0.85: Strong pattern, important observation
+- 0.5-0.65: Moderate insight, hypothesis
+- 0.3-0.45: Minor observation
+
+TYPES: 'analysis' (structured), 'insight' (learning), 'observation' (market note)
+
+Example: "Head-and-shoulders on 4H with declining volume predicted reversal in 7/9 instances. Entry on neckline break with 1.5% stop yielded 3.2:1 R:R avg."`
+
 	return shared.NewToolBuilder(
 		"save_memory",
-		"Save information to long-term memory. Types: 'analysis' (structured results), 'insight' (learnings/patterns), 'observation' (market notes).",
+		description,
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.MemoryRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "memory repository not configured")

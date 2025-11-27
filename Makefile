@@ -52,7 +52,7 @@ db-create:
 	@PGPASSWORD=$(POSTGRES_PASSWORD) psql -h $(POSTGRES_HOST) -p $(POSTGRES_PORT) -U $(POSTGRES_USER) -d postgres -c "CREATE DATABASE $(POSTGRES_DB);" 2>/dev/null || echo "PostgreSQL database already exists"
 	@echo "✓ PostgreSQL database ready"
 	@echo "Creating ClickHouse database..."
-	@clickhouse-client --host $(CLICKHOUSE_HOST) --port 9000 --user $(CLICKHOUSE_USER) --password $(CLICKHOUSE_PASSWORD) --query "CREATE DATABASE IF NOT EXISTS $(CLICKHOUSE_DB);" 2>/dev/null || echo "ClickHouse database already exists"
+	@docker exec flowly-clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $(CLICKHOUSE_DB);" 2>/dev/null || echo "ClickHouse database already exists"
 	@echo "✓ ClickHouse database ready"
 
 db-drop:
@@ -62,7 +62,7 @@ db-drop:
 		echo "Dropping PostgreSQL database..."; \
 		PGPASSWORD=$(POSTGRES_PASSWORD) psql -h $(POSTGRES_HOST) -p $(POSTGRES_PORT) -U $(POSTGRES_USER) -d postgres -c "DROP DATABASE IF EXISTS $(POSTGRES_DB);"; \
 		echo "Dropping ClickHouse database..."; \
-		clickhouse-client --host $(CLICKHOUSE_HOST) --port 9000 --user $(CLICKHOUSE_USER) --password $(CLICKHOUSE_PASSWORD) --query "DROP DATABASE IF EXISTS $(CLICKHOUSE_DB);"; \
+		docker exec flowly-clickhouse clickhouse-client --query "DROP DATABASE IF EXISTS $(CLICKHOUSE_DB);"; \
 		echo "✓ Databases dropped"; \
 	else \
 		echo "Cancelled."; \
@@ -77,7 +77,7 @@ migrate-up:
 	@migrate -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSL_MODE)" -path migrations/postgres up
 	@echo "✓ PostgreSQL migrations completed"
 	@echo "Running ClickHouse migrations..."
-	@migrate -database "clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?database=$(CLICKHOUSE_DB)&username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)" -path migrations/clickhouse up
+	@migrate -database "clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?database=$(CLICKHOUSE_DB)&username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse up
 	@echo "✓ ClickHouse migrations completed"
 
 migrate-down:
@@ -89,7 +89,7 @@ migrate-status:
 	@echo "PostgreSQL migration status:"
 	@migrate -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSL_MODE)" -path migrations/postgres version
 	@echo "\nClickHouse migration status:"
-	@migrate -database "clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?database=$(CLICKHOUSE_DB)&username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)" -path migrations/clickhouse version
+	@migrate -database "clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?database=$(CLICKHOUSE_DB)&username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse version
 
 migrate-force:
 	@read -p "Enter version to force: " version; \

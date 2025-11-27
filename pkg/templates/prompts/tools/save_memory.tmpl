@@ -1,0 +1,96 @@
+# SAVE MEMORY TOOL
+
+**Purpose:** Store valuable insights, patterns, and learnings for future retrieval.
+
+## When to Save Memory
+
+### ✅ SAVE (high value):
+- **Patterns discovered:** "BTC forms double bottom at major support 80% success rate"
+- **Lessons learned:** "Entering without HTF confirmation led to 3 consecutive losses"  
+- **Successful strategies:** "Breakout entries with volume spike >2x avg yielded 4:1 R:R"
+- **Risk insights:** "Overtrading during high volatility decreased win rate by 25%"
+- **Market regime changes:** "Volatility spike >50% signals regime shift to range-bound"
+
+### ❌ DON'T SAVE (low value):
+- Current prices: "BTC at $45,000"
+- Obvious facts: "Market is open"
+- Single trades without lesson: "Entered BTC long"
+- Temporary conditions: "Feeling tired today"
+
+## How to Formulate (Critical for Search!)
+
+### 🎯 GOOD Examples:
+```
+Type: insight, Category: pattern
+Content: "Head-and-shoulders pattern on 4H timeframe with declining volume 
+          correctly predicted reversal in 7 out of 9 instances over 3 months.
+          Entry on neckline break with 1.5% stop yielded avg 3.2:1 R:R."
+Importance: 0.9
+```
+
+```
+Type: insight, Category: risk_lesson  
+Content: "Trading against HTF trend (1D bearish but 1H bullish) resulted in 
+          60% loss rate. Wait for HTF/LTF alignment before entry."
+Importance: 0.85
+```
+
+```
+Type: observation, Category: market_regime
+Content: "Correlation between BTC and ETH increased to 0.95 during fear phase,
+          suggesting reduced alpha opportunity in altcoins. Focus on BTC only."
+Importance: 0.7
+```
+
+### ❌ BAD Examples:
+```
+Content: "Good trade"  
+❌ Why: Not specific, unsearchable, no context
+```
+
+```
+Content: "BTC went up today"
+❌ Why: Not actionable, will be outdated tomorrow
+```
+
+```
+Content: "I think bearish divergence works"
+❌ Why: Vague, no data, no context about when/how
+```
+
+## Formulation Rules
+
+1. **Be specific:** Include numbers, timeframes, conditions
+2. **Be searchable:** Use technical terms, describe situation clearly  
+3. **Include context:** Symbol, timeframe, market conditions when relevant
+4. **State outcome:** What happened? What was R:R? Success rate?
+5. **Make it timeless:** Don't rely on "now", "today", "current"
+
+## Importance Scale (0.0 - 1.0)
+
+- **0.9-1.0:** Critical lesson, validated pattern, major insight
+- **0.7-0.85:** Strong pattern, important observation, useful strategy
+- **0.5-0.65:** Moderate insight, hypothesis to validate
+- **0.3-0.45:** Minor observation, needs more data
+
+## Parameters
+
+- `type`: "analysis" (structured), "insight" (learning), "observation" (market note)
+- `content`: The memory text (follow rules above!)
+- `category`: e.g., "risk_lesson", "market_pattern", "execution_lesson"
+- `symbol`: If symbol-specific (e.g., "BTC/USDT")
+- `timeframe`: If timeframe-specific (e.g., "1H", "4H")  
+- `importance`: 0.0-1.0 based on scale above
+- `tags`: Optional array for additional categorization
+
+## Integration with Search
+
+Your saved memories will be retrieved via semantic search when:
+- Similar market situations occur
+- You need to validate a hypothesis  
+- You're planning a similar trade setup
+
+**Quality of formulation = Quality of future retrieval!**
+
+Write memories as if explaining to your future self who needs to make a decision.
+

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS user_strategies (
     -- Strategy metadata
     name VARCHAR(255) NOT NULL,  -- "Balanced Growth", "Aggressive DeFi", etc.
     description TEXT,
-    status VARCHAR(50) NOT NULL DEFAULT 'active',  -- active, paused, closed
+    status strategy_status NOT NULL DEFAULT 'active',
     
     -- Capital allocation
     allocated_capital DECIMAL(20, 8) NOT NULL,  -- Initial capital
@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS user_strategies (
     cash_reserve DECIMAL(20, 8) NOT NULL DEFAULT 0,  -- Unallocated cash
     
     -- Strategy configuration
-    risk_tolerance VARCHAR(50) NOT NULL,  -- conservative, moderate, aggressive
-    rebalance_frequency VARCHAR(50),      -- daily, weekly, monthly, never
+    risk_tolerance risk_tolerance NOT NULL,
+    rebalance_frequency rebalance_frequency,
     target_allocations JSONB NOT NULL,    -- {"BTC/USDT": 0.5, "ETH/USDT": 0.3, ...}
     
     -- Performance metrics
@@ -35,8 +35,6 @@ CREATE TABLE IF NOT EXISTS user_strategies (
     reasoning_log JSONB,  -- Full CoT trace from portfolio creation
     
     -- Constraints
-    CONSTRAINT valid_status CHECK (status IN ('active', 'paused', 'closed')),
-    CONSTRAINT valid_risk_tolerance CHECK (risk_tolerance IN ('conservative', 'moderate', 'aggressive')),
     CONSTRAINT positive_capital CHECK (allocated_capital > 0),
     CONSTRAINT valid_equity CHECK (current_equity >= 0),
     CONSTRAINT valid_cash CHECK (cash_reserve >= 0)

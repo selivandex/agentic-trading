@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS collective_memories (
     agent_type VARCHAR(100) NOT NULL,  -- 'market_analyst', 'risk_manager', etc.
     personality VARCHAR(50),            -- 'conservative', 'aggressive', 'balanced', NULL for all
 
-    -- Content
+    -- Content  
     type memory_type NOT NULL,
     content TEXT NOT NULL,
     embedding vector(1536),            -- OpenAI ada-002 or similar

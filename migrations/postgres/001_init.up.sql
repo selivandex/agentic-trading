@@ -1,9 +1,24 @@
 -- migrations/postgres/001_init.up.sql
--- Initial schema setup
+-- Initial schema setup with ENUM types
 
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
+
+-- Create ENUM types for type safety and low cardinality columns
+CREATE TYPE exchange_type AS ENUM ('binance', 'bybit', 'okx', 'kucoin', 'gate');
+CREATE TYPE market_type AS ENUM ('spot', 'futures');
+CREATE TYPE order_side AS ENUM ('buy', 'sell');
+CREATE TYPE order_type AS ENUM ('market', 'limit', 'stop_market', 'stop_limit');
+CREATE TYPE order_status AS ENUM ('pending', 'open', 'filled', 'partial', 'canceled', 'rejected', 'expired');
+CREATE TYPE position_side AS ENUM ('long', 'short');
+CREATE TYPE position_status AS ENUM ('open', 'closed', 'liquidated');
+CREATE TYPE memory_type AS ENUM ('observation', 'decision', 'trade', 'lesson', 'regime', 'pattern');
+CREATE TYPE risk_event_type AS ENUM ('drawdown_warning', 'consecutive_loss', 'circuit_breaker_triggered', 'max_exposure_reached', 'kill_switch_activated', 'anomaly_detected');
+CREATE TYPE strategy_mode AS ENUM ('auto', 'semi_auto', 'signals');
+CREATE TYPE strategy_status AS ENUM ('active', 'paused', 'closed');
+CREATE TYPE risk_tolerance AS ENUM ('conservative', 'moderate', 'aggressive');
+CREATE TYPE rebalance_frequency AS ENUM ('daily', 'weekly', 'monthly', 'never');
 
 -- Users table
 CREATE TABLE users (
@@ -27,7 +42,7 @@ CREATE INDEX idx_users_is_active ON users(is_active) WHERE is_active = true;
 CREATE TABLE exchange_accounts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    exchange VARCHAR(50) NOT NULL,
+    exchange exchange_type NOT NULL,
     label VARCHAR(255),
     api_key_encrypted BYTEA NOT NULL,
     secret_encrypted BYTEA NOT NULL,
@@ -51,7 +66,7 @@ CREATE TABLE trading_pairs (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     exchange_account_id UUID NOT NULL REFERENCES exchange_accounts(id) ON DELETE CASCADE,
     symbol VARCHAR(50) NOT NULL,
-    market_type VARCHAR(20) NOT NULL,
+    market_type market_type NOT NULL,
 
     -- Budget & Risk
     budget DECIMAL(20,8) NOT NULL,
@@ -62,7 +77,7 @@ CREATE TABLE trading_pairs (
 
     -- Strategy
     ai_provider VARCHAR(50) DEFAULT 'claude',
-    strategy_mode VARCHAR(20) DEFAULT 'signals',
+    strategy_mode strategy_mode DEFAULT 'signals',
     timeframes TEXT[] DEFAULT '{"1h","4h","1d"}',
 
     -- State
@@ -89,11 +104,11 @@ CREATE TABLE orders (
 
     exchange_order_id VARCHAR(255),
     symbol VARCHAR(50) NOT NULL,
-    market_type VARCHAR(20) NOT NULL,
+    market_type market_type NOT NULL,
 
-    side VARCHAR(10) NOT NULL,
-    type VARCHAR(20) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    side order_side NOT NULL,
+    type order_type NOT NULL,
+    status order_status NOT NULL DEFAULT 'pending',
 
     price DECIMAL(20,8),
     amount DECIMAL(20,8) NOT NULL,
@@ -129,8 +144,8 @@ CREATE TABLE positions (
     exchange_account_id UUID NOT NULL REFERENCES exchange_accounts(id),
 
     symbol VARCHAR(50) NOT NULL,
-    market_type VARCHAR(20) NOT NULL,
-    side VARCHAR(10) NOT NULL,
+    market_type market_type NOT NULL,
+    side position_side NOT NULL,
 
     size DECIMAL(20,8) NOT NULL,
     entry_price DECIMAL(20,8) NOT NULL,
@@ -153,7 +168,7 @@ CREATE TABLE positions (
 
     open_reasoning TEXT,
 
-    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    status position_status NOT NULL DEFAULT 'open',
     opened_at TIMESTAMPTZ DEFAULT NOW(),
     closed_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -171,7 +186,7 @@ CREATE TABLE memories (
     agent_id VARCHAR(100) NOT NULL,
     session_id VARCHAR(255),
 
-    type VARCHAR(50) NOT NULL,
+    type memory_type NOT NULL,
     content TEXT NOT NULL,
     
     -- Embedding metadata (critical for search compatibility)
@@ -200,40 +215,7 @@ CREATE INDEX idx_memories_metadata ON memories USING gin(metadata); -- JSON quer
 CREATE INDEX idx_memories_created ON memories(created_at DESC);
 
 -- Collective Memory table (shared knowledge)
-CREATE TABLE collective_memories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-
-    -- Scope
-    agent_type VARCHAR(100) NOT NULL,
-    personality VARCHAR(50),
-
-    -- Content
-    type VARCHAR(50) NOT NULL,
-    content TEXT NOT NULL,
-    embedding vector(1536),
-
-    -- Validation
-    validation_score DECIMAL(3,2),
-    validation_trades INTEGER,
-    validated_at TIMESTAMPTZ,
-
-    -- Metadata
-    symbol VARCHAR(50),
-    timeframe VARCHAR(10),
-    importance DECIMAL(3,2) DEFAULT 0.5,
-
-    -- Source
-    source_user_id UUID REFERENCES users(id),
-    source_trade_id UUID,
-
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    expires_at TIMESTAMPTZ
-);
-
-CREATE INDEX idx_collective_memories_agent ON collective_memories(agent_type);
-CREATE INDEX idx_collective_memories_personality ON collective_memories(personality);
-CREATE INDEX idx_collective_memories_embedding ON collective_memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX idx_collective_memories_validated ON collective_memories(validation_score DESC) WHERE validated_at IS NOT NULL;
+-- collective_memories table moved to 005_collective_memory.up.sql
 
 -- Journal Entries table
 CREATE TABLE journal_entries (
@@ -320,7 +302,7 @@ CREATE TABLE risk_events (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     timestamp TIMESTAMPTZ DEFAULT NOW(),
 
-    event_type VARCHAR(50) NOT NULL,
+    event_type risk_event_type NOT NULL,
     severity VARCHAR(20) NOT NULL,
     message TEXT NOT NULL,
     data JSONB,
