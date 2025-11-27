@@ -61,6 +61,7 @@ Market Research Worker (runs every 1-5 minutes)
 ### 1.3 Output
 
 **Opportunity Signal** (if published):
+
 - Direction: Long or Short
 - Entry price range
 - Stop-loss level
@@ -163,6 +164,7 @@ Position is now ACTIVE
 ### 3.3 Output
 
 **Active Position** record:
+
 - User ID
 - Symbol
 - Direction (Long/Short)
@@ -222,6 +224,7 @@ Position updated in database
 ### 4.3 Automatic Position Closure
 
 Position closes automatically when:
+
 - **Stop-loss hit**: Price reached SL level → close immediately to prevent further loss
 - **Take-profit hit**: Price reached TP level → close position with profit
 - **Circuit breaker**: User hit max drawdown or max consecutive losses → emergency close all
@@ -289,6 +292,7 @@ Position closed (SL/TP hit or manual close)
 ### 6.1 Two Types of Memory
 
 #### Personal Memory (Per User)
+
 - User's own observations
 - Personal trading history
 - Preferred strategies
@@ -296,6 +300,7 @@ Position closed (SL/TP hit or manual close)
 - Personalized lessons
 
 #### Collective Memory (Shared Across All Users)
+
 - Validated patterns that work
 - High-quality lessons (confirmed by 3+ successful trades)
 - Market regime detection
@@ -304,6 +309,7 @@ Position closed (SL/TP hit or manual close)
 ### 6.2 Memory Usage
 
 Agents use memory during analysis:
+
 - **Market Analyst**: "Last time BTC was at this level with RSI divergence, it reversed"
 - **Strategy Planner**: "User historically performs better with trend-following strategies"
 - **Risk Manager**: "This user tends to exit winners too early, recommend higher TP"
@@ -316,17 +322,18 @@ Agents use memory during analysis:
 
 The risk engine stops trading automatically when:
 
-| Condition | Action |
-|-----------|--------|
-| Daily loss >= X% of account | Pause trading until next day |
-| Consecutive losses >= N trades | Pause for manual review |
-| Open positions exposure >= Y% | Block new positions |
-| Exchange API errors | Pause trading, send alert |
-| Unusual market volatility | Reduce position sizes |
+| Condition                      | Action                       |
+| ------------------------------ | ---------------------------- |
+| Daily loss >= X% of account    | Pause trading until next day |
+| Consecutive losses >= N trades | Pause for manual review      |
+| Open positions exposure >= Y%  | Block new positions          |
+| Exchange API errors            | Pause trading, send alert    |
+| Unusual market volatility      | Reduce position sizes        |
 
 ### 7.2 Kill Switch
 
 **Emergency shutdown** triggered by:
+
 - User command from Telegram: `/killswitch`
 - System detects critical error
 - Exchange connection lost
@@ -378,23 +385,27 @@ Report sent via Telegram
 ### 9.1 User Can
 
 **Monitor**:
+
 - `/balance` - Check account balance
 - `/positions` - View open positions with PnL
 - `/stats` - Trading statistics
 - `/report` - Generate performance report
 
 **Control**:
+
 - `/pause` - Pause trading (stop processing new opportunities)
 - `/resume` - Resume trading
 - `/killswitch` - Emergency close all positions
 - `/settings` - Adjust risk tolerance, preferred leverage, etc.
 
 **Configure**:
+
 - `/connect bybit API_KEY SECRET` - Connect exchange account
 - `/disconnect bybit` - Remove exchange
 - `/set-risk moderate` - Change risk profile
 
 **Opportunities**:
+
 - Receive opportunity notifications: "🎯 New signal: BTC/USDT LONG at $43,200"
 - Accept/reject manually (optional): "✅ Accept" or "❌ Skip"
 
@@ -436,19 +447,19 @@ Opportunity Signal published
 
 System collects market data in background to feed analysts:
 
-| Worker | Frequency | Data Type |
-|--------|-----------|-----------|
-| OHLCV Collector | 1 minute | Candlestick data |
-| Ticker Collector | 5 seconds | Real-time prices |
-| OrderBook Collector | 10 seconds | Order book depth |
-| Trades Collector | 1 second | Tape / recent trades |
-| Funding Collector | 1 minute | Futures funding rates |
-| Liquidations Collector | 5 seconds | Liquidation events |
-| News Collector | 5 minutes | Crypto news |
-| Sentiment Collector | 2 minutes | Social media sentiment |
-| On-Chain Collector | 5 minutes | Whale movements, flows |
-| Macro Collector | 1 hour | Economic calendar |
-| Options Collector | 5 minutes | Options flow, gamma |
+| Worker                 | Frequency  | Data Type              |
+| ---------------------- | ---------- | ---------------------- |
+| OHLCV Collector        | 1 minute   | Candlestick data       |
+| Ticker Collector       | 5 seconds  | Real-time prices       |
+| OrderBook Collector    | 10 seconds | Order book depth       |
+| Trades Collector       | 1 second   | Tape / recent trades   |
+| Funding Collector      | 1 minute   | Futures funding rates  |
+| Liquidations Collector | 5 seconds  | Liquidation events     |
+| News Collector         | 5 minutes  | Crypto news            |
+| Sentiment Collector    | 2 minutes  | Social media sentiment |
+| On-Chain Collector     | 5 minutes  | Whale movements, flows |
+| Macro Collector        | 1 hour     | Economic calendar      |
+| Options Collector      | 5 minutes  | Options flow, gamma    |
 
 All data is stored in high-performance databases for fast retrieval during analysis.
 
@@ -459,17 +470,20 @@ All data is stored in high-performance databases for fast retrieval during analy
 ### 12.1 Multiple Protection Layers
 
 1. **Pre-trade validation** (Risk Manager):
+
    - Position size limits
    - Risk/Reward validation
    - Circuit breaker check
    - Margin requirements
 
 2. **Exchange-level protection**:
+
    - Stop-loss orders placed immediately
    - Take-profit orders set
    - Leverage limits enforced
 
 3. **Real-time monitoring**:
+
    - Position monitoring every 30-60s
    - Risk metrics recalculated continuously
    - Circuit breaker can trigger anytime
@@ -486,31 +500,37 @@ All data is stored in high-performance databases for fast retrieval during analy
 ### Example: Alice, Conservative Trader
 
 **9:00 AM** - Market Research runs for BTC/USDT
+
 - 8 analysts analyze the market
 - 6/8 analysts signal LONG
 - Opportunity Synthesizer: 72% confidence → **PUBLISH**
 
 **9:01 AM** - Alice's Personal Trading Workflow
+
 - **Strategy Planner**: Creates plan for $100 position, 2x leverage, tight SL
 - **Risk Manager**: Validates → APPROVED (fits Alice's conservative profile)
 - **Executor**: Places bracket order on Bybit
 - Position opened: BTC LONG @ $43,200, SL: $42,800, TP: $44,400
 
 **9:01 AM - 11:30 AM** - Position Monitoring
+
 - Price moves to $43,600 (+$80 profit)
 - Position Manager: Move SL to breakeven ($43,200)
 - Executor: Updates stop-loss on exchange
 
 **11:35 AM** - Take-profit hit
+
 - Price reaches $44,400
 - Position auto-closes with +$240 profit (+2.8% ROI)
 
 **11:36 AM** - Post-Trade Evaluation
+
 - Self Evaluator analyzes: "Perfect execution, SMC liquidity grab signal was key"
 - Journal entry created
 - Lesson learned: "Order flow divergence + SMC signal = high confidence"
 
 **12:00 AM (next day)** - Daily Report
+
 - Alice receives Telegram message:
   - "📊 Daily Report: +$240 (+2.8%), 1 trade, 100% win rate"
   - "💡 Recommendation: Your entries are excellent, consider larger position sizes"
@@ -522,27 +542,32 @@ All data is stored in high-performance databases for fast retrieval during analy
 ### 14.1 What If...
 
 **Market Research finds no opportunities?**
+
 - No signal published
 - System waits for next analysis cycle
 - No unnecessary trades (quality > quantity)
 
 **Risk Manager rejects all users?**
+
 - Signal expires
 - No trades executed
 - Better safe than sorry
 
 **Position goes against user immediately?**
+
 - Stop-loss triggers automatically
 - Loss is contained to predefined amount
 - Self Evaluator analyzes if entry was bad or just bad luck
 
 **Exchange API connection fails?**
+
 - Trading pauses automatically
 - Alert sent to user
 - Existing positions monitored via backup connection
 - System waits for connection recovery
 
 **Circuit breaker triggers?**
+
 - All new trading paused
 - Open positions stay open (unless kill switch triggered)
 - User notified via Telegram
@@ -572,4 +597,3 @@ All data is stored in high-performance databases for fast retrieval during analy
 ## End of System Flow
 
 This flow describes the complete lifecycle from market analysis to trade execution, monitoring, evaluation, and continuous improvement. Each phase is independent but coordinated through well-defined data contracts (opportunity signals, position records, journal entries, memory items).
-

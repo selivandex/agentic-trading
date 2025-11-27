@@ -15,7 +15,7 @@ var AgentToolCategories = map[AgentType][]string{
 	AgentCorrelationAnalyst: {"market_data", "correlation", "memory"},
 
 	// Decision makers - also need memory for saving plans and decisions
-	AgentStrategyPlanner: {"market_data", "account", "risk", "memory", "expert_agents"}, // Strategy planner can consult experts
+	AgentStrategyPlanner: {"market_data", "account", "risk", "memory"},
 	AgentRiskManager:     {"account", "risk", "memory"},
 	AgentExecutor:        {"account", "execution", "memory"},
 	AgentPositionManager: {"account", "execution", "memory"},

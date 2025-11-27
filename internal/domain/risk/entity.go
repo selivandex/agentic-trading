@@ -1,6 +1,7 @@
 package risk
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,4 +74,13 @@ func (r RiskEventType) Valid() bool {
 // String returns string representation
 func (r RiskEventType) String() string {
 	return string(r)
+}
+
+// RedisClient defines interface for Redis operations needed by risk services
+// This allows domain to not depend on concrete Redis implementation
+type RedisClient interface {
+	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
+	Get(ctx context.Context, key string, dest interface{}) error
+	Delete(ctx context.Context, keys ...string) error
+	Exists(ctx context.Context, key string) (bool, error)
 }

@@ -11,7 +11,7 @@ import (
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
-	"prometheus/internal/risk"
+	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -22,7 +22,7 @@ type PnLCalculator struct {
 	*workers.BaseWorker
 	userRepo       user.Repository
 	posRepo        position.Repository
-	riskEngine     *risk.RiskEngine
+	riskEngine     *riskservice.RiskEngine
 	kafka          *kafka.Producer
 	eventPublisher *events.WorkerPublisher
 }
@@ -31,7 +31,7 @@ type PnLCalculator struct {
 func NewPnLCalculator(
 	userRepo user.Repository,
 	posRepo position.Repository,
-	riskEngine *risk.RiskEngine,
+	riskEngine *riskservice.RiskEngine,
 	kafka *kafka.Producer,
 	interval time.Duration,
 	enabled bool,

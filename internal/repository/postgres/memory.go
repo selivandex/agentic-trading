@@ -27,33 +27,39 @@ func NewMemoryRepository(db *sqlx.DB) *MemoryRepository {
 func (r *MemoryRepository) Store(ctx context.Context, m *memory.Memory) error {
 	query := `
 		INSERT INTO memories (
-			id, user_id, agent_id, session_id, type, content, embedding,
-			symbol, timeframe, importance, related_ids, trade_id, created_at, expires_at
+			id, user_id, agent_id, session_id, type, content, 
+			embedding, embedding_model, embedding_dimensions,
+			symbol, timeframe, importance, metadata, 
+			created_at, expires_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
-		m.ID, m.UserID, m.AgentID, m.SessionID, m.Type, m.Content, m.Embedding,
-		m.Symbol, m.Timeframe, m.Importance, m.RelatedIDs, m.TradeID, m.CreatedAt, m.ExpiresAt,
+		m.ID, m.UserID, m.AgentID, m.SessionID, m.Type, m.Content,
+		m.Embedding, m.EmbeddingModel, m.EmbeddingDimensions,
+		m.Symbol, m.Timeframe, m.Importance, m.Metadata,
+		m.CreatedAt, m.ExpiresAt,
 	)
 
 	return err
 }
 
 // SearchSimilar performs semantic search using pgvector cosine similarity
-func (r *MemoryRepository) SearchSimilar(ctx context.Context, userID uuid.UUID, embedding pgvector.Vector, limit int) ([]*memory.Memory, error) {
+// IMPORTANT: Filters by embedding_model to ensure compatibility
+func (r *MemoryRepository) SearchSimilar(ctx context.Context, userID uuid.UUID, embeddingModel string, embedding pgvector.Vector, limit int) ([]*memory.Memory, error) {
 	var memories []*memory.Memory
 
 	query := `
-		SELECT *, 1 - (embedding <=> $2) as similarity
+		SELECT *, 1 - (embedding <=> $3) as similarity
 		FROM memories
 		WHERE user_id = $1
+		  AND embedding_model = $2
 		  AND (expires_at IS NULL OR expires_at > NOW())
-		ORDER BY embedding <=> $2
-		LIMIT $3`
+		ORDER BY embedding <=> $3
+		LIMIT $4`
 
-	err := r.db.SelectContext(ctx, &memories, query, userID, embedding, limit)
+	err := r.db.SelectContext(ctx, &memories, query, userID, embeddingModel, embedding, limit)
 	if err != nil {
 		return nil, err
 	}

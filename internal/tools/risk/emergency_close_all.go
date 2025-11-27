@@ -1,12 +1,16 @@
 package risk
+
 import (
 	"time"
+
 	"github.com/google/uuid"
-	riskpkg "prometheus/internal/risk"
+	"google.golang.org/adk/tool"
+
+	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
-	"google.golang.org/adk/tool"
 )
+
 // NewEmergencyCloseAllTool closes all open positions for the user using the kill switch
 func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
@@ -39,7 +43,7 @@ func NewEmergencyCloseAllTool(deps shared.Deps) tool.Tool {
 				reason = "Emergency close all triggered by user"
 			}
 			// Create kill switch instance
-			killSwitch := riskpkg.NewKillSwitch(
+			killSwitch := riskservice.NewKillSwitch(
 				deps.PositionRepo,
 				deps.OrderRepo,
 				deps.RiskRepo,

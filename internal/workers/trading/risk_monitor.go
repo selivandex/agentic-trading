@@ -11,7 +11,7 @@ import (
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
-	"prometheus/internal/risk"
+	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 )
@@ -20,7 +20,7 @@ import (
 type RiskMonitor struct {
 	*workers.BaseWorker
 	userRepo       user.Repository
-	riskEngine     *risk.RiskEngine
+	riskEngine     *riskservice.RiskEngine
 	posRepo        position.Repository
 	kafka          *kafka.Producer
 	eventPublisher *events.WorkerPublisher
@@ -29,7 +29,7 @@ type RiskMonitor struct {
 // NewRiskMonitor creates a new risk monitor worker
 func NewRiskMonitor(
 	userRepo user.Repository,
-	riskEngine *risk.RiskEngine,
+	riskEngine *riskservice.RiskEngine,
 	posRepo position.Repository,
 	kafka *kafka.Producer,
 	interval time.Duration,
@@ -195,7 +195,7 @@ type ConsecutiveLossesWarningEvent struct {
 	Timestamp         time.Time `json:"timestamp"`
 }
 
-func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState) {
+func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.UUID, state *riskservice.UserRiskState) {
 	dailyPnL, _ := state.DailyPnL.Float64()
 	maxDrawdown, _ := state.MaxDrawdown.Float64()
 	threshold := maxDrawdown * 0.9 // Assuming 90% threshold
@@ -218,7 +218,7 @@ func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.
 	}
 }
 
-func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState, currentDrawdown decimal.Decimal) {
+func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID, state *riskservice.UserRiskState, currentDrawdown decimal.Decimal) {
 	percentage := currentDrawdown.Div(state.MaxDrawdown).Mul(decimal.NewFromInt(100))
 
 	currentDrawdownFloat, _ := currentDrawdown.Float64()
@@ -245,7 +245,7 @@ func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID
 	}
 }
 
-func (rm *RiskMonitor) sendConsecutiveLossesWarning(ctx context.Context, userID uuid.UUID, state *risk.UserRiskState) {
+func (rm *RiskMonitor) sendConsecutiveLossesWarning(ctx context.Context, userID uuid.UUID, state *riskservice.UserRiskState) {
 	if err := rm.eventPublisher.PublishConsecutiveLossesAlert(
 		ctx,
 		userID.String(),

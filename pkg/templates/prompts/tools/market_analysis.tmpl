@@ -1,0 +1,55 @@
+📊 MARKET ANALYSIS — {{.Exchange}}/{{.Symbol}}
+{{.Timestamp}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 PRICE
+  Current:     ${{printf "%.2f" .Price.Current}}{{if .Price.Bid}} (Bid: ${{printf "%.2f" .Price.Bid}} | Ask: ${{printf "%.2f" .Price.Ask}}){{end}}
+  {{if .Price.Change}}Change:      {{if gt .Price.Change 0}}+{{end}}${{printf "%.4f" .Price.Change}} ({{if gt .Price.ChangePct 0}}+{{end}}{{printf "%.2f" .Price.ChangePct}}%){{end}}
+  {{if .Price.Spread}}Spread:      ${{printf "%.4f" .Price.Spread}} ({{printf "%.3f" .Price.SpreadPct}}%) — {{.Price.SpreadQuality}}{{end}}
+  {{if .Price.BidSize}}Liquidity:   Bid={{printf "%.2f" .Price.BidSize}} | Ask={{printf "%.2f" .Price.AskSize}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 ORDER FLOW
+  {{if .TradeImbalance}}Trade Pressure:  {{.TradeImbalance.Pressure}} ({{printf "%.1f" .TradeImbalance.DeltaPct}}% delta)
+                  Buy: {{printf "%.2f" .TradeImbalance.BuyVolume}} | Sell: {{printf "%.2f" .TradeImbalance.SellVolume}}
+                  → {{.TradeImbalance.Signal}}{{end}}
+
+  {{if .CVD}}CVD Analysis:    {{.CVD.Trend}} ({{.CVD.Divergence}} divergence)
+                  CVD: {{printf "%.2f" .CVD.CVD}}
+                  → {{.CVD.Signal}}{{end}}
+
+  {{if .WhaleActivity}}Whale Activity:  {{.WhaleActivity.Activity}}{{if gt .WhaleActivity.WhaleCount 0}} ({{.WhaleActivity.WhaleCount}} whales){{end}}
+                  {{if gt .WhaleActivity.WhaleCount 0}}Buy: ${{printf "%.0f" .WhaleActivity.BuyVolumeUSD}} | Sell: ${{printf "%.0f" .WhaleActivity.SellVolumeUSD}}
+                  Imbalance: {{printf "%.1f" .WhaleActivity.ImbalancePct}}%{{end}}
+                  → {{.WhaleActivity.Signal}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 ORDERBOOK
+  {{if .Orderbook}}Pressure:     {{.Orderbook.Pressure}} ({{printf "%.1f" .Orderbook.ImbalancePct}}% imbalance)
+  Depth:        Bids={{printf "%.2f" .Orderbook.BidVolume}} | Asks={{printf "%.2f" .Orderbook.AskVolume}}
+  {{if .Orderbook.BidWall}}Bid Wall:     ${{printf "%.2f" .Orderbook.BidWall.Price}} ({{printf "%.2f" .Orderbook.BidWall.Size}} @ {{printf "%.1f" .Orderbook.BidWall.Ratio}}x avg){{end}}
+  {{if .Orderbook.AskWall}}Ask Wall:     ${{printf "%.2f" .Orderbook.AskWall.Price}} ({{printf "%.2f" .Orderbook.AskWall.Size}} @ {{printf "%.1f" .Orderbook.AskWall.Ratio}}x avg){{end}}
+  → {{.Orderbook.Signal}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 VOLUME & ACTIVITY
+  {{if .Volume}}Total Volume:  ${{printf "%.0f" .Volume.TotalUSD}} (Buy: ${{printf "%.0f" .Volume.BuyUSD}} | Sell: ${{printf "%.0f" .Volume.SellUSD}})
+  {{if .Volume.HourlyEstimate}}Hourly Est:    ${{printf "%.0f" .Volume.HourlyEstimate}} (based on {{printf "%.1f" .Volume.PeriodMinutes}}m){{end}}{{end}}
+
+  {{if .TickSpeed}}Tick Speed:    {{printf "%.1f" .TickSpeed.TradesPerMin}} trades/min ({{.TickSpeed.Activity}})
+  Volume/min:    ${{printf "%.0f" .TickSpeed.VolumePerMin}}
+  → {{.TickSpeed.Signal}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 OVERALL SIGNAL
+  Direction:   {{.Signal.Direction | upper}} ({{.Signal.Strength}})
+  Confidence:  {{printf "%.0f" (mul .Signal.Confidence 100)}}%
+  Consensus:   {{.Signal.BullishCount}} bullish | {{.Signal.BearishCount}} bearish signals
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

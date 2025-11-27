@@ -23,15 +23,14 @@ func SaveStructuredReasoningCallback(reasoningRepo reasoning.Repository) agent.A
 			"session", ctx.SessionID(),
 		)
 
-		// Get agent output from conversation history
-		history := ctx.ConversationHistory()
-		if len(history) == 0 {
-			log.Debug("No conversation history available")
-			return nil, nil
-		}
+		// TODO: Get agent output from conversation - ConversationHistory() removed in ADK
+		// For now, we skip reasoning capture as ADK API changed
+		// Will implement using Output() or alternative method in future
+		log.Debug("Reasoning capture temporarily disabled - ADK API migration needed")
+		return nil, nil
 
 		// Get the last message (agent's response)
-		lastMessage := history[len(history)-1]
+		// lastMessage := history[len(history)-1]
 		if lastMessage.Role != genai.RoleModel {
 			log.Debug("Last message is not from model, skipping")
 			return nil, nil
@@ -58,37 +57,37 @@ func SaveStructuredReasoningCallback(reasoningRepo reasoning.Repository) agent.A
 			return saveRawOutput(ctx, reasoningRepo, outputText)
 		}
 
-	// Extract reasoning steps and final output
-	// Supports multiple output formats:
-	// - OpportunitySynthesizer: synthesis_steps + decision + conflicts
-	// - Analyst agents: reasoning_trace + final_analysis + tool_calls_summary
-	// - Legacy: reasoning_steps (fallback)
-	reasoningSteps, hasSteps := structuredOutput["synthesis_steps"]
-	if !hasSteps {
-		reasoningSteps, hasSteps = structuredOutput["reasoning_trace"]
-	}
-	if !hasSteps {
-		reasoningSteps, hasSteps = structuredOutput["reasoning_steps"]
-	}
+		// Extract reasoning steps and final output
+		// Supports multiple output formats:
+		// - OpportunitySynthesizer: synthesis_steps + decision + conflicts
+		// - Analyst agents: reasoning_trace + final_analysis + tool_calls_summary
+		// - Legacy: reasoning_steps (fallback)
+		reasoningSteps, hasSteps := structuredOutput["synthesis_steps"]
+		if !hasSteps {
+			reasoningSteps, hasSteps = structuredOutput["reasoning_trace"]
+		}
+		if !hasSteps {
+			reasoningSteps, hasSteps = structuredOutput["reasoning_steps"]
+		}
 
-	var finalOutput interface{}
-	if decision, ok := structuredOutput["decision"]; ok {
-		finalOutput = decision
-	} else if analysis, ok := structuredOutput["final_analysis"]; ok {
-		finalOutput = analysis
-	} else {
-		// No specific final output field, use entire output
-		finalOutput = structuredOutput
-	}
+		var finalOutput interface{}
+		if decision, ok := structuredOutput["decision"]; ok {
+			finalOutput = decision
+		} else if analysis, ok := structuredOutput["final_analysis"]; ok {
+			finalOutput = analysis
+		} else {
+			// No specific final output field, use entire output
+			finalOutput = structuredOutput
+		}
 
-	// Extract additional metadata (tool calls, conflicts, etc.)
-	metadata := make(map[string]interface{})
-	if toolCalls, ok := structuredOutput["tool_calls_summary"]; ok {
-		metadata["tool_calls_summary"] = toolCalls
-	}
-	if conflicts, ok := structuredOutput["conflicts"]; ok {
-		metadata["conflicts"] = conflicts
-	}
+		// Extract additional metadata (tool calls, conflicts, etc.)
+		metadata := make(map[string]interface{})
+		if toolCalls, ok := structuredOutput["tool_calls_summary"]; ok {
+			metadata["tool_calls_summary"] = toolCalls
+		}
+		if conflicts, ok := structuredOutput["conflicts"]; ok {
+			metadata["conflicts"] = conflicts
+		}
 
 		// Marshal to JSONB for storage
 		reasoningStepsJSON, err := json.Marshal(reasoningSteps)

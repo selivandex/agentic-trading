@@ -1,5 +1,8 @@
 <!-- @format -->
 
+Never create .md docs files without explicit consent
+Never create .txt examples files without explicit consent
+
 # AGENTS — Prometheus (Agentic Trading System)
 
 Guidance for AI agents working in this codebase. Follow idiomatic Go, Clean Architecture, and DDD principles. Keep code modular, testable, and observable.

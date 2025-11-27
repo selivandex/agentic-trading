@@ -35,23 +35,18 @@ type Definition = ToolDefinition
 type ToolCategory string
 
 const (
-	CategoryMarketData  ToolCategory = "market_data"
-	CategoryMomentum    ToolCategory = "momentum"
-	CategoryVolatility  ToolCategory = "volatility"
-	CategoryTrend       ToolCategory = "trend"
-	CategoryVolume      ToolCategory = "volume"
-	CategorySMC         ToolCategory = "smc"
-	CategoryOrderFlow   ToolCategory = "order_flow"
-	CategorySentiment   ToolCategory = "sentiment"
-	CategoryOnChain     ToolCategory = "onchain"
-	CategoryMacro       ToolCategory = "macro"
-	CategoryDerivatives ToolCategory = "derivatives"
-	CategoryCorrelation ToolCategory = "correlation"
-	CategoryAccount     ToolCategory = "account"
-	CategoryExecution   ToolCategory = "execution"
-	CategoryRisk        ToolCategory = "risk"
-	CategoryMemory      ToolCategory = "memory"
-	CategoryEvaluation  ToolCategory = "evaluation"
+	CategoryMarketData  ToolCategory = "market_data" // Real-time market analysis, OHLCV
+	CategorySMC         ToolCategory = "smc"         // Smart Money Concepts analysis
+	CategorySentiment   ToolCategory = "sentiment"   // Fear & Greed, news
+	CategoryOnChain     ToolCategory = "onchain"     // Whale movements, exchange flows
+	CategoryMacro       ToolCategory = "macro"       // Economic calendar
+	CategoryDerivatives ToolCategory = "derivatives" // Funding rates, open interest
+	CategoryCorrelation ToolCategory = "correlation" // Cross-asset correlations
+	CategoryAccount     ToolCategory = "account"     // Account status
+	CategoryExecution   ToolCategory = "execution"   // Place/cancel orders
+	CategoryRisk        ToolCategory = "risk"        // Pre-trade checks, emergency actions
+	CategoryMemory      ToolCategory = "memory"      // Memory search/save
+	CategoryEvaluation  ToolCategory = "evaluation"  // Strategy stats, trade journal
 )
 
 var (
@@ -91,283 +86,35 @@ func DefinitionByName(name string) (*ToolDefinition, bool) {
 // initCatalog initializes the tool catalog
 func initCatalog() {
 	catalog = []ToolDefinition{
-		// Market Data Tools
+		// ========================================
+		// COMPREHENSIVE ANALYSIS (ALL-IN-ONE) - USE THESE!
+		// ========================================
 		{
-			Name:         "get_price",
+			Name:         "get_technical_analysis",
 			Category:     string(CategoryMarketData),
-			Description:  "Get current price with bid/ask spread",
+			Description:  "Get comprehensive technical analysis with ALL indicators in one call: momentum (RSI, MACD, Stochastic, CCI, ROC), volatility (ATR, Bollinger, Keltner), trend (EMA ribbon, Supertrend, Ichimoku, Pivot Points), volume (VWAP, OBV, Volume Profile, Delta). Returns overall signal assessment.",
 			RequiresAuth: false,
-			RateLimit:    60,
+			RateLimit:    30,
 			RiskLevel:    RiskLevelNone,
 		},
 		{
-			Name:         "get_ohlcv",
+			Name:         "get_smc_analysis",
+			Category:     string(CategorySMC),
+			Description:  "Get comprehensive Smart Money Concepts analysis in one call: market structure (trend, BOS, CHoCH), Fair Value Gaps, Order Blocks, liquidity zones, swing points. Returns overall SMC signal.",
+			RequiresAuth: false,
+			RateLimit:    30,
+			RiskLevel:    RiskLevelNone,
+		},
+
+		// ========================================
+		// Market Data & Analysis (ALL-IN-ONE)
+		// Replaces: get_price, get_ohlcv, get_trades, get_orderbook, get_order_flow_analysis
+		{
+			Name:         "get_market_analysis",
 			Category:     string(CategoryMarketData),
-			Description:  "Get historical OHLCV candles",
+			Description:  "Get comprehensive real-time market analysis. Returns: price (bid/ask/spread/change%), volume (total/hourly estimate), order flow (CVD/trade imbalance), whale activity, orderbook (pressure/walls), tick speed, overall signal. Human-readable text format.",
 			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_orderbook",
-			Category:     string(CategoryMarketData),
-			Description:  "Get order book depth",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_trades",
-			Category:     string(CategoryMarketData),
-			Description:  "Get recent trades (tape)",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		// Momentum Indicators
-		{
-			Name:         "rsi",
-			Category:     string(CategoryMomentum),
-			Description:  "Calculate Relative Strength Index",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "macd",
-			Category:     string(CategoryMomentum),
-			Description:  "Calculate MACD indicator",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "stochastic",
-			Category:     string(CategoryMomentum),
-			Description:  "Calculate Stochastic Oscillator",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "cci",
-			Category:     string(CategoryMomentum),
-			Description:  "Calculate Commodity Channel Index",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "roc",
-			Category:     string(CategoryMomentum),
-			Description:  "Calculate Rate of Change",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		// Volatility Indicators
-		{
-			Name:         "atr",
-			Category:     string(CategoryVolatility),
-			Description:  "Calculate Average True Range",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "bollinger",
-			Category:     string(CategoryVolatility),
-			Description:  "Calculate Bollinger Bands",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "keltner",
-			Category:     string(CategoryVolatility),
-			Description:  "Calculate Keltner Channels",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		// Trend Indicators
-		{
-			Name:         "ema",
-			Category:     string(CategoryTrend),
-			Description:  "Calculate Exponential Moving Average",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "sma",
-			Category:     string(CategoryTrend),
-			Description:  "Calculate Simple Moving Average",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "ema_ribbon",
-			Category:     string(CategoryTrend),
-			Description:  "Calculate multiple EMAs (9, 21, 55, 200)",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "supertrend",
-			Category:     string(CategoryTrend),
-			Description:  "Calculate Supertrend indicator",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "ichimoku",
-			Category:     string(CategoryTrend),
-			Description:  "Calculate Ichimoku Cloud",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "pivot_points",
-			Category:     string(CategoryTrend),
-			Description:  "Calculate pivot points and support/resistance",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		// Volume Indicators
-		{
-			Name:         "vwap",
-			Category:     string(CategoryVolume),
-			Description:  "Calculate Volume Weighted Average Price",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "obv",
-			Category:     string(CategoryVolume),
-			Description:  "Calculate On-Balance Volume",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "volume_profile",
-			Category:     string(CategoryVolume),
-			Description:  "Calculate Volume Profile histogram",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "delta_volume",
-			Category:     string(CategoryVolume),
-			Description:  "Calculate Buy vs Sell volume delta",
-			RequiresAuth: false,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelNone,
-		},
-		// Smart Money Concepts
-		{
-			Name:         "detect_fvg",
-			Category:     string(CategorySMC),
-			Description:  "Detect Fair Value Gaps",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "detect_order_blocks",
-			Category:     string(CategorySMC),
-			Description:  "Detect Order Blocks",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_swing_points",
-			Category:     string(CategorySMC),
-			Description:  "Identify swing highs and lows",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "detect_liquidity_zones",
-			Category:     string(CategorySMC),
-			Description:  "Detect liquidity zones and pools",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "detect_stop_hunt",
-			Category:     string(CategorySMC),
-			Description:  "Detect stop hunts and liquidity sweeps",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "detect_imbalances",
-			Category:     string(CategorySMC),
-			Description:  "Detect price imbalances",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_market_structure",
-			Category:     string(CategorySMC),
-			Description:  "Analyze market structure (BOS, CHoCH)",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		// Order Flow
-		{
-			Name:         "get_trade_imbalance",
-			Category:     string(CategoryOrderFlow),
-			Description:  "Get buy vs sell pressure",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_cvd",
-			Category:     string(CategoryOrderFlow),
-			Description:  "Calculate Cumulative Volume Delta",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_whale_trades",
-			Category:     string(CategoryOrderFlow),
-			Description:  "Detect large trades (whales)",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_orderbook_imbalance",
-			Category:     string(CategoryOrderFlow),
-			Description:  "Calculate orderbook bid/ask imbalance",
-			RequiresAuth: false,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
-			Name:         "get_tick_speed",
-			Category:     string(CategoryOrderFlow),
-			Description:  "Calculate trade velocity (ticks per second)",
-			RequiresAuth: false,
-			RateLimit:    60,
+			RateLimit:    30,
 			RiskLevel:    RiskLevelNone,
 		},
 		// Sentiment
@@ -414,28 +161,13 @@ func initCatalog() {
 			RiskLevel:    RiskLevelNone,
 		},
 		// Trading (requires user auth)
+		// Account Status (ALL-IN-ONE) - replaces get_balance, get_positions, get_portfolio_summary, get_user_risk_profile
 		{
-			Name:         "get_balance",
+			Name:         "get_account_status",
 			Category:     string(CategoryAccount),
-			Description:  "Get account balance",
+			Description:  "Get comprehensive account status. Returns connected exchanges, open positions, portfolio summary (PnL/exposure), health warnings, and user risk profile. Human-readable text format.",
 			RequiresAuth: true,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelLow,
-		},
-		{
-			Name:         "get_positions",
-			Category:     string(CategoryAccount),
-			Description:  "Get open positions",
-			RequiresAuth: true,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelLow,
-		},
-		{
-			Name:         "get_portfolio_summary",
-			Category:     string(CategoryAccount),
-			Description:  "Get aggregated portfolio summary with exposure breakdown",
-			RequiresAuth: true,
-			RateLimit:    60,
+			RateLimit:    30,
 			RiskLevel:    RiskLevelLow,
 		},
 		{
@@ -455,18 +187,11 @@ func initCatalog() {
 			RiskLevel:    RiskLevelLow,
 		},
 		// Risk Management
+		// Pre-Trade Check (ALL-IN-ONE) - replaces check_circuit_breaker, validate_trade
 		{
-			Name:         "check_circuit_breaker",
+			Name:         "pre_trade_check",
 			Category:     string(CategoryRisk),
-			Description:  "Check if trading is allowed",
-			RequiresAuth: true,
-			RateLimit:    0,
-			RiskLevel:    RiskLevelLow,
-		},
-		{
-			Name:         "validate_trade",
-			Category:     string(CategoryRisk),
-			Description:  "Validate trade before execution",
+			Description:  "Comprehensive pre-trade validation. Checks circuit breaker status, validates trade parameters against user risk limits. USE THIS BEFORE PLACING ANY ORDER.",
 			RequiresAuth: true,
 			RateLimit:    0,
 			RiskLevel:    RiskLevelLow,
@@ -480,14 +205,6 @@ func initCatalog() {
 			RiskLevel:    RiskLevelCritical,
 		},
 		{
-			Name:         "get_user_risk_profile",
-			Category:     string(CategoryRisk),
-			Description:  "Get user's risk tolerance and trading preferences",
-			RequiresAuth: true,
-			RateLimit:    60,
-			RiskLevel:    RiskLevelNone,
-		},
-		{
 			Name:         "publish_opportunity",
 			Category:     string(CategoryMarketData),
 			Description:  "Publish validated trading opportunity to event stream",
@@ -499,33 +216,17 @@ func initCatalog() {
 		{
 			Name:         "search_memory",
 			Category:     string(CategoryMemory),
-			Description:  "Semantic search past memories",
+			Description:  "Search past memories using text query. Finds similar memories (analysis, insights, patterns, observations) using semantic search.",
 			RequiresAuth: true,
 			RateLimit:    60,
 			RiskLevel:    RiskLevelLow,
 		},
 		{
-			Name:         "save_analysis",
+			Name:         "save_memory",
 			Category:     string(CategoryMemory),
-			Description:  "Save analysis results to memory for future reference",
+			Description:  "Save to long-term memory. Types: 'analysis' (structured JSON results), 'insight' (learnings/patterns as text), 'observation' (market notes). Replaces save_analysis and save_insight.",
 			RequiresAuth: true,
 			RateLimit:    120,
-			RiskLevel:    RiskLevelLow,
-		},
-		{
-			Name:         "save_insight",
-			Category:     string(CategoryMemory),
-			Description:  "Save a learning, pattern, or insight to long-term memory",
-			RequiresAuth: true,
-			RateLimit:    120,
-			RiskLevel:    RiskLevelLow,
-		},
-		{
-			Name:         "record_reasoning",
-			Category:     string(CategoryMemory),
-			Description:  "Record a step in reasoning process for CoT logging",
-			RequiresAuth: true,
-			RateLimit:    180,
 			RiskLevel:    RiskLevelLow,
 		},
 		// Evaluation
@@ -557,21 +258,16 @@ func ToJSON() ([]byte, error) {
 // Categories returns all unique categories
 func Categories() []ToolCategory {
 	return []ToolCategory{
-		CategoryMarketData,
-		CategoryMomentum,
-		CategoryVolatility,
-		CategoryTrend,
-		CategoryVolume,
-		CategorySMC,
-		CategoryOrderFlow,
+		CategoryMarketData, // get_market_analysis, get_technical_analysis, get_ohlcv
+		CategorySMC,        // get_smc_analysis
 		CategorySentiment,
 		CategoryOnChain,
 		CategoryMacro,
 		CategoryDerivatives,
 		CategoryCorrelation,
-		CategoryAccount,
-		CategoryExecution,
-		CategoryRisk,
+		CategoryAccount,   // get_account_status
+		CategoryExecution, // place_order, cancel_order
+		CategoryRisk,      // pre_trade_check, emergency_close_all
 		CategoryMemory,
 		CategoryEvaluation,
 	}

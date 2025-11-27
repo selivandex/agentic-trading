@@ -1,0 +1,23 @@
+🧠 MEMORY SEARCH — {{.ResultCount}} {{if eq .ResultCount 1}}result{{else}}results{{end}} found
+{{if .Query}}Query: {{.Query}}{{end}}
+{{.Timestamp}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{if .Memories}}
+{{range $idx, $mem := .Memories}}
+📝 #{{add $idx 1}} — {{$mem.type | upper}}
+  {{if $mem.symbol}}Symbol:     {{$mem.symbol}}{{if $mem.timeframe}} ({{$mem.timeframe}}){{end}}{{end}}
+  Importance: {{$mem.importance_stars}} {{$mem.importance_label}} ({{printf "%.2f" $mem.importance}})
+  Created:    {{$mem.created_ago}} ({{$mem.created_at}})
+  Agent:      {{$mem.agent_id}}
+
+{{$mem.content}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{end}}
+{{else}}
+No memories found matching your query.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{end}}
+

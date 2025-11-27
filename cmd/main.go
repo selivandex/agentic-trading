@@ -46,7 +46,7 @@ import (
 	"prometheus/internal/metrics"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
-	riskengine "prometheus/internal/risk"
+	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/internal/workers"
@@ -166,10 +166,22 @@ func main() {
 	marketDataFactory := exchangefactory.NewMarketDataFactory(cfg.MarketData)
 	log.Info("Exchange factory initialized")
 
+	// Create embedding provider for semantic memory search
+	embeddingProvider, err := embeddings.NewProvider(embeddings.Config{
+		Provider: embeddings.ProviderOpenAI,
+		APIKey:   cfg.AI.OpenAIKey,
+		Model:    "text-embedding-3-small", // 1536 dimensions, $0.02/1M tokens
+		Timeout:  30 * time.Second,
+	})
+	if err != nil {
+		log.Fatalf("failed to create embedding provider: %v", err)
+	}
+	log.Infof("Embedding provider initialized: %s (%d dimensions)", embeddingProvider.Name(), embeddingProvider.Dimensions())
+
 	// ========================================
 	// Business Logic (Risk, Tools, Agents)
 	// ========================================
-	riskEngine := riskengine.NewRiskEngine(riskRepo, positionRepo, redisClient, log)
+	riskEngine := riskservice.NewRiskEngine(riskRepo, positionRepo, userRepo, redisClient, log)
 
 	toolRegistry := provideToolRegistry(
 		marketDataRepo,
@@ -181,6 +193,7 @@ func main() {
 		userRepo,
 		riskEngine,
 		redisClient,
+		embeddingProvider,
 		kafkaProducer,
 		log,
 	)
@@ -476,8 +489,9 @@ func provideToolRegistry(
 	memoryRepo memory.Repository,
 	riskRepo domainRisk.Repository,
 	userRepo user.Repository,
-	riskEngine *riskengine.RiskEngine,
+	riskEngine *riskservice.RiskEngine,
 	redisClient *redisclient.Client,
+	embeddingProvider shared.EmbeddingProvider,
 	kafkaProducer *kafka.Producer,
 	log *logger.Logger,
 ) *tools.Registry {
@@ -493,11 +507,15 @@ func provideToolRegistry(
 		RiskRepo:            riskRepo,
 		UserRepo:            userRepo,
 		RiskEngine:          riskEngine,
+		EmbeddingProvider:   embeddingProvider,
 		Redis:               redisClient,
 		Log:                 log,
 	}
 
-	tools.RegisterAllTools(registry, deps, kafkaProducer)
+	// Create WorkerPublisher for event publishing
+	workerPublisher := events.NewWorkerPublisher(kafkaProducer)
+
+	tools.RegisterAllTools(registry, deps, workerPublisher)
 	log.Infof("✓ Registered %d tools", len(registry.List()))
 	return registry
 }
@@ -507,7 +525,7 @@ func provideAgents(
 	toolRegistry *tools.Registry,
 	sessionService session.Service,
 	redisClient *redisclient.Client,
-	riskEngine *riskengine.RiskEngine,
+	riskEngine *riskservice.RiskEngine,
 	kafkaProducer *kafka.Producer,
 	aiUsageRepo *chrepo.AIUsageRepository,
 	log *logger.Logger,
@@ -619,7 +637,7 @@ func provideWorkers(
 	derivRepo derivatives.Repository,
 	macroRepo macro.Repository,
 	exchangeAccountRepo exchange_account.Repository,
-	riskEngine *riskengine.RiskEngine,
+	riskEngine *riskservice.RiskEngine,
 	exchFactory exchanges.Factory,
 	marketDataFactory exchanges.CentralFactory,
 	encryptor *crypto.Encryptor,

@@ -1,0 +1,75 @@
+📊 TECHNICAL ANALYSIS — {{.Exchange}}/{{.Symbol}}
+Timeframe: {{.Timeframe}}
+{{.Timestamp}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 PRICE CONTEXT
+  Current:          ${{printf "%.2f" .Price.current}}
+  24h High:         ${{printf "%.2f" .Price.high_24h}}
+  24h Low:          ${{printf "%.2f" .Price.low_24h}}
+  Change:           {{if gt .Price.change_pct 0}}+{{end}}{{printf "%.2f" .Price.change_pct}}%
+  Position in Range: {{printf "%.1f" (mul .Price.position_in_range 100)}}% {{if gt .Price.position_in_range 0.7}}(near high){{else if lt .Price.position_in_range 0.3}}(near low){{else}}(mid-range){{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ MOMENTUM INDICATORS
+{{if .Momentum.rsi}}  RSI(14):          {{printf "%.1f" .Momentum.rsi.value}} — {{.Momentum.rsi.signal | upper}}{{end}}
+{{if .Momentum.macd}}  MACD(12,26,9):    Line={{printf "%.2f" .Momentum.macd.line}} | Signal={{printf "%.2f" .Momentum.macd.signal}} | Hist={{printf "%.2f" .Momentum.macd.histogram}}
+                    → {{.Momentum.macd.direction | upper}}{{end}}
+{{if .Momentum.stochastic}}  Stochastic(14):   K={{printf "%.1f" .Momentum.stochastic.k}} | D={{printf "%.1f" .Momentum.stochastic.d}}
+                    → {{.Momentum.stochastic.signal | upper}}{{end}}
+{{if .Momentum.cci}}  CCI(20):          {{printf "%.1f" .Momentum.cci.value}} — {{.Momentum.cci.signal | upper}}{{end}}
+{{if .Momentum.roc}}  ROC(12):          {{if gt .Momentum.roc.value 0}}+{{end}}{{printf "%.2f" .Momentum.roc.value}}% — {{.Momentum.roc.signal | upper}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📉 VOLATILITY INDICATORS
+{{if .Volatility.atr}}  ATR(14):          ${{printf "%.2f" .Volatility.atr.value}} ({{printf "%.2f" .Volatility.atr.pct}}%) — {{.Volatility.atr.volatility | upper}}{{end}}
+{{if .Volatility.bollinger}}  Bollinger(20,2):  Upper=${{printf "%.2f" .Volatility.bollinger.upper}} | Middle=${{printf "%.2f" .Volatility.bollinger.middle}} | Lower=${{printf "%.2f" .Volatility.bollinger.lower}}
+                    Bandwidth={{printf "%.2f" .Volatility.bollinger.bandwidth}}% | Position={{.Volatility.bollinger.position}}
+                    → {{.Volatility.bollinger.signal | upper}}{{end}}
+{{if .Volatility.keltner}}  Keltner(20,2):    Upper=${{printf "%.2f" .Volatility.keltner.upper}} | Middle=${{printf "%.2f" .Volatility.keltner.middle}} | Lower=${{printf "%.2f" .Volatility.keltner.lower}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 TREND INDICATORS
+{{if .Trend.ema_ribbon}}  EMA Ribbon:       9=${{printf "%.2f" .Trend.ema_ribbon.ema_9}} | 21=${{printf "%.2f" .Trend.ema_ribbon.ema_21}} | 55=${{printf "%.2f" .Trend.ema_ribbon.ema_55}}{{if gt .Trend.ema_ribbon.ema_200 0}} | 200=${{printf "%.2f" .Trend.ema_ribbon.ema_200}}{{end}}
+                    Alignment: {{.Trend.ema_ribbon.alignment | upper}}
+                    Price vs MA: {{.Trend.ema_ribbon.price_vs_ma | upper}}{{end}}
+{{if .Trend.supertrend}}  Supertrend(10,3): ${{printf "%.2f" .Trend.supertrend.value}}
+                    Trend: {{.Trend.supertrend.trend | upper}}
+                    → {{.Trend.supertrend.signal | upper}}{{end}}
+{{if .Trend.direction}}  Direction:        {{.Trend.direction | upper}}{{end}}
+{{if .Trend.ichimoku}}{{if ne .Trend.ichimoku.signal "insufficient_data"}}  Ichimoku:         Tenkan={{printf "%.2f" .Trend.ichimoku.tenkan}} | Kijun={{printf "%.2f" .Trend.ichimoku.kijun}}
+                    Cloud: {{.Trend.ichimoku.cloud_color | upper}} | Price: {{.Trend.ichimoku.price_position}}
+                    → {{.Trend.ichimoku.signal | upper}}{{end}}{{end}}
+{{if .Trend.pivot_points}}{{if ne .Trend.pivot_points.signal "insufficient_data"}}  Pivot Points:     R2=${{printf "%.2f" .Trend.pivot_points.r2}} | R1=${{printf "%.2f" .Trend.pivot_points.r1}}
+                    PP=${{printf "%.2f" .Trend.pivot_points.pivot}}
+                    S1=${{printf "%.2f" .Trend.pivot_points.s1}} | S2=${{printf "%.2f" .Trend.pivot_points.s2}}
+                    Level: {{.Trend.pivot_points.level}} — {{.Trend.pivot_points.signal | upper}}{{end}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 VOLUME INDICATORS
+{{if .Volume.vwap}}  VWAP:             ${{printf "%.2f" .Volume.vwap.value}} — {{.Volume.vwap.signal | upper}}{{end}}
+{{if .Volume.volume}}  Volume:           Current={{printf "%.0f" .Volume.volume.current}} | Avg={{printf "%.0f" .Volume.volume.average}}
+                    Ratio={{printf "%.2f" .Volume.volume.ratio}}x — {{.Volume.volume.signal | upper}}{{end}}
+{{if .Volume.obv_trend}}  OBV Trend:        {{.Volume.obv_trend | upper}}{{end}}
+{{if .Volume.volume_profile}}{{if and (ne .Volume.volume_profile.signal "insufficient_data") (ne .Volume.volume_profile.signal "no_range")}}  Volume Profile:   POC=${{printf "%.2f" .Volume.volume_profile.poc}}
+                    Value Area: ${{printf "%.2f" .Volume.volume_profile.value_area_low}} - ${{printf "%.2f" .Volume.volume_profile.value_area_high}}
+                    Position: {{.Volume.volume_profile.position}} — {{.Volume.volume_profile.signal | upper}}{{end}}{{end}}
+{{if .Volume.delta}}{{if ne .Volume.delta.signal "insufficient_data"}}  Delta Volume:     Buy={{printf "%.0f" .Volume.delta.buy_volume}} | Sell={{printf "%.0f" .Volume.delta.sell_volume}}
+                    Delta={{printf "%.0f" .Volume.delta.delta}} | Ratio={{printf "%.2f" (mul .Volume.delta.ratio 100)}}%
+                    → {{.Volume.delta.signal | upper}}{{end}}{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 OVERALL SIGNAL
+  Direction:   {{.Signal.direction | upper}} ({{.Signal.strength}})
+  Confidence:  {{printf "%.0f" (mul .Signal.confidence 100)}}%
+  Consensus:   {{.Signal.bullish_count}} bullish | {{.Signal.bearish_count}} bearish | {{.Signal.total_signals}} total
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+

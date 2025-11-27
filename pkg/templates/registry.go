@@ -6,10 +6,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"prometheus/pkg/errors"
 	"strings"
 	"sync"
 	"text/template"
+
+	"prometheus/pkg/errors"
 )
 
 //go:embed prompts/**/*.tmpl
@@ -156,7 +157,15 @@ func (r *Registry) loadTemplate(path string) error {
 		return errors.Wrapf(err, "read template %s", id)
 	}
 
-	parsed, err := template.New(id).Parse(string(content))
+	// Create template with helper functions
+	parsed, err := template.New(id).Funcs(template.FuncMap{
+		"upper": strings.ToUpper,
+		"lower": strings.ToLower,
+		"mul":   func(a, b float64) float64 { return a * b },
+		"add":   func(a, b float64) float64 { return a + b },
+		"sub":   func(a, b float64) float64 { return a - b },
+		"div":   func(a, b float64) float64 { if b != 0 { return a / b }; return 0 },
+	}).Parse(string(content))
 	if err != nil {
 		return errors.Wrapf(err, "parse template %s", id)
 	}

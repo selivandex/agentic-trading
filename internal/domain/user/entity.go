@@ -35,6 +35,35 @@ type Settings struct {
 	DailyReportTime    string  `json:"daily_report_time"` // HH:MM
 	Timezone           string  `json:"timezone"`
 	CircuitBreakerOn   bool    `json:"circuit_breaker_on"`
+
+	// Position sizing limits
+	MaxPositionSizeUSD  float64  `json:"max_position_size_usd"`  // max single position in USD
+	MaxTotalExposureUSD float64  `json:"max_total_exposure_usd"` // max total portfolio exposure
+	MinPositionSizeUSD  float64  `json:"min_position_size_usd"`  // min position to avoid dust
+	MaxLeverageMultiple float64  `json:"max_leverage_multiple"`  // max leverage (1.0 = no leverage)
+	AllowedExchanges    []string `json:"allowed_exchanges"`      // whitelist of exchanges
+}
+
+// RiskTolerance provides a convenient accessor for risk-related settings
+type RiskTolerance struct {
+	MaxPositionSizeUSD  float64
+	MaxTotalExposureUSD float64
+	MaxPortfolioRiskPct float64
+	MaxDailyDrawdownPct float64
+	MaxLeverage         float64
+	MaxPositions        int
+}
+
+// GetRiskTolerance returns risk tolerance settings for the user
+func (u *User) GetRiskTolerance() RiskTolerance {
+	return RiskTolerance{
+		MaxPositionSizeUSD:  u.Settings.MaxPositionSizeUSD,
+		MaxTotalExposureUSD: u.Settings.MaxTotalExposureUSD,
+		MaxPortfolioRiskPct: u.Settings.MaxPortfolioRisk,
+		MaxDailyDrawdownPct: u.Settings.MaxDailyDrawdown,
+		MaxLeverage:         u.Settings.MaxLeverageMultiple,
+		MaxPositions:        u.Settings.MaxPositions,
+	}
 }
 
 // DefaultSettings returns default user settings
@@ -51,5 +80,12 @@ func DefaultSettings() Settings {
 		DailyReportTime:    "09:00",
 		Timezone:           "UTC",
 		CircuitBreakerOn:   true,
+
+		// Conservative defaults for position sizing
+		MaxPositionSizeUSD:  1000.0, // $1000 max per position
+		MaxTotalExposureUSD: 5000.0, // $5000 max total
+		MinPositionSizeUSD:  10.0,   // $10 minimum
+		MaxLeverageMultiple: 1.0,    // No leverage by default
+		AllowedExchanges:    []string{"binance", "bybit"},
 	}
 }

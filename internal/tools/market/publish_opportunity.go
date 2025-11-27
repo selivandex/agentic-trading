@@ -5,25 +5,22 @@ import (
 	"time"
 
 	"google.golang.org/adk/tool"
-	"google.golang.org/protobuf/proto"
 
-	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/events"
-	eventspb "prometheus/internal/events/proto"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
 )
 
 // NewPublishOpportunityTool creates the publish_opportunity tool
 // This tool is used by OpportunitySynthesizer to publish validated trading opportunities to Kafka
-func NewPublishOpportunityTool(kafkaProducer *kafka.Producer) tool.Tool {
+func NewPublishOpportunityTool(publisher *events.WorkerPublisher) tool.Tool {
 	return shared.NewToolBuilder(
 		"publish_opportunity",
 		"Publishes a validated trading opportunity signal to event stream for user consumption. "+
 			"Only call this when you have a high-confidence (>65%) opportunity with clear entry/stop/target levels. "+
 			"This triggers personal trading workflows for all interested users.",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
-			return executePublishOpportunity(ctx, args, kafkaProducer)
+			return executePublishOpportunity(ctx, args, publisher)
 		},
 		shared.Deps{}, // No repo dependencies needed
 	).
@@ -35,7 +32,7 @@ func NewPublishOpportunityTool(kafkaProducer *kafka.Producer) tool.Tool {
 func executePublishOpportunity(
 	ctx context.Context,
 	args map[string]interface{},
-	kafkaProducer *kafka.Producer,
+	publisher *events.WorkerPublisher,
 ) (map[string]interface{}, error) {
 	// Extract and validate arguments
 	symbol, _ := args["symbol"].(string)
@@ -116,36 +113,28 @@ func executePublishOpportunity(
 		}, nil
 	}
 
-	// Create protobuf event
-	event := &eventspb.OpportunityFoundEvent{
-		Base:       events.NewBaseEvent(events.TopicOpportunityFound, "market_research_workflow", ""),
-		Symbol:     symbol,
-		Exchange:   exchange,
-		Direction:  direction,
-		Confidence: confidence,
-		Entry:      entry,
-		StopLoss:   stopLoss,
-		TakeProfit: takeProfit,
-		Timeframe:  timeframe,
-		Strategy:   strategy,
-		Reasoning:  reasoning,
-		Indicators: make(map[string]string),
+	// Extract indicators if provided
+	indicators := make(map[string]string)
+	if indMap, ok := args["indicators"].(map[string]interface{}); ok {
+		for k, v := range indMap {
+			if str, ok := v.(string); ok {
+				indicators[k] = str
+			}
+		}
 	}
 
-	// Serialize to protobuf
-	data, err := proto.Marshal(event)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal opportunity event")
-	}
-
-	// Publish to Kafka
-	if err := kafkaProducer.PublishBinary(ctx, events.TopicOpportunityFound, []byte(symbol), data); err != nil {
-		return nil, errors.Wrap(err, "failed to publish opportunity event to Kafka")
+	// Publish using WorkerPublisher
+	if err := publisher.PublishOpportunityFound(
+		ctx,
+		symbol, exchange, direction, timeframe, strategy, reasoning,
+		confidence, entry, stopLoss, takeProfit,
+		indicators,
+	); err != nil {
+		return nil, errors.Wrap(err, "failed to publish opportunity")
 	}
 
 	return map[string]interface{}{
 		"published": true,
-		"event_id":  event.Base.Id,
-		"message":   "Opportunity published successfully to Kafka",
+		"message":   "Opportunity published successfully",
 	}, nil
 }

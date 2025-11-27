@@ -218,8 +218,11 @@ func (r *CollectiveMemoryRepository) PromoteToCollective(
 	if userMemory.Timeframe != "" {
 		collective.Timeframe = &userMemory.Timeframe
 	}
-	if userMemory.TradeID != nil {
-		collective.SourceTradeID = userMemory.TradeID
+	// Extract trade_id from metadata if present
+	if tradeIDStr, ok := userMemory.Metadata["trade_id"].(string); ok && tradeIDStr != "" {
+		if tradeID, err := uuid.Parse(tradeIDStr); err == nil {
+			collective.SourceTradeID = &tradeID
+		}
 	}
 
 	if err := r.Store(ctx, collective); err != nil {

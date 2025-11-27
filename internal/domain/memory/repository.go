@@ -11,7 +11,11 @@ import (
 type Repository interface {
 	// User memory operations
 	Store(ctx context.Context, memory *Memory) error
-	SearchSimilar(ctx context.Context, userID uuid.UUID, embedding pgvector.Vector, limit int) ([]*Memory, error)
+	
+	// SearchSimilar performs semantic search with model filtering
+	// Only searches memories created with the same embedding model
+	SearchSimilar(ctx context.Context, userID uuid.UUID, embeddingModel string, embedding pgvector.Vector, limit int) ([]*Memory, error)
+	
 	GetByAgent(ctx context.Context, userID uuid.UUID, agentID string, limit int) ([]*Memory, error)
 	GetByType(ctx context.Context, userID uuid.UUID, memType MemoryType, limit int) ([]*Memory, error)
 	DeleteExpired(ctx context.Context) (int64, error)

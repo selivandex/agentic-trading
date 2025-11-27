@@ -14,18 +14,22 @@ type Memory struct {
 	AgentID   string    `db:"agent_id"`
 	SessionID string    `db:"session_id"`
 
-	Type      MemoryType      `db:"type"` // observation, decision, trade, lesson
-	Content   string          `db:"content"`
-	Embedding pgvector.Vector `db:"embedding"` // pgvector handles this automatically
+	Type    MemoryType `db:"type"` // observation, decision, trade, lesson
+	Content string     `db:"content"`
 
-	// Metadata
+	// Embedding metadata (critical for search compatibility)
+	Embedding           pgvector.Vector `db:"embedding"` // pgvector handles this automatically
+	EmbeddingModel      string          `db:"embedding_model"`
+	EmbeddingDimensions int             `db:"embedding_dimensions"`
+
+	// Trading metadata (kept as columns for fast filtering)
 	Symbol     string  `db:"symbol"`
 	Timeframe  string  `db:"timeframe"`
 	Importance float64 `db:"importance"` // 0-1, for retrieval ranking
 
-	// References
-	RelatedIDs []uuid.UUID `db:"related_ids"` // Related memories
-	TradeID    *uuid.UUID  `db:"trade_id"`    // If trade-related
+	// Flexible metadata storage (tags, references, custom fields)
+	// Examples: trade_id, position_id, tags, confidence, related_memories
+	Metadata map[string]interface{} `db:"metadata"`
 
 	CreatedAt time.Time  `db:"created_at"`
 	ExpiresAt *time.Time `db:"expires_at"` // TTL for short-term

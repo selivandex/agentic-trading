@@ -4,28 +4,28 @@ import (
 	"context"
 	"time"
 
+	kafkago "github.com/segmentio/kafka-go"
+	"google.golang.org/protobuf/proto"
+
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/events"
 	eventspb "prometheus/internal/events/proto"
-	"prometheus/internal/risk"
+	riskservice "prometheus/internal/services/risk"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
-
-	kafkago "github.com/segmentio/kafka-go"
-	"google.golang.org/protobuf/proto"
 )
 
 // RiskConsumer handles risk events and triggers automated actions
 type RiskConsumer struct {
 	consumer   *kafka.Consumer
-	riskEngine *risk.RiskEngine
+	riskEngine *riskservice.RiskEngine
 	log        *logger.Logger
 }
 
 // NewRiskConsumer creates a new risk event consumer
 func NewRiskConsumer(
 	consumer *kafka.Consumer,
-	riskEngine *risk.RiskEngine,
+	riskEngine *riskservice.RiskEngine,
 	log *logger.Logger,
 ) *RiskConsumer {
 	return &RiskConsumer{

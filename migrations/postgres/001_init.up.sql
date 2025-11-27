@@ -173,14 +173,19 @@ CREATE TABLE memories (
 
     type VARCHAR(50) NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1536), -- OpenAI ada-002 / text-embedding-3-small dimension
+    
+    -- Embedding metadata (critical for search compatibility)
+    embedding vector(1536), -- Default: OpenAI text-embedding-3-small dimension
+    embedding_model VARCHAR(100) NOT NULL, -- e.g., "text-embedding-3-small"
+    embedding_dimensions INT NOT NULL DEFAULT 1536, -- For validation and future migrations
 
+    -- Trading metadata (kept as columns for fast filtering)
     symbol VARCHAR(50),
     timeframe VARCHAR(10),
     importance DECIMAL(3,2) DEFAULT 0.5,
-
-    related_ids UUID[] DEFAULT '{}',
-    trade_id UUID REFERENCES orders(id),
+    
+    -- Flexible metadata storage (tags, references, custom fields)
+    metadata JSONB DEFAULT '{}',
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
     expires_at TIMESTAMPTZ
@@ -189,7 +194,9 @@ CREATE TABLE memories (
 CREATE INDEX idx_memories_user ON memories(user_id);
 CREATE INDEX idx_memories_agent ON memories(agent_id);
 CREATE INDEX idx_memories_type ON memories(type);
+CREATE INDEX idx_memories_embedding_model ON memories(embedding_model); -- Filter by model before vector search
 CREATE INDEX idx_memories_embedding ON memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX idx_memories_metadata ON memories USING gin(metadata); -- JSON queries
 CREATE INDEX idx_memories_created ON memories(created_at DESC);
 
 -- Collective Memory table (shared knowledge)

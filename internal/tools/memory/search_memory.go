@@ -1,79 +1,78 @@
 package memory
+
 import (
 	"time"
+
+	"github.com/dustin/go-humanize"
 	"github.com/google/uuid"
-	"github.com/pgvector/pgvector-go"
+	"google.golang.org/adk/tool"
+
 	memorydomain "prometheus/internal/domain/memory"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
-	"google.golang.org/adk/tool"
+	"prometheus/pkg/templates"
 )
-// SearchMemoryArgs represents input parameters for memory search
-type SearchMemoryArgs struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Embedding []float32 `json:"embedding"`
-	Limit     int       `json:"limit"`
+
+// searchMemoryArgs represents input parameters for memory search
+type searchMemoryArgs struct {
+	UserID uuid.UUID
+	Query  string // Text query for semantic search
+	Limit  int
 }
-// MemoryMetadata represents metadata associated with a memory
-type MemoryMetadata struct {
-	Symbol     string                  `json:"symbol"`
-	Timeframe  string                  `json:"timeframe"`
-	Importance float64                 `json:"importance"`
-	Type       memorydomain.MemoryType `json:"type"`
-}
-// MemorySearchResult represents a single memory search result
-type MemorySearchResult struct {
-	ID        string         `json:"id"`
-	AgentID   string         `json:"agent_id"`
-	Content   string         `json:"content"`
-	Metadata  MemoryMetadata `json:"metadata"`
-	CreatedAt time.Time      `json:"created_at"`
-}
-// MemorySearchResponse represents the response from memory search
-type MemorySearchResponse struct {
-	Memories []MemorySearchResult `json:"memories"`
-}
+
 // NewSearchMemoryTool performs semantic memory search for a user
 func NewSearchMemoryTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(
 		"search_memory",
-		"Semantic memory search",
+		"Search past memories using semantic search. Provide a text query describing what you're looking for.",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
 			if deps.MemoryRepo == nil {
 				return nil, errors.Wrapf(errors.ErrInternal, "search_memory: memory repository not configured")
 			}
-			// Parse and validate input arguments with strong typing
+			if deps.EmbeddingProvider == nil {
+				return nil, errors.Wrapf(errors.ErrInternal, "search_memory: embedding provider not configured")
+			}
+
+			// Parse and validate input arguments
 			searchArgs, err := parseSearchMemoryArgs(ctx, args)
 			if err != nil {
 				return nil, errors.Wrap(err, "search_memory")
 			}
-			// Create vector from embedding
-			vector := pgvector.NewVector(searchArgs.Embedding)
-			// Execute search with typed parameters
-			service := memorydomain.NewService(deps.MemoryRepo)
-			results, err := service.SearchSimilar(ctx, searchArgs.UserID, vector, searchArgs.Limit)
+
+			// Execute search with text query (service generates embedding internally)
+			service := memorydomain.NewService(deps.MemoryRepo, deps.EmbeddingProvider)
+			results, err := service.SearchSimilar(ctx, searchArgs.UserID, searchArgs.Query, searchArgs.Limit)
 			if err != nil {
 				return nil, err
 			}
-			// .Build strongly-typed response
-			response := buildMemorySearchResponse(results)
-			// Convert to map[string]interface{} for ADK compatibility
-			// This is the only place where we lose type safety
+
+			// Prepare data for template
+			templateData := prepareTemplateData(results, searchArgs.Query)
+
+			// Render using template
+			tmpl := templates.Get()
+			formatted, err := tmpl.Render("tools/search_memory", templateData)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to render search_memory template")
+			}
+
 			return map[string]interface{}{
-				"memories": response.Memories,
+				"results": formatted,
 			}, nil
 		},
 		deps,
 	).
-		WithTimeout(10*time.Second).
+		WithTimeout(15*time.Second). // Increased for embedding generation
 		WithRetry(3, 500*time.Millisecond).
 		Build()
 }
+
 // parseSearchMemoryArgs extracts and validates input arguments
-func parseSearchMemoryArgs(ctx tool.Context, args map[string]interface{}) (*SearchMemoryArgs, error) {
-	result := &SearchMemoryArgs{
+func parseSearchMemoryArgs(ctx tool.Context, args map[string]interface{}) (*searchMemoryArgs, error) {
+	result := &searchMemoryArgs{
 		Limit: 5, // default
 	}
+
 	// Parse user_id
 	if idVal, ok := args["user_id"].(string); ok {
 		parsed, err := uuid.Parse(idVal)
@@ -82,55 +81,96 @@ func parseSearchMemoryArgs(ctx tool.Context, args map[string]interface{}) (*Sear
 		}
 		result.UserID = parsed
 	}
+
 	// Try to get user_id from context if not provided
 	if result.UserID == uuid.Nil {
 		if meta, ok := shared.MetadataFromContext(ctx); ok {
 			result.UserID = meta.UserID
 		}
 	}
+
 	if result.UserID == uuid.Nil {
-		return nil, errors.Wrapf(errors.ErrInternal, "user_id is required")
+		return nil, errors.Wrapf(errors.ErrInvalidInput, "user_id is required")
 	}
-	// Parse embedding
-	rawEmbedding, ok := args["embedding"].([]interface{})
-	if !ok {
-		return nil, errors.Wrapf(errors.ErrInternal, "embedding is required")
+
+	// Parse query text
+	query, ok := args["query"].(string)
+	if !ok || query == "" {
+		return nil, errors.Wrapf(errors.ErrInvalidInput, "query text is required")
 	}
-	result.Embedding = make([]float32, 0, len(rawEmbedding))
-	for i, v := range rawEmbedding {
-		switch val := v.(type) {
-		case float64:
-			result.Embedding = append(result.Embedding, float32(val))
-		case float32:
-			result.Embedding = append(result.Embedding, val)
-		default:
-			return nil, errors.Wrapf(errors.ErrInternal, "embedding[%d] must be numeric, got %T", i, v)
-		}
-	}
+	result.Query = query
+
 	// Parse limit
 	if l, ok := args["limit"].(float64); ok && int(l) > 0 {
 		result.Limit = int(l)
 	}
+
 	return result, nil
 }
-// buildMemorySearchResponse converts domain memories to typed response
-func buildMemorySearchResponse(memories []*memorydomain.Memory) MemorySearchResponse {
-	results := make([]MemorySearchResult, 0, len(memories))
+
+// prepareTemplateData converts domain memories to template-ready data
+func prepareTemplateData(memories []*memorydomain.Memory, query string) map[string]interface{} {
+	formattedMemories := make([]map[string]interface{}, 0, len(memories))
+
 	for _, m := range memories {
-		results = append(results, MemorySearchResult{
-			ID:      m.ID.String(),
-			AgentID: m.AgentID,
-			Content: m.Content,
-			Metadata: MemoryMetadata{
-				Symbol:     m.Symbol,
-				Timeframe:  m.Timeframe,
-				Importance: m.Importance,
-				Type:       m.Type,
-			},
-			CreatedAt: m.CreatedAt,
+		// Format importance as stars
+		importanceStars := formatImportanceStars(m.Importance)
+		importanceLabel := formatImportanceLabel(m.Importance)
+
+		// Calculate time ago
+		createdAgo := humanize.Time(m.CreatedAt)
+
+		formattedMemories = append(formattedMemories, map[string]interface{}{
+			"id":               m.ID.String(),
+			"agent_id":         m.AgentID,
+			"content":          m.Content,
+			"symbol":           m.Symbol,
+			"timeframe":        m.Timeframe,
+			"importance":       m.Importance,
+			"importance_stars": importanceStars,
+			"importance_label": importanceLabel,
+			"type":             string(m.Type),
+			"created_at":       m.CreatedAt.Format("2006-01-02 15:04 MST"),
+			"created_ago":      createdAgo,
 		})
 	}
-	return MemorySearchResponse{
-		Memories: results,
+
+	return map[string]interface{}{
+		"Memories":    formattedMemories,
+		"ResultCount": len(memories),
+		"Query":       query,
+		"Timestamp":   time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+// formatImportanceStars returns star representation of importance (0.0 - 1.0)
+func formatImportanceStars(importance float64) string {
+	stars := int(importance * 5) // 0-5 stars
+	if stars > 5 {
+		stars = 5
+	}
+	result := ""
+	for i := 0; i < stars; i++ {
+		result += "⭐"
+	}
+	if stars == 0 {
+		result = "☆"
+	}
+	return result
+}
+
+// formatImportanceLabel returns human-readable importance label
+func formatImportanceLabel(importance float64) string {
+	switch {
+	case importance >= 0.8:
+		return "Critical"
+	case importance >= 0.6:
+		return "High"
+	case importance >= 0.4:
+		return "Medium"
+	case importance >= 0.2:
+		return "Low"
+	default:
+		return "Minimal"
 	}
 }

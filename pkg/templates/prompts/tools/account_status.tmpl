@@ -1,0 +1,61 @@
+💼 ACCOUNT STATUS
+User ID: {{.UserID}}
+{{.Timestamp}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 CONNECTED EXCHANGES ({{.AccountsCount}})
+{{range .Accounts}}  • {{.Exchange}}{{if .Label}} — {{.Label}}{{end}}{{if .IsTestnet}} [TESTNET]{{end}}
+    Permissions: {{.Permissions}}
+{{else}}  No exchanges connected
+{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 PORTFOLIO SUMMARY
+  Total Equity:   ${{printf "%.2f" .Portfolio.TotalEquityUSD}}
+  Unrealized PnL: {{if gt .Portfolio.TotalPnLUSD 0}}+{{end}}${{printf "%.2f" .Portfolio.TotalPnLUSD}} ({{if gt .Portfolio.TotalPnLPercent 0}}+{{end}}{{printf "%.2f" .Portfolio.TotalPnLPercent}}%)
+  Daily PnL:      {{if gt .Portfolio.DailyPnL 0}}+{{end}}${{printf "%.2f" .Portfolio.DailyPnL}}
+
+  Exposure:
+    Long:         ${{printf "%.2f" .Portfolio.LongExposure}}
+    Short:        ${{printf "%.2f" .Portfolio.ShortExposure}}
+    Net:          ${{printf "%.2f" .Portfolio.NetExposure}} {{if gt .Portfolio.NetExposure 0}}(long bias){{else if lt .Portfolio.NetExposure 0}}(short bias){{else}}(balanced){{end}}
+
+  By Symbol:
+{{range $symbol, $exposure := .Portfolio.ExposureBySymbol}}    {{$symbol}}: ${{printf "%.2f" $exposure}}
+{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 OPEN POSITIONS ({{.PositionsCount}})
+{{range .Positions}}  {{.Symbol}} {{.Side | upper}}
+    Size:         {{printf "%.4f" .Size}}
+    Entry:        ${{printf "%.2f" .EntryPrice}}
+    Current:      ${{printf "%.2f" .CurrentPrice}}
+    PnL:          {{if gt .UnrealizedPnl 0}}+{{end}}${{printf "%.2f" .UnrealizedPnl}} ({{if gt .PnlPercent 0}}+{{end}}{{printf "%.2f" .PnlPercent}}%)
+    Status:       {{.Status}}
+{{else}}  No open positions
+{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ PORTFOLIO HEALTH: {{.Health.Status | upper}}
+{{if .Health.Warnings}}  Warnings:
+{{range .Health.Warnings}}    • {{.}}
+{{end}}{{else}}  No warnings
+{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛡️ RISK PROFILE
+  Risk Level:       {{.RiskProfile.RiskLevel | upper}}
+  Max Position:     ${{printf "%.0f" .RiskProfile.MaxPositionSizeUSD}}
+  Max Exposure:     ${{printf "%.0f" .RiskProfile.MaxTotalExposure}}
+  Max Portfolio Risk: {{printf "%.1f" .RiskProfile.MaxPortfolioRisk}}%
+  Max Daily DD:     {{printf "%.1f" .RiskProfile.MaxDailyDrawdown}}%
+  Max Positions:    {{.RiskProfile.MaxPositions}}
+  Circuit Breaker:  {{if .RiskProfile.CircuitBreakerOn}}✅ ON{{else}}❌ OFF{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

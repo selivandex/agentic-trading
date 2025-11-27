@@ -494,3 +494,28 @@ func (wp *WorkerPublisher) PublishAIUsage(
 
 	return wp.publishProto(ctx, TopicAIUsage, sessionID, event)
 }
+
+// PublishOpportunityFound publishes trading opportunity event
+func (wp *WorkerPublisher) PublishOpportunityFound(
+	ctx context.Context,
+	symbol, exchange, direction, timeframe, strategy, reasoning string,
+	confidence, entry, stopLoss, takeProfit float64,
+	indicators map[string]string,
+) error {
+	event := &eventspb.OpportunityFoundEvent{
+		Base:       NewBaseEvent(TopicOpportunityFound, "market_research_workflow", ""),
+		Symbol:     symbol,
+		Exchange:   exchange,
+		Direction:  direction,
+		Confidence: confidence,
+		Entry:      entry,
+		StopLoss:   stopLoss,
+		TakeProfit: takeProfit,
+		Timeframe:  timeframe,
+		Strategy:   strategy,
+		Reasoning:  reasoning,
+		Indicators: indicators,
+	}
+
+	return wp.publishProto(ctx, TopicOpportunityFound, symbol, event)
+}

@@ -31,7 +31,7 @@ func (s *Service) Create(ctx context.Context, user *User) error {
 	if user.TelegramID == 0 {
 		return errors.ErrInvalidInput
 	}
-	if user.Settings == (Settings{}) {
+	if user.Settings.RiskLevel == "" {
 		user.Settings = DefaultSettings()
 	}
 

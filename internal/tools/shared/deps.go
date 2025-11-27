@@ -17,9 +17,13 @@ import (
 type RiskEngine interface {
 	CanTrade(ctx context.Context, userID uuid.UUID) (bool, error)
 }
-// EmbeddingService interface for generating text embeddings
-type EmbeddingService interface {
+// EmbeddingProvider interface for generating text embeddings
+// Supports multiple backends: OpenAI, Cohere, local models, etc.
+type EmbeddingProvider interface {
 	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+	GenerateBatchEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
+	Dimensions() int
+	Name() string
 }
 // Deps bundles dependencies required by concrete tool implementations
 // Note: Stats tracking is now handled by ADK callbacks, not tool middleware
@@ -34,7 +38,7 @@ type Deps struct {
 	RiskRepo            risk.Repository
 	UserRepo            user.Repository
 	RiskEngine          RiskEngine
-	EmbeddingService    EmbeddingService
+	EmbeddingProvider   EmbeddingProvider
 	Redis               RedisClient
 	Log                 *logger.Logger
 }
