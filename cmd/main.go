@@ -16,6 +16,7 @@ import (
 	"prometheus/internal/adapters/ai"
 	chclient "prometheus/internal/adapters/clickhouse"
 	"prometheus/internal/adapters/config"
+	"prometheus/internal/adapters/embeddings"
 	errnoop "prometheus/internal/adapters/errors/noop"
 	"prometheus/internal/adapters/errors/sentry"
 	"prometheus/internal/adapters/exchangefactory"
@@ -131,22 +132,8 @@ func main() {
 	// ========================================
 	// Domain Layer (Services)
 	// ========================================
-	userService := user.NewService(userRepo)
-	exchangeAccountService := exchange_account.NewService(exchangeAccountRepo)
-	tradingPairService := trading_pair.NewService(tradingPairRepo)
-	orderService := order.NewService(orderRepo)
-	positionService := position.NewService(positionRepo)
-	memoryService := memory.NewService(memoryRepo)
-	journalService := journal.NewService(journalRepo)
-	sessionDomainService := domainsession.NewService(sessionRepo)
-
-	log.Info("Services initialized")
-
-	// Create ADK session service adapter
-	adkSessionService := adk.NewSessionService(sessionDomainService)
-
 	// ========================================
-	// External Adapters (Kafka, Exchange, Crypto)
+	// External Adapters (Kafka, Exchange, Crypto, Embeddings)
 	// ========================================
 	kafkaProducer := provideKafkaProducer(cfg, log)
 
@@ -166,7 +153,7 @@ func main() {
 	marketDataFactory := exchangefactory.NewMarketDataFactory(cfg.MarketData)
 	log.Info("Exchange factory initialized")
 
-	// Create embedding provider for semantic memory search
+	// Create embedding provider for semantic memory search (needed for memory service)
 	embeddingProvider, err := embeddings.NewProvider(embeddings.Config{
 		Provider: embeddings.ProviderOpenAI,
 		APIKey:   cfg.AI.OpenAIKey,
@@ -177,6 +164,21 @@ func main() {
 		log.Fatalf("failed to create embedding provider: %v", err)
 	}
 	log.Infof("Embedding provider initialized: %s (%d dimensions)", embeddingProvider.Name(), embeddingProvider.Dimensions())
+
+	// Create domain services
+	userService := user.NewService(userRepo)
+	exchangeAccountService := exchange_account.NewService(exchangeAccountRepo)
+	tradingPairService := trading_pair.NewService(tradingPairRepo)
+	orderService := order.NewService(orderRepo)
+	positionService := position.NewService(positionRepo)
+	memoryService := memory.NewService(memoryRepo, embeddingProvider)
+	journalService := journal.NewService(journalRepo)
+	sessionDomainService := domainsession.NewService(sessionRepo)
+
+	log.Info("Services initialized")
+
+	// Create ADK session service adapter
+	adkSessionService := adk.NewSessionService(sessionDomainService)
 
 	// ========================================
 	// Business Logic (Risk, Tools, Agents)
@@ -198,7 +200,7 @@ func main() {
 		log,
 	)
 
-	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, kafkaProducer, aiUsageRepo, log)
+	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, kafkaProducer, aiUsageRepo, reasoningRepo, log)
 	if err != nil {
 		log.Fatalf("failed to initialize agents: %v", err)
 	}
@@ -528,6 +530,7 @@ func provideAgents(
 	riskEngine *riskservice.RiskEngine,
 	kafkaProducer *kafka.Producer,
 	aiUsageRepo *chrepo.AIUsageRepository,
+	reasoningRepo *pgrepo.ReasoningRepository,
 	log *logger.Logger,
 ) (*agents.Factory, *agents.Registry, error) {
 	log.Info("Initializing agents...")

@@ -23,38 +23,43 @@ func SaveStructuredReasoningCallback(reasoningRepo reasoning.Repository) agent.A
 			"session", ctx.SessionID(),
 		)
 
-		// TODO: Get agent output from conversation - ConversationHistory() removed in ADK
-		// For now, we skip reasoning capture as ADK API changed
-		// Will implement using Output() or alternative method in future
-		log.Debug("Reasoning capture temporarily disabled - ADK API migration needed")
-		return nil, nil
-
-		// Get the last message (agent's response)
-		// lastMessage := history[len(history)-1]
-		if lastMessage.Role != genai.RoleModel {
-			log.Debug("Last message is not from model, skipping")
+		// Get agent output from session state using OutputKey
+		// OutputKey is configured in agent setup (e.g., "market_analyst_output")
+		outputKey := ctx.AgentName() + "_output"
+		outputVal, err := ctx.ReadonlyState().Get(outputKey)
+		if err != nil {
+			// No output in state - agent might not have OutputKey configured
+			// This is normal for agents without OutputKey
+			log.Debug("No output found in state", "output_key", outputKey)
 			return nil, nil
 		}
 
-		// Extract text content from message
+		// Parse output to string and structured format
 		var outputText string
-		for _, part := range lastMessage.Parts {
-			if textPart, ok := part.(*genai.TextPart); ok {
-				outputText += textPart.Text
+		var structuredOutput map[string]interface{}
+
+		switch val := outputVal.(type) {
+		case string:
+			outputText = val
+			// Try to parse as JSON
+			if err := json.Unmarshal([]byte(val), &structuredOutput); err != nil {
+				// Not JSON - save as raw output
+				log.Debug("Agent output is plain text, saving as raw")
+				return saveRawOutput(ctx, reasoningRepo, outputText)
 			}
+		case map[string]interface{}:
+			structuredOutput = val
+			// Convert to string for storage
+			jsonBytes, _ := json.Marshal(val)
+			outputText = string(jsonBytes)
+		default:
+			log.Debugf("Unexpected output type in state: %T", val)
+			return nil, nil
 		}
 
 		if outputText == "" {
-			log.Debug("No text output from agent")
+			log.Debug("Empty output from agent")
 			return nil, nil
-		}
-
-		// Try to parse as structured JSON
-		var structuredOutput map[string]interface{}
-		if err := json.Unmarshal([]byte(outputText), &structuredOutput); err != nil {
-			// Not JSON or invalid JSON - save raw output as fallback
-			log.Debugf("Agent output is not structured JSON (expected for agents without OutputSchema): %v", err)
-			return saveRawOutput(ctx, reasoningRepo, outputText)
 		}
 
 		// Extract reasoning steps and final output
