@@ -11,3 +11,5 @@ DROP INDEX IF EXISTS idx_ai_usage_user_id ON ai_usage;
 -- Drop main table
 DROP TABLE IF EXISTS ai_usage;
 
+
+

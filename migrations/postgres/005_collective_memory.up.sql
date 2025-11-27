@@ -54,3 +54,5 @@ COMMENT ON COLUMN collective_memories.validation_score IS 'Performance score 0-1
 COMMENT ON COLUMN collective_memories.validation_trades IS 'Number of trades that confirmed this pattern';
 COMMENT ON COLUMN collective_memories.source_user_id IS 'Original contributor (anonymized after validation)';
 
+
+

@@ -202,3 +202,5 @@ InputSchema: map[string]interface{}{
 ```
 
 Then add a generic schema validator in callbacks. But even with this, domain-specific business rules should stay in tool implementations.
+
+

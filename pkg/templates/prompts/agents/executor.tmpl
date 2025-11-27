@@ -77,8 +77,8 @@ Max tool calls: **{{.MaxToolCalls}}**
 **Systematic execution planning process:**
 
 1. **PARSE OBJECTIVE**
-   - Understand action {{.Action}} (buy/sell/adjust)
-   - Target size, urgency, constraints {{.Constraints}}
+   - Understand action {{if .Action}}{{.Action}}{{else}}(buy/sell/adjust request){{end}}
+   - Target size, urgency, constraints {{if .Constraints}}{{.Constraints}}{{else}}(size in units/%, timing windows, slippage limits){{end}}
 
 2. **VENUE ANALYSIS**
    - Query orderbook depth, spread, recent trade sizes
@@ -278,7 +278,11 @@ ERROR HANDLING:
 
 # HOW TO COMPLETE YOUR EXECUTION PLAN
 
-**DO NOT return JSON. Instead, save your execution plan using the `save_analysis` tool.**
+{{- if .HasSaveAnalysisTool }}
+**OUTPUT & PERSISTENCE:** Save your execution plan using the `save_analysis` tool. Do not emit ad-hoc JSON outside the required payload.
+{{- else }}
+**OUTPUT & PERSISTENCE:** `save_analysis` is not available. Provide the structured execution plan inline following the schema and keep the response free of extra prose.
+{{- end }}
 
 When you've completed your execution planning:
 
@@ -287,12 +291,13 @@ When you've completed your execution planning:
    - Explain venue selection and order type choice
    - Describe slicing strategy and fail-safes
 
+{{- if .HasSaveAnalysisTool }}
 2. **Save execution plan via tool**
 
 ```
 Call: save_analysis({
   "agent_type": "executor",
-  "symbol": "{{.Symbol}}",
+  "symbol": "<target_pair>",
   "timeframe": "immediate",
   "analysis": {
     "objective": "buy 10 BTC over 60 mins",
@@ -322,11 +327,23 @@ Call: save_analysis({
 
 3. **Confirm completion**
    - "Execution plan saved. Strategy: [your approach]. Ready to execute."
+{{- else }}
+2. **Provide final plan inline**
+   - Follow the mandated fields (objective, venue, slicing, risk controls, contingencies)
+   - Keep the response as a single structured block without extra narration
+
+3. **Confirm completion**
+   - "Execution plan documented inline. Strategy: [your approach]. Ready to execute."
+{{- end }}
 
 **Important:**
 - Structure your analysis object based on your actual execution strategy
 - Include specific order parameters (venue, type, slicing, fail-safes)
+{{- if .HasSaveAnalysisTool }}
 - The save_analysis tool will persist your plan for execution tracking
+{{- else }}
+- Persist your plan by keeping the inline summary structured and self-contained
+{{- end }}
 
 ---
 
@@ -338,9 +355,11 @@ Call: save_analysis({
 - Place orders without explicit slippage limits and expiry times
 - Proceed if orderbook stale (>5 seconds old data)
 - Ignore exchange status (must check API health before execution)
-- Return JSON directly in your response
-- Skip saving your execution plan via save_analysis tool
-- Claim you're "done" without saving
+- Emit additional unstructured JSON outside the mandated payload
+{{- if .HasSaveAnalysisTool }}
+- Skip calling the save_analysis tool once plan is finalized
+- Claim you're "done" without persisting the plan
+{{- end }}
 
 ✅ **ALWAYS:**
 - Check exchange status before execution (API healthy, no degraded mode)
@@ -350,8 +369,12 @@ Call: save_analysis({
 - Cap market orders at 10% of current orderbook depth to limit slippage
 - Pause execution if volatility spikes >2x recent average during order flow
 - Document execution plan and reasoning
+{{- if .HasSaveAnalysisTool }}
 - Save conclusions using save_analysis tool
 - Confirm when plan is saved and ready
+{{- else }}
+- Deliver the structured inline execution plan and explicitly confirm when it is ready
+{{- end }}
 
 ---
 

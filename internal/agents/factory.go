@@ -120,6 +120,7 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 	// Collect tools for ADK agent
 	adkTools := make([]tool.Tool, 0, len(cfg.Tools))
 	toolInfo := make([]tools.Definition, 0, len(cfg.Tools))
+	hasSaveAnalysisTool := false
 	definitionByName := map[string]tools.Definition{}
 	for _, def := range tools.Definitions() {
 		definitionByName[def.Name] = def
@@ -137,6 +138,9 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 
 		if def, ok := definitionByName[toolName]; ok {
 			toolInfo = append(toolInfo, def)
+			if def.Name == "save_analysis" {
+				hasSaveAnalysisTool = true
+			}
 		} else {
 			toolInfo = append(toolInfo, tools.Definition{Name: toolName, Description: ""})
 		}
@@ -146,10 +150,11 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 	instruction := ""
 	if cfg.SystemPromptTemplate != "" {
 		data := map[string]interface{}{
-			"Tools":        toolInfo,
-			"MaxToolCalls": cfg.MaxToolCalls,
-			"AgentName":    cfg.Name,
-			"AgentType":    cfg.Type,
+			"Tools":               toolInfo,
+			"MaxToolCalls":        cfg.MaxToolCalls,
+			"AgentName":           cfg.Name,
+			"AgentType":           cfg.Type,
+			"HasSaveAnalysisTool": hasSaveAnalysisTool,
 		}
 		instruction, err = f.templates.Render(cfg.SystemPromptTemplate, data)
 		if err != nil {
@@ -203,10 +208,25 @@ func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
 		return nil, schemas.RiskManagerOutputSchema
 	case AgentStrategyPlanner:
 		return nil, schemas.StrategyPlannerOutputSchema
-	case AgentMarketAnalyst:
-		return nil, schemas.MarketAnalystOutputSchema
 	case AgentOpportunitySynthesizer:
 		return nil, schemas.OpportunitySynthesizerOutputSchema
+	// All 8 analyst agents with structured CoT
+	case AgentMarketAnalyst:
+		return nil, schemas.MarketAnalystOutputSchema
+	case AgentSMCAnalyst:
+		return nil, schemas.SMCAnalystOutputSchema
+	case AgentSentimentAnalyst:
+		return nil, schemas.SentimentAnalystOutputSchema
+	case AgentOrderFlowAnalyst:
+		return nil, schemas.OrderFlowAnalystOutputSchema
+	case AgentDerivativesAnalyst:
+		return nil, schemas.DerivativesAnalystOutputSchema
+	case AgentMacroAnalyst:
+		return nil, schemas.MacroAnalystOutputSchema
+	case AgentOnChainAnalyst:
+		return nil, schemas.OnChainAnalystOutputSchema
+	case AgentCorrelationAnalyst:
+		return nil, schemas.CorrelationAnalystOutputSchema
 	default:
 		return nil, nil
 	}

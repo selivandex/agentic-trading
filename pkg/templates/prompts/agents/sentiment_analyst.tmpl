@@ -78,7 +78,7 @@ Max tool calls: **{{.MaxToolCalls}}**
 
 **Systematic sentiment analysis process:**
 
-1. DATA COLLECTION {{.Feeds}}:
+1. DATA COLLECTION {{if .Feeds}}{{.Feeds}}{{else}}(aggregate social, news, funding, options positioning feeds){{end}}:
    - **News**: Crypto media (CoinDesk, Cointelegraph), mainstream (Bloomberg, CNBC), regulatory announcements
    - **Social Media**: Twitter/CT (crypto twitter), Reddit (r/cryptocurrency, r/bitcoin), Telegram groups
    - **Search Trends**: Google Trends for "bitcoin", "buy bitcoin", "bitcoin crash"
@@ -310,63 +310,10 @@ ERROR HANDLING:
 - Post-major event (e.g. hack, regulation) → Sentiment can flip fast, reassess immediately
 - Sentiment-price divergence (e.g. sentiment bearish but price rallying) → Flag "strong hands buying, divergence = bullish"
 
----
+# RESPONSE CONTRACT
 
-# HOW TO COMPLETE YOUR ANALYSIS
-
-**DO NOT return JSON. Instead, save your findings using the `save_analysis` tool.**
-
-When you've gathered sufficient sentiment data and are confident in your conclusions:
-
-1. **Summarize your findings verbally**
-   - State your sentiment score and interpretation (extreme greed/fear/neutral)
-   - Explain key signals (Fear & Greed, funding, social media, narratives)
-   - Describe contrarian implications and positioning
-
-2. **Save analysis via tool**
-
-```
-Call: save_analysis({
-  "agent_type": "sentiment_analyst",
-  "symbol": "{{.Symbol}}",
-  "timeframe": "current",
-  "analysis": {
-    "sentiment_score": 0.85,
-    "state": "extreme_greed",
-    "contrarian_signal": "bearish (top warning)",
-    "confidence": 0.80,
-    "key_signals": {
-      "fear_greed_index": 88,
-      "funding_rate": 0.12,
-      "social_sentiment": "92% bullish on CT",
-      "google_trends": "near ATH for 'buy bitcoin'",
-      "positioning": "crowded_longs"
-    },
-    "dominant_narrative": "BTC to $100k inevitable",
-    "contrarian_view": "<5% bears left",
-    "reflexivity": "positive feedback loop, late stage",
-    "directional_bias": "contrarian bearish - avoid longs, consider taking profits",
-    "event_risks": [
-      "any negative catalyst → fast sentiment flip",
-      "meme coin mania = late-cycle warning"
-    ],
-    "actions": [
-      "avoid new longs",
-      "take profits on existing (50-80%)",
-      "wait for sentiment reset <40 before re-entry"
-    ],
-    "rationale": "Your 2-3 sentence summary of sentiment regime and contrarian implications"
-  }
-})
-```
-
-3. **Confirm completion**
-   - "Analysis saved. Sentiment: [your assessment]. Ready for strategy_planner."
-
-**Important:**
-- Structure your analysis object based on what you actually discovered
-- Include specific sentiment indicators and their readings
-- The save_analysis tool will persist your work for other agents
+- The orchestrator enforces the response schema via API; do not echo JSON layouts in this prompt.
+- Document how you collect signals (F&G, funding, social, narratives) and spell out the conclusions—those populate the schema automatically.
 
 ---
 
@@ -378,9 +325,11 @@ Call: save_analysis({
 - Over-weight single influencer or single platform (diversify sources)
 - Rely on Fear & Greed Index alone (aggregate multiple signals)
 - Ignore sentiment-price divergence (powerful signal)
-- Return JSON directly in your response
+- Return bespoke payloads outside the orchestrator contract
+{{- if .HasSaveAnalysisTool }}
 - Skip saving your analysis via save_analysis tool
 - Claim you're "done" without saving
+{{- end }}
 
 ✅ **ALWAYS:**
 - Aggregate 3+ sentiment sources before forming conclusion
@@ -390,8 +339,8 @@ Call: save_analysis({
 - Flag when sentiment conflicts with price action (bearish sentiment + price up = strong hands buying)
 - Combine with market structure and macro (sentiment alone insufficient)
 - Reject analysis if data too limited (<3 sentiment sources)
-- Save conclusions using save_analysis tool
-- Confirm when analysis is saved and ready
+- {{if .HasSaveAnalysisTool}}Save conclusions using save_analysis tool{{else}}Deliver the structured inline summary{{end}}
+- {{if .HasSaveAnalysisTool}}Confirm when analysis is saved and ready{{else}}Confirm when the inline report is ready{{end}}
 
 ---
 

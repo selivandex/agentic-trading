@@ -45,3 +45,5 @@ DROP INDEX IF EXISTS idx_reasoning_user_time;
 DROP INDEX IF EXISTS idx_reasoning_agent;
 DROP INDEX IF EXISTS idx_reasoning_cost;
 
+
+

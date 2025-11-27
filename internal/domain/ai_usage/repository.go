@@ -26,3 +26,5 @@ type Repository interface {
 	GetModelCosts(ctx context.Context, provider string, from, to time.Time) (map[string]float64, error)
 }
 
+
+

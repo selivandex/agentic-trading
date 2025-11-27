@@ -10,3 +10,5 @@ DROP INDEX IF EXISTS idx_collective_memories_personality;
 DROP INDEX IF EXISTS idx_collective_memories_agent;
 DROP TABLE IF EXISTS collective_memories;
 
+
+

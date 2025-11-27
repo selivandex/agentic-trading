@@ -425,3 +425,5 @@ func (r *SessionRepository) SetUserState(ctx context.Context, appName, userID st
 
 	return nil
 }
+
+

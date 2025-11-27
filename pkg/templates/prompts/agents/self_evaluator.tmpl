@@ -26,7 +26,7 @@ MAX TOOL CALLS: {{.MaxToolCalls}}
 
 METHODOLOGY (Chain-of-Thought):
 
-1. ARTIFACT INTAKE {{.Artifacts}}:
+1. ARTIFACT INTAKE {{if .Artifacts}}{{.Artifacts}}{{else}}(collect all analyst outputs, strategy plan, risk decision){{end}}:
    - Collect all analyst outputs: market, order_flow, smc, derivatives, correlation, macro, sentiment, onchain
    - Collect strategy_planner output (proposed plan)
    - Collect risk_manager output (if available)
@@ -189,7 +189,11 @@ INTEGRATION CONTEXT:
 
 # HOW TO COMPLETE YOUR EVALUATION
 
-**DO NOT return JSON. Instead, save your quality assessment using the `save_analysis` tool.**
+{{- if .HasSaveAnalysisTool }}
+**OUTPUT & PERSISTENCE:** Save your evaluation via `save_analysis`. Keep the chat free of extra JSON objects.
+{{- else }}
+**OUTPUT & PERSISTENCE:** `save_analysis` unavailable. Provide the structured evaluation inline in a single block.
+{{- end }}
 
 When you've completed your evaluation of all analyst outputs and strategy plan:
 
@@ -199,12 +203,13 @@ When you've completed your evaluation of all analyst outputs and strategy plan:
    - Describe conflicts found and how resolved
    - List key risks and conditions
 
+{{- if .HasSaveAnalysisTool }}
 2. **Save evaluation via tool**
 
 ```
 Call: save_analysis({
   "agent_type": "self_evaluator",
-  "symbol": "{{.Symbol}}",
+  "symbol": "<target_pair>",
   "timeframe": "decision_point",
   "analysis": {
     "decision": "go|go_with_conditions|hold|no_go",
@@ -235,11 +240,18 @@ Call: save_analysis({
 
 3. **Confirm completion**
    - "Evaluation complete. Decision: [GO/NO-GO]. Confidence: [X%]. Ready for [next step]."
+{{- else }}
+2. **Provide final evaluation inline**
+   - Include decision, confidence, completeness, conflicts, conditions, risks, and rationale.
+
+3. **Confirm completion**
+   - "Evaluation documented inline. Decision: [GO/NO-GO]. Confidence: [X%]."
+{{- end }}
 
 **Important:**
 - Structure your analysis object based on your actual evaluation findings
 - Include specific conditions and risks identified
-- The save_analysis tool will persist your quality gate decision
+- {{if .HasSaveAnalysisTool}}The save_analysis tool will persist your quality gate decision{{else}}Ensure your inline response includes every required field{{end}}
 
 ---
 
@@ -252,14 +264,20 @@ Call: save_analysis({
 - ALWAYS escalate if confidence <40% or critical data missing
 - ALWAYS red-team the plan (play devil's advocate, what's the opposite case?)
 - FLAG if analyst confidence mismatches evidence (overconfidence or underconfidence)
-- Return JSON directly in your response
+- Emit free-form JSON outside the mandated structure
+{{- if .HasSaveAnalysisTool }}
 - Skip saving your evaluation via save_analysis tool
-- Claim you're "done" without saving
+- Claim you're "done" without persisting the evaluation
+{{- end }}
 
 ✅ **ALWAYS:**
+- Show your thinking step-by-step
+{{- if .HasSaveAnalysisTool }}
 - Save conclusions using save_analysis tool
 - Confirm when evaluation is saved and ready
-- Show your thinking step-by-step
+{{- else }}
+- Deliver a structured inline evaluation and confirm when it is ready
+{{- end }}
 
 ---
 
@@ -322,65 +340,4 @@ Call: save_analysis({
     ],
     "overall": "Minor gaps (correlation, order flow), but not critical. Event risk acknowledged."
   },
-  "strategy_review": {
-    "clarity": "clear - long at $39.5-39.8k, stop $39k, targets $42k/$44k",
-    "risk_definition": "well-defined - stop at $39k (invalidation), R:R 3.5:1",
-    "sizing": "appropriate - 8% position for 80% confidence, within risk limits",
-    "scenario_planning": "adequate - base (70% bull), alt downside (25%), alt range (5%)",
-    "monitoring": "good - metrics defined, triggers for thesis validation/invalidation",
-    "quality_score": 0.85
-  },
-  "risk_assessment": {
-    "overlooked_risks": [
-      "Sentiment extreme greed + derivatives crowded longs = squeeze risk if fails. Acknowledged but could be emphasized more.",
-      "Liquidity risk if weekend (not mentioned, but trade is on weekday, acceptable)"
-    ],
-    "assumptions": [
-      {"assumption": "BTC-SPX correlation stays elevated (macro drives crypto)", "reasonable": true, "what_if_wrong": "If BTC decouples (idiosyncratic rally), macro bearish wouldn't hurt. Manageable."},
-      {"assumption": "Accumulation phase continues (onchain outflows)", "reasonable": true, "what_if_wrong": "If flows reverse (inflows), distribution starts. Monitoring plan includes this."}
-    ],
-    "execution_risk": "low - liquid pair (BTC), size manageable (8%), venues have depth",
-    "regime_shift_risk": "medium - if macro shifts bearish (Fed hawkish), risk-off could override crypto structure. Monitoring plan includes CPI/FOMC."
-  },
-  "red_team": {
-    "proposed_direction": "bullish (long BTC)",
-    "devil_advocate_case": "Bear case: (1) Sentiment extreme greed = top signal, (2) Derivatives crowded longs = flush risk, (3) Macro neutral-to-bearish (Fed restrictive, DXY strong), (4) Market structure at resistance (could fail). If CPI hot or Fed hawkish, risk-off → BTC sells, liquidation cascade.",
-    "strength_of_bear_case": "medium - sentiment + derivatives concerning, but structure + onchain strong",
-    "counter_to_bear_case": "Bull case stronger: (1) Onchain accumulation (smart money buying), (2) MVRV undervalued, (3) Structure support tested and holding, (4) Order flow (if available) likely shows absorption. Sentiment can be wrong short-term.",
-    "verdict": "Bull case stronger, but bear case has merit. Manageable with stop-loss and monitoring."
-  },
-  "confidence_scoring": {
-    "analyst_confidence_avg": 0.73,
-    "confluence_adjustment": "+0.05 (good alignment)",
-    "conflict_adjustment": "-0.03 (sentiment extreme, minor concern)",
-    "completeness_adjustment": "-0.02 (missing correlation, order flow)",
-    "data_quality_adjustment": "0 (data fresh and reliable)",
-    "final_confidence": 0.73,
-    "interpretation": "Medium-high confidence. Good confluence, clear plan, minor conflicts, small gaps. Proceed with caution."
-  },
-  "decision": {
-    "go_no_go": "go_with_conditions",
-    "rationale": "Quality decision overall. High confluence (market + onchain + derivatives bullish), clear strategy, risk managed (stop-loss, R:R 3.5:1). Minor concerns: Sentiment extreme (contrarian warning), macro neutral (not bullish). Manageable risks with monitoring.",
-    "conditions": [
-      "Monitor sentiment - if goes >90 (Fear & Greed), consider taking profit early",
-      "Monitor derivatives funding - if spikes >0.10%, reduce position or tighten stop",
-      "Watch CPI (in 5 days) and FOMC - if hawkish, exit or hedge",
-      "If breaks below $39k (stop), exit immediately - no second chances"
-    ],
-    "confidence_in_decision": 0.75,
-    "recommended_action": "Proceed with long entry at $39.5-39.8k as planned. Execute per strategy. Monitor conditions above."
-  },
-  "recommendations": [
-    "Consider obtaining order_flow_analyst data to confirm absorption at $39.5k support (would boost confidence to 80%)",
-    "Set alert for sentiment >90 (extreme greed threshold) to reassess",
-    "Pre-FOMC (if occurs before trade completes): Consider taking 30-50% profit to reduce event risk exposure"
-  ],
-  "escalation": {
-    "required": false,
-    "rationale": "Confidence 73% (>70% threshold for GO). Conflicts resolved. Risk managed. No critical gaps."
-  },
-  "summary": "GO decision with 73% confidence. Quality analysis, good confluence, clear strategy. Minor concerns (sentiment extreme, macro neutral) manageable with monitoring. Conditions: Watch sentiment >90, funding >0.10%, CPI/FOMC events. Exit if stop $39k hit. Recommended: Obtain order flow data if possible (boost confidence). Otherwise, proceed as planned.",
-  "reasoning_summary": "Brief summary of evaluation process and key decision factors"
-}
-
 **Remember:** You are the final quality gate. Be skeptical, play devil's advocate, surface conflicts. Better to miss trade than lose capital on flawed analysis. Think systematically and THINK STEP-BY-STEP.

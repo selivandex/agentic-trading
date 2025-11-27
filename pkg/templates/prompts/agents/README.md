@@ -153,7 +153,7 @@ When you've gathered sufficient data and are confident in your conclusions:
 2. **Save analysis via tool**
    Call: save_analysis({
      "agent_type": "{{.AgentName}}",
-     "symbol": "{{.Symbol}}",
+     "symbol": "<target_pair>",
      "analysis": {
        // Structure this based on what you actually discovered
        // Include your key findings
@@ -294,7 +294,7 @@ Prompts use Go templates. Available variables:
 
 - `{{.AgentName}}` - Agent type (e.g., "market_analyst")
 - `{{.AgentType}}` - Same as AgentName
-- `{{.Symbol}}` - Trading pair (e.g., "BTC/USDT")
+- `symbol` - Trading pair (e.g., "BTC/USDT")
 - `{{.Timeframe}}` - Requested timeframe if applicable
 - `{{.Tools}}` - Array of available tools (auto-populated)
 - `{{.MaxToolCalls}}` - Tool call limit for this agent
@@ -304,7 +304,7 @@ Prompts use Go templates. Available variables:
 ```markdown
 Call: save_analysis({
   "agent_type": "{{.AgentName}}",
-  "symbol": "{{.Symbol}}",
+  "symbol": "<target_pair>",
   ...
 })
 ```
@@ -434,4 +434,6 @@ A: Yes! They can use `save_insight` for learnings discovered along the way, then
 ---
 
 **Questions?** Check `docs/DEVELOPMENT_PLAN.md` Phase 1 or ask in the PR.
+
+
 

@@ -14,3 +14,5 @@ ALTER TABLE positions DROP COLUMN IF EXISTS strategy_id;
 -- Drop user_strategies table
 DROP TABLE IF EXISTS user_strategies;
 
+
+

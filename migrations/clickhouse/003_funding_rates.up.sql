@@ -30,3 +30,5 @@ AS SELECT
 FROM funding_rates
 GROUP BY exchange, symbol, hour;
 
+
+

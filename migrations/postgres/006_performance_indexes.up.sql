@@ -152,3 +152,5 @@ CREATE INDEX IF NOT EXISTS idx_reasoning_cost
     ON agent_reasoning_logs(tokens_used DESC, cost_usd DESC) 
     WHERE tokens_used > 10000;
 
+
+

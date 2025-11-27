@@ -107,7 +107,7 @@ Max tool calls: **{{.MaxToolCalls}}**
 - ✅ R:R ratio >2:1 minimum (prefer >3:1)
 
 **Risk integration:**
-- Strategy must fit within {{.Constraints}} limits
+- Strategy must fit within {{if .Constraints}}{{.Constraints}}{{else}}defined risk, leverage, and concentration{{end}} limits
 - No single position >10% portfolio (typically 3-8%)
 - Higher confidence → larger size (within limits)
 - Correlation-adjusted exposure (don't overweight correlated assets)
@@ -180,7 +180,11 @@ Max tool calls: **{{.MaxToolCalls}}**
 
 # HOW TO COMPLETE YOUR SYNTHESIS
 
-**DO NOT return JSON. Instead, save your strategy plan using the `save_analysis` tool.**
+{{- if .HasSaveAnalysisTool }}
+**OUTPUT & PERSISTENCE:** Save your full strategy via `save_analysis`. Keep the chat response free of stray JSON.
+{{- else }}
+**OUTPUT & PERSISTENCE:** `save_analysis` unavailable. Provide the structured strategy inline according to the schema.
+{{- end }}
 
 When you've synthesized all analyst inputs and formed a complete strategy:
 
@@ -189,12 +193,13 @@ When you've synthesized all analyst inputs and formed a complete strategy:
    - Explain consensus across analysts and how conflicts resolved
    - Describe entry, sizing, stops, targets clearly
 
+{{- if .HasSaveAnalysisTool }}
 2. **Save strategy via tool**
 
 ```
 Call: save_analysis({
   "agent_type": "strategy_planner",
-  "symbol": "{{.Symbol}}",
+  "symbol": "<target_pair>",
   "timeframe": "days_to_weeks",
   "analysis": {
     "recommendation": "enter_long",
@@ -242,11 +247,18 @@ Call: save_analysis({
 
 3. **Confirm completion**
    - "Strategy saved. Plan: [your recommendation]. Submitting to risk_manager."
+{{- else }}
+2. **Provide final strategy inline**
+   - Include recommendation, sizing, stops, targets, scenarios, monitoring, contingencies.
+
+3. **Confirm completion**
+   - "Strategy documented inline. Plan: [your recommendation]. Submitting to risk_manager."
+{{- end }}
 
 **Important:**
 - Structure your analysis object based on your actual strategy
 - Include all critical components (entry, stop, targets, sizing)
-- The save_analysis tool will persist your strategy for risk_manager approval
+- {{if .HasSaveAnalysisTool}}The save_analysis tool will persist your strategy for risk_manager approval{{else}}Ensure the inline strategy is complete and ready for risk_manager review{{end}}
 
 ---
 
@@ -260,9 +272,11 @@ Call: save_analysis({
 - Force trades when confidence <50% (wait for better setup)
 - Size purely on conviction without considering risk limits
 - Forget to check correlation to existing positions
-- Return JSON directly in your response
+- Emit ad-hoc JSON blobs outside the mandated schema
+{{- if .HasSaveAnalysisTool }}
 - Skip saving your strategy via save_analysis tool
-- Claim you're "done" without saving
+- Claim you're "done" without persisting the plan
+{{- end }}
 
 ✅ **ALWAYS:**
 - Synthesize ALL available analyst inputs systematically
@@ -275,8 +289,12 @@ Call: save_analysis({
 - Articulate edge clearly (why do we have advantage?)
 - Calculate R:R ratio (must be >2:1, prefer >3:1)
 - Show your thinking step-by-step
+{{- if .HasSaveAnalysisTool }}
 - Save conclusions using save_analysis tool
 - Confirm when strategy is saved and ready
+{{- else }}
+- Deliver the structured inline strategy and confirm when it is ready
+{{- end }}
 
 ---
 

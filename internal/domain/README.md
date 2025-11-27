@@ -129,3 +129,5 @@ Services handle transactions when operations span multiple repos. Use `BeginTx(c
 - Crypto helpers: `pkg/crypto/`
 - Error types: `pkg/errors/`
 
+
+

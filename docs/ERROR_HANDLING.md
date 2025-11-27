@@ -240,3 +240,5 @@ When updating existing code:
 **Last Updated:** 26 ноября 2025  
 **Related:** `pkg/errors/errors.go`, `AGENTS.md` (Error handling section)
 
+
+

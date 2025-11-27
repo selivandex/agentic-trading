@@ -182,3 +182,5 @@ func (fg *FearGreedCollector) mapValueClassification(classification string) stri
 		return lower
 	}
 }
+
+

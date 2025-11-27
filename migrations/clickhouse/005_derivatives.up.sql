@@ -72,3 +72,5 @@ CREATE INDEX IF NOT EXISTS idx_options_flow_premium
     TYPE minmax 
     GRANULARITY 4;
 
+
+

@@ -68,3 +68,5 @@ func (f *Factory) CreatePersonalTradingWorkflow() (agent.Agent, error) {
 	return workflow, nil
 }
 
+
+

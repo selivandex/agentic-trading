@@ -71,3 +71,5 @@ COMMENT ON TABLE user_strategies IS 'Portfolio strategies created during onboard
 COMMENT ON COLUMN user_strategies.target_allocations IS 'Target allocation percentages as JSON: {"BTC/USDT": 0.5, "ETH/USDT": 0.3}';
 COMMENT ON COLUMN user_strategies.reasoning_log IS 'AI reasoning chain-of-thought for strategy creation (explainability)';
 
+
+

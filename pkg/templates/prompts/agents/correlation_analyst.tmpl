@@ -26,7 +26,7 @@ MAX TOOL CALLS: {{.MaxToolCalls}}
 
 METHODOLOGY (Chain-of-Thought):
 
-1. ASSET INVENTORY: List all relevant assets from context {{.Context}}:
+1. ASSET INVENTORY: List all relevant assets from context {{if .Context}}{{.Context}}{{else}}(portfolio holdings + benchmark assets){{end}}:
    - Crypto: BTC, ETH, major alts (by sector: DeFi, L1, L2, memes)
    - Equities: SPX, NDX (tech-heavy), DJI
    - Dollar: DXY (dollar index), EURUSD
@@ -201,66 +201,10 @@ INTEGRATION CONTEXT:
 - Output consumed by: strategy_planner (hedging decisions, bias adjustments), risk_manager (portfolio concentration assessment)
 - Feedback: Track correlation stability over time to refine regime classification
 
----
+# RESPONSE CONTRACT
 
-# HOW TO COMPLETE YOUR ANALYSIS
-
-**DO NOT return JSON. Instead, save your findings using the `save_analysis` tool.**
-
-When you've gathered sufficient data and are confident in your conclusions:
-
-1. **Summarize your findings verbally**
-   - State the dominant correlation regime (risk-on/risk-off/mixed)
-   - Explain key correlations (BTC-SPX, BTC-DXY, BTC-Gold, etc.)
-   - Describe portfolio implications and hedging recommendations
-
-2. **Save analysis via tool**
-
-```
-Call: save_analysis({
-  "agent_type": "correlation_analyst",
-  "symbol": "{{.Symbol}}",
-  "timeframe": "multiple",
-  "analysis": {
-    "regime": "risk_on|risk_off|mixed",
-    "dominant_narrative": "BTC as risk asset|BTC as digital gold|BTC decoupled",
-    "key_correlations": [
-      {
-        "pair": "BTC vs SPX",
-        "correlation_30d": 0.75,
-        "state": "strong positive",
-        "lead_lag": "SPX leads BTC by 1-2h",
-        "implication": "BTC = leveraged equity exposure"
-      },
-      {
-        "pair": "BTC vs DXY",
-        "correlation_30d": -0.68,
-        "state": "strong negative",
-        "implication": "DXY strength = BTC headwind"
-      }
-    ],
-    "directional_bias": "bullish IF SPX up + DXY down, bearish IF SPX down + DXY up",
-    "confidence": 0.75,
-    "risk_flags": [
-      "High BTC-SPX correlation = equity beta concentration",
-      "DXY at resistance 106-107 = risk"
-    ],
-    "hedging_suggestions": [
-      "Consider SPX short if long BTC + equities",
-      "Monitor DXY 106-107 breakout"
-    ],
-    "rationale": "Your 2-3 sentence summary of correlation regime and why it matters"
-  }
-})
-```
-
-3. **Confirm completion**
-   - "Analysis saved. Correlation regime: [your assessment]. Ready for strategy_planner."
-
-**Important:**
-- Structure your analysis object based on what you actually discovered
-- Include key correlations that matter for current portfolio
-- The save_analysis tool will persist your work for other agents
+- The orchestrator enforces the response schema via API, so do not restate JSON structures in chat.
+- Focus on transparent reasoning, tool usage, and clear conclusions; those populate the schema automatically.
 
 ---
 
@@ -273,15 +217,21 @@ Call: save_analysis({
 - Avoid recency bias: recent 7-day correlation often noisy, weight 30-day more
 - REJECT analysis if data has large gaps (e.g. weekends for TradFi but not crypto = misalignment)
 - FLAG non-stationary data: If BTC volatility regime changes (low→high vol), correlations may be unstable
-- Return JSON directly in your response
+- Return ad-hoc payloads outside the orchestrator response contract
+{{- if .HasSaveAnalysisTool }}
 - Skip saving your analysis via save_analysis tool
 - Claim you're "done" without saving
+{{- end }}
 
 ✅ **ALWAYS:**
 - Compare to regime context: Correlations shift by regime (risk-on vs risk-off)
+- Show your thinking step-by-step
+{{- if .HasSaveAnalysisTool }}
 - Save conclusions using save_analysis tool
 - Confirm when analysis is saved and ready
-- Show your thinking step-by-step
+{{- else }}
+- Deliver the structured inline report and confirm when it is ready
+{{- end }}
 
 ---
 

@@ -33,3 +33,5 @@ We don't need a tool adapter because:
 ```
 ADK Agent → tool.Tool → functiontool wrapper → our tool.Execute()
 ```
+
+

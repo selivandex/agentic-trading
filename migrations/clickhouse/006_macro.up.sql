@@ -61,3 +61,5 @@ CREATE INDEX IF NOT EXISTS idx_correlation_value
     TYPE minmax 
     GRANULARITY 4;
 
+
+

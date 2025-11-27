@@ -33,3 +33,5 @@ type Repository interface {
 	GetMinerMetricsByPool(ctx context.Context, poolName string, since time.Time) ([]MinerMetrics, error)
 	GetLatestMinerMetrics(ctx context.Context) ([]MinerMetrics, error)
 }
+
+

@@ -4,3 +4,5 @@
 DROP TABLE IF EXISTS market_correlations;
 DROP TABLE IF EXISTS macro_events;
 
+
+

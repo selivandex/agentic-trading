@@ -106,3 +106,5 @@ CREATE INDEX IF NOT EXISTS idx_network_gas_price ON network_metrics (gas_price) 
 
 -- Miner metrics indexes
 CREATE INDEX IF NOT EXISTS idx_miner_mpi ON miner_metrics (mpi) TYPE minmax GRANULARITY 4;
+
+

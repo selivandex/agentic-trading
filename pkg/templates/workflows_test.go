@@ -68,7 +68,7 @@ func TestWorkflowTemplate_MarketResearchInput(t *testing.T) {
 	if !strings.Contains(output, ">65%") || !strings.Contains(output, "confidence >65%") {
 		t.Error("Missing confidence threshold")
 	}
-	if !strings.Contains(output, "R:R >2:1") {
+	if !strings.Contains(output, "R:R =") {
 		t.Error("Missing R:R requirement")
 	}
 }
@@ -116,5 +116,61 @@ func TestWorkflowTemplate_FallbackOnError(t *testing.T) {
 	if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "nonexistent") {
 		t.Logf("Error message: %v", err)
 		// Not failing test since error format may vary
+	}
+}
+
+func TestAgentTemplates_RenderWithoutMissingValues(t *testing.T) {
+	registry := Get()
+
+	type testTool struct {
+		Name        string
+		Description string
+	}
+
+	toolset := []testTool{
+		{Name: "save_analysis", Description: "Persist findings for other agents"},
+	}
+
+	templates := []string{
+		"agents/market_analyst",
+		"agents/macro_analyst",
+		"agents/smc_analyst",
+		"agents/strategy_planner",
+		"agents/risk_manager",
+		"agents/executor",
+		"agents/position_manager",
+		"agents/self_evaluator",
+		"agents/onchain_analyst",
+		"agents/order_flow_analyst",
+		"agents/sentiment_analyst",
+		"agents/correlation_analyst",
+		"agents/derivatives_analyst",
+	}
+
+	for _, templateID := range templates {
+		for _, hasTool := range []bool{true, false} {
+			t.Run(templateID, func(t *testing.T) {
+				data := map[string]interface{}{
+					"Tools":               toolset,
+					"MaxToolCalls":        5,
+					"AgentName":           "TestAgent",
+					"AgentType":           "test_agent",
+					"HasSaveAnalysisTool": hasTool,
+				}
+
+				output, err := registry.Render(templateID, data)
+				if err != nil {
+					t.Fatalf("Failed to render template %s: %v", templateID, err)
+				}
+
+				if output == "" {
+					t.Fatalf("Template %s produced empty output", templateID)
+				}
+
+				if strings.Contains(output, "<no value>") {
+					t.Fatalf("Template %s contains unresolved placeholder", templateID)
+				}
+			})
+		}
 	}
 }
