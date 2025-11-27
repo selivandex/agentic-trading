@@ -1880,15 +1880,18 @@ import (
 type AgentType string
 
 const (
-    AgentOrchestrator      AgentType = "orchestrator"
-    AgentMarketAnalyst     AgentType = "market_analyst"
-    AgentSentimentAnalyst  AgentType = "sentiment_analyst"
-    AgentOnChainAnalyst    AgentType = "onchain_analyst"
-    AgentCorrelationAnalyst AgentType = "correlation_analyst"
-    AgentStrategyPlanner   AgentType = "strategy_planner"
-    AgentRiskManager       AgentType = "risk_manager"
-    AgentExecutor          AgentType = "executor"
-    AgentPositionManager   AgentType = "position_manager"
+    // Personal trading workflow agents (per-user)
+    AgentStrategyPlanner AgentType = "strategy_planner"
+    AgentRiskManager     AgentType = "risk_manager"
+    AgentExecutor        AgentType = "executor"
+    AgentPositionManager AgentType = "position_manager"
+    AgentSelfEvaluator   AgentType = "self_evaluator"
+
+    // Market research workflow agent (global)
+    AgentOpportunitySynthesizer AgentType = "opportunity_synthesizer"
+
+    // Portfolio management agent (onboarding)
+    AgentPortfolioArchitect AgentType = "portfolio_architect"
 )
 
 type AgentConfig struct {
@@ -2012,59 +2015,27 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
     })
 }
 
-// CreateTradingPipeline creates the full trading workflow
-func (f *Factory) CreateTradingPipeline(userCfg UserAgentConfig) (agent.Agent, error) {
-    // Create analysis agents (run in parallel)
-    marketAnalyst, _ := f.CreateAgent(AgentConfig{
-        Type:        AgentMarketAnalyst,
-        Name:        "MarketAnalyst",
-        AIProvider:  userCfg.AIProvider,
-        Model:       userCfg.Model,
-        Tools:       []string{"get_price", "get_ohlcv", "get_orderbook", "rsi", "macd", "bollinger", "atr"},
-        OutputKey:   "market_analysis",
-        SystemPromptTemplate: "agents/market_analyst/system",
+// CreateMarketResearchWorkflow creates the simplified market research workflow
+// This workflow uses OpportunitySynthesizer which calls algorithmic analysis tools directly
+func (f *Factory) CreateMarketResearchWorkflow() (agent.Agent, error) {
+    // Single agent: OpportunitySynthesizer calls comprehensive analysis tools directly
+    // No intermediate analyst agents needed - tools return algorithmic analysis
+    synthesizerAgent, _ := f.CreateAgent(AgentConfig{
+        Type:        AgentOpportunitySynthesizer,
+        Name:        "OpportunitySynthesizer",
+        AIProvider:  "openai",
+        Model:       "gpt-4o-mini",
+        Tools:       []string{"get_technical_analysis", "get_smc_analysis", "get_market_analysis", "publish_opportunity", "save_memory"},
+        OutputKey:   "opportunity_decision",
+        SystemPromptTemplate: "agents/opportunity_synthesizer",
+        MaxToolCalls: 10,
     })
 
-    sentimentAnalyst, _ := f.CreateAgent(AgentConfig{
-        Type:        AgentSentimentAnalyst,
-        Name:        "SentimentAnalyst",
-        AIProvider:  userCfg.AIProvider,
-        Model:       userCfg.Model,
-        Tools:       []string{"get_news", "get_social_sentiment", "get_fear_greed", "get_trending"},
-        OutputKey:   "sentiment_analysis",
-        SystemPromptTemplate: "agents/sentiment_analyst/system",
-    })
+    return synthesizerAgent, nil
+}
 
-    onchainAnalyst, _ := f.CreateAgent(AgentConfig{
-        Type:        AgentOnChainAnalyst,
-        Name:        "OnChainAnalyst",
-        AIProvider:  userCfg.AIProvider,
-        Model:       userCfg.Model,
-        Tools:       []string{"get_whale_movements", "get_exchange_flows", "get_nvt_ratio"},
-        OutputKey:   "onchain_analysis",
-        SystemPromptTemplate: "agents/onchain_analyst/system",
-    })
-
-    // Parallel analysis
-    parallelAnalysis, _ := parallelagent.New(parallelagent.Config{
-        AgentConfig: agent.Config{
-            Name:        "ParallelAnalysis",
-            Description: "Concurrent market, sentiment, and on-chain analysis",
-            SubAgents:   []agent.Agent{marketAnalyst, sentimentAnalyst, onchainAnalyst},
-        },
-    })
-
-    // Correlation analyst
-    correlationAnalyst, _ := f.CreateAgent(AgentConfig{
-        Type:        AgentCorrelationAnalyst,
-        Name:        "CorrelationAnalyst",
-        AIProvider:  userCfg.AIProvider,
-        Model:       userCfg.Model,
-        Tools:       []string{"btc_dominance", "altcoin_correlation", "stock_correlation", "dxy_correlation"},
-        OutputKey:   "correlation_analysis",
-        SystemPromptTemplate: "agents/correlation_analyst/system",
-    })
-
+// CreatePersonalTradingWorkflow creates the per-user trading workflow
+func (f *Factory) CreatePersonalTradingWorkflow(userCfg UserAgentConfig) (agent.Agent, error) {
     // Strategy planner
     strategyPlanner, _ := f.CreateAgent(AgentConfig{
         Type:        AgentStrategyPlanner,
@@ -6870,19 +6841,18 @@ import "prometheus/internal/tools"
 
 // Tool categories per agent type (resolved dynamically from the global catalog)
 var AgentToolCategories = map[AgentType][]string{
-    AgentMarketAnalyst:    {"market_data", "momentum", "volatility", "trend", "volume", "smc"},
-    AgentSMCAnalyst:       {"market_data", "smc"},
-    AgentSentimentAnalyst: {"sentiment"},
-    AgentOnChainAnalyst:   {"onchain"},
-    AgentMacroAnalyst:     {"macro"},
-    AgentOrderFlowAnalyst: {"market_data", "order_flow"},
-    AgentDerivativesAnalyst: {"market_data", "derivatives"},
-    AgentCorrelationAnalyst: {"market_data", "correlation"},
-    AgentStrategyPlanner:  {"memory"},
-    AgentRiskManager:      {"account", "risk"},
-    AgentExecutor:         {"account", "execution"},
-    AgentPositionManager:  {"account", "execution"},
-    AgentSelfEvaluator:    {"evaluation", "memory"},
+    // Personal trading workflow agents (per-user decision making)
+    AgentStrategyPlanner: {"market_data", "account", "risk", "memory"},
+    AgentRiskManager:     {"account", "risk", "memory"},
+    AgentExecutor:        {"account", "execution", "memory"},
+    AgentPositionManager: {"account", "execution", "memory"},
+    AgentSelfEvaluator:   {"evaluation", "memory"},
+
+    // Market research agent (global opportunity identification)
+    AgentOpportunitySynthesizer: {"market_data", "smc", "memory"}, // Direct access to comprehensive analysis tools
+
+    // Portfolio management agent (onboarding)
+    AgentPortfolioArchitect: {"market_data", "momentum", "correlation", "account", "memory"},
 }
 
 var AgentToolMap = buildAgentToolMap()
@@ -7109,39 +7079,18 @@ func (w *CoTWrapper) Execute(ctx context.Context, req *AgentRequest) (*AgentResp
 
 ```go
 // internal/agents/factory.go
-func (f *Factory) CreateAnalysisAgents() map[AgentType]agent.Agent {
-    agents := make(map[AgentType]agent.Agent)
+// Simplified agent creation - no separate analyst agents needed
+// Analysis is now done through algorithmic tools called by OpportunitySynthesizer
 
-    // Market Analyst - только технические инструменты
-    agents[AgentMarketAnalyst] = f.CreateAgent(AgentConfig{
-        Type:  AgentMarketAnalyst,
-        Name:  "MarketAnalyst",
-        Tools: AgentToolMap[AgentMarketAnalyst], // Только ЕГО инструменты
-        SystemPromptTemplate: "agents/market_analyst/system",
-        MaxToolCalls: 25,
-    })
-
-    // SMC Analyst - только SMC инструменты
-    agents[AgentSMCAnalyst] = f.CreateAgent(AgentConfig{
-        Type:  AgentSMCAnalyst,
-        Name:  "SMCAnalyst",
-        Tools: AgentToolMap[AgentSMCAnalyst], // Только SMC tools
-        SystemPromptTemplate: "agents/smc_analyst/system",
-        MaxToolCalls: 15,
-    })
-
-    // Sentiment Analyst - только sentiment инструменты
-    agents[AgentSentimentAnalyst] = f.CreateAgent(AgentConfig{
-        Type:  AgentSentimentAnalyst,
-        Name:  "SentimentAnalyst",
-        Tools: AgentToolMap[AgentSentimentAnalyst], // Только sentiment
-        SystemPromptTemplate: "agents/sentiment_analyst/system",
+func (f *Factory) CreateMarketResearchAgent() (agent.Agent, error) {
+    // Single agent that calls comprehensive analysis tools directly
+    return f.CreateAgent(AgentConfig{
+        Type:  AgentOpportunitySynthesizer,
+        Name:  "OpportunitySynthesizer",
+        Tools: AgentToolMap[AgentOpportunitySynthesizer], // Includes technical, SMC, market analysis tools
+        SystemPromptTemplate: "agents/opportunity_synthesizer",
         MaxToolCalls: 10,
     })
-
-    // ... и так далее для каждого агента
-
-    return agents
 }
 ```
 

@@ -43,28 +43,7 @@ func TestWorkflowTemplate_MarketResearchInput(t *testing.T) {
 		}
 	}
 
-	// Verify all 8 analysts are mentioned
-	analysts := []string{
-		"MarketAnalyst",
-		"SMCAnalyst",
-		"SentimentAnalyst",
-		"OrderFlowAnalyst",
-		"DerivativesAnalyst",
-		"MacroAnalyst",
-		"OnChainAnalyst",
-		"CorrelationAnalyst",
-	}
-
-	for _, analyst := range analysts {
-		if !strings.Contains(output, analyst) {
-			t.Errorf("Missing analyst in template: %s", analyst)
-		}
-	}
-
 	// Verify decision criteria are present
-	if !strings.Contains(output, "5+ analysts agree") {
-		t.Error("Missing consensus requirement")
-	}
 	if !strings.Contains(output, ">65%") || !strings.Contains(output, "confidence >65%") {
 		t.Error("Missing confidence threshold")
 	}
@@ -132,19 +111,13 @@ func TestAgentTemplates_RenderWithoutMissingValues(t *testing.T) {
 	}
 
 	templates := []string{
-		"agents/market_analyst",
-		"agents/macro_analyst",
-		"agents/smc_analyst",
+		"agents/opportunity_synthesizer",
 		"agents/strategy_planner",
 		"agents/risk_manager",
 		"agents/executor",
 		"agents/position_manager",
 		"agents/self_evaluator",
-		"agents/onchain_analyst",
-		"agents/order_flow_analyst",
-		"agents/sentiment_analyst",
-		"agents/correlation_analyst",
-		"agents/derivatives_analyst",
+		"agents/portfolio_architect",
 	}
 
 	for _, templateID := range templates {

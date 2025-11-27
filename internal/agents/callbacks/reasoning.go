@@ -24,7 +24,7 @@ func SaveStructuredReasoningCallback(reasoningRepo reasoning.Repository) agent.A
 		)
 
 		// Get agent output from session state using OutputKey
-		// OutputKey is configured in agent setup (e.g., "market_analyst_output")
+		// OutputKey is configured in agent setup (e.g., "opportunity_synthesizer_output")
 		outputKey := ctx.AgentName() + "_output"
 		outputVal, err := ctx.ReadonlyState().Get(outputKey)
 		if err != nil {

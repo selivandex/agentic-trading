@@ -93,9 +93,9 @@ func TestOpportunitySynthesizerOutputFormat_PublishScenario(t *testing.T) {
 		},
 		"conflicts": []map[string]interface{}{
 			{
-				"conflicting_analysts": []string{"macro_analyst"},
+				"conflicting_analysts": []string{"sentiment_analysis"},
 				"conflict_type":        "direction",
-				"resolution_method":    "HTF technical consensus (6 analysts) dominates single macro fundamental dissent for swing trade timeframe",
+				"resolution_method":    "Technical and SMC consensus dominates single sentiment dissent for swing trade timeframe",
 			},
 		},
 	}

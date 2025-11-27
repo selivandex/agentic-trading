@@ -49,7 +49,7 @@ func TestReasoningRepository_Create(t *testing.T) {
 		ID:             uuid.New(),
 		UserID:         &userID,
 		AgentID:        "test_agent",
-		AgentType:      "market_analyst",
+		AgentType:      "opportunity_synthesizer",
 		SessionID:      uuid.New().String(),
 		ReasoningSteps: reasoningStepsJSON,
 		Decision:       decisionJSON,
@@ -96,7 +96,7 @@ func TestReasoningRepository_GetBySession(t *testing.T) {
 		entry := &reasoning.LogEntry{
 			ID:             uuid.New(),
 			AgentID:        "test_agent",
-			AgentType:      "market_analyst",
+			AgentType:      "opportunity_synthesizer",
 			SessionID:      sessionID,
 			ReasoningSteps: reasoningSteps,
 			Decision:       decision,
@@ -135,7 +135,7 @@ func TestReasoningRepository_GetByAgent(t *testing.T) {
 		entry := &reasoning.LogEntry{
 			ID:             uuid.New(),
 			AgentID:        agentID,
-			AgentType:      "market_analyst",
+			AgentType:      "opportunity_synthesizer",
 			SessionID:      uuid.New().String(),
 			ReasoningSteps: reasoningSteps,
 			Decision:       decision,
@@ -201,7 +201,7 @@ func TestReasoningRepository_JSONBFields(t *testing.T) {
 	entry := &reasoning.LogEntry{
 		ID:             uuid.New(),
 		AgentID:        "test_agent",
-		AgentType:      "market_analyst",
+		AgentType:      "opportunity_synthesizer",
 		SessionID:      uuid.New().String(),
 		ReasoningSteps: reasoningStepsJSON,
 		Decision:       decisionJSON,

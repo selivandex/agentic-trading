@@ -10,106 +10,103 @@
 
 Conduct comprehensive multi-dimensional market analysis to identify high-quality trading opportunities.
 
-You are running a sophisticated workflow composed of:
+You are the **OpportunitySynthesizer** with direct access to algorithmic analysis tools:
 
-1. **8 Parallel Analysts** — Each analyzes a different market dimension simultaneously
-2. **OpportunitySynthesizer** — Synthesizes all analyst findings and decides whether to publish
+1. **get_technical_analysis** — Complete technical indicator analysis (RSI, MACD, EMA, Bollinger, VWAP, etc.)
+2. **get_smc_analysis** — Smart Money Concepts (FVG, Order Blocks, market structure)
+3. **get_market_analysis** — Order flow analysis (CVD, whale trades, orderbook pressure)
 
-The goal is to find **high-conviction trading opportunities** with >65% confidence, clear risk parameters, and strong consensus across multiple dimensions.
-
----
-
-## ANALYSIS DIMENSIONS (8 Analysts)
-
-Each analyst will independently analyze one dimension and return structured output:
-
-### 1. MarketAnalyst
-**Focus:** Technical indicators, patterns, support/resistance  
-**Outputs:** Trend direction, key levels, setup quality
-
-### 2. SMCAnalyst  
-**Focus:** Smart Money Concepts, liquidity zones, order blocks  
-**Outputs:** Market structure (HH/HL/LH/LL), FVG zones, liquidity sweeps
-
-### 3. SentimentAnalyst
-**Focus:** News, social media, fear & greed index  
-**Outputs:** Sentiment score (-1 to 1), narrative momentum, crowd positioning
-
-### 4. OrderFlowAnalyst
-**Focus:** Order book depth, CVD, delta, tape reading  
-**Outputs:** Flow bias (bullish/bearish/neutral), absorption zones, delta trends
-
-### 5. DerivativesAnalyst
-**Focus:** Funding rates, open interest, options flow  
-**Outputs:** Positioning skew, leverage levels, options gamma exposure
-
-### 6. MacroAnalyst
-**Focus:** Economic events, correlations, risk regime  
-**Outputs:** Risk-on/risk-off regime, catalysts, cross-market correlations
-
-### 7. OnChainAnalyst
-**Focus:** Whale movements, exchange flows, supply dynamics  
-**Outputs:** Whale accumulation/distribution, exchange inflows/outflows
-
-### 8. CorrelationAnalyst
-**Focus:** Cross-asset correlations, regime detection  
-**Outputs:** Correlation regime, BTC correlation strength, divergences
+The goal is to find **high-conviction trading opportunities** with >65% confidence, clear risk parameters, and strong confluence across analysis dimensions.
 
 ---
 
-## STRUCTURED OUTPUT REQUIREMENT
+## ANALYSIS DIMENSIONS
 
-⚠️ **CRITICAL:** Each analyst MUST return structured JSON with `reasoning_trace` and `final_analysis`.
+You have access to comprehensive algorithmic tools that analyze multiple market dimensions:
 
-### Expected format for each analyst:
+### Technical Analysis Tool (`get_technical_analysis`)
+**Provides:** 
+- Trend direction and strength (EMA ribbon, Supertrend, Ichimoku)
+- Momentum indicators (RSI, MACD, Stochastic, CCI, ROC)
+- Volatility metrics (ATR, Bollinger Bands, Keltner Channels)
+- Volume analysis (VWAP, OBV, Volume Profile, Delta)
+- Support/resistance levels (Pivot Points, Volume Profile POC)
+- Overall bias with confidence score
 
-```json
-{
-  "reasoning_trace": [
-    {
-      "step_number": 1,
-      "step_name": "assess_context",
-      "observation": "I need to analyze BTC/USDT on the 4h timeframe",
-      "tool_used": null,
-      "tool_result_summary": null,
-      "conclusion": "Starting analysis - need current price data"
-    },
-    {
-      "step_number": 2,
-      "step_name": "gather_price_data",
-      "observation": "Current price is $42,000, 24h change +2.3%",
-      "tool_used": "get_price",
-      "tool_result_summary": "BTC/USDT: $42,000, volume normal",
-      "conclusion": "Price stable, need HTF trend context"
-    }
-    // ... more steps (3-7 typical)
-  ],
-  "final_analysis": {
-    "direction": "bullish|bearish|neutral",
-    "confidence": 0.75,
-    "key_findings": [
-      "HTF uptrend intact since October",
-      "Support test at $40k zone (3 touches)",
-      "RSI recovery from oversold"
-    ],
-    "supporting_factors": ["HTF structure", "tested support", "momentum recovery"],
-    "risk_factors": ["Macro uncertainty", "Resistance at $44k"],
-    "rationale": "Strong HTF uptrend with LTF pullback to tested support. Confluence at $40k. Risk:reward favorable for long entry."
-  }
-}
+### SMC Analysis Tool (`get_smc_analysis`)
+**Provides:**
+- Market structure (HH/HL/LH/LL progression)
+- Fair Value Gaps (bullish and bearish)
+- Order Blocks (demand and supply zones)
+- Liquidity zones (equal highs/lows)
+- Swing points and key levels
+- SMC bias with setup quality score
+
+### Market Analysis Tool (`get_market_analysis`)
+**Provides:**
+- Cumulative Volume Delta (CVD) with divergence detection
+- Large trade detection (whale activity >$100K)
+- Orderbook imbalance and pressure
+- Buy/sell pressure metrics
+- Order walls detection
+- Tick speed and activity analysis
+- Market flow bias with confidence
+
+---
+
+## ANALYSIS WORKFLOW
+
+⚠️ **YOUR WORKFLOW:**
+
+1. **Call analysis tools** — Use get_technical_analysis, get_smc_analysis, get_market_analysis
+2. **Review tool outputs** — Each tool returns comprehensive structured data
+3. **Identify confluence** — Find agreement across technical, SMC, and flow analysis
+4. **Assess signal quality** — Does this meet publication criteria?
+5. **Make decision** — Publish or skip?
+6. **Output structured synthesis** — Return synthesis_steps + decision + conflicts
+
+### Tool Output Format:
+
+Each tool returns human-readable text with structured analysis. Example:
+
+**get_technical_analysis output:**
+```
+TECHNICAL ANALYSIS - BTC/USDT
+Timeframe: 4h
+Timestamp: 2025-11-27 10:00:00
+
+OVERALL BIAS: BULLISH (Strength: 0.72)
+Trend: Uptrend (Strong)
+
+MOMENTUM INDICATORS:
+- RSI(14): 58.3 [Neutral - recovering from oversold]
+- MACD: Bullish crossover (histogram positive, expanding)
+- Stochastic: 62.1 [Neutral zone]
+
+VOLATILITY:
+- ATR: 2.3% (Normal regime)
+- Bollinger Bands: Price at middle band, room to expand upward
+
+KEY LEVELS:
+Support: $40,000 (strong), $38,500 (backup)
+Resistance: $44,000 (tested), $46,500 (major)
+
+VOLUME:
+- Above-average volume on recent bounce
+- VWAP: $41,200 (price above VWAP = bullish)
 ```
 
 ---
 
 ## SYNTHESIS REQUIREMENTS
 
-After all 8 analysts complete, **OpportunitySynthesizer** MUST:
+After calling analysis tools, you MUST:
 
-1. **Review all analyst outputs** — Parse reasoning traces and final analyses
-2. **Count consensus** — How many analysts agree on direction? (bullish vs bearish vs neutral)
-3. **Calculate weighted confidence** — Apply analyst weights to get weighted average
-4. **Identify conflicts** — Document any disagreements or contradictions
-5. **Resolve conflicts** — Apply tie-breaker rules (HTF dominates LTF, higher confidence prioritized)
+1. **Review all tool outputs** — Parse technical, SMC, and market analysis results
+2. **Identify confluence** — Do multiple analysis dimensions agree on direction?
+3. **Calculate overall confidence** — Based on signal strength across dimensions
+4. **Identify conflicts** — Document any disagreements between analysis types
+5. **Resolve conflicts** — Apply reasoning (e.g., technical + SMC consensus vs weak sentiment)
 6. **Assess signal quality** — Does this meet publication criteria?
 7. **Make decision** — Publish or skip?
 8. **Output structured synthesis** — Return synthesis_steps + decision + conflicts
@@ -117,95 +114,82 @@ After all 8 analysts complete, **OpportunitySynthesizer** MUST:
 ### Decision Criteria:
 
 ✅ **PUBLISH IF:**
-- 5+ analysts agree on direction (consensus threshold)
-- Weighted confidence >65%
-- Clear entry/stop/target levels defined
+- Strong confluence across 2+ analysis dimensions (e.g., technical + SMC both bullish)
+- Overall confidence >65%
+- Clear entry/stop/target levels defined from key levels
 - Risk:Reward ratio >2:1
 - No unresolved critical conflicts
 
 ❌ **SKIP IF:**
-- <5 consensus (insufficient agreement)
+- Weak or conflicting signals across dimensions
 - Confidence <65% (too uncertain)
-- Conflicts unresolved (contradictory signals)
-- Unclear risk parameters (can't define stops/targets)
+- Conflicts unresolved (contradictory signals with no clear resolution)
+- Unclear risk parameters (can't define stops/targets from levels)
 - Poor risk:reward (<2:1)
 
-### OpportunitySynthesizer Output Format:
+### Your Output Format:
 
 ```json
 {
   "synthesis_steps": [
     {
-      "step_name": "review_inputs",
-      "input_data": { /* all 8 analyst summaries */ },
-      "observation": "Received 8 analyst inputs, all completed successfully",
+      "step_name": "call_technical_analysis",
+      "input_data": { "symbol": "BTC/USDT", "timeframe": "4h" },
+      "observation": "Called get_technical_analysis - received comprehensive indicator data",
       "calculation": null,
-      "conclusion": "Proceeding to consensus calculation"
+      "conclusion": "Technical bias: BULLISH (0.72 confidence), uptrend confirmed, RSI recovering"
     },
     {
-      "step_name": "count_consensus",
-      "input_data": { "bullish": 5, "bearish": 1, "neutral": 2 },
-      "observation": "5/8 analysts signal bullish direction",
+      "step_name": "call_smc_analysis",
+      "input_data": { "symbol": "BTC/USDT", "timeframe": "4h" },
+      "observation": "Called get_smc_analysis - received market structure and zones",
       "calculation": null,
-      "conclusion": "Strong bullish consensus (62.5%)"
+      "conclusion": "SMC bias: BULLISH (0.68 confidence), bullish structure, key demand zone at $40k"
+    },
+    {
+      "step_name": "call_market_analysis",
+      "input_data": { "symbol": "BTC/USDT" },
+      "observation": "Called get_market_analysis - received order flow and whale data",
+      "calculation": null,
+      "conclusion": "Market flow: BULLISH (0.65 confidence), positive CVD, whale accumulation detected"
+    },
+    {
+      "step_name": "identify_confluence",
+      "input_data": { "technical": "bullish", "smc": "bullish", "flow": "bullish" },
+      "observation": "All 3 analysis dimensions agree on bullish direction",
+      "calculation": null,
+      "conclusion": "Strong confluence - technical, SMC, and flow all bullish"
     },
     {
       "step_name": "calculate_confidence",
-      "input_data": { /* weighted analyst confidences */ },
-      "observation": "Applying analyst weights: market=30%, smc=20%, sentiment=15%, ...",
-      "calculation": "0.78×0.30 + 0.65×0.20 + 0.70×0.15 + ... = 0.654",
-      "conclusion": "Weighted confidence = 65.4% (meets 65% threshold)"
+      "input_data": { "technical": 0.72, "smc": 0.68, "flow": 0.65 },
+      "observation": "Averaging confidence scores across dimensions",
+      "calculation": "(0.72 + 0.68 + 0.65) / 3 = 0.683",
+      "conclusion": "Overall confidence = 68.3% (exceeds 65% threshold)"
     },
     {
-      "step_name": "identify_conflicts",
-      "input_data": { "conflicting": ["macro_analyst"] },
-      "observation": "Macro analyst bearish while 5 others bullish",
-      "calculation": null,
-      "conclusion": "Single dissenting view from macro, needs resolution"
-    },
-    {
-      "step_name": "resolve_conflicts",
-      "input_data": { "resolution": "htf_technical_dominates" },
-      "observation": "5 HTF technical analysts vs 1 macro fundamental view",
-      "calculation": null,
-      "conclusion": "Resolved: HTF technical consensus dominates single macro dissent for swing trade"
-    },
-    {
-      "step_name": "assess_signal",
-      "input_data": { "entry": 42000, "stop": 40000, "target": 46000, "rr": 2.0 },
-      "observation": "Entry $42k, stop $40k (-4.8%), target $46k (+9.5%), R:R = 2.0",
+      "step_name": "define_levels",
+      "input_data": { "entry": 42000, "stop": 40000, "target": 46000 },
+      "observation": "Entry at current, stop below demand zone, target at resistance",
       "calculation": "R:R = (46000-42000)/(42000-40000) = 2.0",
-      "conclusion": "Risk parameters well-defined, R:R acceptable"
-    },
-    {
-      "step_name": "define_parameters",
-      "input_data": { /* trade parameters */ },
-      "observation": "All critical parameters defined by analyst consensus",
-      "calculation": null,
-      "conclusion": "Trade parameters complete and actionable"
+      "conclusion": "Risk parameters well-defined, R:R = 2.0"
     },
     {
       "step_name": "make_decision",
       "input_data": { "criteria_met": true },
-      "observation": "All publication criteria satisfied",
+      "observation": "All criteria met: confluence ✓, confidence >65% ✓, R:R >2 ✓",
       "calculation": null,
       "conclusion": "DECISION: PUBLISH opportunity"
     }
   ],
   "decision": {
     "action": "publish",
-    "consensus_count": 5,
-    "weighted_confidence": 0.654,
+    "consensus_count": 3,
+    "weighted_confidence": 0.683,
     "conflicts_resolved": true,
-    "rationale": "Strong bullish consensus (5/8 analysts), weighted confidence 65.4% meets threshold, macro risk noted but secondary to HTF technical setup. Clear risk parameters with R:R 2.0. Publishing opportunity."
+    "rationale": "Strong bullish confluence across all analysis dimensions (technical + SMC + flow). Confidence 68.3% exceeds threshold. Clear levels with R:R 2.0. Demand zone at $40k provides strong support."
   },
-  "conflicts": [
-    {
-      "conflicting_analysts": ["macro_analyst"],
-      "conflict_type": "direction",
-      "resolution_method": "HTF technical consensus (5 analysts) dominates single macro fundamental dissent for swing trade timeframe"
-    }
-  ]
+  "conflicts": []
 }
 ```
 
@@ -213,30 +197,27 @@ After all 8 analysts complete, **OpportunitySynthesizer** MUST:
 
 ## QUALITY PRINCIPLES
 
-### Every analyst MUST:
+### You MUST:
 
-✅ Use tools iteratively (don't guess, gather data step-by-step)  
-✅ Think step-by-step (document each reasoning step in reasoning_trace)  
-✅ Return structured output (JSON with reasoning_trace + final_analysis)  
-✅ Express confidence honestly (0-1 scale, calibrated to historical accuracy)  
-✅ Identify key risks (not just bullish/bearish, but what could invalidate)
-
-### OpportunitySynthesizer MUST:
-
-✅ Review ALL 8 analyst reasoning traces (not just conclusions)  
-✅ Calculate consensus and weighted confidence transparently (show formula)  
-✅ Document conflicts and resolution method explicitly  
-✅ Only publish high-quality signals (5+ consensus, >65% confidence, clear levels)  
+✅ Call all 3 analysis tools (technical, SMC, market analysis)  
+✅ Think step-by-step (document each step in synthesis_steps)  
+✅ Look for confluence across dimensions (don't rely on single source)  
+✅ Express confidence honestly (based on signal strength and confluence)  
+✅ Identify key risks (what could invalidate the setup)  
+✅ Calculate confidence transparently (show formula in synthesis_steps)  
+✅ Only publish high-quality signals (strong confluence, >65% confidence, clear levels)  
 ✅ Skip low-quality signals (be honest when setup doesn't meet criteria)
 
 ---
 
 ## EXECUTION
 
-Begin comprehensive multi-dimensional analysis.
+Begin comprehensive analysis by calling analysis tools.
 
-**Phase 1:** All 8 analysts work independently and simultaneously  
-**Phase 2:** OpportunitySynthesizer reviews outputs and synthesizes decision
+**Step 1:** Call get_technical_analysis, get_smc_analysis, get_market_analysis  
+**Step 2:** Review tool outputs and identify confluence  
+**Step 3:** Calculate overall confidence and define trade parameters  
+**Step 4:** Make decision (publish or skip)
 
 **Think comprehensively. Be rigorous. Only publish high-quality opportunities.**
 
