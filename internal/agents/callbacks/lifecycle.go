@@ -19,7 +19,7 @@ type CostCheckFunc func(userID string) (bool, error)
 func CostTrackingBeforeCallback(checkLimit CostCheckFunc) agent.BeforeAgentCallback {
 	return func(ctx agent.CallbackContext) (*genai.Content, error) {
 		// Store start time in temporary state using helper
-		state.SetTempStartTime(ctx.State(), time.Now())
+		_ = state.SetTempStartTime(ctx.State(), time.Now()) // Ignore state set errors
 
 		// Check if user has exceeded daily cost limit
 		if checkLimit != nil {

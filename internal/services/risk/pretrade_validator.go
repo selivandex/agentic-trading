@@ -130,4 +130,3 @@ func (v *PreTradeValidator) calculateRR(plan *TradePlan) float64 {
 
 	return reward / risk
 }
-

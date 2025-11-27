@@ -172,5 +172,3 @@ func (r *MacroRepository) GetHighImpactEvents(ctx context.Context, from time.Tim
 
 	return events, nil
 }
-
-

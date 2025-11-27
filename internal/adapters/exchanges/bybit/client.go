@@ -544,7 +544,7 @@ func (c *client) publicGet(ctx context.Context, path string, params url.Values, 
 }
 
 func (c *client) privateRequest(ctx context.Context, method, path string, params url.Values, payload map[string]interface{}, target interface{}) error {
-	c.ensureCredentials()
+	_ = c.ensureCredentials() // Ignore error - will fail on actual API call if credentials invalid
 	_, body, err := c.doRequest(ctx, method, path, params, payload, true)
 	if err != nil {
 		return err

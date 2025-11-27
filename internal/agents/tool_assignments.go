@@ -3,27 +3,20 @@ package agents
 import "prometheus/internal/tools"
 
 // AgentToolCategories defines the tool categories each agent can access.
+// Phase 2 refactoring: Removed 8 analyst agents - analysis now done via algorithmic tools
 var AgentToolCategories = map[AgentType][]string{
-	// Analysts - get memory tools to save their analysis via CoT
-	AgentMarketAnalyst:      {"market_data", "momentum", "volatility", "trend", "volume", "smc", "memory"},
-	AgentSMCAnalyst:         {"market_data", "smc", "memory"},
-	AgentSentimentAnalyst:   {"sentiment", "memory"},
-	AgentOnChainAnalyst:     {"onchain", "memory"},
-	AgentMacroAnalyst:       {"macro", "memory"},
-	AgentOrderFlowAnalyst:   {"market_data", "order_flow", "memory"},
-	AgentDerivativesAnalyst: {"market_data", "derivatives", "memory"},
-	AgentCorrelationAnalyst: {"market_data", "correlation", "memory"},
-
-	// Decision makers - also need memory for saving plans and decisions
+	// Personal trading workflow agents (per-user decision making)
 	AgentStrategyPlanner: {"market_data", "account", "risk", "memory"},
 	AgentRiskManager:     {"account", "risk", "memory"},
 	AgentExecutor:        {"account", "execution", "memory"},
 	AgentPositionManager: {"account", "execution", "memory"},
 	AgentSelfEvaluator:   {"evaluation", "memory"},
 
-	// Market research and portfolio management
-	AgentOpportunitySynthesizer: {"market_data", "memory"}, // No execution tools, only publishes signals
-	AgentPortfolioArchitect:     {"market_data", "momentum", "correlation", "account", "memory"},
+	// Market research agent (global opportunity identification)
+	AgentOpportunitySynthesizer: {"market_data", "smc", "memory"}, // Direct access to technical, SMC, and market analysis tools
+
+	// Portfolio management agent (onboarding)
+	AgentPortfolioArchitect: {"market_data", "momentum", "correlation", "account", "memory"},
 }
 
 // AgentToolMap resolves tool names per agent by filtering the global catalog by category.

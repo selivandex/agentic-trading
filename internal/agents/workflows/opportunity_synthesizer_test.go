@@ -75,8 +75,8 @@ func TestOpportunitySynthesizerOutputFormat_PublishScenario(t *testing.T) {
 			{
 				"step_name": "make_decision",
 				"input_data": map[string]interface{}{
-					"consensus_met":     true,
-					"confidence_met":    true,
+					"consensus_met":      true,
+					"confidence_met":     true,
 					"conflicts_resolved": true,
 				},
 				"observation": "All publication criteria satisfied: 6+ consensus ✓, confidence >65% ✓, conflicts resolved ✓",
@@ -207,7 +207,7 @@ func TestOpportunitySynthesizerOutputFormat_SkipScenario(t *testing.T) {
 // TestOpportunitySynthesizerCriteria documents the publication criteria
 func TestOpportunitySynthesizerCriteria(t *testing.T) {
 	criteria := map[string]interface{}{
-		"consensus_threshold":        5,  // At least 5 analysts must agree
+		"consensus_threshold":        5,    // At least 5 analysts must agree
 		"confidence_threshold":       0.65, // Weighted confidence > 65%
 		"required_levels":            []string{"entry", "stop_loss", "take_profit"},
 		"min_risk_reward":            2.0, // R:R must be > 2:1
@@ -244,4 +244,3 @@ func TestSynthesisStepNames(t *testing.T) {
 	// These are the allowed step_name values according to OpportunitySynthesizerOutputSchema
 	t.Logf("Expected synthesis step names: %v", expectedSteps)
 }
-

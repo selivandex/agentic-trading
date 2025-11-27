@@ -67,6 +67,3 @@ func (f *Factory) CreatePersonalTradingWorkflow() (agent.Agent, error) {
 	f.log.Info("Personal trading workflow created successfully")
 	return workflow, nil
 }
-
-
-

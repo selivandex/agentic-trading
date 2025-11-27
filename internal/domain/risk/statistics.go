@@ -78,7 +78,7 @@ func (c *StatsCalculator) CalculateStatsFromPositions(positions []position.Posit
 		// Use CurrentPrice as exit price for closed positions
 		// Return % = (ExitPrice - EntryPrice) / EntryPrice * 100
 		exitPrice := pos.CurrentPrice
-		
+
 		var returnPct decimal.Decimal
 		if pos.Side == position.PositionLong {
 			returnPct = exitPrice.Sub(pos.EntryPrice).Div(pos.EntryPrice).Mul(decimal.NewFromInt(100))
@@ -139,4 +139,3 @@ func (s *TradingStats) HasSufficientData() bool {
 func (s *TradingStats) IsPositiveExpectancy() bool {
 	return s.Expectancy.GreaterThan(decimal.Zero)
 }
-

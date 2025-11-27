@@ -1,9 +1,12 @@
 package tools
+
 import (
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
 func TestRegistry_RiskMetadata(t *testing.T) {
 	registry := NewRegistry()
 	t.Run("GetMetadata", func(t *testing.T) {
@@ -22,18 +25,18 @@ func TestRegistry_RiskMetadata(t *testing.T) {
 		assert.False(t, ok, "unknown tool should not be found")
 	})
 	t.Run("GetRiskLevel", func(t *testing.T) {
-		// Test various risk levels
-		assert.Equal(t, RiskLevelNone, registry.GetRiskLevel("get_price"))
-		assert.Equal(t, RiskLevelLow, registry.GetRiskLevel("get_balance"))
+		// Test various risk levels (updated after Phase 2 refactoring)
+		assert.Equal(t, RiskLevelNone, registry.GetRiskLevel("get_technical_analysis"))
+		assert.Equal(t, RiskLevelLow, registry.GetRiskLevel("get_account_status"))
 		assert.Equal(t, RiskLevelMedium, registry.GetRiskLevel("place_order"))
 		assert.Equal(t, RiskLevelCritical, registry.GetRiskLevel("emergency_close_all"))
 		// Unknown tool returns RiskLevelNone
 		assert.Equal(t, RiskLevelNone, registry.GetRiskLevel("unknown_tool"))
 	})
 	t.Run("IsHighRisk", func(t *testing.T) {
-		// Low/None risk tools
-		assert.False(t, registry.IsHighRisk("get_price"))
-		assert.False(t, registry.IsHighRisk("get_balance"))
+		// Low/None risk tools (updated after Phase 2 refactoring)
+		assert.False(t, registry.IsHighRisk("get_technical_analysis"))
+		assert.False(t, registry.IsHighRisk("get_account_status"))
 		assert.False(t, registry.IsHighRisk("place_order"))
 		// Critical risk tools
 		assert.True(t, registry.IsHighRisk("emergency_close_all"))
@@ -45,9 +48,10 @@ func TestRegistry_RiskMetadata(t *testing.T) {
 		assert.Contains(t, criticalTools, "emergency_close_all")
 		mediumTools := registry.ListByRiskLevel(RiskLevelMedium)
 		assert.Contains(t, mediumTools, "place_order")
+		// Updated after Phase 2 refactoring: get_price and rsi replaced with comprehensive tools
 		noneTools := registry.ListByRiskLevel(RiskLevelNone)
-		assert.Contains(t, noneTools, "get_price")
-		assert.Contains(t, noneTools, "rsi")
+		assert.Contains(t, noneTools, "get_technical_analysis")
+		assert.Contains(t, noneTools, "get_smc_analysis")
 		assert.NotEmpty(t, noneTools, "should have many read-only tools")
 	})
 	t.Run("Register and Get", func(t *testing.T) {
@@ -61,10 +65,12 @@ func TestRegistry_RiskMetadata(t *testing.T) {
 		assert.Equal(t, mockTool, retrieved)
 	})
 }
+
 // mockToolImpl is a minimal implementation of tool.Tool for testing
 type mockToolImpl struct {
 	name string
 }
+
 func (m *mockToolImpl) Name() string        { return m.name }
 func (m *mockToolImpl) Description() string { return "Test tool" }
 func (m *mockToolImpl) IsLongRunning() bool { return false }

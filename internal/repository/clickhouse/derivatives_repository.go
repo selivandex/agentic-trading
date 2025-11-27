@@ -221,5 +221,3 @@ func (r *DerivativesRepository) GetRecentOptionsFlows(ctx context.Context, symbo
 
 	return flows, nil
 }
-
-

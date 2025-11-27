@@ -2,61 +2,28 @@ package agents
 
 import (
 	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/agenttool"
 
-	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
 // CreateExpertTools creates agent-as-tool wrappers for specialized expert agents
 // These can be used by higher-level agents (like Strategy Planner) to consult experts
+//
+// NOTE: After Phase 2 refactoring, most analyst agents were removed and replaced with algorithmic tools.
+// This function is kept for future extensibility but currently returns an empty map.
+// Expert consultation can be re-enabled if needed by creating specialized agents for specific use cases.
 func (f *Factory) CreateExpertTools(provider, model string) (map[string]tool.Tool, error) {
 	log := logger.Get().With("component", "expert_tools")
 
 	expertTools := make(map[string]tool.Tool)
 
-	// Macro analyst expert
-	macroAgent, err := f.CreateAgentForUser(AgentMacroAnalyst, provider, model)
-	if err != nil {
-		log.Warnf("Failed to create macro analyst: %v", err)
-	} else {
-		expertTools["consult_macro_expert"] = agenttool.New(macroAgent, &agenttool.Config{
-			SkipSummarization: false, // Allow summarization for concise expert responses
-		})
-		log.Debug("Registered macro expert tool")
-	}
+	// Phase 2 refactoring: All analyst agents removed
+	// Expert tools disabled until specific use cases identified
+	// Previous expert tools (macro, onchain, correlation, derivatives) replaced by algorithmic tools:
+	// - get_technical_analysis (comprehensive indicators)
+	// - get_smc_analysis (Smart Money Concepts)
+	// - get_market_analysis (order flow, whale detection)
 
-	// On-chain analyst expert
-	onchainAgent, err := f.CreateAgentForUser(AgentOnChainAnalyst, provider, model)
-	if err != nil {
-		log.Warnf("Failed to create onchain analyst: %v", err)
-	} else {
-		expertTools["consult_onchain_expert"] = agenttool.New(onchainAgent, nil)
-		log.Debug("Registered onchain expert tool")
-	}
-
-	// Correlation analyst expert
-	correlationAgent, err := f.CreateAgentForUser(AgentCorrelationAnalyst, provider, model)
-	if err != nil {
-		log.Warnf("Failed to create correlation analyst: %v", err)
-	} else {
-		expertTools["consult_correlation_expert"] = agenttool.New(correlationAgent, nil)
-		log.Debug("Registered correlation expert tool")
-	}
-
-	// Derivatives analyst expert
-	derivativesAgent, err := f.CreateAgentForUser(AgentDerivativesAnalyst, provider, model)
-	if err != nil {
-		log.Warnf("Failed to create derivatives analyst: %v", err)
-	} else {
-		expertTools["consult_derivatives_expert"] = agenttool.New(derivativesAgent, nil)
-		log.Debug("Registered derivatives expert tool")
-	}
-
-	if len(expertTools) == 0 {
-		return nil, errors.New("no expert tools could be created")
-	}
-
-	log.Infof("Created %d expert agent tools", len(expertTools))
+	log.Info("Expert tools disabled (Phase 2 refactoring - use algorithmic tools instead)")
 	return expertTools, nil
 }

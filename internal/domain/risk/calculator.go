@@ -121,4 +121,3 @@ func (c *MarginCalculator) CalculateLiquidationPrice(
 	factor := one.Add(one.Div(leverageDec)).Sub(maintenanceMarginRate)
 	return entry.Mul(factor)
 }
-

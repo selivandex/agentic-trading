@@ -232,7 +232,7 @@ func (s *SessionService) domainEventToADKEvent(domainEvent *domainsession.Event)
 		// Deserialize stored content back to genai.Content
 		contentBytes, _ := json.Marshal(domainEvent.Content)
 		content = &genai.Content{}
-		json.Unmarshal(contentBytes, content)
+		_ = json.Unmarshal(contentBytes, content) // Ignore unmarshal errors for backward compatibility
 	}
 
 	// Convert usage metadata

@@ -21,7 +21,9 @@ type DatabaseConfigs struct {
 func LoadDatabaseConfigsFromEnv(t *testing.T) DatabaseConfigs {
 	t.Helper()
 
-	_ = godotenv.Load()
+	// Load .env.test for test environment, fallback to .env if not found
+	_ = godotenv.Load(".env.test")
+	_ = godotenv.Load() // Fallback to .env if .env.test doesn't exist
 
 	// Restrict parsing only to DB-related sections so other required fields
 	// (e.g. Kafka, Telegram) do not block integration tests.

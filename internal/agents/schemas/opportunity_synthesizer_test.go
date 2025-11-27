@@ -150,4 +150,3 @@ func TestOpportunitySynthesizerOutputSchema_SchemaStructure(t *testing.T) {
 		t.Errorf("Expected 3 required fields, got %d", len(OpportunitySynthesizerOutputSchema.Required))
 	}
 }
-

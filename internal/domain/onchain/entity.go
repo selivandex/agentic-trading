@@ -71,5 +71,3 @@ type MinerMetrics struct {
 	// Miner Position Index (MPI) - ratio of miner outflows to 1-year MA
 	MPI float64 `ch:"mpi"` // >2.0 = high selling pressure, <0.5 = accumulation
 }
-
-

@@ -1,14 +1,18 @@
 package shared
+
 import (
 	"context"
 	"time"
+
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
+
 // TimeoutMiddleware enforces per-call deadlines for tool execution
 type TimeoutMiddleware struct {
 	Timeout time.Duration
 }
+
 // WrapFunc sets a timeout on tool execution if configured
 func (m TimeoutMiddleware) WrapFunc(name, description string, fn ToolFunc) tool.Tool {
 	if m.Timeout <= 0 {

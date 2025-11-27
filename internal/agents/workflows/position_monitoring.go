@@ -37,5 +37,3 @@ func (f *Factory) CreatePositionMonitoringLoop(maxIterations uint) (agent.Agent,
 	f.log.Infof("Position monitoring loop created with max iterations: %d", maxIterations)
 	return monitoringLoop, nil
 }
-
-

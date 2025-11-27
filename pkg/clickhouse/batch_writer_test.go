@@ -61,7 +61,7 @@ func TestBatchWriter_FlushOnTimer(t *testing.T) {
 		Conn:         nil,
 		FlushFunc:    flushFunc,
 		TableName:    "test_table",
-		MaxBatchSize: 100,            // High enough to not trigger by size
+		MaxBatchSize: 100,                    // High enough to not trigger by size
 		MaxAge:       100 * time.Millisecond, // Short interval for testing
 	})
 
@@ -188,6 +188,3 @@ func TestBatchWriter_ConcurrentAdds(t *testing.T) {
 
 	assert.Equal(t, 50, totalItems, "All 50 items should be flushed")
 }
-
-
-

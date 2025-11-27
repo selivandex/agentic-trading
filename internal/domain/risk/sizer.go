@@ -6,11 +6,11 @@ import (
 
 // PositionSizer calculates appropriate position sizes based on risk parameters
 type PositionSizer struct {
-	riskPerTrade    decimal.Decimal // % of capital to risk per trade (e.g., 0.01 = 1%)
-	maxPositionPct  decimal.Decimal // max % of portfolio per position (e.g., 0.10 = 10%)
-	minPositionUSD  decimal.Decimal // minimum position size in USD
-	maxPositionUSD  decimal.Decimal // maximum position size in USD
-	useConfidenceScaling bool       // scale size by signal confidence?
+	riskPerTrade         decimal.Decimal // % of capital to risk per trade (e.g., 0.01 = 1%)
+	maxPositionPct       decimal.Decimal // max % of portfolio per position (e.g., 0.10 = 10%)
+	minPositionUSD       decimal.Decimal // minimum position size in USD
+	maxPositionUSD       decimal.Decimal // maximum position size in USD
+	useConfidenceScaling bool            // scale size by signal confidence?
 }
 
 // SizingInput contains parameters for position sizing calculation
@@ -24,13 +24,13 @@ type SizingInput struct {
 
 // SizingResult contains calculated position size
 type SizingResult struct {
-	Size          decimal.Decimal // position size in base currency
-	SizeUSD       decimal.Decimal // position size in USD
-	RiskAmount    decimal.Decimal // dollar amount at risk
-	RiskPercent   decimal.Decimal // % of portfolio at risk
-	WasReduced    bool            // was size reduced due to limits?
-	ReductionPct  decimal.Decimal // by how much (%)
-	Method        string          // sizing method used
+	Size         decimal.Decimal // position size in base currency
+	SizeUSD      decimal.Decimal // position size in USD
+	RiskAmount   decimal.Decimal // dollar amount at risk
+	RiskPercent  decimal.Decimal // % of portfolio at risk
+	WasReduced   bool            // was size reduced due to limits?
+	ReductionPct decimal.Decimal // by how much (%)
+	Method       string          // sizing method used
 }
 
 // NewPositionSizer creates a new position sizer
@@ -245,4 +245,3 @@ func (s *PositionSizer) CalculateKellySizeWithStats(
 		Method:       "kelly_criterion_25pct",
 	}
 }
-

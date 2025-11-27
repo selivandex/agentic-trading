@@ -137,4 +137,3 @@ type UserTradingStats struct {
 	AvgLoss    float64 // average losing trade %
 	SampleSize int     // number of trades
 }
-

@@ -42,11 +42,11 @@ type RiskDecision struct {
 	SizeWasReduced bool
 
 	// Risk metrics
-	RiskAmount        float64
-	RiskPercent       float64
-	RiskRewardRatio   float64
-	PortfolioMetrics  PortfolioMetrics
-	MarginRequired    float64
+	RiskAmount       float64
+	RiskPercent      float64
+	RiskRewardRatio  float64
+	PortfolioMetrics PortfolioMetrics
+	MarginRequired   float64
 
 	// Check results (for debugging and explanation)
 	Checks map[string]CheckResult
@@ -68,23 +68,23 @@ type CheckResult struct {
 
 // MarketData contains market context for risk evaluation
 type MarketData struct {
-	CurrentPrice      float64
-	Volume24h         float64
-	Volatility        float64 // current volatility (e.g., ATR)
-	AvgVolatility     float64 // average volatility
-	LiquidityScore    float64 // 0-1, based on orderbook depth
-	BidAskSpread      float64
-	LastUpdateTime    time.Time
+	CurrentPrice   float64
+	Volume24h      float64
+	Volatility     float64 // current volatility (e.g., ATR)
+	AvgVolatility  float64 // average volatility
+	LiquidityScore float64 // 0-1, based on orderbook depth
+	BidAskSpread   float64
+	LastUpdateTime time.Time
 }
 
 // Portfolio represents current portfolio state
 type Portfolio struct {
-	TotalValue       float64 // total portfolio value
-	AvailableBalance float64 // available balance (not in positions)
-	TotalExposure    float64 // sum of all position values
+	TotalValue       float64            // total portfolio value
+	AvailableBalance float64            // available balance (not in positions)
+	TotalExposure    float64            // sum of all position values
 	AssetExposure    map[string]float64 // exposure per asset
-	UsedMargin       float64 // margin used (for futures)
-	PeakValue        float64 // all-time high value (for drawdown)
+	UsedMargin       float64            // margin used (for futures)
+	PeakValue        float64            // all-time high value (for drawdown)
 	Positions        []position.Position
 }
 
@@ -108,13 +108,13 @@ type ValidationResult struct {
 
 // SizeResult from position sizer
 type SizeResult struct {
-	Size          float64 // final position size
-	SizeUSD       float64 // size in USD
-	RiskAmount    float64 // dollar amount at risk
-	RiskPercent   float64 // % of portfolio at risk
-	WasReduced    bool    // was size reduced from original?
-	ReductionPct  float64 // by how much (%)
-	Method        string  // "fixed_risk", "kelly", "fixed_pct"
+	Size         float64 // final position size
+	SizeUSD      float64 // size in USD
+	RiskAmount   float64 // dollar amount at risk
+	RiskPercent  float64 // % of portfolio at risk
+	WasReduced   bool    // was size reduced from original?
+	ReductionPct float64 // by how much (%)
+	Method       string  // "fixed_risk", "kelly", "fixed_pct"
 }
 
 // PortfolioCheckResult from portfolio checker
@@ -145,9 +145,9 @@ type CircuitBreakerStats struct {
 
 // MarketConditionResult from market conditioner
 type MarketConditionResult struct {
-	Acceptable bool   // are conditions acceptable?
-	Critical   bool   // is this a critical failure?
-	Message    string
+	Acceptable         bool // are conditions acceptable?
+	Critical           bool // is this a critical failure?
+	Message            string
 	VolatilityMultiple float64
 	LiquidityScore     float64
 	HighImpactEvent    *HighImpactEvent // if event detected
@@ -173,7 +173,7 @@ type MarginCheckResult struct {
 // TimeRuleResult from time-based rules check
 type TimeRuleResult struct {
 	Allowed  bool
-	Critical bool   // if true, blocks trade; if false, just warning
+	Critical bool // if true, blocks trade; if false, just warning
 	Message  string
 	Event    *HighImpactEvent // if blocked by event
 }
@@ -193,9 +193,9 @@ type RiskStatus struct {
 
 // TradeOutcome records the result of a trade for statistics
 type TradeOutcome struct {
-	UserID    string
-	Symbol    string
-	Direction string
+	UserID     string
+	Symbol     string
+	Direction  string
 	EntryPrice float64
 	ExitPrice  float64
 	Size       float64
@@ -212,4 +212,3 @@ type Impulse struct {
 	Direction string  // "up" or "down"
 	Magnitude float64 // % move
 }
-

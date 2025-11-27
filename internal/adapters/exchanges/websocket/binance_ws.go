@@ -141,7 +141,7 @@ func (c *BinanceWSClient) Disconnect() error {
 		}
 
 		// Close underlying connection
-		c.conn.Close()
+		_ = c.conn.Close() // Ignore close error on reconnect
 		c.conn = nil
 	}
 

@@ -59,3 +59,19 @@ func (h *PostgresTestHelper) Rollback() {
 	_ = h.tx.Rollback()
 	h.rolledBack = true
 }
+
+// Close is an alias for Rollback for backward compatibility
+func (h *PostgresTestHelper) Close() {
+	h.Rollback()
+}
+
+// NewTestPostgres creates a test postgres helper with config loaded from .env.test
+// This is a convenience wrapper for NewPostgresTestHelper with default test config
+func NewTestPostgres(t *testing.T) *PostgresTestHelper {
+	t.Helper()
+
+	// Load database configs from .env.test (uses godotenv internally)
+	dbConfigs := LoadDatabaseConfigsFromEnv(t)
+
+	return NewPostgresTestHelper(t, dbConfigs.Postgres)
+}

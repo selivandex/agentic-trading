@@ -1,8 +1,10 @@
 package indicators
+
 import (
 	"prometheus/internal/domain/market_data"
 	"prometheus/pkg/errors"
 )
+
 // TalibData holds OHLCV data in format expected by ta-lib
 type TalibData struct {
 	Open   []float64
@@ -11,6 +13,7 @@ type TalibData struct {
 	Close  []float64
 	Volume []float64
 }
+
 // PrepareData converts domain OHLCV candles to ta-lib format
 // Returns separate slices for each price component
 func PrepareData(candles []market_data.OHLCV) (*TalibData, error) {
@@ -36,6 +39,7 @@ func PrepareData(candles []market_data.OHLCV) (*TalibData, error) {
 	}
 	return data, nil
 }
+
 // PrepareCloses extracts only close prices (for simple indicators like RSI, EMA)
 func PrepareCloses(candles []market_data.OHLCV) ([]float64, error) {
 	if len(candles) == 0 {
@@ -49,6 +53,7 @@ func PrepareCloses(candles []market_data.OHLCV) ([]float64, error) {
 	}
 	return closes, nil
 }
+
 // GetLastValue returns the most recent value from ta-lib output
 // ta-lib returns full array, we typically only need the latest value
 func GetLastValue(values []float64) (float64, error) {
@@ -58,6 +63,7 @@ func GetLastValue(values []float64) (float64, error) {
 	// Last value in array is the most recent
 	return values[len(values)-1], nil
 }
+
 // GetLastNValues returns last N values from ta-lib output
 func GetLastNValues(values []float64, n int) ([]float64, error) {
 	if len(values) == 0 {
@@ -70,6 +76,7 @@ func GetLastNValues(values []float64, n int) ([]float64, error) {
 	start := len(values) - n
 	return values[start:], nil
 }
+
 // ValidateMinLength checks if we have enough data for indicator calculation
 func ValidateMinLength(candles []market_data.OHLCV, minLength int, indicatorName string) error {
 	if len(candles) < minLength {

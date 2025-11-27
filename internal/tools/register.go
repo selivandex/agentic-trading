@@ -2,6 +2,7 @@ package tools
 
 import (
 	"prometheus/internal/events"
+	"prometheus/internal/tools/evaluation"
 	"prometheus/internal/tools/indicators"
 	"prometheus/internal/tools/market"
 	toolmemory "prometheus/internal/tools/memory"
@@ -76,6 +77,14 @@ func RegisterAllTools(registry *Registry, deps shared.Deps, workerPublisher *eve
 	registry.Register("search_memory", toolmemory.NewSearchMemoryTool(deps))
 	registry.Register("save_memory", toolmemory.NewSaveMemoryTool(deps)) // Universal: analysis, insights, observations
 	log.Debug("Registered memory tools")
+
+	// ========================================
+	// Evaluation Tools (for SelfEvaluator agent)
+	// ========================================
+	registry.Register("get_strategy_stats", evaluation.NewGetStrategyStatsTool(deps))
+	registry.Register("get_trade_journal", evaluation.NewGetTradeJournalTool(deps))
+	log.Debug("Registered evaluation tools")
+
 	// Expert agent tools will be registered separately after agent factory initialization
 	log.Infof("Tool registration complete: %d tools available", len(registry.List()))
 }

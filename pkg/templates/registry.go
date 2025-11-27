@@ -164,7 +164,12 @@ func (r *Registry) loadTemplate(path string) error {
 		"mul":   func(a, b float64) float64 { return a * b },
 		"add":   func(a, b float64) float64 { return a + b },
 		"sub":   func(a, b float64) float64 { return a - b },
-		"div":   func(a, b float64) float64 { if b != 0 { return a / b }; return 0 },
+		"div": func(a, b float64) float64 {
+			if b != 0 {
+				return a / b
+			}
+			return 0
+		},
 	}).Parse(string(content))
 	if err != nil {
 		return errors.Wrapf(err, "parse template %s", id)

@@ -1,14 +1,18 @@
 package shared
+
 import (
 	"time"
+
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
+
 // RetryMiddleware retries tool execution on error with optional backoff
 type RetryMiddleware struct {
 	Attempts int
 	Backoff  time.Duration
 }
+
 // WrapFunc wraps a tool function with retry logic
 func (m RetryMiddleware) WrapFunc(name, description string, fn ToolFunc) tool.Tool {
 	attempts := m.Attempts

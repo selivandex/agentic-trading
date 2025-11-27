@@ -123,4 +123,3 @@ func (r *CorrelationRepository) ClearCache() {
 	r.cacheTTL = 0
 	r.log.Debug("Correlation cache cleared")
 }
-

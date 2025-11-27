@@ -1,0 +1,70 @@
+📊 TRADING STATISTICS — {{.UserID}}
+Timeframe: {{.Timeframe}}
+{{.CalculatedAt}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 PERFORMANCE OVERVIEW
+
+  Total Trades:     {{.TotalTrades}}
+  Winning Trades:   {{.WinningTrades}} ✅
+  Losing Trades:    {{.LosingTrades}} ❌
+  Win Rate:         {{printf "%.1f" (mul .WinRate 100)}}%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 PROFIT & LOSS
+
+  Total P&L:        ${{printf "%.2f" .TotalPnL}}{{if gt .TotalPnL 0}} ✅{{else if lt .TotalPnL 0}} ❌{{end}}
+  Average P&L:      ${{printf "%.2f" .AvgPnL}}
+  
+  Average Win:      ${{printf "%.2f" .AvgWin}}
+  Average Loss:     ${{printf "%.2f" .AvgLoss}}
+  
+  Max Win:          ${{printf "%.2f" .MaxWin}} 🎯
+  Max Loss:         ${{printf "%.2f" .MaxLoss}} ⚠️
+  
+  Profit Factor:    {{printf "%.2f" .ProfitFactor}}{{if gt .ProfitFactor 2.0}} 🔥{{else if gt .ProfitFactor 1.5}} ✅{{else if lt .ProfitFactor 1.0}} ❌{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️ TIMING
+
+  Average Hold Time: {{.AvgHoldTime}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 INTERPRETATION
+
+{{if eq .TotalTrades 0}}
+  No trades found for the selected timeframe.
+{{else}}
+  {{if gt .WinRate 0.6}}
+  ✅ Strong win rate (>60%) indicates good trade selection.
+  {{else if gt .WinRate 0.5}}
+  ⚠️ Win rate above 50% but room for improvement.
+  {{else}}
+  ❌ Win rate below 50% - review entry criteria and risk management.
+  {{end}}
+  
+  {{if gt .ProfitFactor 2.0}}
+  ✅ Excellent profit factor (>2.0) - winners significantly outweigh losers.
+  {{else if gt .ProfitFactor 1.5}}
+  ✅ Good profit factor (>1.5) - positive risk/reward ratio.
+  {{else if gt .ProfitFactor 1.0}}
+  ⚠️ Profit factor >1.0 but modest - consider improving R:R ratio.
+  {{else}}
+  ❌ Profit factor <1.0 - losses exceed wins. Review strategy urgently.
+  {{end}}
+  
+  {{if gt .TotalPnL 0}}
+  ✅ Positive total P&L - strategy is profitable over this period.
+  {{else if lt .TotalPnL 0}}
+  ❌ Negative total P&L - strategy needs optimization or halt.
+  {{else}}
+  ⚠️ Breakeven performance - no edge detected.
+  {{end}}
+{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

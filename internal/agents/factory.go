@@ -210,23 +210,6 @@ func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
 		return nil, schemas.StrategyPlannerOutputSchema
 	case AgentOpportunitySynthesizer:
 		return nil, schemas.OpportunitySynthesizerOutputSchema
-	// All 8 analyst agents with structured CoT
-	case AgentMarketAnalyst:
-		return nil, schemas.MarketAnalystOutputSchema
-	case AgentSMCAnalyst:
-		return nil, schemas.SMCAnalystOutputSchema
-	case AgentSentimentAnalyst:
-		return nil, schemas.SentimentAnalystOutputSchema
-	case AgentOrderFlowAnalyst:
-		return nil, schemas.OrderFlowAnalystOutputSchema
-	case AgentDerivativesAnalyst:
-		return nil, schemas.DerivativesAnalystOutputSchema
-	case AgentMacroAnalyst:
-		return nil, schemas.MacroAnalystOutputSchema
-	case AgentOnChainAnalyst:
-		return nil, schemas.OnChainAnalystOutputSchema
-	case AgentCorrelationAnalyst:
-		return nil, schemas.CorrelationAnalystOutputSchema
 	default:
 		return nil, nil
 	}

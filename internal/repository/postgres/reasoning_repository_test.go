@@ -30,16 +30,16 @@ func TestReasoningRepository_Create(t *testing.T) {
 	// Create test reasoning log
 	reasoningSteps := []map[string]interface{}{
 		{
-			"step":        1,
-			"action":      "thinking",
-			"content":     "Analyzing market conditions",
-			"timestamp":   time.Now().Format(time.RFC3339),
+			"step":      1,
+			"action":    "thinking",
+			"content":   "Analyzing market conditions",
+			"timestamp": time.Now().Format(time.RFC3339),
 		},
 	}
 	reasoningStepsJSON, _ := json.Marshal(reasoningSteps)
 
 	decision := map[string]interface{}{
-		"action": "publish",
+		"action":     "publish",
 		"confidence": 0.75,
 	}
 	decisionJSON, _ := json.Marshal(decision)
@@ -170,18 +170,18 @@ func TestReasoningRepository_JSONBFields(t *testing.T) {
 	// Complex reasoning steps with nested structures
 	reasoningSteps := []map[string]interface{}{
 		{
-			"step":        1,
-			"action":      "tool_call",
-			"tool":        "get_price",
-			"input":       map[string]interface{}{"symbol": "BTC/USDT"},
-			"output":      map[string]interface{}{"price": 42000},
-			"timestamp":   time.Now().Format(time.RFC3339),
+			"step":      1,
+			"action":    "tool_call",
+			"tool":      "get_price",
+			"input":     map[string]interface{}{"symbol": "BTC/USDT"},
+			"output":    map[string]interface{}{"price": 42000},
+			"timestamp": time.Now().Format(time.RFC3339),
 		},
 		{
-			"step":        2,
-			"action":      "thinking",
-			"content":     "Price is above key level",
-			"timestamp":   time.Now().Format(time.RFC3339),
+			"step":      2,
+			"action":    "thinking",
+			"content":   "Price is above key level",
+			"timestamp": time.Now().Format(time.RFC3339),
 		},
 	}
 	reasoningStepsJSON, _ := json.Marshal(reasoningSteps)
@@ -191,8 +191,8 @@ func TestReasoningRepository_JSONBFields(t *testing.T) {
 		"confidence": 0.85,
 		"reasoning":  "Strong bullish signal",
 		"levels": map[string]interface{}{
-			"entry": 42000,
-			"stop":  41000,
+			"entry":  42000,
+			"stop":   41000,
 			"target": 44000,
 		},
 	}
@@ -233,4 +233,3 @@ func TestReasoningRepository_JSONBFields(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, float64(42000), levels["entry"])
 }
-

@@ -1,12 +1,15 @@
 package trading
+
 import (
-	"time"
-	"github.com/shopspring/decimal"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/errors"
+	"time"
+
+	"github.com/shopspring/decimal"
 	"google.golang.org/adk/tool"
 )
+
 // NewPlaceOrderTool creates a pending order record
 func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 	return shared.NewToolBuilder(

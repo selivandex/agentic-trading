@@ -1,8 +1,9 @@
 package risk
 
 import (
-	"github.com/google/uuid"
 	"prometheus/pkg/errors"
+
+	"github.com/google/uuid"
 )
 
 func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
@@ -30,6 +31,3 @@ func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
 func toUUID(raw interface{}) (uuid.UUID, error) {
 	return parseUUIDArg(raw, "id")
 }
-
-
-

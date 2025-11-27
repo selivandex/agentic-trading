@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -26,6 +24,7 @@ import (
 	redisclient "prometheus/internal/adapters/redis"
 	"prometheus/internal/agents"
 	"prometheus/internal/agents/workflows"
+	"prometheus/internal/api"
 	"prometheus/internal/api/health"
 	"prometheus/internal/consumers"
 	"prometheus/internal/domain/derivatives"
@@ -79,7 +78,9 @@ func main() {
 	if err := initLogger(cfg); err != nil {
 		panic("failed to init logger: " + err.Error())
 	}
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // Ignore error on shutdown
+	}()
 
 	log := logger.Get()
 	log.Infof("Starting %s in %s mode", cfg.App.Name, cfg.App.Env)
@@ -332,9 +333,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		addr := fmt.Sprintf(":%d", cfg.HTTP.Port)
-		log.Infof("Starting HTTP server on %s", addr)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpServer.Start(); err != nil {
 			log.Errorf("HTTP server failed: %v", err)
 			cancel() // Trigger shutdown on fatal HTTP error
 		}
@@ -550,7 +549,9 @@ func provideAgents(
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	modelCfg, modelInfo, err := selector.Get(ctx, string(agents.AgentMarketAnalyst), defaultProvider)
+	// Use OpportunitySynthesizer as default for model resolution
+	// It's the main market research agent and represents typical workload
+	modelCfg, modelInfo, err := selector.Get(ctx, string(agents.AgentOpportunitySynthesizer), defaultProvider)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "resolve default model")
 	}
@@ -1009,39 +1010,13 @@ func provideWorkers(
 	return scheduler
 }
 
-func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, log *logger.Logger) *http.Server {
-	mux := http.NewServeMux()
-
-	// Health check endpoints
-	mux.HandleFunc("/health", healthHandler.HandleHealth)
-	mux.HandleFunc("/ready", healthHandler.HandleReadiness)
-	mux.HandleFunc("/live", healthHandler.HandleLiveness)
-
-	// Prometheus metrics endpoint
-	mux.Handle("/metrics", metrics.Handler())
-
-	// Root endpoint (service info)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"service":"%s","version":"%s","status":"running"}`, cfg.App.Name, cfg.App.Version)
-	})
-
-	port := 8080
-	if cfg.HTTP.Port > 0 {
-		port = cfg.HTTP.Port
-	}
-
-	return &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, log *logger.Logger) *api.Server {
+	// HTTP server setup moved to internal/api (Clean Architecture)
+	return api.NewServer(api.ServerConfig{
+		Port:        cfg.HTTP.Port,
+		ServiceName: cfg.App.Name,
+		Version:     cfg.App.Version,
+	}, healthHandler, log)
 }
 
 // gracefulShutdown handles coordinated cleanup of all components
@@ -1058,7 +1033,7 @@ func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, log *l
 // 8. Close database connections (last - other components may need them)
 func gracefulShutdown(
 	wg *sync.WaitGroup,
-	httpServer *http.Server,
+	httpServer *api.Server,
 	workerScheduler *workers.Scheduler,
 	marketDataFactory exchanges.CentralFactory,
 	kafkaProducer *kafka.Producer,
@@ -1084,13 +1059,10 @@ func gracefulShutdown(
 	// We wait for graceful completion with timeouts
 
 	// Step 1: Stop accepting new HTTP requests (5s timeout)
-	log.Info("[1/7] Stopping HTTP server...")
 	httpCtx, httpCancel := context.WithTimeout(shutdownCtx, 5*time.Second)
 	defer httpCancel()
 	if err := httpServer.Shutdown(httpCtx); err != nil {
 		log.Error("HTTP server shutdown failed", "error", err)
-	} else {
-		log.Info("✓ HTTP server stopped")
 	}
 
 	// Step 2: Stop background workers (they check ctx.Done() in their loops)

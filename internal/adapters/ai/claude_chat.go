@@ -46,7 +46,7 @@ func (p *ClaudeProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	if err != nil {
 		return nil, errors.Wrap(err, "send claude request")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response
 	respBody, err := io.ReadAll(resp.Body)
@@ -185,7 +185,7 @@ func (p *ClaudeProvider) convertToClaude(req ChatRequest) claudeRequest {
 			}
 			for _, tc := range msg.ToolCalls {
 				var input map[string]interface{}
-				json.Unmarshal([]byte(tc.Function.Arguments), &input)
+				_ = json.Unmarshal([]byte(tc.Function.Arguments), &input) // Ignore unmarshal errors
 				contents = append(contents, claudeContent{
 					Type:  "tool_use",
 					ID:    tc.ID,

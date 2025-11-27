@@ -1,0 +1,52 @@
+📓 TRADE JOURNAL
+Status Filter: {{.Status}} | Limit: {{.Limit}} | Total: {{.TotalCount}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{if eq .TotalCount 0}}
+No trades found matching the criteria.
+{{else}}
+{{range $idx, $entry := .Entries}}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 TRADE #{{add (float64 $idx) 1.0 | printf "%.0f"}} — {{$entry.Symbol}} {{if eq $entry.Side "long"}}📈 LONG{{else}}📉 SHORT{{end}}
+
+  Trade ID:     {{$entry.TradeID}}
+  Status:       {{upper $entry.Status}}{{if eq $entry.Status "closed"}}{{if eq $entry.Outcome "win"}} ✅{{else if eq $entry.Outcome "loss"}} ❌{{else}} ⚖️{{end}}{{end}}
+  Opened:       {{$entry.OpenedAt}}
+  {{if $entry.ClosedAt}}Closed:       {{$entry.ClosedAt}}{{end}}
+  {{if $entry.HoldTime}}Hold Time:    {{$entry.HoldTime}}{{end}}
+
+💹 PRICES & P&L
+
+  Entry Price:  ${{printf "%.2f" $entry.EntryPrice}}
+  {{if $entry.ExitPrice}}Exit Price:   ${{printf "%.2f" $entry.ExitPrice}}{{end}}
+  {{if $entry.CurrentPrice}}Current:      ${{printf "%.2f" $entry.CurrentPrice}}{{end}}
+  Size:         {{printf "%.4f" $entry.Size}}
+  {{if $entry.Leverage}}Leverage:     {{$entry.Leverage}}x{{end}}
+
+  {{if $entry.PnL}}P&L:          ${{printf "%.2f" $entry.PnL}} ({{printf "%.2f" $entry.PnLPercent}}%){{if gt $entry.PnL 0}} ✅{{else if lt $entry.PnL 0}} ❌{{else}} ⚖️{{end}}{{end}}
+  {{if $entry.UnrealizedPnL}}Unrealized:   ${{printf "%.2f" $entry.UnrealizedPnL}} ({{printf "%.2f" $entry.UnrealizedPnLPercent}}%){{end}}
+
+🎯 RISK MANAGEMENT
+
+  {{if $entry.StopLoss}}Stop Loss:    ${{printf "%.2f" $entry.StopLoss}}{{else}}Stop Loss:    Not set ⚠️{{end}}
+  {{if $entry.TakeProfit}}Take Profit:  ${{printf "%.2f" $entry.TakeProfit}}{{else}}Take Profit:  Not set{{end}}
+
+{{if $entry.Reasoning}}
+📝 REASONING
+
+  {{$entry.Reasoning}}
+{{end}}
+
+{{if $entry.Lessons}}
+💡 LESSONS LEARNED
+
+  {{$entry.Lessons}}
+{{end}}
+
+{{end}}
+{{end}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
