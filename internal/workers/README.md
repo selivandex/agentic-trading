@@ -45,12 +45,63 @@ workers/
 ## Core Rules
 
 - **Context respect**: Always check `<-ctx.Done()` in loops, exit gracefully
-- **Graceful shutdown**: Implement `Stop()`, finish in-progress work, cleanup resources
+- **Graceful shutdown**: Check context in ALL processing loops (users, symbols, exchanges)
 - **Error handling**: Log errors, don't crash worker, implement retry with backoff
 - **Idempotency**: Workers may run twice, ensure operations are idempotent
 - **Rate limiting**: Respect exchange/API rate limits, use backoff
 - **Logging**: Structured logs with worker name, iteration count, duration
 - **Metrics**: Track execution count, duration, errors to ClickHouse
+
+### Critical: Context Checks in Processing Loops
+
+**Every worker MUST check context cancellation in ALL batch processing loops.**
+
+Workers often iterate over collections (users, symbols, exchanges, positions, etc.). If shutdown is triggered mid-iteration, the worker must stop immediately to allow clean shutdown within the 30-second timeout.
+
+**Pattern for single loop:**
+```go
+for _, item := range items {
+    // Check for context cancellation (graceful shutdown)
+    select {
+    case <-ctx.Done():
+        log.Info("Worker interrupted by shutdown", "processed", count)
+        return ctx.Err()
+    default:
+    }
+    
+    // Process item...
+}
+```
+
+**Pattern for nested loops:**
+```go
+for _, outer := range outerItems {
+    // Check context at outer loop
+    select {
+    case <-ctx.Done():
+        return ctx.Err()
+    default:
+    }
+    
+    for _, inner := range innerItems {
+        // Check context at inner loop too
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+        
+        // Process item...
+    }
+}
+```
+
+**Why this matters:**
+- OpportunityFinder with 10 symbols × 2min/workflow = 20 minutes without checks
+- OrderSync with 1000 users = potentially minutes to complete
+- TickerCollector with 5 exchanges × 10 symbols = 50 API calls
+
+Without context checks, shutdown can take MUCH longer than the 30s timeout, causing force kills and potential data loss.
 
 ## Worker Pattern
 
@@ -123,6 +174,37 @@ Log structured events:
 - Worker start/stop
 - Iteration complete (duration, records)
 - Errors with context
+
+## Graceful Shutdown Improvements (Nov 2025)
+
+Recent improvements to ensure clean shutdown within timeout:
+
+**Scheduler Enhancements:**
+- ✅ Increased shutdown timeout from 30s to 2 minutes to accommodate long-running operations
+- ✅ Fixed race condition in `Stop()` method with proper mutex handling
+- ✅ Clear timeout messages and structured error handling
+
+**OpportunityFinder:**
+- ✅ Added context cancellation checks in ADK runner event loop
+- ✅ Prevents hanging during long-running market research workflows (2-3 minutes per symbol)
+- ✅ Logs workflow state on interruption (symbol, session_id, opportunity published)
+
+**OHLCVCollector:**
+- ✅ Fixed `RateLimiter` goroutine leak by adding `Close()` method and stop channel
+- ✅ Improved shutdown logging with detailed progress (current symbol, timeframe, counts)
+- ✅ Enhanced visibility into collection state during graceful shutdown
+
+**All Workers:**
+- ✅ Context checks in nested processing loops (users, symbols, exchanges, positions)
+- ✅ Comprehensive shutdown logging with processed/remaining counts
+- ✅ No goroutine leaks, all background tasks respect context cancellation
+
+**Testing Checklist:**
+- [ ] Test shutdown during active OpportunityFinder ADK workflow execution
+- [ ] Verify all workers complete within 2-minute timeout
+- [ ] Check for goroutine leaks after shutdown (use `pprof`)
+- [ ] Validate Kafka event delivery during shutdown window
+- [ ] Test with high user/symbol counts to verify nested loop cancellation
 
 ## References
 

@@ -2,6 +2,7 @@ package consumers
 
 import (
 	"context"
+	"time"
 
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/events"
@@ -35,6 +36,16 @@ func NewAnalyticsConsumer(
 func (ac *AnalyticsConsumer) Start(ctx context.Context) error {
 	ac.log.Info("Starting analytics consumer...")
 
+	// Ensure consumer is closed on exit
+	defer func() {
+		ac.log.Info("Closing analytics consumer...")
+		if err := ac.consumer.Close(); err != nil {
+			ac.log.Error("Failed to close analytics consumer", "error", err)
+		} else {
+			ac.log.Info("✓ Analytics consumer closed")
+		}
+	}()
+
 	// Subscribe to analytics-worthy topics
 	topics := []string{
 		events.TopicOpportunityFound,
@@ -52,21 +63,31 @@ func (ac *AnalyticsConsumer) Start(ctx context.Context) error {
 	for {
 		msg, err := ac.consumer.ReadMessage(ctx)
 		if err != nil {
-			// Check if error is due to context cancellation
+			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {
 				ac.log.Info("Analytics consumer stopping (context cancelled)")
 				return nil
 			}
-			ac.log.Error("Failed to read analytics event", "error", err)
+			// Reader might be closed during shutdown, log at debug level
+			ac.log.Debug("Failed to read analytics event", "error", err)
 			continue
 		}
 
-		// Process message
-		if err := ac.handleMessage(ctx, msg); err != nil {
+		// Process message with timeout to prevent hanging during shutdown
+		// Allow up to 5s to complete current message processing
+		processCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := ac.handleMessage(processCtx, msg); err != nil {
 			ac.log.Error("Failed to handle analytics event",
 				"topic", msg.Topic,
 				"error", err,
 			)
+		}
+		cancel()
+
+		// Check if we should stop AFTER processing current message
+		if ctx.Err() != nil {
+			ac.log.Info("Analytics consumer stopping after processing current message")
+			return nil
 		}
 	}
 }

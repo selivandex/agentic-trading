@@ -9,6 +9,7 @@ import (
 	"prometheus/internal/domain/ai_usage"
 	"prometheus/pkg/clickhouse"
 	"prometheus/pkg/errors"
+	"prometheus/pkg/logger"
 )
 
 // AIUsageRepository implements ai_usage.Repository for ClickHouse
@@ -51,12 +52,30 @@ func (r *AIUsageRepository) Store(ctx context.Context, log *ai_usage.UsageLog) e
 	return r.batchWriter.Add(ctx, log)
 }
 
+// LogUsage is an alias for Store to implement UsageLogger interface
+func (r *AIUsageRepository) LogUsage(ctx context.Context, log interface{}) error {
+	usageLog, ok := log.(*ai_usage.UsageLog)
+	if !ok {
+		return errors.New("invalid log type: expected *ai_usage.UsageLog")
+	}
+	return r.Store(ctx, usageLog)
+}
+
 // flushBatch performs the actual batch insert to ClickHouse
+// This uses ClickHouse native batch protocol:
+// 1. PrepareBatch() creates a batch statement
+// 2. Append() adds rows to batch (in memory, no network I/O)
+// 3. Send() executes ONE batch INSERT for all rows
+//
+// Result: INSERT INTO ai_usage (...) VALUES (row1), (row2), ..., (rowN)
 func (r *AIUsageRepository) flushBatch(ctx context.Context, batch []interface{}) error {
 	if len(batch) == 0 {
 		return nil
 	}
 
+	log := logger.Get().With("component", "ai_usage_batch")
+
+	// This query template is used by PrepareBatch to generate batch INSERT
 	query := `
 		INSERT INTO ai_usage (
 			timestamp, event_id, user_id, session_id,
@@ -77,39 +96,48 @@ func (r *AIUsageRepository) flushBatch(ctx context.Context, batch []interface{})
 		)
 	`
 
-	// Prepare batch statement
+	start := time.Now()
+
+	// PrepareBatch creates a batch statement (not executed yet!)
 	stmt, err := r.conn.PrepareBatch(ctx, query)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare batch")
 	}
 	defer stmt.Close()
 
-	// Append all items to batch
+	// Append all items to batch (accumulates in memory)
+	validItems := 0
 	for _, item := range batch {
-		log, ok := item.(*ai_usage.UsageLog)
+		usageLog, ok := item.(*ai_usage.UsageLog)
 		if !ok {
-			continue // Skip invalid items
+			log.Warnf("Skipping invalid item type: %T", item)
+			continue
 		}
 
 		err := stmt.Append(
-			log.Timestamp, log.EventID, log.UserID, log.SessionID,
-			log.AgentName, log.AgentType,
-			log.Provider, log.ModelID, log.ModelFamily,
-			log.PromptTokens, log.CompletionTokens, log.TotalTokens,
-			log.InputCostUSD, log.OutputCostUSD, log.TotalCostUSD,
-			log.ToolCallsCount, log.IsCached, log.CacheHit,
-			log.LatencyMs, log.ReasoningStep, log.WorkflowName, log.CreatedAt,
+			usageLog.Timestamp, usageLog.EventID, usageLog.UserID, usageLog.SessionID,
+			usageLog.AgentName, usageLog.AgentType,
+			usageLog.Provider, usageLog.ModelID, usageLog.ModelFamily,
+			usageLog.PromptTokens, usageLog.CompletionTokens, usageLog.TotalTokens,
+			usageLog.InputCostUSD, usageLog.OutputCostUSD, usageLog.TotalCostUSD,
+			usageLog.ToolCallsCount, usageLog.IsCached, usageLog.CacheHit,
+			usageLog.LatencyMs, usageLog.ReasoningStep, usageLog.WorkflowName, usageLog.CreatedAt,
 		)
 
 		if err != nil {
 			return errors.Wrap(err, "failed to append to batch")
 		}
+		validItems++
 	}
 
-	// Execute batch
+	// Send() executes ONE batch INSERT for all rows
+	// Network call happens ONLY here, not in loop above
 	if err := stmt.Send(); err != nil {
 		return errors.Wrap(err, "failed to send batch")
 	}
+
+	duration := time.Since(start)
+	log.Infof("Batch inserted %d AI usage records in %v", validItems, duration)
 
 	return nil
 }

@@ -86,6 +86,17 @@ func (os *OrderSync) Run(ctx context.Context) error {
 	successCount := 0
 	errorCount := 0
 	for _, usr := range activeUsers {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			os.Log().Info("Order sync interrupted by shutdown",
+				"users_processed", successCount,
+				"users_remaining", len(activeUsers)-successCount-errorCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		if err := os.syncUserOrders(ctx, usr.ID); err != nil {
 			os.Log().Error("Failed to sync user orders",
 				"user_id", usr.ID,
@@ -128,6 +139,14 @@ func (os *OrderSync) syncUserOrders(ctx context.Context, userID uuid.UUID) error
 
 	// Process each exchange account
 	for accountID, accountOrders := range ordersByAccount {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			os.Log().Debug("Order sync for user interrupted by shutdown", "user_id", userID)
+			return ctx.Err()
+		default:
+		}
+
 		if err := os.syncAccountOrders(ctx, accountID, accountOrders); err != nil {
 			os.Log().Error("Failed to sync orders for account",
 				"account_id", accountID,
@@ -156,6 +175,14 @@ func (os *OrderSync) syncAccountOrders(ctx context.Context, accountID uuid.UUID,
 
 	// Sync each order
 	for _, ord := range orders {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			os.Log().Debug("Order sync for account interrupted by shutdown", "account_id", accountID)
+			return ctx.Err()
+		default:
+		}
+
 		if err := os.syncOrder(ctx, exchangeClient, ord); err != nil {
 			os.Log().Error("Failed to sync order",
 				"order_id", ord.ID,

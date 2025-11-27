@@ -13,16 +13,16 @@ import (
 
 // GetPortfolioSummaryOutput defines the output schema for portfolio summary
 type GetPortfolioSummaryOutput struct {
-	TotalEquityUSD      float64            `json:"total_equity_usd" description:"Total portfolio equity in USD"`
-	TotalPnLUSD         float64            `json:"total_pnl_usd" description:"Total unrealized PnL in USD"`
-	TotalPnLPercent     float64            `json:"total_pnl_percent" description:"Total PnL as percentage"`
-	OpenPositionsCount  int                `json:"open_positions_count" description:"Number of open positions"`
-	ExposureBySymbol    map[string]float64 `json:"exposure_by_symbol" description:"USD exposure per symbol"`
-	ExposureByExchange  map[string]float64 `json:"exposure_by_exchange" description:"USD exposure per exchange"`
-	LongExposure        float64            `json:"long_exposure" description:"Total long exposure USD"`
-	ShortExposure       float64            `json:"short_exposure" description:"Total short exposure USD"`
-	NetExposure         float64            `json:"net_exposure" description:"Net exposure (long - short)"`
-	DailyPnL            float64            `json:"daily_pnl" description:"PnL today"`
+	TotalEquityUSD     float64            `json:"total_equity_usd" description:"Total portfolio equity in USD"`
+	TotalPnLUSD        float64            `json:"total_pnl_usd" description:"Total unrealized PnL in USD"`
+	TotalPnLPercent    float64            `json:"total_pnl_percent" description:"Total PnL as percentage"`
+	OpenPositionsCount int                `json:"open_positions_count" description:"Number of open positions"`
+	ExposureBySymbol   map[string]float64 `json:"exposure_by_symbol" description:"USD exposure per symbol"`
+	ExposureByExchange map[string]float64 `json:"exposure_by_exchange" description:"USD exposure per exchange"`
+	LongExposure       float64            `json:"long_exposure" description:"Total long exposure USD"`
+	ShortExposure      float64            `json:"short_exposure" description:"Total short exposure USD"`
+	NetExposure        float64            `json:"net_exposure" description:"Net exposure (long - short)"`
+	DailyPnL           float64            `json:"daily_pnl" description:"PnL today"`
 }
 
 // NewGetPortfolioSummaryTool creates a tool for retrieving aggregated portfolio summary
@@ -53,21 +53,21 @@ func NewGetPortfolioSummaryTool(deps shared.Deps) tool.Tool {
 
 			// Convert to map for ADK tool response
 			return map[string]interface{}{
-				"total_equity_usd":      output.TotalEquityUSD,
-				"total_pnl_usd":         output.TotalPnLUSD,
-				"total_pnl_percent":     output.TotalPnLPercent,
-				"open_positions_count":  output.OpenPositionsCount,
-				"exposure_by_symbol":    output.ExposureBySymbol,
-				"exposure_by_exchange":  output.ExposureByExchange,
-				"long_exposure":         output.LongExposure,
-				"short_exposure":        output.ShortExposure,
-				"net_exposure":          output.NetExposure,
-				"daily_pnl":             output.DailyPnL,
+				"total_equity_usd":     output.TotalEquityUSD,
+				"total_pnl_usd":        output.TotalPnLUSD,
+				"total_pnl_percent":    output.TotalPnLPercent,
+				"open_positions_count": output.OpenPositionsCount,
+				"exposure_by_symbol":   output.ExposureBySymbol,
+				"exposure_by_exchange": output.ExposureByExchange,
+				"long_exposure":        output.LongExposure,
+				"short_exposure":       output.ShortExposure,
+				"net_exposure":         output.NetExposure,
+				"daily_pnl":            output.DailyPnL,
 			}, nil
 		},
 		deps,
 	).
-		WithTimeout(10 * time.Second).
+		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
 		Build()
 }
@@ -146,4 +146,3 @@ func (h *getPortfolioSummaryHandler) execute(ctx context.Context, userID interfa
 		DailyPnL:           dailyPnL,
 	}, nil
 }
-

@@ -53,8 +53,35 @@ func (oc *OHLCVCollector) Run(ctx context.Context) error {
 	totalCandles := 0
 
 	// For each symbol and timeframe, collect OHLCV data
-	for _, symbol := range oc.symbols {
-		for _, timeframe := range oc.timeframes {
+	for symbolIdx, symbol := range oc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			oc.Log().Info("OHLCV collection interrupted by shutdown",
+				"candles_collected", totalCandles,
+				"symbols_processed", symbolIdx,
+				"symbols_remaining", len(oc.symbols)-symbolIdx,
+				"current_symbol", symbol,
+			)
+			return ctx.Err()
+		default:
+		}
+
+		for tfIdx, timeframe := range oc.timeframes {
+			// Check for context cancellation within nested loop
+			select {
+			case <-ctx.Done():
+				oc.Log().Info("OHLCV collection interrupted by shutdown",
+					"candles_collected", totalCandles,
+					"symbols_processed", symbolIdx,
+					"current_symbol", symbol,
+					"current_timeframe", timeframe,
+					"timeframes_completed_for_symbol", tfIdx,
+				)
+				return ctx.Err()
+			default:
+			}
+
 			candles, err := oc.collectOHLCV(ctx, symbol, timeframe)
 			if err != nil {
 				oc.Log().Error("Failed to collect OHLCV",
@@ -170,11 +197,12 @@ func (oc *OHLCVCollector) retryWithBackoff(ctx context.Context, fn func() error,
 	return errors.Wrap(err, "max retries exceeded")
 }
 
-// RateLimiter implements a simple rate limiter
+// RateLimiter implements a simple rate limiter with graceful shutdown support
 type RateLimiter struct {
 	tokens     chan struct{}
 	refillRate time.Duration
 	capacity   int
+	stop       chan struct{} // Channel to signal shutdown to refill goroutine
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -183,6 +211,7 @@ func NewRateLimiter(capacity int, refillRate time.Duration) *RateLimiter {
 		tokens:     make(chan struct{}, capacity),
 		refillRate: refillRate,
 		capacity:   capacity,
+		stop:       make(chan struct{}),
 	}
 
 	// Fill initial tokens
@@ -206,17 +235,30 @@ func (rl *RateLimiter) Acquire(ctx context.Context) error {
 	}
 }
 
+// Close stops the rate limiter and cleans up the refill goroutine
+func (rl *RateLimiter) Close() {
+	close(rl.stop)
+}
+
 // refill refills tokens at the specified rate
+// Exits gracefully when Close() is called
 func (rl *RateLimiter) refill() {
 	ticker := time.NewTicker(rl.refillRate)
 	defer ticker.Stop()
 
-	for range ticker.C {
+	for {
 		select {
-		case rl.tokens <- struct{}{}:
-			// Token added
-		default:
-			// Channel full, skip
+		case <-rl.stop:
+			// Graceful shutdown requested
+			return
+		case <-ticker.C:
+			// Try to add a token
+			select {
+			case rl.tokens <- struct{}{}:
+				// Token added
+			default:
+				// Channel full, skip
+			}
 		}
 	}
 }

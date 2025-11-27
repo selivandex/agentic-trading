@@ -33,14 +33,14 @@ func RegisterAllTools(registry *Registry, deps shared.Deps, kafkaProducer interf
 	registry.Register("get_ohlcv", market.NewGetOHLCVTool(deps))
 	registry.Register("get_orderbook", market.NewGetOrderBookTool(deps))
 	registry.Register("get_trades", market.NewGetTradesTool(deps))
-	
+
 	// publish_opportunity requires kafka producer (concrete type, not interface)
 	if kafkaProducer != nil {
 		if kp, ok := kafkaProducer.(*kafka.Producer); ok {
 			registry.Register("publish_opportunity", market.NewPublishOpportunityTool(kp))
 		}
 	}
-	
+
 	log.Debug("Registered market data tools")
 	// ========================================
 	// Technical Indicators - Momentum

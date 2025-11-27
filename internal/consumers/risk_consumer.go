@@ -2,6 +2,7 @@ package consumers
 
 import (
 	"context"
+	"time"
 
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/events"
@@ -38,6 +39,16 @@ func NewRiskConsumer(
 func (rc *RiskConsumer) Start(ctx context.Context) error {
 	rc.log.Info("Starting risk consumer...")
 
+	// Ensure consumer is closed on exit
+	defer func() {
+		rc.log.Info("Closing risk consumer...")
+		if err := rc.consumer.Close(); err != nil {
+			rc.log.Error("Failed to close risk consumer", "error", err)
+		} else {
+			rc.log.Info("✓ Risk consumer closed")
+		}
+	}()
+
 	// Subscribe to risk-related topics
 	topics := []string{
 		events.TopicCircuitBreakerTripped,
@@ -54,21 +65,31 @@ func (rc *RiskConsumer) Start(ctx context.Context) error {
 	for {
 		msg, err := rc.consumer.ReadMessage(ctx)
 		if err != nil {
-			// Check if error is due to context cancellation
+			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {
 				rc.log.Info("Risk consumer stopping (context cancelled)")
 				return nil
 			}
-			rc.log.Error("Failed to read risk event", "error", err)
+			// Reader might be closed during shutdown, log at debug level
+			rc.log.Debug("Failed to read risk event", "error", err)
 			continue
 		}
 
-		// Process message
-		if err := rc.handleMessage(ctx, msg); err != nil {
+		// Process message with timeout to prevent hanging during shutdown
+		// Allow up to 5s to complete current message processing
+		processCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := rc.handleMessage(processCtx, msg); err != nil {
 			rc.log.Error("Failed to handle risk event",
 				"topic", msg.Topic,
 				"error", err,
 			)
+		}
+		cancel()
+
+		// Check if we should stop AFTER processing current message
+		if ctx.Err() != nil {
+			rc.log.Info("Risk consumer stopping after processing current message")
+			return nil
 		}
 	}
 }

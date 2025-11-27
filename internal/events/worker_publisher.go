@@ -456,3 +456,41 @@ func (wp *WorkerPublisher) PublishStrategyWarning(
 
 	return wp.publishProto(ctx, TopicStrategyWarning, userID, event)
 }
+
+// PublishAIUsage publishes AI model usage event
+func (wp *WorkerPublisher) PublishAIUsage(
+	ctx context.Context,
+	userID, sessionID, agentName, agentType string,
+	provider, modelID, modelFamily string,
+	promptTokens, completionTokens, totalTokens uint32,
+	inputCostUSD, outputCostUSD, totalCostUSD float64,
+	toolCallsCount uint32,
+	isCached, cacheHit bool,
+	latencyMs uint32,
+	reasoningStep uint32,
+	workflowName string,
+) error {
+	event := &eventspb.AIUsageEvent{
+		Base:             NewBaseEvent(TopicAIUsage, "agent_callback", userID),
+		SessionId:        sessionID,
+		AgentName:        agentName,
+		AgentType:        agentType,
+		Provider:         provider,
+		ModelId:          modelID,
+		ModelFamily:      modelFamily,
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		TotalTokens:      totalTokens,
+		InputCostUsd:     inputCostUSD,
+		OutputCostUsd:    outputCostUSD,
+		TotalCostUsd:     totalCostUSD,
+		ToolCallsCount:   toolCallsCount,
+		IsCached:         isCached,
+		CacheHit:         cacheHit,
+		LatencyMs:        latencyMs,
+		ReasoningStep:    reasoningStep,
+		WorkflowName:     workflowName,
+	}
+
+	return wp.publishProto(ctx, TopicAIUsage, sessionID, event)
+}

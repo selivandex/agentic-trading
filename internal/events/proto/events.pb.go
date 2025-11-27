@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.8
 // 	protoc        v5.28.2
-// source: internal/events/proto/events.proto
+// source: events.proto
 
 package eventspb
 
@@ -37,7 +37,7 @@ type BaseEvent struct {
 
 func (x *BaseEvent) Reset() {
 	*x = BaseEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[0]
+	mi := &file_events_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -49,7 +49,7 @@ func (x *BaseEvent) String() string {
 func (*BaseEvent) ProtoMessage() {}
 
 func (x *BaseEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[0]
+	mi := &file_events_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -62,7 +62,7 @@ func (x *BaseEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BaseEvent.ProtoReflect.Descriptor instead.
 func (*BaseEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{0}
+	return file_events_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *BaseEvent) GetId() string {
@@ -107,6 +107,195 @@ func (x *BaseEvent) GetVersion() string {
 	return ""
 }
 
+// AIUsageEvent tracks AI model usage (tokens, costs, latency)
+type AIUsageEvent struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Base             *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	SessionId        string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	AgentName        string                 `protobuf:"bytes,3,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
+	AgentType        string                 `protobuf:"bytes,4,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	Provider         string                 `protobuf:"bytes,5,opt,name=provider,proto3" json:"provider,omitempty"`                          // anthropic, openai, google, deepseek
+	ModelId          string                 `protobuf:"bytes,6,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`             // claude-sonnet-4, gpt-4o, etc.
+	ModelFamily      string                 `protobuf:"bytes,7,opt,name=model_family,json=modelFamily,proto3" json:"model_family,omitempty"` // claude-3.5, gpt-4o, etc.
+	PromptTokens     uint32                 `protobuf:"varint,8,opt,name=prompt_tokens,json=promptTokens,proto3" json:"prompt_tokens,omitempty"`
+	CompletionTokens uint32                 `protobuf:"varint,9,opt,name=completion_tokens,json=completionTokens,proto3" json:"completion_tokens,omitempty"`
+	TotalTokens      uint32                 `protobuf:"varint,10,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
+	InputCostUsd     float64                `protobuf:"fixed64,11,opt,name=input_cost_usd,json=inputCostUsd,proto3" json:"input_cost_usd,omitempty"`
+	OutputCostUsd    float64                `protobuf:"fixed64,12,opt,name=output_cost_usd,json=outputCostUsd,proto3" json:"output_cost_usd,omitempty"`
+	TotalCostUsd     float64                `protobuf:"fixed64,13,opt,name=total_cost_usd,json=totalCostUsd,proto3" json:"total_cost_usd,omitempty"`
+	ToolCallsCount   uint32                 `protobuf:"varint,14,opt,name=tool_calls_count,json=toolCallsCount,proto3" json:"tool_calls_count,omitempty"`
+	IsCached         bool                   `protobuf:"varint,15,opt,name=is_cached,json=isCached,proto3" json:"is_cached,omitempty"`
+	CacheHit         bool                   `protobuf:"varint,16,opt,name=cache_hit,json=cacheHit,proto3" json:"cache_hit,omitempty"`
+	LatencyMs        uint32                 `protobuf:"varint,17,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`
+	ReasoningStep    uint32                 `protobuf:"varint,18,opt,name=reasoning_step,json=reasoningStep,proto3" json:"reasoning_step,omitempty"`
+	WorkflowName     string                 `protobuf:"bytes,19,opt,name=workflow_name,json=workflowName,proto3" json:"workflow_name,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AIUsageEvent) Reset() {
+	*x = AIUsageEvent{}
+	mi := &file_events_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIUsageEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIUsageEvent) ProtoMessage() {}
+
+func (x *AIUsageEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_events_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIUsageEvent.ProtoReflect.Descriptor instead.
+func (*AIUsageEvent) Descriptor() ([]byte, []int) {
+	return file_events_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AIUsageEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *AIUsageEvent) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIUsageEvent) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
+}
+
+func (x *AIUsageEvent) GetAgentType() string {
+	if x != nil {
+		return x.AgentType
+	}
+	return ""
+}
+
+func (x *AIUsageEvent) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *AIUsageEvent) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *AIUsageEvent) GetModelFamily() string {
+	if x != nil {
+		return x.ModelFamily
+	}
+	return ""
+}
+
+func (x *AIUsageEvent) GetPromptTokens() uint32 {
+	if x != nil {
+		return x.PromptTokens
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetCompletionTokens() uint32 {
+	if x != nil {
+		return x.CompletionTokens
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetTotalTokens() uint32 {
+	if x != nil {
+		return x.TotalTokens
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetInputCostUsd() float64 {
+	if x != nil {
+		return x.InputCostUsd
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetOutputCostUsd() float64 {
+	if x != nil {
+		return x.OutputCostUsd
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetTotalCostUsd() float64 {
+	if x != nil {
+		return x.TotalCostUsd
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetToolCallsCount() uint32 {
+	if x != nil {
+		return x.ToolCallsCount
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetIsCached() bool {
+	if x != nil {
+		return x.IsCached
+	}
+	return false
+}
+
+func (x *AIUsageEvent) GetCacheHit() bool {
+	if x != nil {
+		return x.CacheHit
+	}
+	return false
+}
+
+func (x *AIUsageEvent) GetLatencyMs() uint32 {
+	if x != nil {
+		return x.LatencyMs
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetReasoningStep() uint32 {
+	if x != nil {
+		return x.ReasoningStep
+	}
+	return 0
+}
+
+func (x *AIUsageEvent) GetWorkflowName() string {
+	if x != nil {
+		return x.WorkflowName
+	}
+	return ""
+}
+
 // OpportunityFoundEvent is published when a trading opportunity is detected
 type OpportunityFoundEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -128,7 +317,7 @@ type OpportunityFoundEvent struct {
 
 func (x *OpportunityFoundEvent) Reset() {
 	*x = OpportunityFoundEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[1]
+	mi := &file_events_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -140,7 +329,7 @@ func (x *OpportunityFoundEvent) String() string {
 func (*OpportunityFoundEvent) ProtoMessage() {}
 
 func (x *OpportunityFoundEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[1]
+	mi := &file_events_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -153,7 +342,7 @@ func (x *OpportunityFoundEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpportunityFoundEvent.ProtoReflect.Descriptor instead.
 func (*OpportunityFoundEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{1}
+	return file_events_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *OpportunityFoundEvent) GetBase() *BaseEvent {
@@ -256,7 +445,7 @@ type RegimeChangedEvent struct {
 
 func (x *RegimeChangedEvent) Reset() {
 	*x = RegimeChangedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[2]
+	mi := &file_events_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +457,7 @@ func (x *RegimeChangedEvent) String() string {
 func (*RegimeChangedEvent) ProtoMessage() {}
 
 func (x *RegimeChangedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[2]
+	mi := &file_events_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,7 +470,7 @@ func (x *RegimeChangedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegimeChangedEvent.ProtoReflect.Descriptor instead.
 func (*RegimeChangedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{2}
+	return file_events_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RegimeChangedEvent) GetBase() *BaseEvent {
@@ -352,7 +541,7 @@ type OrderPlacedEvent struct {
 
 func (x *OrderPlacedEvent) Reset() {
 	*x = OrderPlacedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[3]
+	mi := &file_events_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -364,7 +553,7 @@ func (x *OrderPlacedEvent) String() string {
 func (*OrderPlacedEvent) ProtoMessage() {}
 
 func (x *OrderPlacedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[3]
+	mi := &file_events_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -377,7 +566,7 @@ func (x *OrderPlacedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrderPlacedEvent.ProtoReflect.Descriptor instead.
 func (*OrderPlacedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{3}
+	return file_events_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *OrderPlacedEvent) GetBase() *BaseEvent {
@@ -468,7 +657,7 @@ type OrderFilledEvent struct {
 
 func (x *OrderFilledEvent) Reset() {
 	*x = OrderFilledEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[4]
+	mi := &file_events_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +669,7 @@ func (x *OrderFilledEvent) String() string {
 func (*OrderFilledEvent) ProtoMessage() {}
 
 func (x *OrderFilledEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[4]
+	mi := &file_events_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +682,7 @@ func (x *OrderFilledEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrderFilledEvent.ProtoReflect.Descriptor instead.
 func (*OrderFilledEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{4}
+	return file_events_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *OrderFilledEvent) GetBase() *BaseEvent {
@@ -579,7 +768,7 @@ type PositionOpenedEvent struct {
 
 func (x *PositionOpenedEvent) Reset() {
 	*x = PositionOpenedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[5]
+	mi := &file_events_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +780,7 @@ func (x *PositionOpenedEvent) String() string {
 func (*PositionOpenedEvent) ProtoMessage() {}
 
 func (x *PositionOpenedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[5]
+	mi := &file_events_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +793,7 @@ func (x *PositionOpenedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PositionOpenedEvent.ProtoReflect.Descriptor instead.
 func (*PositionOpenedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{5}
+	return file_events_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PositionOpenedEvent) GetBase() *BaseEvent {
@@ -705,7 +894,7 @@ type PositionClosedEvent struct {
 
 func (x *PositionClosedEvent) Reset() {
 	*x = PositionClosedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[6]
+	mi := &file_events_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -717,7 +906,7 @@ func (x *PositionClosedEvent) String() string {
 func (*PositionClosedEvent) ProtoMessage() {}
 
 func (x *PositionClosedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[6]
+	mi := &file_events_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -730,7 +919,7 @@ func (x *PositionClosedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PositionClosedEvent.ProtoReflect.Descriptor instead.
 func (*PositionClosedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{6}
+	return file_events_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PositionClosedEvent) GetBase() *BaseEvent {
@@ -833,7 +1022,7 @@ type CircuitBreakerTrippedEvent struct {
 
 func (x *CircuitBreakerTrippedEvent) Reset() {
 	*x = CircuitBreakerTrippedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[7]
+	mi := &file_events_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -845,7 +1034,7 @@ func (x *CircuitBreakerTrippedEvent) String() string {
 func (*CircuitBreakerTrippedEvent) ProtoMessage() {}
 
 func (x *CircuitBreakerTrippedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[7]
+	mi := &file_events_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -858,7 +1047,7 @@ func (x *CircuitBreakerTrippedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CircuitBreakerTrippedEvent.ProtoReflect.Descriptor instead.
 func (*CircuitBreakerTrippedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{7}
+	return file_events_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CircuitBreakerTrippedEvent) GetBase() *BaseEvent {
@@ -929,7 +1118,7 @@ type AgentExecutedEvent struct {
 
 func (x *AgentExecutedEvent) Reset() {
 	*x = AgentExecutedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[8]
+	mi := &file_events_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -941,7 +1130,7 @@ func (x *AgentExecutedEvent) String() string {
 func (*AgentExecutedEvent) ProtoMessage() {}
 
 func (x *AgentExecutedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[8]
+	mi := &file_events_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -954,7 +1143,7 @@ func (x *AgentExecutedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentExecutedEvent.ProtoReflect.Descriptor instead.
 func (*AgentExecutedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{8}
+	return file_events_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AgentExecutedEvent) GetBase() *BaseEvent {
@@ -1044,7 +1233,7 @@ type DecisionMadeEvent struct {
 
 func (x *DecisionMadeEvent) Reset() {
 	*x = DecisionMadeEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[9]
+	mi := &file_events_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1056,7 +1245,7 @@ func (x *DecisionMadeEvent) String() string {
 func (*DecisionMadeEvent) ProtoMessage() {}
 
 func (x *DecisionMadeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[9]
+	mi := &file_events_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1069,7 +1258,7 @@ func (x *DecisionMadeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecisionMadeEvent.ProtoReflect.Descriptor instead.
 func (*DecisionMadeEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{9}
+	return file_events_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DecisionMadeEvent) GetBase() *BaseEvent {
@@ -1142,7 +1331,7 @@ type WorkerFailedEvent struct {
 
 func (x *WorkerFailedEvent) Reset() {
 	*x = WorkerFailedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[10]
+	mi := &file_events_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1154,7 +1343,7 @@ func (x *WorkerFailedEvent) String() string {
 func (*WorkerFailedEvent) ProtoMessage() {}
 
 func (x *WorkerFailedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[10]
+	mi := &file_events_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1167,7 +1356,7 @@ func (x *WorkerFailedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerFailedEvent.ProtoReflect.Descriptor instead.
 func (*WorkerFailedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{10}
+	return file_events_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *WorkerFailedEvent) GetBase() *BaseEvent {
@@ -1220,7 +1409,7 @@ type DrawdownAlert struct {
 
 func (x *DrawdownAlert) Reset() {
 	*x = DrawdownAlert{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[11]
+	mi := &file_events_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1421,7 @@ func (x *DrawdownAlert) String() string {
 func (*DrawdownAlert) ProtoMessage() {}
 
 func (x *DrawdownAlert) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[11]
+	mi := &file_events_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1434,7 @@ func (x *DrawdownAlert) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DrawdownAlert.ProtoReflect.Descriptor instead.
 func (*DrawdownAlert) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{11}
+	return file_events_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DrawdownAlert) GetBase() *BaseEvent {
@@ -1302,7 +1491,7 @@ type ConsecutiveLossesAlert struct {
 
 func (x *ConsecutiveLossesAlert) Reset() {
 	*x = ConsecutiveLossesAlert{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[12]
+	mi := &file_events_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1503,7 @@ func (x *ConsecutiveLossesAlert) String() string {
 func (*ConsecutiveLossesAlert) ProtoMessage() {}
 
 func (x *ConsecutiveLossesAlert) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[12]
+	mi := &file_events_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +1516,7 @@ func (x *ConsecutiveLossesAlert) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsecutiveLossesAlert.ProtoReflect.Descriptor instead.
 func (*ConsecutiveLossesAlert) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{12}
+	return file_events_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ConsecutiveLossesAlert) GetBase() *BaseEvent {
@@ -1368,7 +1557,7 @@ type PnLUpdatedEvent struct {
 
 func (x *PnLUpdatedEvent) Reset() {
 	*x = PnLUpdatedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[13]
+	mi := &file_events_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1380,7 +1569,7 @@ func (x *PnLUpdatedEvent) String() string {
 func (*PnLUpdatedEvent) ProtoMessage() {}
 
 func (x *PnLUpdatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[13]
+	mi := &file_events_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1393,7 +1582,7 @@ func (x *PnLUpdatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PnLUpdatedEvent.ProtoReflect.Descriptor instead.
 func (*PnLUpdatedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{13}
+	return file_events_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PnLUpdatedEvent) GetBase() *BaseEvent {
@@ -1468,7 +1657,7 @@ type JournalEntryCreatedEvent struct {
 
 func (x *JournalEntryCreatedEvent) Reset() {
 	*x = JournalEntryCreatedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[14]
+	mi := &file_events_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1480,7 +1669,7 @@ func (x *JournalEntryCreatedEvent) String() string {
 func (*JournalEntryCreatedEvent) ProtoMessage() {}
 
 func (x *JournalEntryCreatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[14]
+	mi := &file_events_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1493,7 +1682,7 @@ func (x *JournalEntryCreatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JournalEntryCreatedEvent.ProtoReflect.Descriptor instead.
 func (*JournalEntryCreatedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{14}
+	return file_events_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *JournalEntryCreatedEvent) GetBase() *BaseEvent {
@@ -1562,7 +1751,7 @@ type DailyReportEvent struct {
 
 func (x *DailyReportEvent) Reset() {
 	*x = DailyReportEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[15]
+	mi := &file_events_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1574,7 +1763,7 @@ func (x *DailyReportEvent) String() string {
 func (*DailyReportEvent) ProtoMessage() {}
 
 func (x *DailyReportEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[15]
+	mi := &file_events_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1587,7 +1776,7 @@ func (x *DailyReportEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DailyReportEvent.ProtoReflect.Descriptor instead.
 func (*DailyReportEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{15}
+	return file_events_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DailyReportEvent) GetBase() *BaseEvent {
@@ -1662,7 +1851,7 @@ type StrategyDisabledEvent struct {
 
 func (x *StrategyDisabledEvent) Reset() {
 	*x = StrategyDisabledEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[16]
+	mi := &file_events_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1674,7 +1863,7 @@ func (x *StrategyDisabledEvent) String() string {
 func (*StrategyDisabledEvent) ProtoMessage() {}
 
 func (x *StrategyDisabledEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[16]
+	mi := &file_events_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1687,7 +1876,7 @@ func (x *StrategyDisabledEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StrategyDisabledEvent.ProtoReflect.Descriptor instead.
 func (*StrategyDisabledEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{16}
+	return file_events_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StrategyDisabledEvent) GetBase() *BaseEvent {
@@ -1753,7 +1942,7 @@ type OrderCancelledEvent struct {
 
 func (x *OrderCancelledEvent) Reset() {
 	*x = OrderCancelledEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[17]
+	mi := &file_events_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1765,7 +1954,7 @@ func (x *OrderCancelledEvent) String() string {
 func (*OrderCancelledEvent) ProtoMessage() {}
 
 func (x *OrderCancelledEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[17]
+	mi := &file_events_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1778,7 +1967,7 @@ func (x *OrderCancelledEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrderCancelledEvent.ProtoReflect.Descriptor instead.
 func (*OrderCancelledEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{17}
+	return file_events_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *OrderCancelledEvent) GetBase() *BaseEvent {
@@ -1832,7 +2021,7 @@ type PositionPnLUpdatedEvent struct {
 
 func (x *PositionPnLUpdatedEvent) Reset() {
 	*x = PositionPnLUpdatedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[18]
+	mi := &file_events_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1844,7 +2033,7 @@ func (x *PositionPnLUpdatedEvent) String() string {
 func (*PositionPnLUpdatedEvent) ProtoMessage() {}
 
 func (x *PositionPnLUpdatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[18]
+	mi := &file_events_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1857,7 +2046,7 @@ func (x *PositionPnLUpdatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PositionPnLUpdatedEvent.ProtoReflect.Descriptor instead.
 func (*PositionPnLUpdatedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{18}
+	return file_events_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PositionPnLUpdatedEvent) GetBase() *BaseEvent {
@@ -1925,7 +2114,7 @@ type FVGDetectedEvent struct {
 
 func (x *FVGDetectedEvent) Reset() {
 	*x = FVGDetectedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[19]
+	mi := &file_events_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1937,7 +2126,7 @@ func (x *FVGDetectedEvent) String() string {
 func (*FVGDetectedEvent) ProtoMessage() {}
 
 func (x *FVGDetectedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[19]
+	mi := &file_events_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1950,7 +2139,7 @@ func (x *FVGDetectedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FVGDetectedEvent.ProtoReflect.Descriptor instead.
 func (*FVGDetectedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{19}
+	return file_events_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *FVGDetectedEvent) GetBase() *BaseEvent {
@@ -2017,7 +2206,7 @@ type OrderBlockDetectedEvent struct {
 
 func (x *OrderBlockDetectedEvent) Reset() {
 	*x = OrderBlockDetectedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[20]
+	mi := &file_events_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2029,7 +2218,7 @@ func (x *OrderBlockDetectedEvent) String() string {
 func (*OrderBlockDetectedEvent) ProtoMessage() {}
 
 func (x *OrderBlockDetectedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[20]
+	mi := &file_events_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2042,7 +2231,7 @@ func (x *OrderBlockDetectedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrderBlockDetectedEvent.ProtoReflect.Descriptor instead.
 func (*OrderBlockDetectedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{20}
+	return file_events_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *OrderBlockDetectedEvent) GetBase() *BaseEvent {
@@ -2100,7 +2289,7 @@ type MarketAnalysisRequestEvent struct {
 
 func (x *MarketAnalysisRequestEvent) Reset() {
 	*x = MarketAnalysisRequestEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[21]
+	mi := &file_events_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2112,7 +2301,7 @@ func (x *MarketAnalysisRequestEvent) String() string {
 func (*MarketAnalysisRequestEvent) ProtoMessage() {}
 
 func (x *MarketAnalysisRequestEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[21]
+	mi := &file_events_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2125,7 +2314,7 @@ func (x *MarketAnalysisRequestEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarketAnalysisRequestEvent.ProtoReflect.Descriptor instead.
 func (*MarketAnalysisRequestEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{21}
+	return file_events_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *MarketAnalysisRequestEvent) GetBase() *BaseEvent {
@@ -2169,7 +2358,7 @@ type MarketScanCompleteEvent struct {
 
 func (x *MarketScanCompleteEvent) Reset() {
 	*x = MarketScanCompleteEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[22]
+	mi := &file_events_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2181,7 +2370,7 @@ func (x *MarketScanCompleteEvent) String() string {
 func (*MarketScanCompleteEvent) ProtoMessage() {}
 
 func (x *MarketScanCompleteEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[22]
+	mi := &file_events_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2194,7 +2383,7 @@ func (x *MarketScanCompleteEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarketScanCompleteEvent.ProtoReflect.Descriptor instead.
 func (*MarketScanCompleteEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{22}
+	return file_events_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *MarketScanCompleteEvent) GetBase() *BaseEvent {
@@ -2243,7 +2432,7 @@ type WhaleAlertEvent struct {
 
 func (x *WhaleAlertEvent) Reset() {
 	*x = WhaleAlertEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[23]
+	mi := &file_events_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2255,7 +2444,7 @@ func (x *WhaleAlertEvent) String() string {
 func (*WhaleAlertEvent) ProtoMessage() {}
 
 func (x *WhaleAlertEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[23]
+	mi := &file_events_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2268,7 +2457,7 @@ func (x *WhaleAlertEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhaleAlertEvent.ProtoReflect.Descriptor instead.
 func (*WhaleAlertEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{23}
+	return file_events_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *WhaleAlertEvent) GetBase() *BaseEvent {
@@ -2350,7 +2539,7 @@ type LiquidationAlertEvent struct {
 
 func (x *LiquidationAlertEvent) Reset() {
 	*x = LiquidationAlertEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[24]
+	mi := &file_events_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2362,7 +2551,7 @@ func (x *LiquidationAlertEvent) String() string {
 func (*LiquidationAlertEvent) ProtoMessage() {}
 
 func (x *LiquidationAlertEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[24]
+	mi := &file_events_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2375,7 +2564,7 @@ func (x *LiquidationAlertEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LiquidationAlertEvent.ProtoReflect.Descriptor instead.
 func (*LiquidationAlertEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{24}
+	return file_events_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *LiquidationAlertEvent) GetBase() *BaseEvent {
@@ -2443,7 +2632,7 @@ type StrategyWarningEvent struct {
 
 func (x *StrategyWarningEvent) Reset() {
 	*x = StrategyWarningEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[25]
+	mi := &file_events_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2455,7 +2644,7 @@ func (x *StrategyWarningEvent) String() string {
 func (*StrategyWarningEvent) ProtoMessage() {}
 
 func (x *StrategyWarningEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[25]
+	mi := &file_events_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2468,7 +2657,7 @@ func (x *StrategyWarningEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StrategyWarningEvent.ProtoReflect.Descriptor instead.
 func (*StrategyWarningEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{25}
+	return file_events_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *StrategyWarningEvent) GetBase() *BaseEvent {
@@ -2520,18 +2709,43 @@ func (x *StrategyWarningEvent) GetTotalTrades() int32 {
 	return 0
 }
 
-var File_internal_events_proto_events_proto protoreflect.FileDescriptor
+var File_events_proto protoreflect.FileDescriptor
 
-const file_internal_events_proto_events_proto_rawDesc = "" +
+const file_events_proto_rawDesc = "" +
 	"\n" +
-	"\"internal/events/proto/events.proto\x12\x06events\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb4\x01\n" +
+	"\fevents.proto\x12\x06events\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb4\x01\n" +
 	"\tBaseEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x128\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n" +
 	"\x06source\x18\x04 \x01(\tR\x06source\x12\x17\n" +
 	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x18\n" +
-	"\aversion\x18\x06 \x01(\tR\aversion\"\xea\x03\n" +
+	"\aversion\x18\x06 \x01(\tR\aversion\"\xa4\x05\n" +
+	"\fAIUsageEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x03 \x01(\tR\tagentName\x12\x1d\n" +
+	"\n" +
+	"agent_type\x18\x04 \x01(\tR\tagentType\x12\x1a\n" +
+	"\bprovider\x18\x05 \x01(\tR\bprovider\x12\x19\n" +
+	"\bmodel_id\x18\x06 \x01(\tR\amodelId\x12!\n" +
+	"\fmodel_family\x18\a \x01(\tR\vmodelFamily\x12#\n" +
+	"\rprompt_tokens\x18\b \x01(\rR\fpromptTokens\x12+\n" +
+	"\x11completion_tokens\x18\t \x01(\rR\x10completionTokens\x12!\n" +
+	"\ftotal_tokens\x18\n" +
+	" \x01(\rR\vtotalTokens\x12$\n" +
+	"\x0einput_cost_usd\x18\v \x01(\x01R\finputCostUsd\x12&\n" +
+	"\x0foutput_cost_usd\x18\f \x01(\x01R\routputCostUsd\x12$\n" +
+	"\x0etotal_cost_usd\x18\r \x01(\x01R\ftotalCostUsd\x12(\n" +
+	"\x10tool_calls_count\x18\x0e \x01(\rR\x0etoolCallsCount\x12\x1b\n" +
+	"\tis_cached\x18\x0f \x01(\bR\bisCached\x12\x1b\n" +
+	"\tcache_hit\x18\x10 \x01(\bR\bcacheHit\x12\x1d\n" +
+	"\n" +
+	"latency_ms\x18\x11 \x01(\rR\tlatencyMs\x12%\n" +
+	"\x0ereasoning_step\x18\x12 \x01(\rR\rreasoningStep\x12#\n" +
+	"\rworkflow_name\x18\x13 \x01(\tR\fworkflowName\"\xea\x03\n" +
 	"\x15OpportunityFoundEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x16\n" +
 	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12\x1a\n" +
@@ -2799,107 +3013,109 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\ftotal_trades\x18\a \x01(\x05R\vtotalTradesB+Z)prometheus/internal/events/proto;eventspbb\x06proto3"
 
 var (
-	file_internal_events_proto_events_proto_rawDescOnce sync.Once
-	file_internal_events_proto_events_proto_rawDescData []byte
+	file_events_proto_rawDescOnce sync.Once
+	file_events_proto_rawDescData []byte
 )
 
-func file_internal_events_proto_events_proto_rawDescGZIP() []byte {
-	file_internal_events_proto_events_proto_rawDescOnce.Do(func() {
-		file_internal_events_proto_events_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_events_proto_events_proto_rawDesc), len(file_internal_events_proto_events_proto_rawDesc)))
+func file_events_proto_rawDescGZIP() []byte {
+	file_events_proto_rawDescOnce.Do(func() {
+		file_events_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_events_proto_rawDesc), len(file_events_proto_rawDesc)))
 	})
-	return file_internal_events_proto_events_proto_rawDescData
+	return file_events_proto_rawDescData
 }
 
-var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
-var file_internal_events_proto_events_proto_goTypes = []any{
+var file_events_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_events_proto_goTypes = []any{
 	(*BaseEvent)(nil),                  // 0: events.BaseEvent
-	(*OpportunityFoundEvent)(nil),      // 1: events.OpportunityFoundEvent
-	(*RegimeChangedEvent)(nil),         // 2: events.RegimeChangedEvent
-	(*OrderPlacedEvent)(nil),           // 3: events.OrderPlacedEvent
-	(*OrderFilledEvent)(nil),           // 4: events.OrderFilledEvent
-	(*PositionOpenedEvent)(nil),        // 5: events.PositionOpenedEvent
-	(*PositionClosedEvent)(nil),        // 6: events.PositionClosedEvent
-	(*CircuitBreakerTrippedEvent)(nil), // 7: events.CircuitBreakerTrippedEvent
-	(*AgentExecutedEvent)(nil),         // 8: events.AgentExecutedEvent
-	(*DecisionMadeEvent)(nil),          // 9: events.DecisionMadeEvent
-	(*WorkerFailedEvent)(nil),          // 10: events.WorkerFailedEvent
-	(*DrawdownAlert)(nil),              // 11: events.DrawdownAlert
-	(*ConsecutiveLossesAlert)(nil),     // 12: events.ConsecutiveLossesAlert
-	(*PnLUpdatedEvent)(nil),            // 13: events.PnLUpdatedEvent
-	(*JournalEntryCreatedEvent)(nil),   // 14: events.JournalEntryCreatedEvent
-	(*DailyReportEvent)(nil),           // 15: events.DailyReportEvent
-	(*StrategyDisabledEvent)(nil),      // 16: events.StrategyDisabledEvent
-	(*OrderCancelledEvent)(nil),        // 17: events.OrderCancelledEvent
-	(*PositionPnLUpdatedEvent)(nil),    // 18: events.PositionPnLUpdatedEvent
-	(*FVGDetectedEvent)(nil),           // 19: events.FVGDetectedEvent
-	(*OrderBlockDetectedEvent)(nil),    // 20: events.OrderBlockDetectedEvent
-	(*MarketAnalysisRequestEvent)(nil), // 21: events.MarketAnalysisRequestEvent
-	(*MarketScanCompleteEvent)(nil),    // 22: events.MarketScanCompleteEvent
-	(*WhaleAlertEvent)(nil),            // 23: events.WhaleAlertEvent
-	(*LiquidationAlertEvent)(nil),      // 24: events.LiquidationAlertEvent
-	(*StrategyWarningEvent)(nil),       // 25: events.StrategyWarningEvent
-	nil,                                // 26: events.OpportunityFoundEvent.IndicatorsEntry
-	nil,                                // 27: events.DecisionMadeEvent.ContextEntry
-	(*timestamppb.Timestamp)(nil),      // 28: google.protobuf.Timestamp
+	(*AIUsageEvent)(nil),               // 1: events.AIUsageEvent
+	(*OpportunityFoundEvent)(nil),      // 2: events.OpportunityFoundEvent
+	(*RegimeChangedEvent)(nil),         // 3: events.RegimeChangedEvent
+	(*OrderPlacedEvent)(nil),           // 4: events.OrderPlacedEvent
+	(*OrderFilledEvent)(nil),           // 5: events.OrderFilledEvent
+	(*PositionOpenedEvent)(nil),        // 6: events.PositionOpenedEvent
+	(*PositionClosedEvent)(nil),        // 7: events.PositionClosedEvent
+	(*CircuitBreakerTrippedEvent)(nil), // 8: events.CircuitBreakerTrippedEvent
+	(*AgentExecutedEvent)(nil),         // 9: events.AgentExecutedEvent
+	(*DecisionMadeEvent)(nil),          // 10: events.DecisionMadeEvent
+	(*WorkerFailedEvent)(nil),          // 11: events.WorkerFailedEvent
+	(*DrawdownAlert)(nil),              // 12: events.DrawdownAlert
+	(*ConsecutiveLossesAlert)(nil),     // 13: events.ConsecutiveLossesAlert
+	(*PnLUpdatedEvent)(nil),            // 14: events.PnLUpdatedEvent
+	(*JournalEntryCreatedEvent)(nil),   // 15: events.JournalEntryCreatedEvent
+	(*DailyReportEvent)(nil),           // 16: events.DailyReportEvent
+	(*StrategyDisabledEvent)(nil),      // 17: events.StrategyDisabledEvent
+	(*OrderCancelledEvent)(nil),        // 18: events.OrderCancelledEvent
+	(*PositionPnLUpdatedEvent)(nil),    // 19: events.PositionPnLUpdatedEvent
+	(*FVGDetectedEvent)(nil),           // 20: events.FVGDetectedEvent
+	(*OrderBlockDetectedEvent)(nil),    // 21: events.OrderBlockDetectedEvent
+	(*MarketAnalysisRequestEvent)(nil), // 22: events.MarketAnalysisRequestEvent
+	(*MarketScanCompleteEvent)(nil),    // 23: events.MarketScanCompleteEvent
+	(*WhaleAlertEvent)(nil),            // 24: events.WhaleAlertEvent
+	(*LiquidationAlertEvent)(nil),      // 25: events.LiquidationAlertEvent
+	(*StrategyWarningEvent)(nil),       // 26: events.StrategyWarningEvent
+	nil,                                // 27: events.OpportunityFoundEvent.IndicatorsEntry
+	nil,                                // 28: events.DecisionMadeEvent.ContextEntry
+	(*timestamppb.Timestamp)(nil),      // 29: google.protobuf.Timestamp
 }
-var file_internal_events_proto_events_proto_depIdxs = []int32{
-	28, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 1: events.OpportunityFoundEvent.base:type_name -> events.BaseEvent
-	26, // 2: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
-	0,  // 3: events.RegimeChangedEvent.base:type_name -> events.BaseEvent
-	0,  // 4: events.OrderPlacedEvent.base:type_name -> events.BaseEvent
-	0,  // 5: events.OrderFilledEvent.base:type_name -> events.BaseEvent
-	0,  // 6: events.PositionOpenedEvent.base:type_name -> events.BaseEvent
-	0,  // 7: events.PositionClosedEvent.base:type_name -> events.BaseEvent
-	0,  // 8: events.CircuitBreakerTrippedEvent.base:type_name -> events.BaseEvent
-	28, // 9: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
-	0,  // 10: events.AgentExecutedEvent.base:type_name -> events.BaseEvent
-	0,  // 11: events.DecisionMadeEvent.base:type_name -> events.BaseEvent
-	27, // 12: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
-	0,  // 13: events.WorkerFailedEvent.base:type_name -> events.BaseEvent
-	28, // 14: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
-	0,  // 15: events.DrawdownAlert.base:type_name -> events.BaseEvent
-	0,  // 16: events.ConsecutiveLossesAlert.base:type_name -> events.BaseEvent
-	0,  // 17: events.PnLUpdatedEvent.base:type_name -> events.BaseEvent
-	0,  // 18: events.JournalEntryCreatedEvent.base:type_name -> events.BaseEvent
-	0,  // 19: events.DailyReportEvent.base:type_name -> events.BaseEvent
-	0,  // 20: events.StrategyDisabledEvent.base:type_name -> events.BaseEvent
-	0,  // 21: events.OrderCancelledEvent.base:type_name -> events.BaseEvent
-	0,  // 22: events.PositionPnLUpdatedEvent.base:type_name -> events.BaseEvent
-	0,  // 23: events.FVGDetectedEvent.base:type_name -> events.BaseEvent
-	0,  // 24: events.OrderBlockDetectedEvent.base:type_name -> events.BaseEvent
-	0,  // 25: events.MarketAnalysisRequestEvent.base:type_name -> events.BaseEvent
-	0,  // 26: events.MarketScanCompleteEvent.base:type_name -> events.BaseEvent
-	0,  // 27: events.WhaleAlertEvent.base:type_name -> events.BaseEvent
-	0,  // 28: events.LiquidationAlertEvent.base:type_name -> events.BaseEvent
-	0,  // 29: events.StrategyWarningEvent.base:type_name -> events.BaseEvent
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+var file_events_proto_depIdxs = []int32{
+	29, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 1: events.AIUsageEvent.base:type_name -> events.BaseEvent
+	0,  // 2: events.OpportunityFoundEvent.base:type_name -> events.BaseEvent
+	27, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
+	0,  // 4: events.RegimeChangedEvent.base:type_name -> events.BaseEvent
+	0,  // 5: events.OrderPlacedEvent.base:type_name -> events.BaseEvent
+	0,  // 6: events.OrderFilledEvent.base:type_name -> events.BaseEvent
+	0,  // 7: events.PositionOpenedEvent.base:type_name -> events.BaseEvent
+	0,  // 8: events.PositionClosedEvent.base:type_name -> events.BaseEvent
+	0,  // 9: events.CircuitBreakerTrippedEvent.base:type_name -> events.BaseEvent
+	29, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
+	0,  // 11: events.AgentExecutedEvent.base:type_name -> events.BaseEvent
+	0,  // 12: events.DecisionMadeEvent.base:type_name -> events.BaseEvent
+	28, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
+	0,  // 14: events.WorkerFailedEvent.base:type_name -> events.BaseEvent
+	29, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
+	0,  // 16: events.DrawdownAlert.base:type_name -> events.BaseEvent
+	0,  // 17: events.ConsecutiveLossesAlert.base:type_name -> events.BaseEvent
+	0,  // 18: events.PnLUpdatedEvent.base:type_name -> events.BaseEvent
+	0,  // 19: events.JournalEntryCreatedEvent.base:type_name -> events.BaseEvent
+	0,  // 20: events.DailyReportEvent.base:type_name -> events.BaseEvent
+	0,  // 21: events.StrategyDisabledEvent.base:type_name -> events.BaseEvent
+	0,  // 22: events.OrderCancelledEvent.base:type_name -> events.BaseEvent
+	0,  // 23: events.PositionPnLUpdatedEvent.base:type_name -> events.BaseEvent
+	0,  // 24: events.FVGDetectedEvent.base:type_name -> events.BaseEvent
+	0,  // 25: events.OrderBlockDetectedEvent.base:type_name -> events.BaseEvent
+	0,  // 26: events.MarketAnalysisRequestEvent.base:type_name -> events.BaseEvent
+	0,  // 27: events.MarketScanCompleteEvent.base:type_name -> events.BaseEvent
+	0,  // 28: events.WhaleAlertEvent.base:type_name -> events.BaseEvent
+	0,  // 29: events.LiquidationAlertEvent.base:type_name -> events.BaseEvent
+	0,  // 30: events.StrategyWarningEvent.base:type_name -> events.BaseEvent
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
-func init() { file_internal_events_proto_events_proto_init() }
-func file_internal_events_proto_events_proto_init() {
-	if File_internal_events_proto_events_proto != nil {
+func init() { file_events_proto_init() }
+func file_events_proto_init() {
+	if File_events_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_events_proto_events_proto_rawDesc), len(file_internal_events_proto_events_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_events_proto_rawDesc), len(file_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_internal_events_proto_events_proto_goTypes,
-		DependencyIndexes: file_internal_events_proto_events_proto_depIdxs,
-		MessageInfos:      file_internal_events_proto_events_proto_msgTypes,
+		GoTypes:           file_events_proto_goTypes,
+		DependencyIndexes: file_events_proto_depIdxs,
+		MessageInfos:      file_events_proto_msgTypes,
 	}.Build()
-	File_internal_events_proto_events_proto = out.File
-	file_internal_events_proto_events_proto_goTypes = nil
-	file_internal_events_proto_events_proto_depIdxs = nil
+	File_events_proto = out.File
+	file_events_proto_goTypes = nil
+	file_events_proto_depIdxs = nil
 }

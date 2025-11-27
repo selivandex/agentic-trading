@@ -37,18 +37,33 @@ func NewFundingAggregator(
 func (fa *FundingAggregator) Run(ctx context.Context) error {
 	fa.Log().Debug("Funding aggregator: starting iteration")
 
+	processedCount := 0
+
 	// Aggregate funding rates for each symbol
 	for _, symbol := range fa.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			fa.Log().Info("Funding aggregator interrupted by shutdown",
+				"symbols_processed", processedCount,
+				"symbols_remaining", len(fa.symbols)-processedCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		aggregated, err := fa.aggregateFundingRates(ctx, symbol)
 		if err != nil {
 			fa.Log().Error("Failed to aggregate funding rates",
 				"symbol", symbol,
 				"error", err,
 			)
+			processedCount++
 			continue
 		}
 
 		if aggregated == nil {
+			processedCount++
 			continue
 		}
 
@@ -69,6 +84,8 @@ func (fa *FundingAggregator) Run(ctx context.Context) error {
 				"spread", arbitrage.spread,
 			)
 		}
+
+		processedCount++
 	}
 
 	fa.Log().Info("Funding aggregation complete", "symbols", len(fa.symbols))

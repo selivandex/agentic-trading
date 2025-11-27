@@ -10,25 +10,31 @@ import (
 	"prometheus/pkg/logger"
 )
 
-// CostTracker interface to avoid import cycle with agents package
-type CostTracker interface {
-	ExceededDailyLimit(userID string) bool
-}
+// CostCheckFunc checks if user has exceeded cost limits
+// Returns true if limit exceeded, false otherwise
+type CostCheckFunc func(userID string) (bool, error)
 
 // CostTrackingBeforeCallback tracks execution start time and validates budget
-func CostTrackingBeforeCallback(tracker CostTracker) agent.BeforeAgentCallback {
+// Uses ClickHouse to check daily cost limits
+func CostTrackingBeforeCallback(checkLimit CostCheckFunc) agent.BeforeAgentCallback {
 	return func(ctx agent.CallbackContext) (*genai.Content, error) {
 		// Store start time in temporary state using helper
 		state.SetTempStartTime(ctx.State(), time.Now())
 
-		// Check if user has budget
-		userID := ctx.UserID()
-		if tracker != nil && tracker.ExceededDailyLimit(userID) {
-			logger.Get().Warnf("User %s exceeded daily cost limit", userID)
-			return genai.NewContentFromText(
-				"Daily cost limit exceeded. Please try again tomorrow or contact support.",
-				genai.RoleModel,
-			), nil
+		// Check if user has exceeded daily cost limit
+		if checkLimit != nil {
+			userID := ctx.UserID()
+			exceeded, err := checkLimit(userID)
+			if err != nil {
+				logger.Get().Warnf("Failed to check cost limit for user %s: %v", userID, err)
+				// Continue anyway - don't block on cost check failure
+			} else if exceeded {
+				logger.Get().Warnf("User %s exceeded daily cost limit", userID)
+				return genai.NewContentFromText(
+					"Daily cost limit exceeded. Please try again tomorrow or contact support.",
+					genai.RoleModel,
+				), nil
+			}
 		}
 
 		// Update user last activity
@@ -39,13 +45,18 @@ func CostTrackingBeforeCallback(tracker CostTracker) agent.BeforeAgentCallback {
 }
 
 // ValidationBeforeCallback validates user permissions and system state
-func ValidationBeforeCallback() agent.BeforeAgentCallback {
+func ValidationBeforeCallback(agentType string) agent.BeforeAgentCallback {
 	return func(ctx agent.CallbackContext) (*genai.Content, error) {
 		log := logger.Get().With(
 			"agent", ctx.AgentName(),
 			"user", ctx.UserID(),
 			"session", ctx.SessionID(),
 		)
+
+		// Store agent type in temp state for callbacks
+		if agentType != "" {
+			state.SetAgentType(ctx.State(), agentType)
+		}
 
 		log.Infof("Agent %s started for user %s", ctx.AgentName(), ctx.UserID())
 

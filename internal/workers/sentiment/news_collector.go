@@ -58,6 +58,18 @@ func (nc *NewsCollector) Run(ctx context.Context) error {
 	// Save to database
 	savedCount := 0
 	for _, article := range articles {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			nc.Log().Info("News saving interrupted by shutdown",
+				"total_articles", len(articles),
+				"saved_articles", savedCount,
+				"remaining", len(articles)-savedCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		if err := nc.sentimentRepo.InsertNews(ctx, article); err != nil {
 			nc.Log().Error("Failed to save news article",
 				"title", article.Title,

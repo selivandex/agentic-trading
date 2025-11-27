@@ -11,6 +11,9 @@ import (
 
 // All Kafka topic names MUST be defined here
 const (
+	// AI/ML events
+	TopicAIUsage = "ai.usage" // AI model usage tracking (tokens, costs, latency)
+
 	// Market events
 	TopicOpportunityFound = "market.opportunity_found"
 	TopicRegimeChanged    = "market.regime_changed"

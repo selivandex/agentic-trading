@@ -246,3 +246,94 @@ func GetTempTokens(state session.ReadonlyState) (promptTokens, completionTokens 
 	}
 	return promptTokens, completionTokens
 }
+
+// SetTempModelInfo stores model information in temporary state
+func SetTempModelInfo(state session.State, provider, modelID, modelFamily string, inputCost, outputCost float64) error {
+	return state.Set(KeyPrefixTemp+"model_info", map[string]interface{}{
+		"provider":     provider,
+		"model_id":     modelID,
+		"model_family": modelFamily,
+		"input_cost":   inputCost,
+		"output_cost":  outputCost,
+	})
+}
+
+// GetTempModelInfo retrieves model information from temporary state
+func GetTempModelInfo(state session.ReadonlyState) (provider, modelID, modelFamily string, inputCost, outputCost float64, ok bool) {
+	val, err := state.Get(KeyPrefixTemp + "model_info")
+	if err != nil {
+		return "", "", "", 0, 0, false
+	}
+
+	info, ok := val.(map[string]interface{})
+	if !ok {
+		return "", "", "", 0, 0, false
+	}
+
+	provider, _ = info["provider"].(string)
+	modelID, _ = info["model_id"].(string)
+	modelFamily, _ = info["model_family"].(string)
+	inputCost, _ = info["input_cost"].(float64)
+	outputCost, _ = info["output_cost"].(float64)
+
+	return provider, modelID, modelFamily, inputCost, outputCost, true
+}
+
+// IncrementReasoningStep increments and returns the current reasoning step counter
+func IncrementReasoningStep(state session.State) uint16 {
+	count := uint16(0)
+	if val, err := state.Get(KeyPrefixTemp + "reasoning_step"); err == nil {
+		if c, ok := val.(uint16); ok {
+			count = c
+		}
+	}
+	count++
+	state.Set(KeyPrefixTemp+"reasoning_step", count)
+	return count
+}
+
+// GetReasoningStep gets the current reasoning step
+func GetReasoningStep(state session.ReadonlyState) uint16 {
+	val, err := state.Get(KeyPrefixTemp + "reasoning_step")
+	if err != nil {
+		return 0
+	}
+	if step, ok := val.(uint16); ok {
+		return step
+	}
+	return 0
+}
+
+// SetWorkflowName stores the current workflow name
+func SetWorkflowName(state session.State, name string) error {
+	return state.Set(KeyPrefixTemp+"workflow_name", name)
+}
+
+// GetWorkflowName retrieves the current workflow name
+func GetWorkflowName(state session.ReadonlyState) string {
+	val, err := state.Get(KeyPrefixTemp + "workflow_name")
+	if err != nil {
+		return ""
+	}
+	if name, ok := val.(string); ok {
+		return name
+	}
+	return ""
+}
+
+// SetAgentType stores the agent type
+func SetAgentType(state session.State, agentType string) error {
+	return state.Set(KeyPrefixTemp+"agent_type", agentType)
+}
+
+// GetAgentType retrieves the agent type
+func GetAgentType(state session.ReadonlyState) string {
+	val, err := state.Get(KeyPrefixTemp + "agent_type")
+	if err != nil {
+		return ""
+	}
+	if agentType, ok := val.(string); ok {
+		return agentType
+	}
+	return ""
+}

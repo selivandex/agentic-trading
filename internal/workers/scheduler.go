@@ -73,39 +73,47 @@ func (s *Scheduler) Start(ctx context.Context) error {
 }
 
 // Stop gracefully shuts down all workers
+// Uses 2-minute timeout to allow long-running operations (e.g., ADK workflows) to complete
 func (s *Scheduler) Stop() error {
 	s.mu.Lock()
 	if !s.started {
 		s.mu.Unlock()
 		return errors.Wrapf(errors.ErrInternal, "scheduler not started")
 	}
-	s.mu.Unlock()
-
-	s.log.Info("Stopping worker scheduler...")
 
 	// Cancel context to signal all workers to stop
 	s.cancel()
 
+	// Release lock before waiting to allow workers to check s.started if needed
+	s.mu.Unlock()
+
+	s.log.Info("Stopping worker scheduler...")
+
 	// Wait for all workers to finish with timeout
+	// 2-minute timeout accommodates long-running operations like:
+	// - OpportunityFinder ADK workflows (can take 2-3 minutes per symbol)
+	// - Large batch processing in other workers
 	done := make(chan struct{})
 	go func() {
 		s.wg.Wait()
 		close(done)
 	}()
 
+	var shutdownErr error
 	select {
 	case <-done:
 		s.log.Info("All workers stopped gracefully")
-	case <-time.After(30 * time.Second):
-		s.log.Warn("Worker shutdown timed out after 30s")
-		return errors.Wrapf(errors.ErrInternal, "shutdown timeout")
+	case <-time.After(2 * time.Minute):
+		s.log.Warn("Worker shutdown timed out after 2 minutes")
+		shutdownErr = errors.Wrapf(errors.ErrInternal, "shutdown timeout after 2 minutes")
 	}
 
+	// Re-acquire lock to update state
 	s.mu.Lock()
 	s.started = false
 	s.mu.Unlock()
 
-	return nil
+	return shutdownErr
 }
 
 // runWorker executes a single worker in a loop

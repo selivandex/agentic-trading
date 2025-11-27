@@ -83,6 +83,17 @@ func (pm *PositionMonitor) Run(ctx context.Context) error {
 	successCount := 0
 	errorCount := 0
 	for _, usr := range activeUsers {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			pm.Log().Info("Position monitoring interrupted by shutdown",
+				"users_processed", successCount,
+				"users_remaining", len(activeUsers)-successCount-errorCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		if err := pm.monitorUserPositions(ctx, usr.ID); err != nil {
 			pm.Log().Error("Failed to monitor user positions",
 				"user_id", usr.ID,
@@ -125,6 +136,14 @@ func (pm *PositionMonitor) monitorUserPositions(ctx context.Context, userID uuid
 
 	// Process each exchange account
 	for accountID, accountPositions := range positionsByAccount {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			pm.Log().Debug("Position monitoring for user interrupted by shutdown", "user_id", userID)
+			return ctx.Err()
+		default:
+		}
+
 		if err := pm.monitorAccountPositions(ctx, accountID, accountPositions); err != nil {
 			pm.Log().Error("Failed to monitor positions for account",
 				"account_id", accountID,
@@ -153,6 +172,14 @@ func (pm *PositionMonitor) monitorAccountPositions(ctx context.Context, accountI
 
 	// Update each position
 	for _, pos := range positions {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			pm.Log().Debug("Position monitoring for account interrupted by shutdown", "account_id", accountID)
+			return ctx.Err()
+		default:
+		}
+
 		if err := pm.updatePosition(ctx, exchangeClient, pos); err != nil {
 			pm.Log().Error("Failed to update position",
 				"position_id", pos.ID,

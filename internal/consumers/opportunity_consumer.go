@@ -65,25 +65,46 @@ func NewOpportunityConsumer(
 func (oc *OpportunityConsumer) Start(ctx context.Context) error {
 	oc.log.Info("Starting opportunity consumer (event-driven trading)...")
 
+	// Ensure consumer is closed on exit
+	defer func() {
+		oc.log.Info("Closing opportunity consumer...")
+		if err := oc.consumer.Close(); err != nil {
+			oc.log.Error("Failed to close opportunity consumer", "error", err)
+		} else {
+			oc.log.Info("✓ Opportunity consumer closed")
+		}
+	}()
+
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
 		msg, err := oc.consumer.ReadMessage(ctx)
 		if err != nil {
-			// Check if error is due to context cancellation
+			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {
 				oc.log.Info("Opportunity consumer stopping (context cancelled)")
 				return nil
 			}
-			oc.log.Error("Failed to read opportunity event", "error", err)
+			// Reader might be closed during shutdown, log at debug level
+			oc.log.Debug("Failed to read opportunity event", "error", err)
 			continue
 		}
 
-		// Process opportunity event
+		// Pass ctx directly to handleOpportunity. It will create its own workflowCtx
+		// for running workflows, but will use ctx for shutdown detection to:
+		// 1. Skip starting new workflows during shutdown
+		// 2. Cancel running workflows early
+		// 3. Wait with timeout for workflow completion
 		if err := oc.handleOpportunity(ctx, msg); err != nil {
 			oc.log.Error("Failed to handle opportunity",
 				"topic", msg.Topic,
 				"error", err,
 			)
+		}
+
+		// Check if we should stop AFTER processing current message
+		if ctx.Err() != nil {
+			oc.log.Info("Opportunity consumer stopping after processing current message")
+			return nil
 		}
 	}
 }
@@ -129,7 +150,34 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, oc.maxConcurrency)
 
+	// Create workflow context with timeout to prevent infinite workflows.
+	// During normal operation: workflows have up to 45 seconds to complete.
+	// During shutdown: workflows are cancelled immediately via ctx cancellation.
+	workflowCtx, workflowCancel := context.WithTimeout(ctx, 45*time.Second)
+	defer workflowCancel()
+
+	// Channel to signal early termination during shutdown
+	shutdownCh := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		close(shutdownCh)
+		// Cancel all workflows immediately on shutdown
+		workflowCancel()
+	}()
+
 	for _, pair := range pairs {
+		// Check if shutdown was requested before starting new workflow
+		select {
+		case <-shutdownCh:
+			oc.log.Warn("Shutdown requested, skipping remaining workflows",
+				"symbol", event.Symbol,
+				"remaining_users", len(pairs),
+			)
+			// Don't start new workflows during shutdown
+			goto waitForCompletion
+		default:
+		}
+
 		// Get user
 		usr, err := oc.userRepo.GetByID(ctx, pair.UserID)
 		if err != nil {
@@ -147,10 +195,18 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 			defer wg.Done()
 
 			// Acquire semaphore
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
+			select {
+			case semaphore <- struct{}{}:
+				defer func() { <-semaphore }()
+			case <-workflowCtx.Done():
+				oc.log.Warn("Workflow cancelled before starting (context done)",
+					"user_id", u.ID,
+					"symbol", p.Symbol,
+				)
+				return
+			}
 
-			if err := oc.runPersonalTradingWorkflow(ctx, u, p, &event); err != nil {
+			if err := oc.runPersonalTradingWorkflow(workflowCtx, u, p, &event); err != nil {
 				oc.log.Error("Personal trading workflow failed",
 					"user_id", u.ID,
 					"symbol", p.Symbol,
@@ -160,12 +216,47 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		}(usr, pair)
 	}
 
-	wg.Wait()
+waitForCompletion:
+	// Wait for all started workflows to complete with timeout.
+	// During shutdown, workflows are cancelled via workflowCtx, so this should be fast.
+	// Timeout: 60s (45s workflow timeout + 15s buffer)
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
 
-	oc.log.Info("Opportunity processing complete",
-		"symbol", event.Symbol,
-		"users_processed", len(pairs),
-	)
+	waitTimeout := 60 * time.Second
+	// During shutdown, use shorter timeout since workflows should already be cancelled
+	if ctx.Err() != nil {
+		waitTimeout = 15 * time.Second
+	}
+
+	select {
+	case <-done:
+		oc.log.Info("Opportunity processing complete",
+			"symbol", event.Symbol,
+			"users_processed", len(pairs),
+		)
+	case <-time.After(waitTimeout):
+		oc.log.Warn("Timeout waiting for workflows to complete",
+			"symbol", event.Symbol,
+			"timeout", waitTimeout,
+			"during_shutdown", ctx.Err() != nil,
+		)
+		// Force cancel remaining workflows
+		workflowCancel()
+
+		// Give goroutines additional 5s to cleanup after force cancel
+		select {
+		case <-done:
+			oc.log.Info("Workflows completed after force cancel")
+		case <-time.After(5 * time.Second):
+			oc.log.Error("Some workflows still running after force cancel - possible goroutine leak",
+				"symbol", event.Symbol,
+			)
+		}
+	}
 
 	return nil
 }

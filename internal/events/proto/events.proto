@@ -16,6 +16,29 @@ message BaseEvent {
   string version = 6;
 }
 
+// AIUsageEvent tracks AI model usage (tokens, costs, latency)
+message AIUsageEvent {
+  BaseEvent base = 1;
+  string session_id = 2;
+  string agent_name = 3;
+  string agent_type = 4;
+  string provider = 5;       // anthropic, openai, google, deepseek
+  string model_id = 6;       // claude-sonnet-4, gpt-4o, etc.
+  string model_family = 7;   // claude-3.5, gpt-4o, etc.
+  uint32 prompt_tokens = 8;
+  uint32 completion_tokens = 9;
+  uint32 total_tokens = 10;
+  double input_cost_usd = 11;
+  double output_cost_usd = 12;
+  double total_cost_usd = 13;
+  uint32 tool_calls_count = 14;
+  bool is_cached = 15;
+  bool cache_hit = 16;
+  uint32 latency_ms = 17;
+  uint32 reasoning_step = 18;
+  string workflow_name = 19;
+}
+
 // OpportunityFoundEvent is published when a trading opportunity is detected
 message OpportunityFoundEvent {
   BaseEvent base = 1;

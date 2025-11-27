@@ -1,6 +1,7 @@
 package callbacks
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,7 +12,9 @@ import (
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/model"
 
+	"prometheus/internal/adapters/ai"
 	"prometheus/internal/agents/state"
+	"prometheus/internal/events"
 	"prometheus/pkg/logger"
 )
 
@@ -72,8 +75,8 @@ func SaveToCacheAfterModelCallback(redisClient *redis.Client, ttl time.Duration)
 	}
 }
 
-// TokenCountingCallback tracks token usage for cost calculation
-func TokenCountingCallback(costTracker interface{}) llmagent.AfterModelCallback {
+// TokenCountingCallback tracks token usage and publishes to Kafka via WorkerPublisher
+func TokenCountingCallback(eventPublisher *events.WorkerPublisher) llmagent.AfterModelCallback {
 	return func(ctx agent.CallbackContext, resp *model.LLMResponse, respErr error) (*model.LLMResponse, error) {
 		if respErr != nil || resp == nil || resp.UsageMetadata == nil {
 			return resp, respErr
@@ -91,7 +94,100 @@ func TokenCountingCallback(costTracker interface{}) llmagent.AfterModelCallback 
 		state.SetTempPromptTokens(ctx.State(), int(resp.UsageMetadata.PromptTokenCount))
 		state.SetTempCompletionTokens(ctx.State(), int(resp.UsageMetadata.CandidatesTokenCount))
 
+		// Publish to Kafka if event publisher is available
+		if eventPublisher != nil {
+			// Publish asynchronously (don't block LLM response)
+			go func() {
+				publishCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+
+				// Calculate latency from temp state
+				latencyMs := uint32(0)
+				if startTime, err := state.GetTempStartTime(ctx.ReadonlyState()); err == nil {
+					latencyMs = uint32(time.Since(startTime).Milliseconds())
+				}
+
+				// Get model info from temp state
+				provider, modelID, modelFamily, inputCostPer1K, outputCostPer1K, hasModelInfo := state.GetTempModelInfo(ctx.ReadonlyState())
+				if !hasModelInfo {
+					provider = "unknown"
+					modelID = "unknown"
+					modelFamily = "unknown"
+					inputCostPer1K = 0
+					outputCostPer1K = 0
+				}
+
+				// Calculate costs
+				promptTokens := resp.UsageMetadata.PromptTokenCount
+				completionTokens := resp.UsageMetadata.CandidatesTokenCount
+				inputCostUSD := float64(promptTokens) / 1000.0 * inputCostPer1K
+				outputCostUSD := float64(completionTokens) / 1000.0 * outputCostPer1K
+				totalCostUSD := inputCostUSD + outputCostUSD
+
+				// Get reasoning step and increment
+				reasoningStep := state.IncrementReasoningStep(ctx.State())
+
+				// Get workflow name
+				workflowName := state.GetWorkflowName(ctx.ReadonlyState())
+
+				// Count tool calls from tool call counter
+				toolCallsCount := uint32(state.GetToolCallCount(ctx.ReadonlyState()))
+
+				// Publish using WorkerPublisher helper
+				if err := eventPublisher.PublishAIUsage(
+					publishCtx,
+					ctx.UserID(),
+					ctx.SessionID(),
+					ctx.AgentName(),
+					"", // agentType - extracted from agent name pattern
+					provider,
+					modelID,
+					modelFamily,
+					uint32(promptTokens),
+					uint32(completionTokens),
+					uint32(resp.UsageMetadata.TotalTokenCount),
+					inputCostUSD,
+					outputCostUSD,
+					totalCostUSD,
+					toolCallsCount,
+					false, // isCached
+					false, // cacheHit
+					latencyMs,
+					uint32(reasoningStep),
+					workflowName,
+				); err != nil {
+					log.Errorf("Failed to publish AI usage event to Kafka: %v", err)
+				} else {
+					log.Debugf("Published AI usage event: session=%s tokens=%d", ctx.SessionID(), resp.UsageMetadata.TotalTokenCount)
+				}
+			}()
+		}
+
 		return resp, nil
+	}
+}
+
+// ModelInfoCallback stores model information in state for cost calculation
+func ModelInfoCallback(aiRegistry *ai.ProviderRegistry, providerName, modelName string) llmagent.BeforeModelCallback {
+	return func(ctx agent.CallbackContext, req *model.LLMRequest) (*model.LLMResponse, error) {
+		// Resolve model info from AI registry
+		modelInfo, err := aiRegistry.ResolveModel(ctx, providerName, modelName)
+		if err != nil {
+			logger.Get().Warnf("Failed to resolve model info: %v", err)
+			return nil, nil // Continue anyway
+		}
+
+		// Store model info in temp state for AfterCallback
+		state.SetTempModelInfo(
+			ctx.State(),
+			string(modelInfo.Provider),
+			modelInfo.Name,
+			modelInfo.Family,
+			modelInfo.InputCostPer1K,
+			modelInfo.OutputCostPer1K,
+		)
+
+		return nil, nil
 	}
 }
 

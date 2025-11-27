@@ -3,6 +3,7 @@ package consumers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/events"
@@ -35,6 +36,16 @@ func NewNotificationConsumer(
 func (nc *NotificationConsumer) Start(ctx context.Context) error {
 	nc.log.Info("Starting notification consumer...")
 
+	// Ensure consumer is closed on exit
+	defer func() {
+		nc.log.Info("Closing notification consumer...")
+		if err := nc.consumer.Close(); err != nil {
+			nc.log.Error("Failed to close notification consumer", "error", err)
+		} else {
+			nc.log.Info("✓ Notification consumer closed")
+		}
+	}()
+
 	// Subscribe to all notification-worthy topics
 	topics := []string{
 		events.TopicOrderPlaced,
@@ -55,21 +66,31 @@ func (nc *NotificationConsumer) Start(ctx context.Context) error {
 	for {
 		msg, err := nc.consumer.ReadMessage(ctx)
 		if err != nil {
-			// Check if error is due to context cancellation
+			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {
 				nc.log.Info("Notification consumer stopping (context cancelled)")
 				return nil
 			}
-			nc.log.Error("Failed to read message", "error", err)
+			// Reader might be closed during shutdown, log at debug level
+			nc.log.Debug("Failed to read message", "error", err)
 			continue
 		}
 
-		// Process message
-		if err := nc.handleMessage(ctx, msg); err != nil {
+		// Process message with timeout to prevent hanging during shutdown
+		// Allow up to 5s to complete current message processing
+		processCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := nc.handleMessage(processCtx, msg); err != nil {
 			nc.log.Error("Failed to handle message",
 				"topic", msg.Topic,
 				"error", err,
 			)
+		}
+		cancel()
+
+		// Check if we should stop AFTER processing current message
+		if ctx.Err() != nil {
+			nc.log.Info("Notification consumer stopping after processing current message")
+			return nil
 		}
 	}
 }

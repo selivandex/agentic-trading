@@ -18,10 +18,9 @@ import (
 func TestWorkflowFactory_CreateParallelAnalysts(t *testing.T) {
 	// Create minimal setup for testing
 	aiRegistry := createTestAIRegistry(t)
-	toolRegistry := tools.NewRegistry()
+	toolRegistry := toolspkg.NewRegistry()
 
 	// Register at least one tool so agents can be created
-	// This is a placeholder - in real scenario we'd register actual tools
 	toolRegistry.Register("test_tool", createDummyTool())
 
 	agentFactory, err := agents.NewFactory(agents.FactoryDeps{
@@ -48,7 +47,7 @@ func TestWorkflowFactory_CreateParallelAnalysts(t *testing.T) {
 
 func TestWorkflowFactory_CreateMarketResearchWorkflow(t *testing.T) {
 	aiRegistry := createTestAIRegistry(t)
-	toolRegistry := tools.NewRegistry()
+	toolRegistry := toolspkg.NewRegistry()
 	toolRegistry.Register("test_tool", createDummyTool())
 
 	agentFactory, err := agents.NewFactory(agents.FactoryDeps{
@@ -73,7 +72,7 @@ func TestWorkflowFactory_CreateMarketResearchWorkflow(t *testing.T) {
 
 func TestWorkflowFactory_CreatePersonalTradingWorkflow(t *testing.T) {
 	aiRegistry := createTestAIRegistry(t)
-	toolRegistry := tools.NewRegistry()
+	toolRegistry := toolspkg.NewRegistry()
 	toolRegistry.Register("test_tool", createDummyTool())
 
 	agentFactory, err := agents.NewFactory(agents.FactoryDeps{
@@ -98,7 +97,7 @@ func TestWorkflowFactory_CreatePersonalTradingWorkflow(t *testing.T) {
 
 func TestWorkflowFactory_CreatePortfolioInitializationWorkflow(t *testing.T) {
 	aiRegistry := createTestAIRegistry(t)
-	toolRegistry := tools.NewRegistry()
+	toolRegistry := toolspkg.NewRegistry()
 	toolRegistry.Register("test_tool", createDummyTool())
 
 	agentFactory, err := agents.NewFactory(agents.FactoryDeps{
@@ -181,20 +180,13 @@ func (p *testProvider) ChatStream(ctx context.Context, req ai.ChatRequest) (<-ch
 	return nil, errCh
 }
 
-func createDummyTool() agent.Tool {
-	return &dummyTool{}
-}
-
-type dummyTool struct{}
-
-func (d *dummyTool) Name() string        { return "test_tool" }
-func (d *dummyTool) Description() string { return "Test tool" }
-func (d *dummyTool) IsLongRunning() bool { return false }
-
-func (d *dummyTool) ProcessRequest(ctx agent.Context, req *agent.LLMRequest) error {
-	return nil
-}
-
-func (d *dummyTool) Run(ctx agent.Context, args map[string]any) (map[string]any, error) {
-	return map[string]any{"result": "ok"}, nil
+// createDummyTool creates a minimal tool for testing using ADK functiontool
+func createDummyTool() tool.Tool {
+	return functiontool.New(functiontool.Config{
+		Name:        "test_tool",
+		Description: "Test tool for workflow testing",
+		Func: func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
+			return map[string]interface{}{"result": "ok"}, nil
+		},
+	})
 }

@@ -15,6 +15,7 @@ import (
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/agents/callbacks"
 	"prometheus/internal/agents/schemas"
+	"prometheus/internal/events"
 	"prometheus/internal/tools"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -28,24 +29,31 @@ type FactoryDeps struct {
 	Templates      *templates.Registry
 	SessionService session.Service
 	CallbackDeps   *CallbackDeps
+
+	// Model configuration for cost tracking
+	DefaultProvider string
+	DefaultModel    string
 }
 
 // CallbackDeps contains dependencies for agent callbacks
 type CallbackDeps struct {
-	Redis       *redis.Client
-	CostTracker callbacks.CostTracker
-	RiskEngine  interface{}
-	StatsRepo   interface{}
+	Redis          *redis.Client
+	EventPublisher *events.WorkerPublisher // Publishes events to Kafka
+	CostCheckFunc  callbacks.CostCheckFunc // Function to check daily cost limits
+	RiskEngine     interface{}
+	StatsRepo      interface{}
 }
 
 // Factory creates configured ADK agents.
 type Factory struct {
-	aiRegistry     *ai.ProviderRegistry
-	toolRegistry   *tools.Registry
-	templates      *templates.Registry
-	sessionService session.Service
-	callbackDeps   *CallbackDeps
-	log            *logger.Logger
+	aiRegistry      *ai.ProviderRegistry
+	toolRegistry    *tools.Registry
+	templates       *templates.Registry
+	sessionService  session.Service
+	callbackDeps    *CallbackDeps
+	defaultProvider string
+	defaultModel    string
+	log             *logger.Logger
 }
 
 // NewFactory builds an agent factory with required dependencies.
@@ -71,17 +79,21 @@ func NewFactory(deps FactoryDeps) (*Factory, error) {
 	}
 
 	return &Factory{
-		aiRegistry:     deps.AIRegistry,
-		toolRegistry:   deps.ToolRegistry,
-		templates:      deps.Templates,
-		sessionService: deps.SessionService,
-		callbackDeps:   deps.CallbackDeps,
-		log:            logger.Get().With("component", "agent_factory"),
+		aiRegistry:      deps.AIRegistry,
+		toolRegistry:    deps.ToolRegistry,
+		templates:       deps.Templates,
+		sessionService:  deps.SessionService,
+		callbackDeps:    deps.CallbackDeps,
+		defaultProvider: deps.DefaultProvider,
+		defaultModel:    deps.DefaultModel,
+		log:             logger.Get().With("component", "agent_factory"),
 	}, nil
 }
 
 // CreateAgent constructs a pure ADK agent instance from a config.
 func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
+	// Store agent type for callbacks
+	agentTypeStr := string(cfg.Type)
 	// Resolve model info
 	modelInfo, err := f.aiRegistry.ResolveModel(context.Background(), cfg.AIProvider, cfg.Model)
 	if err != nil {
@@ -146,8 +158,8 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 	f.log.Debugf("Creating ADK agent: %s with model %s and %d tools",
 		cfg.Name, modelInfo.Name, len(adkTools))
 
-	// Prepare callbacks
-	agentCallbacks := f.buildAgentCallbacks()
+	// Prepare callbacks (pass agent type for state tracking)
+	agentCallbacks := f.buildAgentCallbacks(agentTypeStr)
 	modelCallbacks := f.buildModelCallbacks()
 	toolCallbacks := f.buildToolCallbacks()
 
@@ -215,18 +227,18 @@ type toolCallbacksSet struct {
 }
 
 // buildAgentCallbacks creates agent lifecycle callbacks
-func (f *Factory) buildAgentCallbacks() agentCallbacksSet {
+func (f *Factory) buildAgentCallbacks(agentType string) agentCallbacksSet {
 	var before []agent.BeforeAgentCallback
 	var after []agent.AfterAgentCallback
 
 	if f.callbackDeps != nil {
-		// Cost tracking
-		if f.callbackDeps.CostTracker != nil {
-			before = append(before, callbacks.CostTrackingBeforeCallback(f.callbackDeps.CostTracker))
+		// Cost tracking (using ClickHouse cost check)
+		if f.callbackDeps.CostCheckFunc != nil {
+			before = append(before, callbacks.CostTrackingBeforeCallback(f.callbackDeps.CostCheckFunc))
 		}
 
-		// Validation
-		before = append(before, callbacks.ValidationBeforeCallback())
+		// Validation (pass agent type for state tracking)
+		before = append(before, callbacks.ValidationBeforeCallback(agentType))
 
 		// Metrics
 		after = append(after, callbacks.MetricsAfterCallback(nil)) // TODO: pass stats repo
@@ -244,15 +256,20 @@ func (f *Factory) buildModelCallbacks() modelCallbacksSet {
 	var after []llmagent.AfterModelCallback
 
 	if f.callbackDeps != nil {
+		// Model info tracking (stores provider/model/pricing in state)
+		if f.aiRegistry != nil && f.defaultProvider != "" && f.defaultModel != "" {
+			before = append(before, callbacks.ModelInfoCallback(f.aiRegistry, f.defaultProvider, f.defaultModel))
+		}
+
 		// Response caching
 		if f.callbackDeps.Redis != nil {
 			before = append(before, callbacks.CachingBeforeModelCallback(f.callbackDeps.Redis))
 			after = append(after, callbacks.SaveToCacheAfterModelCallback(f.callbackDeps.Redis, 1*time.Hour))
 		}
 
-		// Token counting
-		if f.callbackDeps.CostTracker != nil {
-			after = append(after, callbacks.TokenCountingCallback(f.callbackDeps.CostTracker))
+		// Token counting and usage publishing to Kafka
+		if f.callbackDeps.EventPublisher != nil {
+			after = append(after, callbacks.TokenCountingCallback(f.callbackDeps.EventPublisher))
 		}
 
 		// Rate limiting

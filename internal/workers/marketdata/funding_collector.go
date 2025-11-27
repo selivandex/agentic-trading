@@ -47,6 +47,16 @@ func (fc *FundingCollector) Run(ctx context.Context) error {
 
 	// Collect funding rates from each exchange
 	for _, exchangeName := range fc.exchanges {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			fc.Log().Info("Funding collection interrupted by shutdown",
+				"rates_collected", totalRates,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		exchangeClient, err := fc.exchFactory.GetClient(exchangeName)
 		if err != nil {
 			fc.Log().Error("Failed to get exchange client",
@@ -98,6 +108,14 @@ func (fc *FundingCollector) collectExchangeFundingRates(
 
 	// Collect funding rate for each symbol
 	for _, symbol := range fc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			fc.Log().Debug("Funding collection for exchange interrupted by shutdown", "exchange", exchangeName)
+			return successCount, ctx.Err()
+		default:
+		}
+
 		fundingData, err := fc.collectFundingRate(ctx, exchange, exchangeName, symbol)
 		if err != nil {
 			fc.Log().Error("Failed to collect funding rate",

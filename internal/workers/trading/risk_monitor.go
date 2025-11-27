@@ -74,6 +74,17 @@ func (rm *RiskMonitor) Run(ctx context.Context) error {
 	successCount := 0
 	errorCount := 0
 	for _, usr := range activeUsers {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			rm.Log().Info("Risk monitoring interrupted by shutdown",
+				"users_processed", successCount,
+				"users_remaining", len(activeUsers)-successCount-errorCount,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		if err := rm.monitorUser(ctx, usr.ID); err != nil {
 			rm.Log().Error("Failed to monitor user risk",
 				"user_id", usr.ID,

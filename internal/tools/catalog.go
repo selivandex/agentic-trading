@@ -1,10 +1,13 @@
 package tools
+
 import (
 	"encoding/json"
 	"sync"
 )
+
 // RiskLevel defines the risk level of a tool operation
 type RiskLevel string
+
 const (
 	RiskLevelNone     RiskLevel = "none"     // Read-only operations with no side effects
 	RiskLevelLow      RiskLevel = "low"      // Low-risk operations (queries, analysis)
@@ -12,6 +15,7 @@ const (
 	RiskLevelHigh     RiskLevel = "high"     // High-risk operations (large orders, multiple actions)
 	RiskLevelCritical RiskLevel = "critical" // Critical operations (emergency actions, kill switches)
 )
+
 // ToolDefinition describes a tool's metadata
 type ToolDefinition struct {
 	Name         string                 `json:"name"`
@@ -23,10 +27,13 @@ type ToolDefinition struct {
 	RateLimit    int                    `json:"rate_limit"`    // Calls per minute (0 = unlimited)
 	RiskLevel    RiskLevel              `json:"risk_level"`    // Risk level of the operation
 }
+
 // Definition is an alias for backward compatibility
 type Definition = ToolDefinition
+
 // ToolCategory represents a category of tools
 type ToolCategory string
+
 const (
 	CategoryMarketData  ToolCategory = "market_data"
 	CategoryMomentum    ToolCategory = "momentum"
@@ -46,15 +53,18 @@ const (
 	CategoryMemory      ToolCategory = "memory"
 	CategoryEvaluation  ToolCategory = "evaluation"
 )
+
 var (
 	catalog     []ToolDefinition
 	catalogOnce sync.Once
 )
+
 // Definitions returns all tool definitions
 func Definitions() []ToolDefinition {
 	catalogOnce.Do(initCatalog)
 	return catalog
 }
+
 // DefinitionsByCategory returns tools filtered by category
 func DefinitionsByCategory(category ToolCategory) []ToolDefinition {
 	catalogOnce.Do(initCatalog)
@@ -66,6 +76,7 @@ func DefinitionsByCategory(category ToolCategory) []ToolDefinition {
 	}
 	return filtered
 }
+
 // DefinitionByName returns a tool definition by name
 func DefinitionByName(name string) (*ToolDefinition, bool) {
 	catalogOnce.Do(initCatalog)
@@ -76,6 +87,7 @@ func DefinitionByName(name string) (*ToolDefinition, bool) {
 	}
 	return nil, false
 }
+
 // initCatalog initializes the tool catalog
 func initCatalog() {
 	catalog = []ToolDefinition{
@@ -535,11 +547,13 @@ func initCatalog() {
 		},
 	}
 }
+
 // ToJSON exports catalog to JSON
 func ToJSON() ([]byte, error) {
 	catalogOnce.Do(initCatalog)
 	return json.MarshalIndent(catalog, "", "  ")
 }
+
 // Categories returns all unique categories
 func Categories() []ToolCategory {
 	return []ToolCategory{

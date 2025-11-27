@@ -47,6 +47,17 @@ func (tc *TickerCollector) Run(ctx context.Context) error {
 
 	// Collect tickers from each exchange
 	for _, exchangeName := range tc.exchanges {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			tc.Log().Info("Ticker collection interrupted by shutdown",
+				"tickers_collected", totalTickers,
+				"exchanges_remaining", len(tc.exchanges)-totalTickers/len(tc.symbols),
+			)
+			return ctx.Err()
+		default:
+		}
+
 		exchangeClient, err := tc.exchFactory.GetClient(exchangeName)
 		if err != nil {
 			tc.Log().Error("Failed to get exchange client",
@@ -89,6 +100,17 @@ func (tc *TickerCollector) collectExchangeTickers(
 
 	// Collect ticker for each symbol
 	for _, symbol := range tc.symbols {
+		// Check for context cancellation (graceful shutdown)
+		select {
+		case <-ctx.Done():
+			tc.Log().Debug("Ticker collection for exchange interrupted by shutdown",
+				"exchange", exchangeName,
+				"symbols_collected", successCount,
+			)
+			return successCount, ctx.Err()
+		default:
+		}
+
 		ticker, err := tc.collectTicker(ctx, exchange, exchangeName, symbol)
 		if err != nil {
 			tc.Log().Error("Failed to collect ticker",

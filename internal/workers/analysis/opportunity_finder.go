@@ -22,11 +22,11 @@ import (
 // for each monitored symbol, publishing high-quality signals to Kafka for user consumption.
 type OpportunityFinder struct {
 	*workers.BaseWorker
-	workflow       agent.Agent      // MarketResearchWorkflow (ADK)
-	runner         *runner.Runner   // ADK runner
-	sessionService session.Service  // Session persistence
-	symbols        []string         // List of symbols to monitor
-	exchange       string           // Primary exchange for analysis
+	workflow       agent.Agent     // MarketResearchWorkflow (ADK)
+	runner         *runner.Runner  // ADK runner
+	sessionService session.Service // Session persistence
+	symbols        []string        // List of symbols to monitor
+	exchange       string          // Primary exchange for analysis
 	log            *logger.Logger
 }
 
@@ -85,6 +85,18 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 
 	// Run workflow for each symbol
 	for _, symbol := range of.symbols {
+		// Check for context cancellation (graceful shutdown)
+		// Critical: ADK workflows can take minutes, check between symbols
+		select {
+		case <-ctx.Done():
+			of.Log().Info("Market research interrupted by shutdown",
+				"opportunities_found", opportunities,
+				"symbols_remaining", len(of.symbols)-opportunities-errors,
+			)
+			return ctx.Err()
+		default:
+		}
+
 		found, err := of.analyzeSymbol(ctx, symbol)
 		if err != nil {
 			of.Log().Error("Failed to analyze symbol",
@@ -138,6 +150,19 @@ func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (
 
 	// Iterate through events from the workflow
 	for event, err := range of.runner.Run(ctx, userID, sessionID, input, runConfig) {
+		// Check for context cancellation between workflow events
+		// Critical: ADK workflows can take minutes, need to exit gracefully on shutdown
+		select {
+		case <-ctx.Done():
+			of.log.Info("Workflow interrupted by shutdown",
+				"symbol", symbol,
+				"session_id", sessionID,
+				"opportunity_published", opportunityPublished,
+			)
+			return opportunityPublished, ctx.Err()
+		default:
+		}
+
 		if err != nil {
 			return false, errors.Wrap(err, "market research workflow failed")
 		}

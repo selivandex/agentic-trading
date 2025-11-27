@@ -27,7 +27,7 @@ func NewPublishOpportunityTool(kafkaProducer *kafka.Producer) tool.Tool {
 		},
 		shared.Deps{}, // No repo dependencies needed
 	).
-		WithTimeout(10 * time.Second).
+		WithTimeout(10*time.Second).
 		WithRetry(3, 500*time.Millisecond).
 		Build()
 }

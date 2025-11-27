@@ -154,6 +154,7 @@ func main() {
 	riskConsumer := provideKafkaConsumer(cfg, "risk_events", log)
 	analyticsConsumer := provideKafkaConsumer(cfg, "analytics", log)
 	opportunityKafkaConsumer := provideKafkaConsumer(cfg, events.TopicOpportunityFound, log)
+	aiUsageKafkaConsumer := provideKafkaConsumer(cfg, events.TopicAIUsage, log)
 
 	encryptor, err := crypto.NewEncryptor(cfg.Crypto.EncryptionKey)
 	if err != nil {
@@ -183,7 +184,7 @@ func main() {
 		log,
 	)
 
-	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, log)
+	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, kafkaProducer, aiUsageRepo, log)
 	if err != nil {
 		log.Fatalf("failed to initialize agents: %v", err)
 	}
@@ -235,6 +236,10 @@ func main() {
 	notificationSvc := consumers.NewNotificationConsumer(notificationConsumer, log)
 	riskSvc := consumers.NewRiskConsumer(riskConsumer, riskEngine, log)
 	analyticsSvc := consumers.NewAnalyticsConsumer(analyticsConsumer, log)
+
+	// AI usage consumer: Reads AI usage events from Kafka and writes to ClickHouse in batches
+	aiUsageSvc := consumers.NewAIUsageConsumer(aiUsageKafkaConsumer, aiUsageRepo, log)
+
 	// Create workflow factory for personal trading workflows
 	workflowFactory := workflows.NewFactory(agentFactory, cfg.AI.DefaultProvider, "claude-sonnet-4")
 
@@ -249,7 +254,7 @@ func main() {
 	)
 
 	// Start consumers in background (all tracked by WaitGroup)
-	wg.Add(4)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
 		if err := notificationSvc.Start(ctx); err != nil && ctx.Err() == nil {
@@ -274,8 +279,14 @@ func main() {
 			log.Error("Opportunity consumer failed", "error", err)
 		}
 	}()
+	go func() {
+		defer wg.Done()
+		if err := aiUsageSvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("AI usage consumer failed", "error", err)
+		}
+	}()
 
-	log.Info("✓ Event consumers started (notification, risk, analytics, opportunity)")
+	log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage")
 
 	log.With("tools", len(toolRegistry.List())).Info("System initialized successfully")
 
@@ -300,10 +311,6 @@ func main() {
 	// HTTP Server (Health + Metrics API)
 	// ========================================
 	httpServer := provideHTTPServer(cfg, healthHandler, log)
-
-	// Start AI usage batch writer (background flush loop)
-	aiUsageRepo.Start(ctx)
-	log.Info("✓ AI usage batch writer started")
 
 	// Start HTTP server in background (tracked by wg)
 	wg.Add(1)
@@ -359,7 +366,7 @@ func main() {
 		riskConsumer,
 		analyticsConsumer,
 		opportunityKafkaConsumer,
-		aiUsageRepo,
+		aiUsageKafkaConsumer,
 		pgClient,
 		chClient,
 		redisClient,
@@ -500,6 +507,8 @@ func provideAgents(
 	sessionService session.Service,
 	redisClient *redisclient.Client,
 	riskEngine *riskengine.RiskEngine,
+	kafkaProducer *kafka.Producer,
+	aiUsageRepo *chrepo.AIUsageRepository,
 	log *logger.Logger,
 ) (*agents.Factory, *agents.Registry, error) {
 	log.Info("Initializing agents...")
@@ -514,24 +523,7 @@ func provideAgents(
 		return nil, nil, errors.ErrUnavailable
 	}
 
-	// Create cost tracker for monitoring AI spend across providers and models
-	costTracker := agents.NewCostTracker()
-
-	factory, err := agents.NewFactory(agents.FactoryDeps{
-		AIRegistry:     aiRegistry,
-		ToolRegistry:   toolRegistry,
-		Templates:      templates.Get(),
-		SessionService: sessionService,
-		CallbackDeps: &agents.CallbackDeps{
-			Redis:       redisClient.Client(),
-			CostTracker: costTracker,
-			RiskEngine:  riskEngine,
-		},
-	})
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "create agent factory")
-	}
-
+	// Resolve model FIRST (before creating factory)
 	selector := ai.NewModelSelector(aiRegistry, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -539,6 +531,37 @@ func provideAgents(
 	modelCfg, modelInfo, err := selector.Get(ctx, string(agents.AgentMarketAnalyst), defaultProvider)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "resolve default model")
+	}
+
+	// Create cost check function using ClickHouse
+	costCheckFunc := func(userID string) (bool, error) {
+		cost, err := aiUsageRepo.GetUserDailyCost(context.Background(), userID, time.Now())
+		if err != nil {
+			return false, err
+		}
+		const dailyLimit = 10.0 // $10 daily limit per user
+		return cost > dailyLimit, nil
+	}
+
+	// Create event publisher for callbacks
+	eventPublisher := events.NewWorkerPublisher(kafkaProducer)
+
+	factory, err := agents.NewFactory(agents.FactoryDeps{
+		AIRegistry:      aiRegistry,
+		ToolRegistry:    toolRegistry,
+		Templates:       templates.Get(),
+		SessionService:  sessionService,
+		DefaultProvider: modelCfg.Provider,
+		DefaultModel:    modelCfg.Model,
+		CallbackDeps: &agents.CallbackDeps{
+			Redis:          redisClient.Client(),
+			EventPublisher: eventPublisher,
+			CostCheckFunc:  costCheckFunc,
+			RiskEngine:     riskEngine,
+		},
+	})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "create agent factory")
 	}
 
 	registry, err := factory.CreateDefaultRegistry(modelCfg.Provider, modelCfg.Model)
@@ -999,6 +1022,16 @@ func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, log *l
 
 // gracefulShutdown handles coordinated cleanup of all components
 // Note: Application context is already cancelled by caller before this function
+//
+// Shutdown sequence:
+// 1. Stop HTTP server (no new requests)
+// 2. Stop background workers (market data collectors, etc.)
+// 3. Close Kafka consumers (unblock ReadMessage calls)
+// 4. Wait for consumer goroutines (should exit quickly now)
+// 5. Close Kafka producer (after consumers finished)
+// 6. Flush error tracker
+// 7. Sync logs
+// 8. Close database connections (last - other components may need them)
 func gracefulShutdown(
 	wg *sync.WaitGroup,
 	httpServer *http.Server,
@@ -1009,15 +1042,16 @@ func gracefulShutdown(
 	riskConsumer *kafka.Consumer,
 	analyticsConsumer *kafka.Consumer,
 	opportunityKafkaConsumer *kafka.Consumer,
-	aiUsageRepo *chrepo.AIUsageRepository,
+	aiUsageKafkaConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
 	errorTracker errors.Tracker,
 	log *logger.Logger,
 ) {
-	// Create shutdown context with timeout (30 seconds for complete cleanup)
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Create shutdown context with timeout (2.5 minutes for complete cleanup)
+	// This accommodates the 2-minute worker timeout + time for other cleanup
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 150*time.Second)
 	defer shutdownCancel()
 
 	// Cleanup sequence (order matters!)
@@ -1044,8 +1078,26 @@ func gracefulShutdown(
 		log.Info("✓ Workers stopped")
 	}
 
-	// Step 3: Wait for auxiliary goroutines (market scanner listener, etc.)
-	log.Info("[3/7] Waiting for auxiliary goroutines...")
+	// Step 3: Close Kafka consumers FIRST to unblock ReadMessage() calls
+	// This is critical - consumer.Close() will interrupt blocking ReadMessage()
+	log.Info("[3/7] Closing Kafka consumers (to unblock ReadMessage)...")
+	for name, consumer := range map[string]*kafka.Consumer{
+		"notification": notificationConsumer,
+		"risk":         riskConsumer,
+		"analytics":    analyticsConsumer,
+		"opportunity":  opportunityKafkaConsumer,
+		"ai_usage":     aiUsageKafkaConsumer,
+	} {
+		if consumer != nil {
+			if err := consumer.Close(); err != nil {
+				log.Error("Kafka consumer close failed", "consumer", name, "error", err)
+			}
+		}
+	}
+	log.Info("✓ Kafka consumers closed")
+
+	// Step 4: Wait for consumer goroutines (now they should exit quickly)
+	log.Info("[4/7] Waiting for consumer goroutines...")
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -1059,40 +1111,17 @@ func gracefulShutdown(
 		log.Warn("⚠ Some goroutines did not finish within 5s timeout")
 	}
 
-	// Step 4: Flush AI usage batch writer
-	log.Info("[4/8] Flushing AI usage batch writer...")
-	flushCtx, flushCancel := context.WithTimeout(shutdownCtx, 10*time.Second)
-	defer flushCancel()
-	if err := aiUsageRepo.Stop(flushCtx); err != nil {
-		log.Error("AI usage batch writer stop failed", "error", err)
-	} else {
-		log.Info("✓ AI usage batch writer flushed and stopped")
-	}
-
-	// Step 5: Close Kafka clients
-	log.Info("[5/8] Closing Kafka clients...")
+	// Step 5: Close Kafka producer (after consumers finished)
+	log.Info("[5/7] Closing Kafka producer...")
 	if kafkaProducer != nil {
 		if err := kafkaProducer.Close(); err != nil {
 			log.Error("Kafka producer close failed", "error", err)
 		}
 	}
-	// Close all consumers
-	for name, consumer := range map[string]*kafka.Consumer{
-		"notification": notificationConsumer,
-		"risk":         riskConsumer,
-		"analytics":    analyticsConsumer,
-		"opportunity":  opportunityKafkaConsumer,
-	} {
-		if consumer != nil {
-			if err := consumer.Close(); err != nil {
-				log.Error("Kafka consumer close failed", "consumer", name, "error", err)
-			}
-		}
-	}
-	log.Info("✓ Kafka clients closed")
+	log.Info("✓ Kafka producer closed")
 
 	// Step 6: Flush error tracker
-	log.Info("[6/8] Flushing error tracker...")
+	log.Info("[6/7] Flushing error tracker...")
 	if errorTracker != nil {
 		flushCtx, flushCancel := context.WithTimeout(shutdownCtx, 3*time.Second)
 		defer flushCancel()
@@ -1104,7 +1133,7 @@ func gracefulShutdown(
 	}
 
 	// Step 7: Sync logs
-	log.Info("[7/8] Syncing logs...")
+	log.Info("[7/7] Syncing logs...")
 	if err := logger.Sync(); err != nil {
 		// Ignore "sync /dev/stderr: inappropriate ioctl for device" on Linux
 		log.Warn("Log sync completed with warnings")
