@@ -145,8 +145,8 @@ func TestOpportunitySynthesizerOutputSchema_SchemaStructure(t *testing.T) {
 		t.Errorf("Expected decision to be OBJECT, got %s", decision.Type)
 	}
 
-	// Verify Required field lists the required properties
-	if len(OpportunitySynthesizerOutputSchema.Required) != 3 {
-		t.Errorf("Expected 3 required fields, got %d", len(OpportunitySynthesizerOutputSchema.Required))
+	// Verify Required field lists the required properties (Phase 1: added evidence field)
+	if len(OpportunitySynthesizerOutputSchema.Required) != 4 {
+		t.Errorf("Expected 4 required fields (synthesis_steps, decision, conflicts, evidence), got %d", len(OpportunitySynthesizerOutputSchema.Required))
 	}
 }

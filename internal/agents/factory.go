@@ -202,10 +202,14 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 // getSchemaForAgent returns input/output schemas for specific agent types
 func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
 	switch agentType {
-	case AgentStrategyPlanner:
-		return nil, schemas.StrategyPlannerOutputSchema
+	case AgentPortfolioManager:
+		return nil, schemas.PortfolioManagerOutputSchema
 	case AgentOpportunitySynthesizer:
 		return nil, schemas.OpportunitySynthesizerOutputSchema
+	case AgentPreTradeReviewer:
+		return nil, schemas.PreTradeReviewerOutputSchema
+	case AgentPerformanceCommittee:
+		return nil, schemas.PerformanceCommitteeOutputSchema
 	default:
 		return nil, nil
 	}
@@ -328,15 +332,15 @@ func (f *Factory) CreateDefaultRegistry(provider, model string) (*Registry, erro
 	return reg, nil
 }
 
-// CreateTradingPipeline creates a strategy planner agent.
+// CreateTradingPipeline creates a portfolio manager agent for a specific user.
 // TODO: Extend to multi-agent workflow using ADK workflow agents when needed.
 func (f *Factory) CreateTradingPipeline(userCfg UserAgentConfig) (agent.Agent, error) {
-	// For now, create a strategy planner that can orchestrate via tools
-	strategyCfg := DefaultAgentConfigs[AgentStrategyPlanner]
-	strategyCfg.AIProvider = userCfg.AIProvider
-	strategyCfg.Model = userCfg.Model
+	// Create a portfolio manager that personalizes opportunities for this user
+	portfolioMgrCfg := DefaultAgentConfigs[AgentPortfolioManager]
+	portfolioMgrCfg.AIProvider = userCfg.AIProvider
+	portfolioMgrCfg.Model = userCfg.Model
 
-	return f.CreateAgent(strategyCfg)
+	return f.CreateAgent(portfolioMgrCfg)
 }
 
 // CreateAgentForUser creates a specific agent for a user with custom config.

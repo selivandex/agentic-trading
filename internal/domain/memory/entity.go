@@ -66,7 +66,7 @@ type CollectiveMemory struct {
 	ID uuid.UUID `db:"id"`
 
 	// Scope
-	AgentType   string  `db:"agent_type"`  // "opportunity_synthesizer", "strategy_planner", "risk_manager", etc.
+	AgentType   string  `db:"agent_type"`  // "opportunity_synthesizer", "portfolio_manager", "position_manager", etc.
 	Personality *string `db:"personality"` // NULL for all personalities
 
 	// Content

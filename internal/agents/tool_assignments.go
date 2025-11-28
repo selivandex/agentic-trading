@@ -6,10 +6,9 @@ import "prometheus/internal/tools"
 // Phase 2 refactoring: Removed 8 analyst agents - analysis now done via algorithmic tools
 var AgentToolCategories = map[AgentType][]string{
 	// Personal trading workflow agents (per-user decision making)
-	// Added execution category for execute_trade tool
-	AgentStrategyPlanner: {"market_data", "account", "risk", "execution", "memory"},
-	AgentPositionManager: {"account", "execution", "memory"},
-	AgentSelfEvaluator:   {"evaluation", "memory"},
+	// Portfolio Manager (per-client decision making)
+	AgentPortfolioManager: {"market_data", "account", "risk", "execution", "memory"},
+	AgentPositionManager:  {"account", "execution", "memory"},
 
 	// Market research agent (global opportunity identification)
 	AgentOpportunitySynthesizer: {"market_data", "smc", "memory"}, // Direct access to technical, SMC, and market analysis tools
@@ -21,6 +20,10 @@ var AgentToolCategories = map[AgentType][]string{
 	// System agents (adaptive intelligence)
 	AgentRegimeDetector:      {"market_data", "derivatives", "memory"},
 	AgentPerformanceAnalyzer: {"evaluation", "memory"},
+
+	// Quality gates and review agents
+	AgentPreTradeReviewer:     {"risk", "memory"},
+	AgentPerformanceCommittee: {"evaluation", "memory"},
 }
 
 // AgentToolMap resolves tool names per agent by filtering the global catalog by category.

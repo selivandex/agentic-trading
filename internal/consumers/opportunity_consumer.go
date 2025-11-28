@@ -384,26 +384,19 @@ func (oc *OpportunityConsumer) buildTradingPrompt(
 
 **Your Task**:
 
-You are executing a personal trading workflow. The market research has ALREADY been completed by 8 specialist analysts. Your job is to make a personalized trading decision based on:
+You are a Portfolio Manager executing a personal trading workflow. The market research has ALREADY been completed. Your job is to make a personalized trading decision based on:
 
 1. **The PRE-ANALYZED market signal above** (objective market view)
 2. **Your personal context** (portfolio, risk profile, existing positions)
 
-### Step 1: StrategyPlanner
+### Workflow:
 - Use tools to get YOUR context:
   - get_portfolio_summary() - understand current portfolio
   - get_positions() - check existing positions
   - get_user_risk_profile() - understand risk limits
 - Decide: Should YOU take this trade? If yes, with what size?
-- Output: Personal trading plan
-
-### Step 2: RiskManager
-- Validate the plan against YOUR risk limits
-- Check: daily loss limits, position size limits, correlation
-- Output: Approved/rejected + adjusted plan
-
-### Step 3: Executor
-- If approved → place order using place_order() tool
+- Validate via pre_trade_check() tool against YOUR risk limits
+- If approved → execute via execute_trade() tool
 - If rejected → log reason and skip
 
 **Think step-by-step. Be thorough but decisive.**

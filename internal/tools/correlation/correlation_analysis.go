@@ -46,8 +46,14 @@ func (t *CorrelationAnalysisTool) Execute(ctx context.Context, symbol string) (s
 		return "", errors.Wrap(err, "failed to get BTC correlation")
 	}
 
+	// Convert correlations to map[string]interface{} for formatAnalysis
+	corrsInterface := make(map[string]interface{}, len(correlations))
+	for k, v := range correlations {
+		corrsInterface[k] = v
+	}
+
 	// Format analysis
-	return t.formatAnalysis(symbol, correlations, btcCorr.InexactFloat64()), nil
+	return t.formatAnalysis(symbol, corrsInterface, btcCorr.InexactFloat64()), nil
 }
 
 // formatAnalysis creates human-readable correlation analysis
@@ -236,4 +242,3 @@ func (t *CorrelationAnalysisTool) GetDefinition() map[string]interface{} {
 		},
 	}
 }
-

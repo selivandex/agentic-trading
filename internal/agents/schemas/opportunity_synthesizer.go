@@ -5,6 +5,9 @@ import "google.golang.org/genai"
 // OpportunitySynthesizerOutputSchema defines the structured Chain-of-Thought output
 // for OpportunitySynthesizer agent. This schema enforces transparent reasoning with
 // explicit synthesis steps, decision rationale, and conflict resolution.
+//
+// Phase 1 Update: Added evidence tracking and alternatives_considered for full
+// explainability compliance.
 var OpportunitySynthesizerOutputSchema = &genai.Schema{
 	Type: "OBJECT",
 	Properties: map[string]*genai.Schema{
@@ -106,6 +109,18 @@ var OpportunitySynthesizerOutputSchema = &genai.Schema{
 				Required: []string{"conflicting_analysts", "conflict_type", "resolution_method"},
 			},
 		},
+		// Explainability fields (Phase 1 addition)
+		"evidence": {
+			Type:        "OBJECT",
+			Description: "Evidence sources and data quality used in analysis",
+			Properties:  EvidenceSchema.Properties,
+			Required:    EvidenceSchema.Required,
+		},
+		"alternatives_considered": {
+			Type:        "ARRAY",
+			Description: "Alternative interpretations or actions that were considered and rejected",
+			Items:       AlternativeSchema,
+		},
 	},
-	Required: []string{"synthesis_steps", "decision", "conflicts"},
+	Required: []string{"synthesis_steps", "decision", "conflicts", "evidence"},
 }

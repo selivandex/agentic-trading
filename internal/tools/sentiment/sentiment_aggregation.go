@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"prometheus/internal/domain/sentiment"
-	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
