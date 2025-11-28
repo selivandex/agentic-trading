@@ -28,7 +28,7 @@ type RegimeDetectorML struct {
 	mdRepo           market_data.Repository
 	regimeRepo       regime.Repository
 	classifier       *regimeml.Classifier // ML model for classification
-	interpreterAgent agent.Agent          // LLM agent for interpretation (from factory)
+	interpreterAgent agent.Agent          // LLM agent for interpretation (optional, can be nil)
 	runner           *runner.Runner       // ADK runner for interpreter agent
 	sessionService   session.Service      // Session service
 	kafka            *kafka.Producer
@@ -221,8 +221,7 @@ func (rd *RegimeDetectorML) interpretRegime(
 	}
 
 	// Build input data for agent
-	// Agent's system prompt template (agents/regime_interpreter) will be rendered automatically
-	// We just need to provide the data in user message
+	// Agent will use this data in its processing
 	promptData := map[string]interface{}{
 		"Symbol":        symbol,
 		"Regime":        string(classification.Regime),
@@ -237,7 +236,7 @@ func (rd *RegimeDetectorML) interpretRegime(
 		return nil, errors.Wrap(err, "failed to marshal input data")
 	}
 
-	// Build user message - agent will process this with its configured template
+	// Build user message - agent will process this data
 	input := &genai.Content{
 		Role: "user",
 		Parts: []*genai.Part{

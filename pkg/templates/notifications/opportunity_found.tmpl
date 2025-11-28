@@ -1,0 +1,18 @@
+💡 *Trading Opportunity Detected*
+
+📊 *{{.Symbol}}* {{.Direction}}
+
+💰 Entry: ${{printf "%.2f" .Entry}}
+🛑 Stop Loss: ${{printf "%.2f" .StopLoss}}
+🎯 Take Profit: ${{printf "%.2f" .TakeProfit}}
+📊 Confidence: {{printf "%.0f" (mul .Confidence 100)}}%
+
+📋 Strategy: {{.Strategy}}
+
+{{if .Reasoning}}💭 Analysis:
+{{.Reasoning}}{{end}}
+
+_Analyzing if this fits your portfolio..._
+
+🕐 {{.Timestamp.Format "2006-01-02 15:04"}}
+

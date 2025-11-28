@@ -83,6 +83,7 @@ type TelegramConfig struct {
 	BotToken   string  `envconfig:"TELEGRAM_BOT_TOKEN" required:"true"`
 	WebhookURL string  `envconfig:"TELEGRAM_WEBHOOK_URL"`
 	AdminIDs   []int64 `envconfig:"TELEGRAM_ADMIN_IDS"`
+	Debug      bool    `envconfig:"TELEGRAM_DEBUG" default:"false"`
 }
 
 type AIConfig struct {

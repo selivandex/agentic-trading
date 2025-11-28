@@ -1,0 +1,20 @@
+📊 *Portfolio Status*
+
+Hello {{.FirstName}}!
+
+{{if .IsActive}}🟢 Status: Active{{else}}🔴 Status: Paused{{end}}
+{{.CircuitBreakerStatus}}
+
+📈 *Performance*
+{{if ge .TotalPnL 0.0}}💚{{else}}💔{{end}} Total PnL: ${{printf "%.2f" .TotalPnL}} ({{printf "%.2f" .TotalPnLPercent}}%)
+💼 Invested: ${{printf "%.2f" .TotalInvested}}
+📌 Open Positions: {{.OpenPositionsCount}}
+
+🛡️ *Risk Settings*
+Risk Level: {{.RiskLevel}}
+Max Positions: {{.MaxPositions}}
+
+🕐 {{.Timestamp}}
+
+_Use /portfolio for detailed positions_
+

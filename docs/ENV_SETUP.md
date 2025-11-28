@@ -41,6 +41,7 @@ KAFKA_GROUP_ID=prometheus
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 TELEGRAM_WEBHOOK_URL=
 TELEGRAM_ADMIN_IDS=
+TELEGRAM_DEBUG=false
 
 # AI Provider API Keys
 CLAUDE_API_KEY=sk-ant-your-claude-key-here

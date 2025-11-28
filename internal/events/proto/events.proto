@@ -114,6 +114,7 @@ message PositionOpenedEvent {
   double stop_loss = 9;
   double take_profit = 10;
   string strategy_id = 11;
+  string reasoning = 12;  // Agent reasoning for trade
 }
 
 // PositionClosedEvent is published when a position is closed
@@ -141,6 +142,8 @@ message CircuitBreakerTrippedEvent {
   double drawdown = 5;
   bool auto_resume = 6;
   google.protobuf.Timestamp resume_at = 7;
+  int32 consecutive_losses = 8;  // Number of consecutive losses
+  double daily_loss_percent = 9;  // Daily loss as percentage
 }
 
 // AgentExecutedEvent is published after agent execution

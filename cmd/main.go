@@ -22,6 +22,7 @@ import (
 	"prometheus/internal/adapters/kafka"
 	pgclient "prometheus/internal/adapters/postgres"
 	redisclient "prometheus/internal/adapters/redis"
+	telegram "prometheus/internal/adapters/telegram"
 	"prometheus/internal/agents"
 	"prometheus/internal/agents/workflows"
 	"prometheus/internal/api"
@@ -48,6 +49,7 @@ import (
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
 	analysisservice "prometheus/internal/services/analysis"
+	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
@@ -148,6 +150,7 @@ func main() {
 	opportunityKafkaConsumer := provideKafkaConsumer(cfg, events.TopicOpportunityFound, log)
 	aiUsageKafkaConsumer := provideKafkaConsumer(cfg, events.TopicAIUsage, log)
 	positionGuardianConsumer := provideKafkaConsumer(cfg, "position_guardian", log)
+	telegramNotificationConsumer := provideKafkaConsumer(cfg, "telegram_notifications", log)
 
 	encryptor, err := crypto.NewEncryptor(cfg.Crypto.EncryptionKey)
 	if err != nil {
@@ -318,8 +321,25 @@ func main() {
 		log,
 	)
 
+	// ========================================
+	// Telegram Bot & Notifications
+	// ========================================
+	telegramBot, telegramHandlers, telegramNotificationSvc := provideTelegramBot(
+		cfg,
+		userRepo,
+		positionRepo,
+		exchangeAccountRepo,
+		workflowFactory,
+		adkSessionService,
+		redisClient,
+		encryptor,
+		exchFactory,
+		telegramNotificationConsumer,
+		log,
+	)
+
 	// Start consumers in background (all tracked by WaitGroup)
-	wg.Add(6)
+	wg.Add(8) // Increased from 6 to 8 (added Telegram bot + notification consumer)
 	go func() {
 		defer wg.Done()
 		if err := notificationSvc.Start(ctx); err != nil && ctx.Err() == nil {
@@ -356,8 +376,20 @@ func main() {
 			log.Error("Position guardian consumer failed", "error", err)
 		}
 	}()
+	go func() {
+		defer wg.Done()
+		if err := telegramBot.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Telegram bot failed", "error", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if err := telegramNotificationSvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Telegram notification consumer failed", "error", err)
+		}
+	}()
 
-	log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian")
+	log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian, telegram_bot, telegram_notifications")
 
 	log.With("tools", len(toolRegistry.List())).Info("System initialized successfully")
 
@@ -407,6 +439,7 @@ func main() {
 	_ = memoryService
 	_ = journalService
 	_ = agentRegistry
+	_ = telegramHandlers // Handler registered with bot, used indirectly
 
 	log.Info("All systems operational")
 
@@ -437,6 +470,7 @@ func main() {
 		opportunityKafkaConsumer,
 		aiUsageKafkaConsumer,
 		positionGuardianConsumer,
+		telegramNotificationConsumer,
 		pgClient,
 		chClient,
 		redisClient,
@@ -1098,19 +1132,16 @@ func provideWorkers(
 		log.Info("Regime ML classifier loaded successfully")
 		defer regimeClassifier.Close()
 
-		// Get RegimeInterpreter agent from registry (already created and configured)
-		regimeInterpreterAgent, ok := agentRegistry.Get(agents.AgentRegimeInterpreter)
-		if !ok {
-			log.Warn("RegimeInterpreter agent not found in registry, using ML without interpretation")
-			regimeInterpreterAgent = nil
-		}
+		// RegimeInterpreter agent is NOT created here - it will be created on-demand
+		// in regime_detector_ml.go when there is actual data to interpret
+		// This avoids template rendering errors at startup (template requires runtime data)
 
-		// Register ML-based regime detector with LLM interpretation
+		// Register ML-based regime detector with LLM interpretation (agent=nil for now)
 		mlRegimeDetector, err := analysis.NewRegimeDetectorML(
 			marketDataRepo,
 			regimeRepo,
 			regimeClassifier,
-			regimeInterpreterAgent,
+			nil, // interpreterAgent - not needed yet, will be used in future
 			adkSessionService,
 			kafkaProducer,
 			defaultSymbols,
@@ -1179,6 +1210,114 @@ func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, log *l
 	}, healthHandler, log)
 }
 
+func provideTelegramBot(
+	cfg *config.Config,
+	userRepo user.Repository,
+	positionRepo position.Repository,
+	exchAcctRepo exchange_account.Repository,
+	workflowFactory *workflows.Factory,
+	sessionService session.Service,
+	redisClient *redisclient.Client,
+	encryptor *crypto.Encryptor,
+	exchFactory exchanges.Factory,
+	notificationConsumer *kafka.Consumer,
+	log *logger.Logger,
+) (*telegram.Bot, *telegram.Handler, *consumers.TelegramNotificationConsumer) {
+	log.Info("Initializing Telegram bot...")
+
+	// Create bot client
+	bot, err := telegram.NewBot(telegram.Config{
+		Token:      cfg.Telegram.BotToken,
+		Debug:      cfg.Telegram.Debug,
+		Timeout:    60,
+		BufferSize: 100,
+	}, log)
+	if err != nil {
+		log.Fatalf("Failed to create Telegram bot: %v", err)
+	}
+
+	// Create notification service
+	notificationService := telegram.NewNotificationService(bot, templates.Get(), log)
+
+	// Create onboarding orchestrator
+	onboardingOrchestrator := onboardingservice.NewService(
+		workflowFactory,
+		sessionService,
+		templates.Get(),
+		userRepo,
+		exchAcctRepo,
+		log,
+	)
+
+	// Create onboarding service
+	onboardingService := telegram.NewOnboardingService(
+		redisClient.Client(),
+		bot,
+		userRepo,
+		exchAcctRepo,
+		onboardingOrchestrator,
+		templates.Get(),
+		log,
+	)
+
+	// Create exchange setup service
+	exchangeSetupService := telegram.NewExchangeSetupService(
+		redisClient.Client(),
+		bot,
+		exchAcctRepo,
+		exchFactory,
+		encryptor,
+		templates.Get(),
+		log,
+	)
+
+	// Create query command handler (status, portfolio)
+	queryHandler := telegram.NewQueryCommandHandler(
+		positionRepo,
+		userRepo,
+		templates.Get(),
+		bot,
+		log,
+	)
+
+	// Create control command handler (stop, settings)
+	controlHandler := telegram.NewControlCommandHandler(
+		positionRepo,
+		userRepo,
+		templates.Get(),
+		bot,
+		log,
+	)
+
+	// Create main handler
+	handler := telegram.NewHandler(telegram.HandlerDeps{
+		Bot:              bot,
+		UserRepo:         userRepo,
+		OnboardingMgr:    onboardingService,
+		StatusHandler:    queryHandler,
+		PortfolioHandler: queryHandler,
+		ControlHandler:   controlHandler,
+		ExchangeHandler:  exchangeSetupService,
+		Templates:        templates.Get(),
+		Log:              log,
+	})
+
+	// Register handlers with bot
+	handler.RegisterHandlers()
+
+	// Create Telegram notification consumer
+	telegramNotificationSvc := consumers.NewTelegramNotificationConsumer(
+		notificationConsumer,
+		bot,
+		notificationService,
+		userRepo,
+		log,
+	)
+
+	log.Info("✓ Telegram bot initialized")
+	return bot, handler, telegramNotificationSvc
+}
+
 // gracefulShutdown handles coordinated cleanup of all components
 // Note: Application context is already cancelled by caller before this function
 //
@@ -1203,6 +1342,7 @@ func gracefulShutdown(
 	opportunityKafkaConsumer *kafka.Consumer,
 	aiUsageKafkaConsumer *kafka.Consumer,
 	positionGuardianConsumer *kafka.Consumer,
+	telegramNotificationConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -1239,12 +1379,13 @@ func gracefulShutdown(
 	// This is critical - consumer.Close() will interrupt blocking ReadMessage()
 	log.Info("[3/7] Closing Kafka consumers (to unblock ReadMessage)...")
 	for name, consumer := range map[string]*kafka.Consumer{
-		"notification":      notificationConsumer,
-		"risk":              riskConsumer,
-		"analytics":         analyticsConsumer,
-		"opportunity":       opportunityKafkaConsumer,
-		"ai_usage":          aiUsageKafkaConsumer,
-		"position_guardian": positionGuardianConsumer,
+		"notification":           notificationConsumer,
+		"risk":                   riskConsumer,
+		"analytics":              analyticsConsumer,
+		"opportunity":            opportunityKafkaConsumer,
+		"ai_usage":               aiUsageKafkaConsumer,
+		"position_guardian":      positionGuardianConsumer,
+		"telegram_notifications": telegramNotificationConsumer,
 	} {
 		if consumer != nil {
 			if err := consumer.Close(); err != nil {

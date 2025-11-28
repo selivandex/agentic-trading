@@ -1,0 +1,13 @@
+{{if ge .TotalPnL 0.0}}📈{{else}}📉{{end}} *Daily Report* - {{.Date}}
+
+{{if ge .TotalPnL 0.0}}💚{{else}}💔{{end}} Total PnL: ${{printf "%.2f" .TotalPnL}} ({{printf "%.2f" .TotalPnLPercent}}%)
+📊 Trades: {{.TradesCount}}
+✅ Win Rate: {{printf "%.1f" (mul .WinRate 100)}}%
+📌 Open Positions: {{.OpenPositions}}
+💼 Portfolio Value: ${{printf "%.2f" .PortfolioValue}}
+
+{{if .BestTrade}}🏆 Best: {{.BestTrade}}{{end}}
+{{if .WorstTrade}}📉 Worst: {{.WorstTrade}}{{end}}
+
+_Keep up the discipline!_
+

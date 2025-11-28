@@ -1,0 +1,12 @@
+🎯 *Take Profit Hit*
+
+📊 *{{.Symbol}}* {{.Side}}
+
+💰 Entry: ${{printf "%.2f" .EntryPrice}}
+🎯 Target: ${{printf "%.2f" .TargetPrice}}
+💚 Profit: ${{printf "%.2f" .Profit}} ({{printf "%.2f" .ProfitPercent}}%)
+
+_Excellent execution! Target reached._
+
+🕐 {{.Timestamp.Format "2006-01-02 15:04"}}
+

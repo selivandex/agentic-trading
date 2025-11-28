@@ -1,0 +1,15 @@
+⚙️ *Settings*
+
+Current Configuration:
+
+🎯 Risk Level: *{{.RiskLevel}}*
+📊 Max Positions: *{{.MaxPositions}}*
+🛡️ Circuit Breaker: {{if .CircuitBreakerOn}}✅ Enabled{{else}}❌ Disabled{{end}}
+🔔 Notifications: {{if .NotificationsOn}}✅ Enabled{{else}}❌ Disabled{{end}}
+
+💰 *Risk Limits:*
+• Max Daily Drawdown: {{printf "%.1f" .MaxDailyDrawdown}}%
+• Max Position Size: ${{printf "%.0f" .MaxPositionSizeUSD}}
+
+Use buttons below to change settings.
+

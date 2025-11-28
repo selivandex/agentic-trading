@@ -47,3 +47,97 @@ func (e ExchangeType) Valid() bool {
 func (e ExchangeType) String() string {
 	return string(e)
 }
+
+// Encryptor interface for encryption/decryption operations
+// This allows domain to be independent from crypto implementation
+type Encryptor interface {
+	Encrypt(plaintext string) ([]byte, error)
+	Decrypt(ciphertext []byte) (string, error)
+}
+
+// SetAPIKey encrypts and sets the API key
+func (ea *ExchangeAccount) SetAPIKey(plaintext string, encryptor Encryptor) error {
+	if encryptor == nil {
+		return nil // Skip encryption if no encryptor provided
+	}
+
+	encrypted, err := encryptor.Encrypt(plaintext)
+	if err != nil {
+		return err
+	}
+
+	ea.APIKeyEncrypted = encrypted
+	return nil
+}
+
+// GetAPIKey decrypts and returns the API key
+func (ea *ExchangeAccount) GetAPIKey(encryptor Encryptor) (string, error) {
+	if encryptor == nil || len(ea.APIKeyEncrypted) == 0 {
+		return "", nil
+	}
+
+	plaintext, err := encryptor.Decrypt(ea.APIKeyEncrypted)
+	if err != nil {
+		return "", err
+	}
+
+	return plaintext, nil
+}
+
+// SetSecret encrypts and sets the API secret
+func (ea *ExchangeAccount) SetSecret(plaintext string, encryptor Encryptor) error {
+	if encryptor == nil {
+		return nil
+	}
+
+	encrypted, err := encryptor.Encrypt(plaintext)
+	if err != nil {
+		return err
+	}
+
+	ea.SecretEncrypted = encrypted
+	return nil
+}
+
+// GetSecret decrypts and returns the API secret
+func (ea *ExchangeAccount) GetSecret(encryptor Encryptor) (string, error) {
+	if encryptor == nil || len(ea.SecretEncrypted) == 0 {
+		return "", nil
+	}
+
+	plaintext, err := encryptor.Decrypt(ea.SecretEncrypted)
+	if err != nil {
+		return "", err
+	}
+
+	return plaintext, nil
+}
+
+// SetPassphrase encrypts and sets the passphrase (for OKX)
+func (ea *ExchangeAccount) SetPassphrase(plaintext string, encryptor Encryptor) error {
+	if encryptor == nil || plaintext == "" {
+		return nil
+	}
+
+	encrypted, err := encryptor.Encrypt(plaintext)
+	if err != nil {
+		return err
+	}
+
+	ea.Passphrase = encrypted
+	return nil
+}
+
+// GetPassphrase decrypts and returns the passphrase
+func (ea *ExchangeAccount) GetPassphrase(encryptor Encryptor) (string, error) {
+	if encryptor == nil || len(ea.Passphrase) == 0 {
+		return "", nil
+	}
+
+	plaintext, err := encryptor.Decrypt(ea.Passphrase)
+	if err != nil {
+		return "", err
+	}
+
+	return plaintext, nil
+}

@@ -864,6 +864,7 @@ type PositionOpenedEvent struct {
 	StopLoss      float64                `protobuf:"fixed64,9,opt,name=stop_loss,json=stopLoss,proto3" json:"stop_loss,omitempty"`
 	TakeProfit    float64                `protobuf:"fixed64,10,opt,name=take_profit,json=takeProfit,proto3" json:"take_profit,omitempty"`
 	StrategyId    string                 `protobuf:"bytes,11,opt,name=strategy_id,json=strategyId,proto3" json:"strategy_id,omitempty"`
+	Reasoning     string                 `protobuf:"bytes,12,opt,name=reasoning,proto3" json:"reasoning,omitempty"` // Agent reasoning for trade
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -971,6 +972,13 @@ func (x *PositionOpenedEvent) GetTakeProfit() float64 {
 func (x *PositionOpenedEvent) GetStrategyId() string {
 	if x != nil {
 		return x.StrategyId
+	}
+	return ""
+}
+
+func (x *PositionOpenedEvent) GetReasoning() string {
+	if x != nil {
+		return x.Reasoning
 	}
 	return ""
 }
@@ -1110,16 +1118,18 @@ func (x *PositionClosedEvent) GetCloseReason() string {
 
 // CircuitBreakerTrippedEvent is published when circuit breaker is activated
 type CircuitBreakerTrippedEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	CurrentLoss   float64                `protobuf:"fixed64,3,opt,name=current_loss,json=currentLoss,proto3" json:"current_loss,omitempty"`
-	Threshold     float64                `protobuf:"fixed64,4,opt,name=threshold,proto3" json:"threshold,omitempty"`
-	Drawdown      float64                `protobuf:"fixed64,5,opt,name=drawdown,proto3" json:"drawdown,omitempty"`
-	AutoResume    bool                   `protobuf:"varint,6,opt,name=auto_resume,json=autoResume,proto3" json:"auto_resume,omitempty"`
-	ResumeAt      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=resume_at,json=resumeAt,proto3" json:"resume_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Base              *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Reason            string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	CurrentLoss       float64                `protobuf:"fixed64,3,opt,name=current_loss,json=currentLoss,proto3" json:"current_loss,omitempty"`
+	Threshold         float64                `protobuf:"fixed64,4,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	Drawdown          float64                `protobuf:"fixed64,5,opt,name=drawdown,proto3" json:"drawdown,omitempty"`
+	AutoResume        bool                   `protobuf:"varint,6,opt,name=auto_resume,json=autoResume,proto3" json:"auto_resume,omitempty"`
+	ResumeAt          *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=resume_at,json=resumeAt,proto3" json:"resume_at,omitempty"`
+	ConsecutiveLosses int32                  `protobuf:"varint,8,opt,name=consecutive_losses,json=consecutiveLosses,proto3" json:"consecutive_losses,omitempty"` // Number of consecutive losses
+	DailyLossPercent  float64                `protobuf:"fixed64,9,opt,name=daily_loss_percent,json=dailyLossPercent,proto3" json:"daily_loss_percent,omitempty"` // Daily loss as percentage
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CircuitBreakerTrippedEvent) Reset() {
@@ -1199,6 +1209,20 @@ func (x *CircuitBreakerTrippedEvent) GetResumeAt() *timestamppb.Timestamp {
 		return x.ResumeAt
 	}
 	return nil
+}
+
+func (x *CircuitBreakerTrippedEvent) GetConsecutiveLosses() int32 {
+	if x != nil {
+		return x.ConsecutiveLosses
+	}
+	return 0
+}
+
+func (x *CircuitBreakerTrippedEvent) GetDailyLossPercent() float64 {
+	if x != nil {
+		return x.DailyLossPercent
+	}
+	return 0
 }
 
 // AgentExecutedEvent is published after agent execution
@@ -3684,7 +3708,7 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\ffilled_price\x18\x06 \x01(\x01R\vfilledPrice\x12#\n" +
 	"\rfilled_amount\x18\a \x01(\x01R\ffilledAmount\x12\x10\n" +
 	"\x03fee\x18\b \x01(\x01R\x03fee\x12!\n" +
-	"\ffee_currency\x18\t \x01(\tR\vfeeCurrency\"\xd9\x02\n" +
+	"\ffee_currency\x18\t \x01(\tR\vfeeCurrency\"\xf7\x02\n" +
 	"\x13PositionOpenedEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1f\n" +
 	"\vposition_id\x18\x02 \x01(\tR\n" +
@@ -3701,7 +3725,8 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	" \x01(\x01R\n" +
 	"takeProfit\x12\x1f\n" +
 	"\vstrategy_id\x18\v \x01(\tR\n" +
-	"strategyId\"\xfe\x02\n" +
+	"strategyId\x12\x1c\n" +
+	"\treasoning\x18\f \x01(\tR\treasoning\"\xfe\x02\n" +
 	"\x13PositionClosedEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1f\n" +
 	"\vposition_id\x18\x02 \x01(\tR\n" +
@@ -3719,7 +3744,7 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	" \x01(\x01R\n" +
 	"pnlPercent\x12)\n" +
 	"\x10duration_seconds\x18\v \x01(\x03R\x0fdurationSeconds\x12!\n" +
-	"\fclose_reason\x18\f \x01(\tR\vcloseReason\"\x92\x02\n" +
+	"\fclose_reason\x18\f \x01(\tR\vcloseReason\"\xef\x02\n" +
 	"\x1aCircuitBreakerTrippedEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12!\n" +
@@ -3728,7 +3753,9 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\bdrawdown\x18\x05 \x01(\x01R\bdrawdown\x12\x1f\n" +
 	"\vauto_resume\x18\x06 \x01(\bR\n" +
 	"autoResume\x127\n" +
-	"\tresume_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bresumeAt\"\xb9\x02\n" +
+	"\tresume_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bresumeAt\x12-\n" +
+	"\x12consecutive_losses\x18\b \x01(\x05R\x11consecutiveLosses\x12,\n" +
+	"\x12daily_loss_percent\x18\t \x01(\x01R\x10dailyLossPercent\"\xb9\x02\n" +
 	"\x12AgentExecutedEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
 	"\n" +

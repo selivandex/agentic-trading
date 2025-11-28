@@ -1,0 +1,11 @@
+{{if ge .PnL 0.0}}✅{{else}}❌{{end}} *Position Closed*
+
+📊 *{{.Symbol}}* {{.Side}}
+
+💰 Entry: ${{printf "%.2f" .EntryPrice}} → Exit: ${{printf "%.2f" .ExitPrice}}
+{{if ge .PnL 0.0}}💚{{else}}💔{{end}} PnL: ${{printf "%.2f" .PnL}} ({{printf "%.2f" .PnLPercent}}%)
+⏱️ Duration: {{.Duration}}
+📋 Reason: {{.CloseReason}}
+
+🕐 {{.Timestamp.Format "2006-01-02 15:04"}}
+

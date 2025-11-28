@@ -1,0 +1,14 @@
+✅ *Position Opened*
+
+📊 *{{.Symbol}}* {{.Side}}
+
+💰 Entry: ${{printf "%.2f" .EntryPrice}}
+📈 Amount: {{printf "%.4f" .Amount}}
+🛑 Stop Loss: ${{printf "%.2f" .StopLoss}}
+🎯 Take Profit: ${{printf "%.2f" .TakeProfit}}
+🏦 Exchange: {{.Exchange}}
+
+{{if .Reasoning}}📝 Reasoning: {{.Reasoning}}{{end}}
+
+🕐 {{.Timestamp.Format "2006-01-02 15:04"}}
+

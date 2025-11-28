@@ -170,6 +170,20 @@ func (r *Registry) loadTemplate(path string) error {
 			}
 			return 0
 		},
+		"float64": func(v interface{}) float64 {
+			switch val := v.(type) {
+			case int:
+				return float64(val)
+			case int64:
+				return float64(val)
+			case float64:
+				return val
+			case float32:
+				return float64(val)
+			default:
+				return 0
+			}
+		},
 	}).Parse(string(content))
 	if err != nil {
 		return errors.Wrapf(err, "parse template %s", id)

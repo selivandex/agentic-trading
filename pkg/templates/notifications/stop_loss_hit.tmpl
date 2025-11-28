@@ -1,0 +1,12 @@
+🛑 *Stop Loss Hit*
+
+📊 *{{.Symbol}}* {{.Side}}
+
+💰 Entry: ${{printf "%.2f" .EntryPrice}}
+🛑 Stop: ${{printf "%.2f" .StopPrice}}
+💔 Loss: ${{printf "%.2f" .Loss}} ({{printf "%.2f" .LossPercent}}%)
+
+_Risk management in action. Better a small loss than a big one._
+
+🕐 {{.Timestamp.Format "2006-01-02 15:04"}}
+

@@ -154,19 +154,9 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 		TotalTimeout:         90 * time.Second,
 		MaxCostPerRun:        0.05,
 	},
-	AgentRegimeInterpreter: {
-		Type:                 AgentRegimeInterpreter,
-		Name:                 "RegimeInterpreter",
-		Description:          "Interprets ML regime classification and provides strategic recommendations",
-		Tools:                []string{}, // No tools needed, pure interpretation
-		OutputKey:            "interpretation",
-		SystemPromptTemplate: "agents/regime_interpreter",
-		MaxToolCalls:         0,
-		MaxThinkingTokens:    3000,
-		TimeoutPerTool:       10 * time.Second,
-		TotalTimeout:         30 * time.Second,
-		MaxCostPerRun:        0.05,
-	},
+	// AgentRegimeInterpreter is NOT in DefaultAgentConfigs - created on-demand when needed
+	// because its template requires runtime data (Symbol, Confidence, etc)
+	// See: provideRegimeInterpreter() for on-demand creation
 	AgentPerformanceAnalyzer: {
 		Type:                 AgentPerformanceAnalyzer,
 		Name:                 "PerformanceAnalyzer",
@@ -206,4 +196,23 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 		TotalTimeout:         3 * time.Minute,
 		MaxCostPerRun:        0.08,
 	},
+}
+
+// GetRegimeInterpreterConfig returns config for RegimeInterpreter agent
+// This agent is NOT created at startup because its template requires runtime data
+// Template is rendered manually in regime_detector_ml.go with actual data
+func GetRegimeInterpreterConfig() AgentConfig {
+	return AgentConfig{
+		Type:                 AgentRegimeInterpreter,
+		Name:                 "RegimeInterpreter",
+		Description:          "Interprets ML regime classification and provides strategic recommendations",
+		Tools:                []string{}, // No tools needed, pure interpretation
+		OutputKey:            "interpretation",
+		SystemPromptTemplate: "", // Template rendered manually with runtime data
+		MaxToolCalls:         0,
+		MaxThinkingTokens:    3000,
+		TimeoutPerTool:       10 * time.Second,
+		TotalTimeout:         30 * time.Second,
+		MaxCostPerRun:        0.05,
+	}
 }
