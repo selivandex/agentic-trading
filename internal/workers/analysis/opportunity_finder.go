@@ -12,6 +12,7 @@ import (
 	"google.golang.org/genai"
 
 	"prometheus/internal/agents/workflows"
+	analysisservice "prometheus/internal/services/analysis"
 	"prometheus/internal/workers"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -23,13 +24,19 @@ import (
 // for each monitored symbol, publishing high-quality signals to Kafka for user consumption.
 type OpportunityFinder struct {
 	*workers.BaseWorker
-	workflow       agent.Agent         // MarketResearchWorkflow (ADK)
-	runner         *runner.Runner      // ADK runner
-	sessionService session.Service     // Session persistence
-	templates      *templates.Registry // Template registry for workflow prompts
-	symbols        []string            // List of symbols to monitor
+	workflow       agent.Agent                       // MarketResearchWorkflow (ADK)
+	runner         *runner.Runner                    // ADK runner
+	sessionService session.Service                   // Session persistence
+	templates      *templates.Registry               // Template registry for workflow prompts
+	preScreener    *analysisservice.PreScreener      // Pre-screening service (Phase 5 optimization)
+	symbols        []string                          // List of symbols to monitor
 	exchange       string              // Primary exchange for analysis
 	log            *logger.Logger
+	
+	// Metrics (Phase 5)
+	totalRuns      int64
+	skippedRuns    int64
+	analyzedRuns   int64
 }
 
 // NewOpportunityFinder creates a new opportunity finder using ADK workflow
@@ -37,6 +44,7 @@ func NewOpportunityFinder(
 	workflowFactory *workflows.Factory,
 	sessionService session.Service,
 	templates *templates.Registry,
+	preScreener *analysisservice.PreScreener,
 	symbols []string,
 	exchange string,
 	interval time.Duration,
@@ -60,7 +68,9 @@ func NewOpportunityFinder(
 		return nil, errors.Wrap(err, "failed to create ADK runner")
 	}
 
-	log.Info("OpportunityFinder initialized with ADK MarketResearchWorkflow")
+	log.Info("OpportunityFinder initialized with ADK MarketResearchWorkflow",
+		"prescreener_enabled", preScreener != nil,
+	)
 
 	return &OpportunityFinder{
 		BaseWorker:     workers.NewBaseWorker("opportunity_finder", interval, enabled),
@@ -68,6 +78,7 @@ func NewOpportunityFinder(
 		runner:         runnerInstance,
 		sessionService: sessionService,
 		templates:      templates,
+		preScreener:    preScreener,
 		symbols:        symbols,
 		exchange:       exchange,
 		log:            log,
@@ -85,6 +96,7 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 	}
 
 	opportunities := 0
+	skipped := 0
 	errors := 0
 
 	// Run workflow for each symbol
@@ -95,10 +107,40 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			of.Log().Info("Market research interrupted by shutdown",
 				"opportunities_found", opportunities,
-				"symbols_remaining", len(of.symbols)-opportunities-errors,
+				"skipped", skipped,
+				"symbols_remaining", len(of.symbols)-opportunities-skipped-errors,
 			)
 			return ctx.Err()
 		default:
+		}
+
+		// Phase 5: Pre-screening before expensive LLM analysis
+		if of.preScreener != nil {
+			of.totalRuns++
+			
+			preScreen, err := of.preScreener.ShouldAnalyze(ctx, of.exchange, symbol)
+			if err != nil {
+				of.Log().Warn("Pre-screening failed, proceeding with analysis",
+					"symbol", symbol,
+					"error", err,
+				)
+			} else if !preScreen.ShouldAnalyze {
+				of.skippedRuns++
+				skipped++
+				of.Log().Debug("Skipped analysis (pre-screening)",
+					"symbol", symbol,
+					"reason", preScreen.SkipReason,
+					"confidence", preScreen.Confidence,
+					"metrics", preScreen.Metrics,
+				)
+				continue
+			} else {
+				of.analyzedRuns++
+				of.Log().Debug("Passed pre-screening",
+					"symbol", symbol,
+					"metrics", preScreen.Metrics,
+				)
+			}
 		}
 
 		found, err := of.analyzeSymbol(ctx, symbol)
@@ -116,10 +158,18 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 		}
 	}
 
+	// Calculate skip rate for monitoring
+	skipRate := 0.0
+	if of.totalRuns > 0 {
+		skipRate = float64(of.skippedRuns) / float64(of.totalRuns) * 100
+	}
+
 	of.Log().Debug("Market research complete",
 		"opportunities_published", opportunities,
+		"skipped", skipped,
 		"errors", errors,
 		"total_symbols", len(of.symbols),
+		"skip_rate_pct", skipRate,
 	)
 
 	return nil

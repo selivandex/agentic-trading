@@ -6,8 +6,6 @@ type AgentType string
 const (
 	// Personal trading workflow agents (per-user)
 	AgentStrategyPlanner AgentType = "strategy_planner"
-	AgentRiskManager     AgentType = "risk_manager"
-	AgentExecutor        AgentType = "executor"
 	AgentPositionManager AgentType = "position_manager"
 	AgentSelfEvaluator   AgentType = "self_evaluator"
 
@@ -16,6 +14,10 @@ const (
 
 	// Portfolio management agent (onboarding)
 	AgentPortfolioArchitect AgentType = "portfolio_architect"
+
+	// System agents (adaptive intelligence)
+	AgentRegimeDetector      AgentType = "regime_detector"
+	AgentPerformanceAnalyzer AgentType = "performance_analyzer"
 )
 
 // UserAgentConfig carries runtime user-specific context for building pipelines.

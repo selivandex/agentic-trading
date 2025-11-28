@@ -202,10 +202,6 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 // getSchemaForAgent returns input/output schemas for specific agent types
 func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
 	switch agentType {
-	case AgentExecutor:
-		return schemas.ExecutorInputSchema, schemas.ExecutorOutputSchema
-	case AgentRiskManager:
-		return nil, schemas.RiskManagerOutputSchema
 	case AgentStrategyPlanner:
 		return nil, schemas.StrategyPlannerOutputSchema
 	case AgentOpportunitySynthesizer:

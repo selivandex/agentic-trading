@@ -46,6 +46,7 @@ import (
 	"prometheus/internal/metrics"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
+	analysisservice "prometheus/internal/services/analysis"
 	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
@@ -936,6 +937,23 @@ func provideWorkers(
 	// Analysis Workers (core agentic system)
 	// ========================================
 
+	// Phase 5: Create pre-screener service for cost optimization
+	preScreener := analysisservice.NewPreScreener(
+		analysisservice.PreScreenConfig{
+			Enabled:            true,
+			MinPriceChangePct:  0.002, // 0.2%
+			MinVolumePct:       0.50,  // 50%
+			MinATRPct:          0.01,  // 1%
+			CooldownDuration:   2 * time.Hour,
+			CheckPriceMovement: true,
+			CheckVolume:        true,
+			CheckVolatility:    true,
+			CheckOrderBook:     false,
+			CheckCooldown:      true,
+		},
+		marketDataRepo,
+	)
+
 	// Opportunity finder: Runs market research workflow (8 analysts + synthesizer)
 	// This replaces the old MarketScanner - now we do global analysis once per symbol
 	// instead of per-user analysis (much more efficient)
@@ -943,6 +961,7 @@ func provideWorkers(
 		workflowFactory,
 		adkSessionService,
 		templates.Get(),
+		preScreener, // Phase 5 optimization
 		defaultSymbols,
 		"binance", // Primary exchange
 		cfg.Workers.OpportunityFinderInterval,
