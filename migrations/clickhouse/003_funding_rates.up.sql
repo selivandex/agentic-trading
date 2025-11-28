@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS funding_rates (
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (exchange, symbol, timestamp)
-TTL timestamp + INTERVAL 90 DAY;
+TTL toDateTime(timestamp) + INTERVAL 90 DAY;
 
 -- Create materialized view for funding rate statistics
 CREATE MATERIALIZED VIEW IF NOT EXISTS funding_rates_hourly_mv

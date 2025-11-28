@@ -16,7 +16,7 @@ CREATE TABLE
 PARTITION BY
   toYYYYMMDD (timestamp)
 ORDER BY
-  (user_id, agent_id, tool_name, timestamp) TTL timestamp + INTERVAL 90 DAY;
+  (user_id, agent_id, tool_name, timestamp) TTL toDateTime (timestamp) + INTERVAL 90 DAY;
 
 -- Materialized view for hourly aggregation
 CREATE MATERIALIZED VIEW IF NOT EXISTS tool_usage_hourly_mv ENGINE = SummingMergeTree ()

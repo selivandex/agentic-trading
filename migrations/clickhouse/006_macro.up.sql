@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS market_correlations (
 ) ENGINE = MergeTree()
 ORDER BY (asset, timestamp)
 PARTITION BY toYYYYMM(timestamp)
-TTL timestamp + INTERVAL 365 DAY;
+TTL toDateTime(timestamp) + INTERVAL 365 DAY;
 
 -- ============================================================================
 -- Indexes

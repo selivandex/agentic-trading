@@ -20,7 +20,7 @@ CREATE TABLE
 ORDER BY
   (blockchain, token, timestamp)
 PARTITION BY
-  toYYYYMM (timestamp) TTL timestamp + INTERVAL 90 DAY;
+  toYYYYMM (timestamp) TTL toDateTime(timestamp) + INTERVAL 90 DAY;
 
 -- Index for querying large movements
 CREATE INDEX IF NOT EXISTS idx_whale_amount_usd ON whale_movements (amount_usd) TYPE minmax GRANULARITY 4;
@@ -42,7 +42,7 @@ CREATE TABLE
 ORDER BY
   (exchange, blockchain, token, timestamp)
 PARTITION BY
-  toYYYYMM (timestamp) TTL timestamp + INTERVAL 180 DAY;
+  toYYYYMM (timestamp) TTL toDateTime(timestamp) + INTERVAL 180 DAY;
 
 -- ============================================================================
 -- Network Metrics Table
@@ -68,7 +68,7 @@ CREATE TABLE
 ORDER BY
   (blockchain, timestamp)
 PARTITION BY
-  toYYYYMM (timestamp) TTL timestamp + INTERVAL 365 DAY;
+  toYYYYMM (timestamp) TTL toDateTime(timestamp) + INTERVAL 365 DAY;
 
 -- ============================================================================
 -- Miner Metrics Table
@@ -91,7 +91,7 @@ CREATE TABLE
 ORDER BY
   (pool_name, timestamp)
 PARTITION BY
-  toYYYYMM (timestamp) TTL timestamp + INTERVAL 365 DAY;
+  toYYYYMM (timestamp) TTL toDateTime(timestamp) + INTERVAL 365 DAY;
 
 -- ============================================================================
 -- Indexes for performance

@@ -1,15 +1,29 @@
-.PHONY: help docker-up docker-down db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create test-db-create test-db-drop test-db-reset test-migrate-up gen-encryption-key lint fmt test test-short test-integration build run clean deps proto-gen
+.PHONY: help docker-up docker-down docker-logs clean deps proto-gen
+.PHONY: db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create
+.PHONY: db-pg-create db-pg-drop migrate-pg-up migrate-pg-down migrate-pg-status
+.PHONY: db-ch-create db-ch-drop migrate-ch-up migrate-ch-down migrate-ch-status
+.PHONY: test-db-create test-db-drop test-db-reset test-migrate-up
+.PHONY: gen-encryption-key lint fmt test test-short test-integration test-coverage test-repo
+.PHONY: build build-linux build-prod run run-dev setup
+.PHONY: docker-build docker-run
 
 # Load environment variables from .env file (if exists)
 -include .env
 export
 
-# Load test environment variables when running test commands
-TEST_ENV_FILE := .env.test
-ifneq (,$(wildcard $(TEST_ENV_FILE)))
-    include $(TEST_ENV_FILE)
-    export
-endif
+# Database configuration (can be overridden for test environment)
+DB_PG_HOST ?= $(POSTGRES_HOST)
+DB_PG_PORT ?= $(POSTGRES_PORT)
+DB_PG_USER ?= $(POSTGRES_USER)
+DB_PG_PASSWORD ?= $(POSTGRES_PASSWORD)
+DB_PG_NAME ?= $(POSTGRES_DB)
+DB_PG_SSL_MODE ?= $(POSTGRES_SSL_MODE)
+
+DB_CH_HOST ?= $(CLICKHOUSE_HOST)
+DB_CH_PORT ?= $(CLICKHOUSE_PORT)
+DB_CH_USER ?= $(CLICKHOUSE_USER)
+DB_CH_PASSWORD ?= $(CLICKHOUSE_PASSWORD)
+DB_CH_NAME ?= $(CLICKHOUSE_DB)
 
 # Default target
 help:
@@ -19,21 +33,35 @@ help:
 	@echo "  make docker-up          - Start all Docker services"
 	@echo "  make docker-down        - Stop all Docker services"
 	@echo ""
-	@echo "🗄️  Database:"
-	@echo "  make db-create          - Create databases (PostgreSQL + ClickHouse)"
-	@echo "  make db-drop            - Drop databases (with confirmation)"
-	@echo "  make db-reset           - Drop, create, and migrate databases"
-	@echo "  make migrate-up         - Apply all migrations"
-	@echo "  make migrate-down       - Rollback 1 migration"
-	@echo "  make migrate-status     - Show migration status"
+	@echo "🗄️  Database (Combined):"
+	@echo "  make db-create          - Create all databases (PostgreSQL + ClickHouse)"
+	@echo "  make db-drop            - Drop all databases (with confirmation)"
+	@echo "  make db-reset           - Drop, create, and migrate all databases"
+	@echo "  make migrate-up         - Apply all migrations (PostgreSQL + ClickHouse)"
+	@echo "  make migrate-down       - Rollback 1 migration (PostgreSQL + ClickHouse)"
+	@echo "  make migrate-status     - Show migration status for all databases"
 	@echo "  make migrate-force      - Force migration version (fix dirty state)"
 	@echo "  make migrate-create     - Create new migration file"
 	@echo ""
-	@echo "🧪 Test Database:"
-	@echo "  make test-db-create     - Create test database"
-	@echo "  make test-db-drop       - Drop test database"
-	@echo "  make test-db-reset      - Reset test database (drop + create + migrate)"
-	@echo "  make test-migrate-up    - Apply migrations to test database"
+	@echo "🗄️  PostgreSQL Only:"
+	@echo "  make db-pg-create       - Create PostgreSQL database"
+	@echo "  make db-pg-drop         - Drop PostgreSQL database"
+	@echo "  make migrate-pg-up      - Apply PostgreSQL migrations"
+	@echo "  make migrate-pg-down    - Rollback PostgreSQL migrations"
+	@echo "  make migrate-pg-status  - Show PostgreSQL migration status"
+	@echo ""
+	@echo "🗄️  ClickHouse Only:"
+	@echo "  make db-ch-create       - Create ClickHouse database"
+	@echo "  make db-ch-drop         - Drop ClickHouse database"
+	@echo "  make migrate-ch-up      - Apply ClickHouse migrations"
+	@echo "  make migrate-ch-down    - Rollback ClickHouse migrations"
+	@echo "  make migrate-ch-status  - Show ClickHouse migration status"
+	@echo ""
+	@echo "🧪 Test Databases:"
+	@echo "  make test-db-create     - Create test databases (PostgreSQL + ClickHouse, uses .env.test)"
+	@echo "  make test-db-drop       - Drop test databases"
+	@echo "  make test-db-reset      - Reset test databases (drop + create + migrate)"
+	@echo "  make test-migrate-up    - Apply migrations to test databases"
 	@echo ""
 	@echo "🔧 Development:"
 	@echo "  make gen-encryption-key - Generate encryption key"
@@ -61,24 +89,76 @@ docker-down:
 docker-logs:
 	docker-compose logs -f
 
-# Database initialization
-db-create:
-	@echo "Creating PostgreSQL database..."
-	@PGPASSWORD=$(POSTGRES_PASSWORD) psql -h $(POSTGRES_HOST) -p $(POSTGRES_PORT) -U $(POSTGRES_USER) -d postgres -c "CREATE DATABASE $(POSTGRES_DB);" 2>/dev/null || echo "PostgreSQL database already exists"
-	@echo "✓ PostgreSQL database ready"
-	@echo "Creating ClickHouse database..."
-	@docker exec flowly-clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $(CLICKHOUSE_DB);" 2>/dev/null || echo "ClickHouse database already exists"
-	@echo "✓ ClickHouse database ready"
+# ============================================================================
+# PostgreSQL Commands
+# ============================================================================
+
+db-pg-create:
+	@echo "Creating PostgreSQL database: $(DB_PG_NAME)..."
+	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "CREATE DATABASE $(DB_PG_NAME);" 2>/dev/null || echo "PostgreSQL database already exists"
+	@echo "✓ PostgreSQL database ready: $(DB_PG_NAME)"
+
+db-pg-drop:
+	@echo "Dropping PostgreSQL database: $(DB_PG_NAME)..."
+	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_PG_NAME);"
+	@echo "✓ PostgreSQL database dropped"
+
+migrate-pg-up:
+	@echo "Running PostgreSQL migrations on $(DB_PG_NAME)..."
+	@migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres up
+	@echo "✓ PostgreSQL migrations completed"
+
+migrate-pg-down:
+	@echo "Rolling back PostgreSQL migrations (1 step) on $(DB_PG_NAME)..."
+	@migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres down 1
+	@echo "✓ PostgreSQL rollback completed"
+
+migrate-pg-status:
+	@echo "PostgreSQL migration status for $(DB_PG_NAME):"
+	@migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres version
+
+# ============================================================================
+# ClickHouse Commands
+# ============================================================================
+
+db-ch-create:
+	@echo "Creating ClickHouse database: $(DB_CH_NAME)..."
+	@docker exec flowly-clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $(DB_CH_NAME);" 2>/dev/null || echo "ClickHouse database already exists"
+	@echo "✓ ClickHouse database ready: $(DB_CH_NAME)"
+
+db-ch-drop:
+	@echo "Dropping ClickHouse database: $(DB_CH_NAME)..."
+	@docker exec flowly-clickhouse clickhouse-client --query "DROP DATABASE IF EXISTS $(DB_CH_NAME);"
+	@echo "✓ ClickHouse database dropped"
+
+migrate-ch-up:
+	@echo "Running ClickHouse migrations on $(DB_CH_NAME)..."
+	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse up
+	@echo "✓ ClickHouse migrations completed"
+
+migrate-ch-down:
+	@echo "Rolling back ClickHouse migrations (1 step) on $(DB_CH_NAME)..."
+	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse down 1
+	@echo "✓ ClickHouse rollback completed"
+
+migrate-ch-status:
+	@echo "ClickHouse migration status for $(DB_CH_NAME):"
+	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse version
+
+# ============================================================================
+# Combined Database Commands (PostgreSQL + ClickHouse)
+# ============================================================================
+
+db-create: db-pg-create db-ch-create
+	@echo "✓ All databases created"
 
 db-drop:
 	@echo "⚠️  WARNING: This will DROP all databases!"
 	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
-		echo "Dropping PostgreSQL database..."; \
-		PGPASSWORD=$(POSTGRES_PASSWORD) psql -h $(POSTGRES_HOST) -p $(POSTGRES_PORT) -U $(POSTGRES_USER) -d postgres -c "DROP DATABASE IF EXISTS $(POSTGRES_DB);"; \
-		echo "Dropping ClickHouse database..."; \
-		docker exec flowly-clickhouse clickhouse-client --query "DROP DATABASE IF EXISTS $(CLICKHOUSE_DB);"; \
-		echo "✓ Databases dropped"; \
+		$(MAKE) db-pg-drop; \
+		$(MAKE) db-ch-drop; \
+		echo "✓ All databases dropped"; \
 	else \
 		echo "Cancelled."; \
 	fi
@@ -86,73 +166,115 @@ db-drop:
 db-reset: db-drop db-create migrate-up
 	@echo "✓ Databases reset complete"
 
-# Test database commands (use .env.test)
+# ============================================================================
+# Test Database Commands (uses same functions with .env.test config)
+# ============================================================================
+
 test-db-create:
-	@echo "Creating test PostgreSQL database..."
-	@if [ -f .env.test ]; then \
-		set -a; . ./.env.test; set +a; \
-		PGPASSWORD=$$POSTGRES_PASSWORD psql -h $$POSTGRES_HOST -p $$POSTGRES_PORT -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE $$POSTGRES_DB;" 2>/dev/null || echo "Test database already exists"; \
-		echo "✓ Test PostgreSQL database ready: $$POSTGRES_DB"; \
-	else \
+	@if [ ! -f .env.test ]; then \
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
+	@set -a; . ./.env.test; set +a; \
+	$(MAKE) db-pg-create \
+		DB_PG_HOST=$$POSTGRES_HOST \
+		DB_PG_PORT=$$POSTGRES_PORT \
+		DB_PG_USER=$$POSTGRES_USER \
+		DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
+		DB_PG_NAME=$$POSTGRES_DB \
+		DB_PG_SSL_MODE=$$POSTGRES_SSL_MODE; \
+	$(MAKE) db-ch-create \
+		DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
+		DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
+		DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
+		DB_CH_PASSWORD=$${CLICKHOUSE_PASSWORD:-$(CLICKHOUSE_PASSWORD)} \
+		DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}
+	@echo "✓ All test databases created"
 
 test-db-drop:
-	@echo "⚠️  WARNING: This will DROP the test database!"
+	@if [ ! -f .env.test ]; then \
+		echo "❌ .env.test file not found"; \
+		exit 1; \
+	fi
+	@echo "⚠️  WARNING: This will DROP all test databases!"
 	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
-		if [ -f .env.test ]; then \
-			set -a; . ./.env.test; set +a; \
-			echo "Dropping test PostgreSQL database: $$POSTGRES_DB..."; \
-			PGPASSWORD=$$POSTGRES_PASSWORD psql -h $$POSTGRES_HOST -p $$POSTGRES_PORT -U $$POSTGRES_USER -d postgres -c "DROP DATABASE IF EXISTS $$POSTGRES_DB;"; \
-			echo "✓ Test database dropped"; \
-		else \
-			echo "❌ .env.test file not found"; \
-			exit 1; \
-		fi; \
+		set -a; . ./.env.test; set +a; \
+		$(MAKE) db-pg-drop \
+			DB_PG_HOST=$$POSTGRES_HOST \
+			DB_PG_PORT=$$POSTGRES_PORT \
+			DB_PG_USER=$$POSTGRES_USER \
+			DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
+			DB_PG_NAME=$$POSTGRES_DB; \
+		$(MAKE) db-ch-drop \
+			DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
+			DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
+			DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
+			DB_CH_PASSWORD=$${CLICKHOUSE_PASSWORD:-$(CLICKHOUSE_PASSWORD)} \
+			DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}; \
+		echo "✓ All test databases dropped"; \
 	else \
 		echo "Cancelled."; \
 	fi
 
-test-db-reset: test-db-drop test-db-create test-migrate-up
-	@echo "✓ Test database reset complete"
-
-# Test database migrations
-test-migrate-up:
-	@echo "Running PostgreSQL migrations on test database..."
-	@if [ -f .env.test ]; then \
-		set -a; . ./.env.test; set +a; \
-		migrate -database "postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@$$POSTGRES_HOST:$$POSTGRES_PORT/$$POSTGRES_DB?sslmode=$$POSTGRES_SSL_MODE" -path migrations/postgres up; \
-		echo "✓ Test database migrations completed"; \
-	else \
+test-db-reset:
+	@if [ ! -f .env.test ]; then \
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
+	@set -a; . ./.env.test; set +a; \
+	$(MAKE) test-db-drop && \
+	$(MAKE) test-db-create && \
+	$(MAKE) test-migrate-up
+	@echo "✓ Test databases reset complete"
 
-# Database migrations
-migrate-up:
-	@echo "Running PostgreSQL migrations..."
-	@migrate -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSL_MODE)" -path migrations/postgres up
-	@echo "✓ PostgreSQL migrations completed"
-	@echo "Running ClickHouse migrations..."
-	@migrate -database "clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?database=$(CLICKHOUSE_DB)&username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse up
-	@echo "✓ ClickHouse migrations completed"
+test-migrate-up:
+	@if [ ! -f .env.test ]; then \
+		echo "❌ .env.test file not found"; \
+		exit 1; \
+	fi
+	@set -a; . ./.env.test; set +a; \
+	$(MAKE) migrate-pg-up \
+		DB_PG_HOST=$$POSTGRES_HOST \
+		DB_PG_PORT=$$POSTGRES_PORT \
+		DB_PG_USER=$$POSTGRES_USER \
+		DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
+		DB_PG_NAME=$$POSTGRES_DB \
+		DB_PG_SSL_MODE=$$POSTGRES_SSL_MODE; \
+	$(MAKE) migrate-ch-up \
+		DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
+		DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
+		DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
+		DB_CH_PASSWORD=$${CLICKHOUSE_PASSWORD:-$(CLICKHOUSE_PASSWORD)} \
+		DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}
+	@echo "✓ All test migrations completed"
 
-migrate-down:
-	@echo "Rolling back PostgreSQL migrations (1 step)..."
-	@migrate -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSL_MODE)" -path migrations/postgres down 1
-	@echo "✓ PostgreSQL rollback completed"
+# ============================================================================
+# Migration Commands (Combined)
+# ============================================================================
 
-migrate-status:
-	@echo "PostgreSQL migration status:"
-	@migrate -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSL_MODE)" -path migrations/postgres version
-	@echo "\nClickHouse migration status:"
-	@migrate -database "clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?database=$(CLICKHOUSE_DB)&username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse version
+migrate-up: migrate-pg-up migrate-ch-up
+	@echo "✓ All migrations completed"
+
+migrate-down: migrate-pg-down migrate-ch-down
+	@echo "✓ All rollbacks completed"
+
+migrate-status: migrate-pg-status migrate-ch-status
 
 migrate-force:
-	@read -p "Enter version to force: " version; \
-	migrate -database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSL_MODE)" -path migrations/postgres force $$version
+	@echo "Select database:"
+	@echo "  1) PostgreSQL"
+	@echo "  2) ClickHouse"
+	@read -p "Enter choice (1 or 2): " db_choice; \
+	read -p "Enter version to force: " version; \
+	if [ "$$db_choice" = "1" ]; then \
+		migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres force $$version; \
+	elif [ "$$db_choice" = "2" ]; then \
+		migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse force $$version; \
+	else \
+		echo "Invalid choice"; \
+		exit 1; \
+	fi
 
 migrate-create:
 	@read -p "Enter migration name: " name; \

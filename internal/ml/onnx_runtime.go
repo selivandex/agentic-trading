@@ -118,4 +118,3 @@ func (m *ONNXModel) Destroy() {
 		m.session = nil
 	}
 }
-
