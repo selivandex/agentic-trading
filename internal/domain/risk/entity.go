@@ -15,7 +15,7 @@ type CircuitBreakerState struct {
 	// Current state
 	IsTriggered   bool       `db:"is_triggered"`
 	TriggeredAt   *time.Time `db:"triggered_at"`
-	TriggerReason string     `db:"trigger_reason"`
+	TriggerReason *string    `db:"trigger_reason"` // NULL when not triggered
 
 	// Daily stats
 	DailyPnL          decimal.Decimal `db:"daily_pnl"`

@@ -60,10 +60,18 @@ message RegimeChangedEvent {
   BaseEvent base = 1;
   string symbol = 2;
   string old_regime = 3;
-  string new_regime = 4;  // "trending", "ranging", "volatile"
+  string new_regime = 4;  // "trend_up", "trend_down", "range", "breakout", "volatile", etc.
   double confidence = 5;
   double volatility = 6;
   string trend = 7;  // "bullish", "bearish", "neutral"
+  
+  // ML interpretation fields (from RegimeInterpreter agent)
+  string explanation = 8;  // What this regime means
+  string strategic_guidance = 9;  // Strategic recommendations
+  double position_size_multiplier = 10;  // 0.5x - 2.0x
+  double cash_reserve_target = 11;  // 5% - 30%
+  repeated string favored_strategies = 12;  // Strategies that work well
+  repeated string avoided_strategies = 13;  // Strategies to avoid
 }
 
 // OrderPlacedEvent is published when an order is placed
@@ -327,5 +335,107 @@ message StrategyWarningEvent {
   double win_rate = 5;
   double profit_factor = 6;
   int32 total_trades = 7;
+}
+
+// Event Urgency levels for position monitoring
+enum EventUrgency {
+  LOW = 0;
+  MEDIUM = 1;
+  HIGH = 2;
+  CRITICAL = 3;
+}
+
+// Position Guardian Events - Event-driven position monitoring
+
+// StopApproachingEvent is published when price approaches stop-loss (within 2%)
+message StopApproachingEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  double current_price = 5;
+  double stop_loss_price = 6;
+  double distance_percent = 7;  // Distance to stop in percent
+  EventUrgency urgency = 8;
+  double entry_price = 9;
+  string side = 10;  // long, short
+}
+
+// TargetApproachingEvent is published when price approaches take-profit (within 5%)
+message TargetApproachingEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  double current_price = 5;
+  double take_profit_price = 6;
+  double distance_percent = 7;  // Distance to target in percent
+  EventUrgency urgency = 8;
+  double unrealized_pnl_percent = 9;
+  string side = 10;  // long, short
+}
+
+// ThesisInvalidationEvent is published when trade thesis is invalidated
+message ThesisInvalidationEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  string invalidation_reason = 5;  // structure_broken, regime_change, key_level_lost
+  double current_price = 6;
+  EventUrgency urgency = 7;
+  string original_thesis = 8;
+  double confidence = 9;  // Confidence in invalidation (0.0 - 1.0)
+}
+
+// TimeDecayEvent is published when position is held longer than expected
+message TimeDecayEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  int64 duration_hours = 5;
+  int64 expected_duration_hours = 6;
+  double current_pnl_percent = 7;
+  EventUrgency urgency = 8;
+  string timeframe = 9;  // Original timeframe (4h, 1d, etc.)
+}
+
+// ProfitMilestoneEvent is published when position reaches profit milestone (+5%, +10%, +20%)
+message ProfitMilestoneEvent {
+  BaseEvent base = 1;
+  string position_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  double unrealized_pnl_percent = 5;
+  int32 milestone = 6;  // 5, 10, 20, 50, 100
+  double current_price = 7;
+  double entry_price = 8;
+  EventUrgency urgency = 9;
+  bool stop_at_breakeven = 10;  // Recommendation to trail stop
+}
+
+// CorrelationSpikeEvent is published when portfolio correlation increases significantly
+message CorrelationSpikeEvent {
+  BaseEvent base = 1;
+  repeated string symbols = 2;  // Correlated symbols
+  double correlation = 3;  // Correlation coefficient (0.0 - 1.0)
+  double previous_correlation = 4;
+  double total_exposure_percent = 5;  // Total exposure in correlated assets
+  EventUrgency urgency = 6;
+  string risk_level = 7;  // low, medium, high, critical
+}
+
+// VolatilitySpikeEvent is published when volatility increases suddenly
+message VolatilitySpikeEvent {
+  BaseEvent base = 1;
+  string symbol = 2;
+  string exchange = 3;
+  double current_volatility = 4;  // ATR or similar metric
+  double average_volatility = 5;
+  double spike_ratio = 6;  // current / average
+  EventUrgency urgency = 7;
+  repeated string affected_positions = 8;  // Position IDs affected
+  string timeframe = 9;
 }
 

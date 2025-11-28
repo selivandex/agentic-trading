@@ -1,7 +1,20 @@
 <!-- @format -->
 
-Never create .md docs files without explicit consent
+We’re building a project where AI agents act like a full trading desk — 10–20 analysts working inside a hedge fund.
+Each agent understands the market, correlations, technical analysis, macro signals, liquidity zones, volatility regimes — the whole package.
+
+A user simply connects their exchange account through Telegram and invests with a command like /invest 1000.
+From that moment, the agents take the user’s exchange account into circulation:
+they design the portfolio, allocate capital, monitor market conditions, react to volatility, rebalance positions, buy more, close trades, and manage risk with stop-losses and other controls.
+
+In other words, we’re building an AI-driven fund.
+The agents do the exact same work professional traders and analysts would do — but continuously, automatically, and at scale.
+
+⸻
+
+Never create .md docs files without explicit consent !!!!!!!!!!!!
 Never create .txt examples files without explicit consent
+Never use sed function to mass-replace code. It's very dangerous
 
 # AGENTS — Prometheus (Agentic Trading System)
 

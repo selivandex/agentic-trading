@@ -36,10 +36,10 @@ func (r *PositionRepository) Create(ctx context.Context, p *position.Position) e
 			stop_loss_price, take_profit_price, trailing_stop_pct,
 			stop_loss_order_id, take_profit_order_id,
 			open_reasoning,
-			status, opened_at, updated_at
+			status, opened_at, closed_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -51,7 +51,7 @@ func (r *PositionRepository) Create(ctx context.Context, p *position.Position) e
 		p.StopLossPrice, p.TakeProfitPrice, p.TrailingStopPct,
 		p.StopLossOrderID, p.TakeProfitOrderID,
 		p.OpenReasoning,
-		p.Status, p.OpenedAt, p.UpdatedAt,
+		p.Status, p.OpenedAt, p.ClosedAt, p.UpdatedAt,
 	)
 
 	return err

@@ -204,10 +204,8 @@ Transform findings into recommendations:
 
 {{- if .Tools }}
 {{- range .Tools }}
-- {{.Name}}: {{.Description}}
+- {{.Name}}{{if .Requirement}} ({{.Requirement}}){{end}}: {{.Description}}
 {{- end }}
-
-**PRIMARY**: get_trade_journal, get_strategy_stats, save_memory
 {{- else }}
 No tools available.
 {{- end }}

@@ -275,7 +275,8 @@ func (e *RiskEngine) ResetCircuitBreaker(ctx context.Context, userID uuid.UUID) 
 
 	state.IsTriggered = false
 	state.TriggeredAt = nil
-	state.TriggerReason = ""
+	emptyReason := ""
+	state.TriggerReason = &emptyReason
 	state.UpdatedAt = time.Now()
 
 	if err := e.riskRepo.SaveState(ctx, state); err != nil {
@@ -339,7 +340,7 @@ func (e *RiskEngine) tripCircuitBreaker(ctx context.Context, state *risk.Circuit
 	now := time.Now()
 	state.IsTriggered = true
 	state.TriggeredAt = &now
-	state.TriggerReason = reason
+	state.TriggerReason = &reason
 	state.UpdatedAt = now
 
 	if err := e.riskRepo.SaveState(ctx, state); err != nil {
@@ -394,11 +395,16 @@ func (e *RiskEngine) createWarningEvent(ctx context.Context, userID uuid.UUID, e
 }
 
 func (e *RiskEngine) buildUserRiskState(state *risk.CircuitBreakerState, canTrade bool) UserRiskState {
+	tripReason := ""
+	if state.TriggerReason != nil {
+		tripReason = *state.TriggerReason
+	}
+	
 	return UserRiskState{
 		UserID:             state.UserID,
 		CanTrade:           canTrade,
 		IsCircuitTripped:   state.IsTriggered,
-		TripReason:         state.TriggerReason,
+		TripReason:         tripReason,
 		DailyPnL:           state.DailyPnL,
 		DailyPnLPercent:    state.DailyPnLPercent,
 		DailyTradeCount:    state.DailyTradeCount,

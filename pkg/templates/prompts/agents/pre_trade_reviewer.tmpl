@@ -165,7 +165,7 @@ Make final call: GO / HOLD / NO-GO
 
 {{- if .Tools }}
 {{- range .Tools }}
-- {{.Name}}: {{.Description}}
+- {{.Name}}{{if .Requirement}} ({{.Requirement}}){{end}}: {{.Description}}
 {{- end }}
 {{- else }}
 No tools available.

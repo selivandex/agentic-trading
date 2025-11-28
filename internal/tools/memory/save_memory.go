@@ -149,14 +149,14 @@ Example: "Head-and-shoulders on 4H with declining volume predicted reversal in 7
 				metadata["tags"] = tags
 			}
 
-			// Create memory entry (embedding will be generated in service)
-			memory := &memorydomain.Memory{
-				ID:         uuid.New(),
-				UserID:     userID,
-				AgentID:    agentID,
-				SessionID:  sessionID,
-				Type:       domainType,
-				Content:    content,
+		// Create memory entry (embedding will be generated in service)
+		memory := &memorydomain.Memory{
+			ID:         uuid.New(),
+			UserID:     &userID,
+			AgentID:    agentID,
+			SessionID:  sessionID,
+			Type:       domainType,
+			Content:    content,
 				Symbol:     symbol,
 				Timeframe:  timeframe,
 				Importance: importance,

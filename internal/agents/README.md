@@ -54,6 +54,33 @@ Agents use Google ADK for LLM orchestration and tool calling.
 
 Agents call tools via ADK runtime. Tools return structured data (maps). Agent processes results and makes decisions. All tool calls logged automatically via middleware.
 
+### Tool Requirements
+
+Each agent defines which tools are **required** vs **optional** in `AgentToolRequirements` map (`tool_assignments.go`):
+
+```go
+AgentToolRequirements = map[AgentType]map[string]ToolRequirement{
+    AgentHeadOfResearch: {
+        "publish_opportunity": ToolRequired, // Must call
+        "save_memory":         ToolOptional, // Can call
+    },
+}
+```
+
+**Why this matters:**
+
+- **Required tools** must be called before agent can complete its task (enforced via prompts and validation)
+- **Optional tools** enhance functionality but aren't mandatory (e.g., saving to memory, searching history)
+- **Risk level** (from tool catalog) is separate — it's about operational risk, not workflow necessity
+- **Prompts render requirements** clearly: `- tool_name (required): description`
+
+**Adding requirements for new agents:**
+
+1. Add entry in `AgentToolRequirements` map
+2. Mark core workflow tools as `ToolRequired`
+3. Mark enhancement tools (memory, search) as `ToolOptional`
+4. Template will automatically render requirements in prompts
+
 ## Memory & State
 
 **Stateless agents** — use services for persistence:

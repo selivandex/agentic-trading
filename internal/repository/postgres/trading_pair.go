@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 
 	"prometheus/internal/domain/trading_pair"
+	pkgerrors "prometheus/pkg/errors"
 )
 
 // Compile-time check
@@ -21,6 +23,25 @@ type TradingPairRepository struct {
 // NewTradingPairRepository creates a new trading pair repository
 func NewTradingPairRepository(db *sqlx.DB) *TradingPairRepository {
 	return &TradingPairRepository{db: db}
+}
+
+// scanTradingPair scans a single trading pair from database row
+func scanTradingPair(row interface {
+	Scan(dest ...interface{}) error
+}) (*trading_pair.TradingPair, error) {
+	p := &trading_pair.TradingPair{}
+
+	err := row.Scan(
+		&p.ID, &p.UserID, &p.ExchangeAccountID, &p.Symbol, &p.MarketType,
+		&p.Budget, &p.MaxPositionSize, &p.MaxLeverage, &p.StopLossPercent, &p.TakeProfitPercent,
+		&p.AIProvider, &p.StrategyMode, pq.Array(&p.Timeframes),
+		&p.IsActive, &p.IsPaused, &p.PausedReason, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 // Create inserts a new trading pair
@@ -47,44 +68,90 @@ func (r *TradingPairRepository) Create(ctx context.Context, pair *trading_pair.T
 
 // GetByID retrieves a trading pair by ID
 func (r *TradingPairRepository) GetByID(ctx context.Context, id uuid.UUID) (*trading_pair.TradingPair, error) {
-	var pair trading_pair.TradingPair
+	query := `
+		SELECT 
+			id, user_id, exchange_account_id, symbol, market_type,
+			budget, max_position_size, max_leverage, stop_loss_percent, take_profit_percent,
+			ai_provider, strategy_mode, timeframes,
+			is_active, is_paused, paused_reason, created_at, updated_at
+		FROM trading_pairs 
+		WHERE id = $1`
 
-	query := `SELECT * FROM trading_pairs WHERE id = $1`
-
-	err := r.db.GetContext(ctx, &pair, query, id)
+	row := r.db.QueryRowContext(ctx, query, id)
+	pair, err := scanTradingPair(row)
+	if err == sql.ErrNoRows {
+		return nil, pkgerrors.Wrap(err, "trading pair not found")
+	}
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to get trading pair")
 	}
 
-	return &pair, nil
+	return pair, nil
 }
 
 // GetByUser retrieves all trading pairs for a user
 func (r *TradingPairRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]*trading_pair.TradingPair, error) {
-	var pairs []*trading_pair.TradingPair
+	query := `
+		SELECT 
+			id, user_id, exchange_account_id, symbol, market_type,
+			budget, max_position_size, max_leverage, stop_loss_percent, take_profit_percent,
+			ai_provider, strategy_mode, timeframes,
+			is_active, is_paused, paused_reason, created_at, updated_at
+		FROM trading_pairs 
+		WHERE user_id = $1 
+		ORDER BY created_at DESC`
 
-	query := `SELECT * FROM trading_pairs WHERE user_id = $1 ORDER BY created_at DESC`
-
-	err := r.db.SelectContext(ctx, &pairs, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to query trading pairs")
+	}
+	defer rows.Close()
+
+	var pairs []*trading_pair.TradingPair
+	for rows.Next() {
+		pair, err := scanTradingPair(rows)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to scan trading pair")
+		}
+		pairs = append(pairs, pair)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to iterate trading pairs")
 	}
 
 	return pairs, nil
 }
 
-// GetActiveByUser retrieves active trading pairs for a user
+// GetActiveByUser retrieves active trading pairs for a user (including paused ones)
 func (r *TradingPairRepository) GetActiveByUser(ctx context.Context, userID uuid.UUID) ([]*trading_pair.TradingPair, error) {
-	var pairs []*trading_pair.TradingPair
-
 	query := `
-		SELECT * FROM trading_pairs 
-		WHERE user_id = $1 AND is_active = true AND is_paused = false
+		SELECT 
+			id, user_id, exchange_account_id, symbol, market_type,
+			budget, max_position_size, max_leverage, stop_loss_percent, take_profit_percent,
+			ai_provider, strategy_mode, timeframes,
+			is_active, is_paused, paused_reason, created_at, updated_at
+		FROM trading_pairs 
+		WHERE user_id = $1 AND is_active = true
 		ORDER BY created_at DESC`
 
-	err := r.db.SelectContext(ctx, &pairs, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to query active trading pairs")
+	}
+	defer rows.Close()
+
+	var pairs []*trading_pair.TradingPair
+	for rows.Next() {
+		pair, err := scanTradingPair(rows)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to scan trading pair")
+		}
+		pairs = append(pairs, pair)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to iterate trading pairs")
 	}
 
 	return pairs, nil
@@ -93,16 +160,33 @@ func (r *TradingPairRepository) GetActiveByUser(ctx context.Context, userID uuid
 // GetActiveBySymbol retrieves active trading pairs for a specific symbol across all users
 // This is used for event-driven analysis when an opportunity is detected on a symbol
 func (r *TradingPairRepository) GetActiveBySymbol(ctx context.Context, symbol string) ([]*trading_pair.TradingPair, error) {
-	var pairs []*trading_pair.TradingPair
-
 	query := `
-		SELECT * FROM trading_pairs 
+		SELECT 
+			id, user_id, exchange_account_id, symbol, market_type,
+			budget, max_position_size, max_leverage, stop_loss_percent, take_profit_percent,
+			ai_provider, strategy_mode, timeframes,
+			is_active, is_paused, paused_reason, created_at, updated_at
+		FROM trading_pairs 
 		WHERE symbol = $1 AND is_active = true AND is_paused = false
 		ORDER BY created_at DESC`
 
-	err := r.db.SelectContext(ctx, &pairs, query, symbol)
+	rows, err := r.db.QueryContext(ctx, query, symbol)
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to query trading pairs by symbol")
+	}
+	defer rows.Close()
+
+	var pairs []*trading_pair.TradingPair
+	for rows.Next() {
+		pair, err := scanTradingPair(rows)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to scan trading pair")
+		}
+		pairs = append(pairs, pair)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to iterate trading pairs")
 	}
 
 	return pairs, nil

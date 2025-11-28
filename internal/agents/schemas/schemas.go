@@ -413,3 +413,163 @@ var PerformanceCommitteeOutputSchema = &genai.Schema{
 	},
 	Required: []string{"summary", "validated_patterns", "failure_modes", "recommendations", "reasoning_trace", "evidence"},
 }
+
+// ============================================================================
+// Phase 3: Research Committee Agent Schemas
+// ============================================================================
+
+// AnalystReportSchema defines the output schema for specialist analysts in the Research Committee.
+// Shared by TechnicalAnalyst, StructuralAnalyst, FlowAnalyst, and MacroAnalyst.
+// Each analyst provides their specialized perspective with confidence and key signals.
+var AnalystReportSchema = &genai.Schema{
+	Type: "OBJECT",
+	Properties: map[string]*genai.Schema{
+		"direction": {
+			Type:        "STRING",
+			Description: "Market direction assessment from this analyst's perspective",
+			Enum:        []string{"bullish", "bearish", "neutral"},
+		},
+		"confidence": {
+			Type:        "NUMBER",
+			Description: "Confidence level in this assessment (0-1)",
+			Minimum:     float64Ptr(0),
+			Maximum:     float64Ptr(1),
+		},
+		"key_signals": {
+			Type:        "ARRAY",
+			Description: "3-5 key signals supporting this assessment",
+			Items: &genai.Schema{
+				Type: "STRING",
+			},
+		},
+		"reasoning": {
+			Type:        "STRING",
+			Description: "2-3 sentences explaining the assessment and key signals",
+		},
+		"risk_factors": {
+			Type:        "ARRAY",
+			Description: "Potential risks or contradictory signals identified",
+			Items: &genai.Schema{
+				Type: "STRING",
+			},
+		},
+		"strength": {
+			Type:        "STRING",
+			Description: "Overall signal strength",
+			Enum:        []string{"weak", "moderate", "strong"},
+		},
+	},
+	Required: []string{"direction", "confidence", "key_signals", "reasoning", "risk_factors", "strength"},
+}
+
+// HeadOfResearchOutputSchema defines the output schema for the HeadOfResearch agent.
+// This agent synthesizes all analyst reports, resolves conflicts, conducts debate,
+// and makes the final decision: PUBLISH or SKIP the opportunity.
+var HeadOfResearchOutputSchema = &genai.Schema{
+	Type: "OBJECT",
+	Properties: map[string]*genai.Schema{
+		"decision": {
+			Type:        "STRING",
+			Description: "Final decision on whether to publish this opportunity",
+			Enum:        []string{"publish", "skip"},
+		},
+		"synthesis": {
+			Type:        "STRING",
+			Description: "2-3 paragraph synthesis of all analyst inputs, consensus areas, and conflict resolution",
+		},
+		"conflicts": {
+			Type:        "ARRAY",
+			Description: "Conflicts identified between analysts (empty if no conflicts)",
+			Items: &genai.Schema{
+				Type: "OBJECT",
+				Properties: map[string]*genai.Schema{
+					"conflicting_analysts": {
+						Type:        "ARRAY",
+						Description: "Names of analysts with conflicting views",
+						Items: &genai.Schema{
+							Type: "STRING",
+						},
+					},
+					"conflict_type": {
+						Type:        "STRING",
+						Description: "Type of conflict",
+						Enum:        []string{"direction", "confidence", "timing", "risk_assessment"},
+					},
+					"resolution": {
+						Type:        "STRING",
+						Description: "How this conflict was resolved (e.g., 'HTF consensus dominates', 'Higher confidence analyst prioritized')",
+					},
+				},
+				Required: []string{"conflicting_analysts", "conflict_type", "resolution"},
+			},
+		},
+		"consensus_count": {
+			Type:        "INTEGER",
+			Description: "Number of analysts agreeing on primary direction (0-4)",
+			Minimum:     float64Ptr(0),
+			Maximum:     float64Ptr(4),
+		},
+		"weighted_confidence": {
+			Type:        "NUMBER",
+			Description: "Weighted confidence combining all analyst inputs (0-1)",
+			Minimum:     float64Ptr(0),
+			Maximum:     float64Ptr(1),
+		},
+		"entry_price": {
+			Type:        "NUMBER",
+			Description: "Recommended entry price (only if decision=publish)",
+			Minimum:     float64Ptr(0),
+		},
+		"stop_loss": {
+			Type:        "NUMBER",
+			Description: "Stop loss price (only if decision=publish)",
+			Minimum:     float64Ptr(0),
+		},
+		"take_profit": {
+			Type:        "NUMBER",
+			Description: "Take profit target (only if decision=publish)",
+			Minimum:     float64Ptr(0),
+		},
+		"risk_reward_ratio": {
+			Type:        "NUMBER",
+			Description: "Calculated R:R ratio (only if decision=publish)",
+			Minimum:     float64Ptr(0),
+		},
+		"pre_mortem_analysis": {
+			Type:        "STRING",
+			Description: "Pre-mortem: What could go wrong with this trade? What's the bear case (if long)?",
+		},
+		"rationale": {
+			Type:        "STRING",
+			Description: "2-3 sentence summary explaining the publish/skip decision",
+		},
+		// Explainability fields
+		"reasoning_trace": {
+			Type:        "ARRAY",
+			Description: "Step-by-step reasoning from analyst synthesis to final decision",
+			Items:       ReasoningStepSchema,
+		},
+		"evidence": {
+			Type:        "OBJECT",
+			Description: "Evidence sources (analyst reports) and data quality",
+			Properties:  EvidenceSchema.Properties,
+			Required:    EvidenceSchema.Required,
+		},
+		"alternatives_considered": {
+			Type:        "ARRAY",
+			Description: "Alternative decisions or interpretations that were considered",
+			Items:       AlternativeSchema,
+		},
+	},
+	Required: []string{
+		"decision",
+		"synthesis",
+		"conflicts",
+		"consensus_count",
+		"weighted_confidence",
+		"pre_mortem_analysis",
+		"rationale",
+		"reasoning_trace",
+		"evidence",
+	},
+}

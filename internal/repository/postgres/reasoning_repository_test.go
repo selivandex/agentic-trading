@@ -24,6 +24,9 @@ func TestReasoningRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
+	fixtures := NewTestFixtures(t, testDB.DB())
+	userID := fixtures.CreateUser()
+
 	repo := NewReasoningRepository(testDB.DB())
 	ctx := context.Background()
 
@@ -43,8 +46,6 @@ func TestReasoningRepository_Create(t *testing.T) {
 		"confidence": 0.75,
 	}
 	decisionJSON, _ := json.Marshal(decision)
-
-	userID := uuid.New()
 	entry := &reasoning.LogEntry{
 		ID:             uuid.New(),
 		UserID:         &userID,

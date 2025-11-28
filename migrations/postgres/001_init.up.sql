@@ -179,43 +179,7 @@ CREATE INDEX idx_positions_status ON positions(status);
 CREATE INDEX idx_positions_symbol ON positions(symbol);
 CREATE INDEX idx_positions_trading_pair ON positions(trading_pair_id);
 
--- Agent Memory table (with vector embeddings)
-CREATE TABLE memories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    agent_id VARCHAR(100) NOT NULL,
-    session_id VARCHAR(255),
-
-    type memory_type NOT NULL,
-    content TEXT NOT NULL,
-    
-    -- Embedding metadata (critical for search compatibility)
-    embedding vector(1536), -- Default: OpenAI text-embedding-3-small dimension
-    embedding_model VARCHAR(100) NOT NULL, -- e.g., "text-embedding-3-small"
-    embedding_dimensions INT NOT NULL DEFAULT 1536, -- For validation and future migrations
-
-    -- Trading metadata (kept as columns for fast filtering)
-    symbol VARCHAR(50),
-    timeframe VARCHAR(10),
-    importance DECIMAL(3,2) DEFAULT 0.5,
-    
-    -- Flexible metadata storage (tags, references, custom fields)
-    metadata JSONB DEFAULT '{}',
-
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    expires_at TIMESTAMPTZ
-);
-
-CREATE INDEX idx_memories_user ON memories(user_id);
-CREATE INDEX idx_memories_agent ON memories(agent_id);
-CREATE INDEX idx_memories_type ON memories(type);
-CREATE INDEX idx_memories_embedding_model ON memories(embedding_model); -- Filter by model before vector search
-CREATE INDEX idx_memories_embedding ON memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX idx_memories_metadata ON memories USING gin(metadata); -- JSON queries
-CREATE INDEX idx_memories_created ON memories(created_at DESC);
-
--- Collective Memory table (shared knowledge)
--- collective_memories table moved to 005_collective_memory.up.sql
+-- Agent Memory tables moved to 005_agent_memories.up.sql (unified structure)
 
 -- Journal Entries table
 CREATE TABLE journal_entries (

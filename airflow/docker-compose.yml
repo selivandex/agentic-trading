@@ -1,0 +1,102 @@
+version: "3.8"
+
+# Airflow setup for ML training automation
+# Minimal configuration for regime model training DAG
+
+services:
+  airflow-init:
+    image: apache/airflow:2.7.3-python3.11
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-'81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs='}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ../scripts:/app/scripts
+      - ../models:/app/models
+    entrypoint: /bin/bash
+    command: >
+      -c "airflow db migrate &&
+          airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@prometheus.com || true"
+    depends_on:
+      - postgres-airflow
+    networks:
+      - airflow-net
+
+  airflow-webserver:
+    image: apache/airflow:2.7.3-python3.11
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-'81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs='}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-clickhouse}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-9000}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../scripts:/app/scripts
+      - ../models:/app/models
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      - postgres-airflow
+      - airflow-init
+    networks:
+      - airflow-net
+    restart: always
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.3-python3.11
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-'81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs='}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-clickhouse}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-9000}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../scripts:/app/scripts
+      - ../models:/app/models
+    command: scheduler
+    depends_on:
+      - postgres-airflow
+      - airflow-init
+    networks:
+      - airflow-net
+    restart: always
+
+  postgres-airflow:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    networks:
+      - airflow-net
+    restart: always
+
+volumes:
+  airflow-postgres-data:
+
+networks:
+  airflow-net:
+    driver: bridge

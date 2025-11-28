@@ -7,33 +7,14 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
-// Memory represents an agent's memory entry with vector embedding
-type Memory struct {
-	ID        uuid.UUID `db:"id"`
-	UserID    uuid.UUID `db:"user_id"`
-	AgentID   string    `db:"agent_id"`
-	SessionID string    `db:"session_id"`
+// MemoryScope defines the level of memory
+type MemoryScope string
 
-	Type    MemoryType `db:"type"` // observation, decision, trade, lesson
-	Content string     `db:"content"`
-
-	// Embedding metadata (critical for search compatibility)
-	Embedding           pgvector.Vector `db:"embedding"` // pgvector handles this automatically
-	EmbeddingModel      string          `db:"embedding_model"`
-	EmbeddingDimensions int             `db:"embedding_dimensions"`
-
-	// Trading metadata (kept as columns for fast filtering)
-	Symbol     string  `db:"symbol"`
-	Timeframe  string  `db:"timeframe"`
-	Importance float64 `db:"importance"` // 0-1, for retrieval ranking
-
-	// Flexible metadata storage (tags, references, custom fields)
-	// Examples: trade_id, position_id, tags, confidence, related_memories
-	Metadata map[string]interface{} `db:"metadata"`
-
-	CreatedAt time.Time  `db:"created_at"`
-	ExpiresAt *time.Time `db:"expires_at"` // TTL for short-term
-}
+const (
+	MemoryScopeUser       MemoryScope = "user"       // Agent-level memory for specific user (episodic)
+	MemoryScopeCollective MemoryScope = "collective" // Agent-level shared knowledge across users (semantic)
+	MemoryScopeWorking    MemoryScope = "working"    // Temporary working memory
+)
 
 // MemoryType defines the type of memory
 type MemoryType string
@@ -61,35 +42,70 @@ func (m MemoryType) String() string {
 	return string(m)
 }
 
-// CollectiveMemory represents shared knowledge validated across users
-type CollectiveMemory struct {
+// Memory represents unified memory entry (user, collective, or working)
+type Memory struct {
 	ID uuid.UUID `db:"id"`
 
-	// Scope
-	AgentType   string  `db:"agent_type"`  // "opportunity_synthesizer", "portfolio_manager", "position_manager", etc.
-	Personality *string `db:"personality"` // NULL for all personalities
+	// Scope determines memory level
+	Scope MemoryScope `db:"scope"`
 
-	// Content
-	Type      MemoryType      `db:"type"`
-	Content   string          `db:"content"`
-	Embedding pgvector.Vector `db:"embedding"`
+	// User-specific (NULL for collective/working)
+	UserID *uuid.UUID `db:"user_id"`
 
-	// Validation (promoted only when proven)
-	ValidationScore  float64    `db:"validation_score"`  // 0-100, how well this lesson performed
-	ValidationTrades int        `db:"validation_trades"` // Number of trades that validated this
+	// Agent that created memory
+	AgentID   string `db:"agent_id"`
+	SessionID string `db:"session_id"`
+
+	// Memory classification
+	Type    MemoryType `db:"type"`
+	Content string     `db:"content"`
+
+	// Vector embedding for semantic search
+	Embedding           pgvector.Vector `db:"embedding"`
+	EmbeddingModel      string          `db:"embedding_model"`
+	EmbeddingDimensions int             `db:"embedding_dimensions"`
+
+	// Validation metrics (for collective memories)
+	ValidationScore  float64    `db:"validation_score"`
+	ValidationTrades int        `db:"validation_trades"`
 	ValidatedAt      *time.Time `db:"validated_at"`
 
-	// Metadata
-	Symbol     *string  `db:"symbol"`     // NULL for general lessons
-	Timeframe  *string  `db:"timeframe"`  // NULL for general lessons
-	Importance float64  `db:"importance"` // 0-1, for retrieval ranking
-	Tags       []string `db:"tags"`       // Additional categorization
+	// Context metadata
+	Symbol     string   `db:"symbol"`
+	Timeframe  string   `db:"timeframe"`
+	Importance float64  `db:"importance"`
+	Tags       []string `db:"tags"`
 
-	// Source (anonymized)
-	SourceUserID  *uuid.UUID `db:"source_user_id"`  // Who contributed this
-	SourceTradeID *uuid.UUID `db:"source_trade_id"` // Which trade led to this lesson
+	// Additional context (flexible JSON)
+	Metadata map[string]interface{} `db:"metadata"`
 
+	// Personality filter (for collective memories)
+	Personality *string `db:"personality"`
+
+	// Source tracking (for collective memories)
+	SourceUserID  *uuid.UUID `db:"source_user_id"`
+	SourceTradeID *uuid.UUID `db:"source_trade_id"`
+
+	// Lifecycle
 	CreatedAt time.Time  `db:"created_at"`
 	UpdatedAt time.Time  `db:"updated_at"`
-	ExpiresAt *time.Time `db:"expires_at"` // TTL for time-sensitive lessons
+	ExpiresAt *time.Time `db:"expires_at"`
+
+	// Search result metadata (not stored in DB)
+	Similarity float64 `db:"similarity"` // Cosine similarity score for search results
+}
+
+// IsUserMemory checks if this is agent-level memory for specific user
+func (m *Memory) IsUserMemory() bool {
+	return m.Scope == MemoryScopeUser
+}
+
+// IsCollectiveMemory checks if this is agent-level shared knowledge
+func (m *Memory) IsCollectiveMemory() bool {
+	return m.Scope == MemoryScopeCollective
+}
+
+// IsWorkingMemory checks if this is temporary working memory
+func (m *Memory) IsWorkingMemory() bool {
+	return m.Scope == MemoryScopeWorking
 }

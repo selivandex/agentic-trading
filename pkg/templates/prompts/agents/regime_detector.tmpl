@@ -229,7 +229,7 @@ Provide clear, actionable recommendations with reasoning.
 
 {{- if .Tools }}
 {{- range .Tools }}
-- {{.Name}}: {{.Description}}
+- {{.Name}}{{if .Requirement}} ({{.Requirement}}){{end}}: {{.Description}}
 {{- end }}
 {{- else }}
 No tools available.

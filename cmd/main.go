@@ -44,9 +44,11 @@ import (
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
 	"prometheus/internal/metrics"
+	regimeml "prometheus/internal/ml/regime"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
 	analysisservice "prometheus/internal/services/analysis"
+	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
@@ -145,6 +147,7 @@ func main() {
 	analyticsConsumer := provideKafkaConsumer(cfg, "analytics", log)
 	opportunityKafkaConsumer := provideKafkaConsumer(cfg, events.TopicOpportunityFound, log)
 	aiUsageKafkaConsumer := provideKafkaConsumer(cfg, events.TopicAIUsage, log)
+	positionGuardianConsumer := provideKafkaConsumer(cfg, "position_guardian", log)
 
 	encryptor, err := crypto.NewEncryptor(cfg.Crypto.EncryptionKey)
 	if err != nil {
@@ -202,13 +205,13 @@ func main() {
 		log,
 	)
 
-	agentFactory, agentRegistry, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, kafkaProducer, aiUsageRepo, reasoningRepo, log)
+	agentFactory, agentRegistry, defaultProvider, defaultModel, err := provideAgents(cfg, toolRegistry, adkSessionService, redisClient, riskEngine, kafkaProducer, aiUsageRepo, reasoningRepo, log)
 	if err != nil {
 		log.Fatalf("failed to initialize agents: %v", err)
 	}
 
 	// Register expert agent tools (agent-as-tool pattern)
-	if err := registerExpertTools(agentFactory, toolRegistry, cfg.AI.DefaultProvider, "claude-sonnet-4", log); err != nil {
+	if err := registerExpertTools(agentFactory, toolRegistry, defaultProvider, defaultModel, log); err != nil {
 		log.Warnf("Failed to register expert tools: %v", err)
 	}
 
@@ -243,7 +246,10 @@ func main() {
 		encryptor,
 		kafkaProducer,
 		agentFactory,
+		agentRegistry, // Add agent registry
 		adkSessionService,
+		defaultProvider,
+		defaultModel,
 		cfg,
 		log,
 	)
@@ -259,7 +265,7 @@ func main() {
 	aiUsageSvc := consumers.NewAIUsageConsumer(aiUsageKafkaConsumer, aiUsageRepo, log)
 
 	// Create workflow factory for personal trading workflows
-	workflowFactory := workflows.NewFactory(agentFactory, cfg.AI.DefaultProvider, "claude-sonnet-4")
+	workflowFactory := workflows.NewFactory(agentFactory, defaultProvider, defaultModel)
 
 	opportunitySvc := consumers.NewOpportunityConsumer(
 		opportunityKafkaConsumer,
@@ -271,8 +277,49 @@ func main() {
 		log,
 	)
 
+	// ========================================
+	// Position Guardian (Event-Driven Monitoring) - Phase 2
+	// ========================================
+
+	// Critical event handler (algorithmic, <1s response)
+	criticalHandler := positionservice.NewCriticalEventHandler(
+		positionRepo,
+		log,
+	)
+
+	// Agent event handler (LLM-based decisions)
+	// Use PositionManager agent for position monitoring decisions
+	var agentHandler *positionservice.AgentEventHandler
+
+	// Create PositionManager agent using resolved provider and model
+	positionManagerAgent, agentErr := agentFactory.CreateAgentForUser(
+		agents.AgentPositionManager,
+		defaultProvider,
+		defaultModel,
+	)
+	if agentErr != nil {
+		log.Warnf("PositionManager agent creation failed, agent handler disabled: %v", agentErr)
+	} else {
+		agentHandler = positionservice.NewAgentEventHandler(
+			positionRepo,
+			positionManagerAgent,
+			adkSessionService,
+			log,
+			30*time.Second, // timeout
+		)
+		log.Info("✓ Agent event handler initialized with PositionManager agent")
+	}
+
+	// Position guardian consumer
+	positionGuardianSvc := consumers.NewPositionGuardianConsumer(
+		positionGuardianConsumer,
+		criticalHandler,
+		agentHandler,
+		log,
+	)
+
 	// Start consumers in background (all tracked by WaitGroup)
-	wg.Add(5)
+	wg.Add(6)
 	go func() {
 		defer wg.Done()
 		if err := notificationSvc.Start(ctx); err != nil && ctx.Err() == nil {
@@ -303,8 +350,14 @@ func main() {
 			log.Error("AI usage consumer failed", "error", err)
 		}
 	}()
+	go func() {
+		defer wg.Done()
+		if err := positionGuardianSvc.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Error("Position guardian consumer failed", "error", err)
+		}
+	}()
 
-	log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage")
+	log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian")
 
 	log.With("tools", len(toolRegistry.List())).Info("System initialized successfully")
 
@@ -383,6 +436,7 @@ func main() {
 		analyticsConsumer,
 		opportunityKafkaConsumer,
 		aiUsageKafkaConsumer,
+		positionGuardianConsumer,
 		pgClient,
 		chClient,
 		redisClient,
@@ -532,29 +586,37 @@ func provideAgents(
 	aiUsageRepo *chrepo.AIUsageRepository,
 	reasoningRepo *pgrepo.ReasoningRepository,
 	log *logger.Logger,
-) (*agents.Factory, *agents.Registry, error) {
+) (*agents.Factory, *agents.Registry, string, string, error) {
 	log.Info("Initializing agents...")
 
 	aiRegistry, err := ai.BuildRegistry(cfg.AI)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "build AI registry")
+		return nil, nil, "", "", errors.Wrap(err, "build AI registry")
 	}
 
 	defaultProvider := resolveProvider(aiRegistry, cfg.AI.DefaultProvider)
 	if defaultProvider == "" {
-		return nil, nil, errors.ErrUnavailable
+		return nil, nil, "", "", errors.ErrUnavailable
 	}
 
-	// Resolve model FIRST (before creating factory)
+	// Resolve model from config or auto-select
 	selector := ai.NewModelSelector(aiRegistry, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Use OpportunitySynthesizer as default for model resolution
-	// It's the main market research agent and represents typical workload
-	modelCfg, modelInfo, err := selector.Get(ctx, string(agents.AgentOpportunitySynthesizer), defaultProvider)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "resolve default model")
+	var selectedModel string
+	if cfg.AI.DefaultModel != "" {
+		// Use model from ENV config
+		selectedModel = cfg.AI.DefaultModel
+		log.Infof("Using configured model from ENV: provider=%s model=%s", defaultProvider, selectedModel)
+	} else {
+		// Auto-select best model for provider
+		modelCfg, modelInfo, err := selector.Get(ctx, string(agents.AgentOpportunitySynthesizer), defaultProvider)
+		if err != nil {
+			return nil, nil, "", "", errors.Wrap(err, "auto-select model")
+		}
+		selectedModel = modelCfg.Model
+		log.Infof("Auto-selected model: provider=%s model=%s (%s)", defaultProvider, selectedModel, modelInfo.Name)
 	}
 
 	// Create cost check function using ClickHouse
@@ -575,8 +637,8 @@ func provideAgents(
 		ToolRegistry:    toolRegistry,
 		Templates:       templates.Get(),
 		SessionService:  sessionService,
-		DefaultProvider: modelCfg.Provider,
-		DefaultModel:    modelCfg.Model,
+		DefaultProvider: defaultProvider,
+		DefaultModel:    selectedModel,
 		CallbackDeps: &agents.CallbackDeps{
 			Redis:          redisClient.Client(),
 			EventPublisher: eventPublisher,
@@ -586,16 +648,16 @@ func provideAgents(
 		},
 	})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "create agent factory")
+		return nil, nil, "", "", errors.Wrap(err, "create agent factory")
 	}
 
-	registry, err := factory.CreateDefaultRegistry(modelCfg.Provider, modelCfg.Model)
+	registry, err := factory.CreateDefaultRegistry(defaultProvider, selectedModel)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "create default agent registry")
+		return nil, nil, "", "", errors.Wrap(err, "create default agent registry")
 	}
 
-	log.Infof("✓ Agents initialized with provider=%s model=%s", modelCfg.Provider, modelInfo.Name)
-	return factory, registry, nil
+	log.Infof("✓ Agents initialized with provider=%s model=%s", defaultProvider, selectedModel)
+	return factory, registry, defaultProvider, selectedModel, nil
 }
 
 func resolveProvider(registry *ai.ProviderRegistry, desired string) string {
@@ -648,7 +710,10 @@ func provideWorkers(
 	encryptor *crypto.Encryptor,
 	kafkaProducer *kafka.Producer,
 	agentFactory *agents.Factory,
+	agentRegistry *agents.Registry,
 	adkSessionService session.Service,
+	defaultProvider string,
+	defaultModel string,
 	cfg *config.Config,
 	log *logger.Logger,
 ) *workers.Scheduler {
@@ -656,8 +721,35 @@ func provideWorkers(
 
 	scheduler := workers.NewScheduler()
 
-	// Create workflow factory for market research and personal trading workflows
-	workflowFactory := workflows.NewFactory(agentFactory, cfg.AI.DefaultProvider, "claude-sonnet-4")
+	// Create workflow factory for market research and personal trading workflows (passed from provideAgents)
+	workflowFactory := workflows.NewFactory(agentFactory, defaultProvider, defaultModel)
+
+	// Phase 3: Create PathSelector for intelligent routing between fast-path and committee
+	// PathSelector routes analysis requests based on:
+	// - Priority level (high/critical → committee)
+	// - Position size (>10% portfolio → committee)
+	// - Market volatility (>5% → committee)
+	// - Conflicting signals (escalation from fast-path → committee)
+	// - Cost control (target 20% of requests to committee)
+	pathSelector, err := workflowFactory.CreatePathSelector()
+	if err != nil {
+		log.Fatal("Failed to create PathSelector", "error", err)
+	}
+	log.Info("PathSelector created successfully",
+		"high_stakes_threshold", pathSelector.GetMetrics()["high_stakes_threshold"],
+		"volatility_threshold", pathSelector.GetMetrics()["volatility_threshold"],
+		"target_committee_pct", pathSelector.GetMetrics()["target_committee_pct"],
+	)
+
+	// TODO (Phase 3 integration): Update OpportunityFinder to use PathSelector
+	// Instead of single workflow, use pathSelector.SelectPath() to route requests
+	// Example:
+	//   analysisAgent := pathSelector.SelectPath(ctx, workflows.AnalysisRequest{
+	//       Symbol: symbol,
+	//       Exchange: exchange,
+	//       Priority: workflows.PriorityMedium,
+	//   })
+	//   result, err := analysisAgent.Run(ctx, input)
 
 	// Default monitored symbols
 	defaultSymbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"}
@@ -665,6 +757,12 @@ func provideWorkers(
 	// ========================================
 	// Trading Workers (high frequency)
 	// ========================================
+
+	// Event publisher for position events
+	eventPublisher := events.NewPublisher(kafkaProducer, log)
+
+	// Position event generator for trigger checking
+	positionEventGenerator := trading.NewPositionEventGenerator(eventPublisher, log)
 
 	// Position monitor: Updates PnL and checks SL/TP
 	scheduler.RegisterWorker(trading.NewPositionMonitor(
@@ -674,6 +772,7 @@ func provideWorkers(
 		exchFactory,
 		*encryptor,
 		kafkaProducer,
+		positionEventGenerator,
 		cfg.Workers.PositionMonitorInterval,
 		true, // enabled
 	))
@@ -972,15 +1071,57 @@ func provideWorkers(
 	}
 	scheduler.RegisterWorker(opportunityFinder)
 
-	// Regime detector: Detects market regime
-	scheduler.RegisterWorker(analysis.NewRegimeDetector(
+	// Phase 4: ML-Based Regime Detection
+	// Feature extractor: Extracts ML features from market data every hour
+	scheduler.RegisterWorker(analysis.NewFeatureExtractor(
 		marketDataRepo,
 		regimeRepo,
-		kafkaProducer,
 		defaultSymbols,
-		cfg.Workers.RegimeDetectorInterval,
-		true, // enabled
+		1*time.Hour, // Run every hour
+		true,        // enabled
 	))
+
+	// Load ONNX regime classifier (optional - graceful degradation if model not found)
+	regimeClassifier, classifierErr := regimeml.NewClassifier("models/regime_detector.onnx")
+	if classifierErr != nil {
+		log.Warn("Regime ML classifier not available, will use algorithmic fallback", "error", classifierErr)
+		// Fall back to algorithmic regime detector
+		scheduler.RegisterWorker(analysis.NewRegimeDetector(
+			marketDataRepo,
+			regimeRepo,
+			kafkaProducer,
+			defaultSymbols,
+			cfg.Workers.RegimeDetectorInterval,
+			true, // enabled
+		))
+	} else {
+		log.Info("Regime ML classifier loaded successfully")
+		defer regimeClassifier.Close()
+
+		// Get RegimeInterpreter agent from registry (already created and configured)
+		regimeInterpreterAgent, ok := agentRegistry.Get(agents.AgentRegimeInterpreter)
+		if !ok {
+			log.Warn("RegimeInterpreter agent not found in registry, using ML without interpretation")
+			regimeInterpreterAgent = nil
+		}
+
+		// Register ML-based regime detector with LLM interpretation
+		mlRegimeDetector, err := analysis.NewRegimeDetectorML(
+			marketDataRepo,
+			regimeRepo,
+			regimeClassifier,
+			regimeInterpreterAgent,
+			adkSessionService,
+			kafkaProducer,
+			defaultSymbols,
+			cfg.Workers.RegimeDetectorInterval,
+			true, // enabled
+		)
+		if err != nil {
+			log.Fatal("Failed to create ML regime detector", "error", err)
+		}
+		scheduler.RegisterWorker(mlRegimeDetector)
+	}
 
 	// SMC scanner: Scans for Smart Money Concepts patterns
 	scheduler.RegisterWorker(analysis.NewSMCScanner(
@@ -1061,6 +1202,7 @@ func gracefulShutdown(
 	analyticsConsumer *kafka.Consumer,
 	opportunityKafkaConsumer *kafka.Consumer,
 	aiUsageKafkaConsumer *kafka.Consumer,
+	positionGuardianConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -1097,11 +1239,12 @@ func gracefulShutdown(
 	// This is critical - consumer.Close() will interrupt blocking ReadMessage()
 	log.Info("[3/7] Closing Kafka consumers (to unblock ReadMessage)...")
 	for name, consumer := range map[string]*kafka.Consumer{
-		"notification": notificationConsumer,
-		"risk":         riskConsumer,
-		"analytics":    analyticsConsumer,
-		"opportunity":  opportunityKafkaConsumer,
-		"ai_usage":     aiUsageKafkaConsumer,
+		"notification":      notificationConsumer,
+		"risk":              riskConsumer,
+		"analytics":         analyticsConsumer,
+		"opportunity":       opportunityKafkaConsumer,
+		"ai_usage":          aiUsageKafkaConsumer,
+		"position_guardian": positionGuardianConsumer,
 	} {
 		if consumer != nil {
 			if err := consumer.Close(); err != nil {

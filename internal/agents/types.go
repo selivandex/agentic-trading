@@ -11,11 +11,19 @@ const (
 	// Market research workflow agent (global)
 	AgentOpportunitySynthesizer AgentType = "opportunity_synthesizer"
 
+	// Research Committee agents (global, multi-agent collaboration)
+	AgentTechnicalAnalyst  AgentType = "technical_analyst"  // Technical indicators specialist
+	AgentStructuralAnalyst AgentType = "structural_analyst" // SMC/ICT specialist
+	AgentFlowAnalyst       AgentType = "flow_analyst"       // Order flow & whale activity
+	AgentMacroAnalyst      AgentType = "macro_analyst"      // Economic context & correlations
+	AgentHeadOfResearch    AgentType = "head_of_research"   // Synthesizer & debate leader
+
 	// Portfolio management agent (onboarding)
 	AgentPortfolioArchitect AgentType = "portfolio_architect"
 
 	// System agents (adaptive intelligence)
 	AgentRegimeDetector      AgentType = "regime_detector"
+	AgentRegimeInterpreter   AgentType = "regime_interpreter"
 	AgentPerformanceAnalyzer AgentType = "performance_analyzer"
 
 	// Quality gates and review agents

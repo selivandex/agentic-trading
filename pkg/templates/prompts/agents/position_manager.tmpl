@@ -201,13 +201,11 @@ Make final call with clear rationale.
 
 {{- if .Tools }}
 {{- range .Tools }}
-- {{.Name}}: {{.Description}}
+- {{.Name}}{{if .Requirement}} ({{.Requirement}}){{end}}: {{.Description}}
 {{- end }}
 {{- else }}
 No tools available.
 {{- end }}
-
-Use get_positions, get_balance to understand full portfolio context if needed.
 
 ---
 

@@ -250,10 +250,8 @@ Save to memory using save_memory():
 
 {{- if .Tools }}
 {{- range .Tools }}
-- {{.Name}}: {{.Description}}
+- {{.Name}}{{if .Requirement}} ({{.Requirement}}){{end}}: {{.Description}}
 {{- end }}
-
-**MANDATORY**: Call analysis tools for market regime, calc_asset_correlation for diversification check, pre_trade_check for each position, execute_trade to place orders.
 {{- else }}
 No tools available.
 {{- end }}

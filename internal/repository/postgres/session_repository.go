@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -219,12 +220,15 @@ func (r *SessionRepository) AppendEvent(ctx context.Context, sessionUUID uuid.UU
 		return errors.Wrap(err, "failed to marshal actions")
 	}
 
-	var usageMetadataJSON []byte
+	var usageMetadataJSON interface{}
 	if event.UsageMetadata != nil {
-		usageMetadataJSON, err = json.Marshal(event.UsageMetadata)
+		usageMetadataJSONBytes, err := json.Marshal(event.UsageMetadata)
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal usage metadata")
 		}
+		usageMetadataJSON = usageMetadataJSONBytes
+	} else {
+		usageMetadataJSON = nil
 	}
 
 	query := `
@@ -281,7 +285,7 @@ func (r *SessionRepository) GetEvents(ctx context.Context, sessionUUID uuid.UUID
 	query += ` ORDER BY timestamp DESC`
 
 	if opts.Limit > 0 {
-		query += ` LIMIT $` + string(rune(len(args)+1))
+		query += fmt.Sprintf(` LIMIT $%d`, len(args)+1)
 		args = append(args, opts.Limit)
 	}
 

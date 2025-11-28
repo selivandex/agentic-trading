@@ -49,14 +49,7 @@ WHERE
     session_id IS NOT NULL;
 
 -- ==================================================
--- Collective memory indexes
--- ==================================================
--- Removed: idx_collective_memory_pattern - collective_memories doesn't have pattern_type column
--- IVFFlat index for semantic search (pgvector)
-CREATE INDEX IF NOT EXISTS idx_collective_memories_embedding_ivfflat ON collective_memories USING ivfflat (embedding vector_cosine_ops)
-WITH
-    (lists = 100);
-
+-- Collective memory indexes moved to 005_agent_memories.up.sql (unified with user memories)
 -- ==================================================
 -- Journal entries indexes
 -- ==================================================

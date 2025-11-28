@@ -39,7 +39,8 @@ func (s *Service) Store(ctx context.Context, memory *Memory) error {
 	if memory == nil {
 		return errors.ErrInvalidInput
 	}
-	if memory.UserID == uuid.Nil {
+	// For user-scope memories, UserID is required
+	if memory.Scope == MemoryScopeUser && (memory.UserID == nil || *memory.UserID == uuid.Nil) {
 		return errors.ErrInvalidInput
 	}
 	if err := s.repo.Store(ctx, memory); err != nil {
@@ -54,7 +55,8 @@ func (s *Service) StoreWithText(ctx context.Context, memory *Memory, searchText 
 	if memory == nil {
 		return errors.ErrInvalidInput
 	}
-	if memory.UserID == uuid.Nil {
+	// For user-scope memories, UserID is required
+	if memory.Scope == MemoryScopeUser && (memory.UserID == nil || *memory.UserID == uuid.Nil) {
 		return errors.ErrInvalidInput
 	}
 	if searchText == "" {
@@ -119,29 +121,15 @@ func (s *Service) SearchSimilar(ctx context.Context, userID uuid.UUID, queryText
 	return results, nil
 }
 
-// StoreCollective saves shared lessons across agents.
-func (s *Service) StoreCollective(ctx context.Context, memory *CollectiveMemory) error {
-	if memory == nil {
-		return errors.ErrInvalidInput
-	}
-	if memory.AgentType == "" {
-		return errors.ErrInvalidInput
-	}
-	if err := s.repo.StoreCollective(ctx, memory); err != nil {
-		return errors.Wrap(err, "store collective memory")
-	}
-	return nil
-}
-
 // SearchCollectiveSimilar searches collective memories by embedding.
-func (s *Service) SearchCollectiveSimilar(ctx context.Context, agentType string, embedding pgvector.Vector, limit int) ([]*CollectiveMemory, error) {
-	if agentType == "" {
+func (s *Service) SearchCollectiveSimilar(ctx context.Context, agentID string, embedding pgvector.Vector, limit int) ([]*Memory, error) {
+	if agentID == "" {
 		return nil, errors.ErrInvalidInput
 	}
 	if limit <= 0 {
 		limit = 10
 	}
-	results, err := s.repo.SearchCollectiveSimilar(ctx, agentType, embedding, limit)
+	results, err := s.repo.SearchCollectiveSimilar(ctx, embedding, agentID, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "search collective memory")
 	}
@@ -149,14 +137,14 @@ func (s *Service) SearchCollectiveSimilar(ctx context.Context, agentType string,
 }
 
 // GetValidatedLessons returns the highest scoring collective lessons.
-func (s *Service) GetValidatedLessons(ctx context.Context, agentType string, minScore float64, limit int) ([]*CollectiveMemory, error) {
-	if agentType == "" {
+func (s *Service) GetValidatedLessons(ctx context.Context, agentID string, minScore float64, limit int) ([]*Memory, error) {
+	if agentID == "" {
 		return nil, errors.ErrInvalidInput
 	}
 	if limit <= 0 {
 		limit = 10
 	}
-	lessons, err := s.repo.GetValidatedLessons(ctx, agentType, minScore, limit)
+	lessons, err := s.repo.GetValidated(ctx, agentID, minScore, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "get validated lessons")
 	}

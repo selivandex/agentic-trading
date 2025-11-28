@@ -43,7 +43,8 @@ type Position struct {
 	TakeProfitOrderID *uuid.UUID `db:"take_profit_order_id"`
 
 	// Metadata
-	OpenReasoning string `db:"open_reasoning"`
+	OpenReasoning string     `db:"open_reasoning"`
+	StrategyID    *uuid.UUID `db:"strategy_id"` // Link to user_strategies table
 
 	Status    PositionStatus `db:"status"`
 	OpenedAt  time.Time      `db:"opened_at"`

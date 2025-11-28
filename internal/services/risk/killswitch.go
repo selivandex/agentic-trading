@@ -155,7 +155,8 @@ func (k *KillSwitch) Activate(ctx context.Context, userID uuid.UUID, reason stri
 	now := time.Now()
 	state.IsTriggered = true
 	state.TriggeredAt = &now
-	state.TriggerReason = fmt.Sprintf("Kill switch activated: %s", reason)
+	triggerMsg := fmt.Sprintf("Kill switch activated: %s", reason)
+	state.TriggerReason = &triggerMsg
 	state.UpdatedAt = now
 
 	if err := k.riskRepo.SaveState(ctx, state); err != nil {
@@ -228,7 +229,8 @@ func (k *KillSwitch) Deactivate(ctx context.Context, userID uuid.UUID) error {
 
 	state.IsTriggered = false
 	state.TriggeredAt = nil
-	state.TriggerReason = ""
+	emptyReason := ""
+	state.TriggerReason = &emptyReason
 	state.UpdatedAt = time.Now()
 
 	if err := k.riskRepo.SaveState(ctx, state); err != nil {

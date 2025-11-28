@@ -91,6 +91,7 @@ type AIConfig struct {
 	DeepSeekKey         string `envconfig:"DEEPSEEK_API_KEY"`
 	GeminiKey           string `envconfig:"GEMINI_API_KEY"`
 	DefaultProvider     string `envconfig:"DEFAULT_AI_PROVIDER" default:"claude"`
+	DefaultModel        string `envconfig:"DEFAULT_AI_MODEL" default:""`                // Default model (auto-selected if empty)
 	MaxDailyCostPerUser string `envconfig:"AI_MAX_DAILY_COST_PER_USER" default:"10.00"` // Max daily AI spending per user (USD)
 	MaxCostPerExecution string `envconfig:"AI_MAX_COST_PER_EXECUTION" default:"1.00"`   // Max cost per single agent execution (USD)
 }

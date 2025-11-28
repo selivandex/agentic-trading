@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 
 	"prometheus/internal/domain/exchange_account"
+	pkgerrors "prometheus/pkg/errors"
 )
 
 // Compile-time check
@@ -21,6 +23,25 @@ type ExchangeAccountRepository struct {
 // NewExchangeAccountRepository creates a new exchange account repository
 func NewExchangeAccountRepository(db *sqlx.DB) *ExchangeAccountRepository {
 	return &ExchangeAccountRepository{db: db}
+}
+
+// scanExchangeAccount scans a single exchange account from database row
+func scanExchangeAccount(row interface {
+	Scan(dest ...interface{}) error
+}) (*exchange_account.ExchangeAccount, error) {
+	acc := &exchange_account.ExchangeAccount{}
+
+	err := row.Scan(
+		&acc.ID, &acc.UserID, &acc.Exchange, &acc.Label,
+		&acc.APIKeyEncrypted, &acc.SecretEncrypted,
+		&acc.Passphrase, &acc.IsTestnet, pq.Array(&acc.Permissions),
+		&acc.IsActive, &acc.LastSyncAt, &acc.CreatedAt, &acc.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return acc, nil
 }
 
 // Create inserts a new exchange account
@@ -46,27 +67,56 @@ func (r *ExchangeAccountRepository) Create(ctx context.Context, account *exchang
 
 // GetByID retrieves an exchange account by ID
 func (r *ExchangeAccountRepository) GetByID(ctx context.Context, id uuid.UUID) (*exchange_account.ExchangeAccount, error) {
-	var account exchange_account.ExchangeAccount
+	query := `
+		SELECT 
+			id, user_id, exchange, label,
+			api_key_encrypted, secret_encrypted,
+			passphrase, is_testnet, permissions,
+			is_active, last_sync_at, created_at, updated_at
+		FROM exchange_accounts 
+		WHERE id = $1`
 
-	query := `SELECT * FROM exchange_accounts WHERE id = $1`
-
-	err := r.db.GetContext(ctx, &account, query, id)
+	row := r.db.QueryRowContext(ctx, query, id)
+	account, err := scanExchangeAccount(row)
+	if err == sql.ErrNoRows {
+		return nil, pkgerrors.Wrap(err, "exchange account not found")
+	}
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to get exchange account")
 	}
 
-	return &account, nil
+	return account, nil
 }
 
 // GetByUser retrieves all exchange accounts for a user
 func (r *ExchangeAccountRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error) {
-	var accounts []*exchange_account.ExchangeAccount
+	query := `
+		SELECT 
+			id, user_id, exchange, label,
+			api_key_encrypted, secret_encrypted,
+			passphrase, is_testnet, permissions,
+			is_active, last_sync_at, created_at, updated_at
+		FROM exchange_accounts 
+		WHERE user_id = $1 
+		ORDER BY created_at DESC`
 
-	query := `SELECT * FROM exchange_accounts WHERE user_id = $1 ORDER BY created_at DESC`
-
-	err := r.db.SelectContext(ctx, &accounts, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to query exchange accounts")
+	}
+	defer rows.Close()
+
+	var accounts []*exchange_account.ExchangeAccount
+	for rows.Next() {
+		acc, err := scanExchangeAccount(rows)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to scan exchange account")
+		}
+		accounts = append(accounts, acc)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to iterate exchange accounts")
 	}
 
 	return accounts, nil
@@ -74,16 +124,33 @@ func (r *ExchangeAccountRepository) GetByUser(ctx context.Context, userID uuid.U
 
 // GetActiveByUser retrieves active exchange accounts for a user
 func (r *ExchangeAccountRepository) GetActiveByUser(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error) {
-	var accounts []*exchange_account.ExchangeAccount
-
 	query := `
-		SELECT * FROM exchange_accounts 
+		SELECT 
+			id, user_id, exchange, label,
+			api_key_encrypted, secret_encrypted,
+			passphrase, is_testnet, permissions,
+			is_active, last_sync_at, created_at, updated_at
+		FROM exchange_accounts 
 		WHERE user_id = $1 AND is_active = true 
 		ORDER BY created_at DESC`
 
-	err := r.db.SelectContext(ctx, &accounts, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return nil, pkgerrors.Wrap(err, "failed to query active exchange accounts")
+	}
+	defer rows.Close()
+
+	var accounts []*exchange_account.ExchangeAccount
+	for rows.Next() {
+		acc, err := scanExchangeAccount(rows)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to scan exchange account")
+		}
+		accounts = append(accounts, acc)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to iterate exchange accounts")
 	}
 
 	return accounts, nil

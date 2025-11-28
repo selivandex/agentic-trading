@@ -7,21 +7,21 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
-// Repository defines the interface for memory data access
+// Repository handles all memory operations (user, collective, working)
 type Repository interface {
 	// User memory operations
 	Store(ctx context.Context, memory *Memory) error
-
-	// SearchSimilar performs semantic search with model filtering
-	// Only searches memories created with the same embedding model
-	SearchSimilar(ctx context.Context, userID uuid.UUID, embeddingModel string, embedding pgvector.Vector, limit int) ([]*Memory, error)
-
+	GetByID(ctx context.Context, id uuid.UUID) (*Memory, error)
+	SearchSimilar(ctx context.Context, userID uuid.UUID, agentID string, embedding pgvector.Vector, limit int) ([]*Memory, error)
 	GetByAgent(ctx context.Context, userID uuid.UUID, agentID string, limit int) ([]*Memory, error)
 	GetByType(ctx context.Context, userID uuid.UUID, memType MemoryType, limit int) ([]*Memory, error)
 	DeleteExpired(ctx context.Context) (int64, error)
 
 	// Collective memory operations
-	StoreCollective(ctx context.Context, memory *CollectiveMemory) error
-	SearchCollectiveSimilar(ctx context.Context, agentType string, embedding pgvector.Vector, limit int) ([]*CollectiveMemory, error)
-	GetValidatedLessons(ctx context.Context, agentType string, minScore float64, limit int) ([]*CollectiveMemory, error)
+	SearchCollectiveSimilar(ctx context.Context, embedding pgvector.Vector, agentID string, limit int) ([]*Memory, error)
+	SearchCollectiveByPersonality(ctx context.Context, embedding pgvector.Vector, agentID string, personality string, limit int) ([]*Memory, error)
+	GetValidated(ctx context.Context, agentID string, minScore float64, limit int) ([]*Memory, error)
+	GetCollectiveByType(ctx context.Context, agentID string, memType MemoryType, limit int) ([]*Memory, error)
+	UpdateValidation(ctx context.Context, id uuid.UUID, score float64, tradeCount int) error
+	PromoteToCollective(ctx context.Context, userMemory *Memory, validationScore float64, validationTrades int) (*Memory, error)
 }

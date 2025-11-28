@@ -221,10 +221,8 @@ Make final call: APPROVE / MODIFY / REJECT
 
 {{- if .Tools }}
 {{- range .Tools }}
-- {{.Name}}: {{.Description}}
+- {{.Name}}{{if .Requirement}} ({{.Requirement}}){{end}}: {{.Description}}
 {{- end }}
-
-**MANDATORY**: Always call get_correlation and pre_trade_check before any APPROVE decision.
 {{- else }}
 No tools available.
 {{- end }}

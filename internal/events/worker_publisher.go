@@ -22,7 +22,7 @@ func NewWorkerPublisher(kafka *kafka.Producer) *WorkerPublisher {
 	return &WorkerPublisher{kafka: kafka}
 }
 
-// PublishRegimeChange publishes a regime change event
+// PublishRegimeChange publishes a regime change event (legacy, without ML interpretation)
 func (wp *WorkerPublisher) PublishRegimeChange(
 	ctx context.Context,
 	symbol, oldRegime, newRegime, trend string,
@@ -36,6 +36,34 @@ func (wp *WorkerPublisher) PublishRegimeChange(
 		Confidence: confidence,
 		Volatility: volatility,
 		Trend:      trend,
+	}
+
+	return wp.publishProto(ctx, TopicRegimeChanged, symbol, event)
+}
+
+// PublishRegimeChangeML publishes enhanced regime change event with ML interpretation
+func (wp *WorkerPublisher) PublishRegimeChangeML(
+	ctx context.Context,
+	symbol, oldRegime, newRegime, trend string,
+	confidence, volatility float64,
+	explanation, strategicGuidance string,
+	positionSizeMultiplier, cashReserveTarget float64,
+	favoredStrategies, avoidedStrategies []string,
+) error {
+	event := &eventspb.RegimeChangedEvent{
+		Base:                   NewBaseEvent(TopicRegimeChanged, "regime_detector_ml", ""),
+		Symbol:                 symbol,
+		OldRegime:              oldRegime,
+		NewRegime:              newRegime,
+		Confidence:             confidence,
+		Volatility:             volatility,
+		Trend:                  trend,
+		Explanation:            explanation,
+		StrategicGuidance:      strategicGuidance,
+		PositionSizeMultiplier: positionSizeMultiplier,
+		CashReserveTarget:      cashReserveTarget,
+		FavoredStrategies:      favoredStrategies,
+		AvoidedStrategies:      avoidedStrategies,
 	}
 
 	return wp.publishProto(ctx, TopicRegimeChanged, symbol, event)

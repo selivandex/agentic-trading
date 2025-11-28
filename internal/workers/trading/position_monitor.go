@@ -28,6 +28,7 @@ type PositionMonitor struct {
 	encryptor      crypto.Encryptor
 	kafka          *kafka.Producer
 	eventPublisher *events.WorkerPublisher
+	eventGenerator *PositionEventGenerator
 }
 
 // NewPositionMonitor creates a new position monitor worker
@@ -38,6 +39,7 @@ func NewPositionMonitor(
 	exchFactory exchanges.Factory,
 	encryptor crypto.Encryptor,
 	kafka *kafka.Producer,
+	eventGenerator *PositionEventGenerator,
 	interval time.Duration,
 	enabled bool,
 ) *PositionMonitor {
@@ -50,6 +52,7 @@ func NewPositionMonitor(
 		encryptor:      encryptor,
 		kafka:          kafka,
 		eventPublisher: events.NewWorkerPublisher(kafka),
+		eventGenerator: eventGenerator,
 	}
 }
 
@@ -227,7 +230,25 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 		return errors.Wrap(err, "failed to update position PnL")
 	}
 
-	// Check if stop loss was hit
+	// Get exchange name for events
+	account, err := pm.accountRepo.GetByID(ctx, pos.ExchangeAccountID)
+	exchangeName := "unknown"
+	if err == nil && account != nil {
+		exchangeName = account.Exchange.String()
+	}
+
+	// Check position triggers and generate events (stop/target approaching, profit milestones, time decay)
+	if pm.eventGenerator != nil {
+		if err := pm.eventGenerator.CheckPositionTriggers(ctx, pos, currentPrice, exchangeName); err != nil {
+			pm.Log().Error("Failed to check position triggers",
+				"position_id", pos.ID,
+				"error", err,
+			)
+		}
+	}
+
+	// CRITICAL: Check if stop loss or take profit was hit - handle immediately
+	// These are CRITICAL events that require immediate algorithmic action
 	if !pos.StopLossPrice.IsZero() {
 		slHit := false
 		if pos.Side == position.PositionLong {
@@ -237,7 +258,7 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 		}
 
 		if slHit {
-			pm.sendStopLossEvent(ctx, pos, currentPrice)
+			pm.handleStopLossHit(ctx, pos, currentPrice, exchangeName)
 		}
 	}
 
@@ -251,11 +272,11 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 		}
 
 		if tpHit {
-			pm.sendTakeProfitEvent(ctx, pos, currentPrice)
+			pm.handleTakeProfitHit(ctx, pos, currentPrice, exchangeName)
 		}
 	}
 
-	// Send PnL update event
+	// Send PnL update event (for monitoring/analytics)
 	pm.sendPnLUpdateEvent(ctx, pos, currentPrice, unrealizedPnL, unrealizedPnLPct)
 
 	pm.Log().Debug("Position updated",
@@ -269,49 +290,8 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 	return nil
 }
 
-// Event structures
-
-type StopLossEvent struct {
-	PositionID    string    `json:"position_id"`
-	UserID        string    `json:"user_id"`
-	Symbol        string    `json:"symbol"`
-	Side          string    `json:"side"`
-	EntryPrice    string    `json:"entry_price"`
-	StopLossPrice string    `json:"stop_loss_price"`
-	CurrentPrice  string    `json:"current_price"`
-	Size          string    `json:"size"`
-	Timestamp     time.Time `json:"timestamp"`
-}
-
-type TakeProfitEvent struct {
-	PositionID      string    `json:"position_id"`
-	UserID          string    `json:"user_id"`
-	Symbol          string    `json:"symbol"`
-	Side            string    `json:"side"`
-	EntryPrice      string    `json:"entry_price"`
-	TakeProfitPrice string    `json:"take_profit_price"`
-	CurrentPrice    string    `json:"current_price"`
-	Size            string    `json:"size"`
-	Timestamp       time.Time `json:"timestamp"`
-}
-
-type PnLUpdateEvent struct {
-	PositionID       string    `json:"position_id"`
-	UserID           string    `json:"user_id"`
-	Symbol           string    `json:"symbol"`
-	CurrentPrice     string    `json:"current_price"`
-	UnrealizedPnL    string    `json:"unrealized_pnl"`
-	UnrealizedPnLPct string    `json:"unrealized_pnl_pct"`
-	Timestamp        time.Time `json:"timestamp"`
-}
-
-func (pm *PositionMonitor) sendStopLossEvent(ctx context.Context, pos *position.Position, currentPrice decimal.Decimal) {
-	// Get exchange from account
-	account, err := pm.accountRepo.GetByID(ctx, pos.ExchangeAccountID)
-	exchangeName := "unknown"
-	if err == nil && account != nil {
-		exchangeName = account.Exchange.String()
-	}
+// handleStopLossHit handles CRITICAL stop loss hit event with immediate action
+func (pm *PositionMonitor) handleStopLossHit(ctx context.Context, pos *position.Position, currentPrice decimal.Decimal, exchangeName string) {
 
 	entryPrice, _ := pos.EntryPrice.Float64()
 	exitPrice, _ := currentPrice.Float64()
@@ -351,13 +331,8 @@ func (pm *PositionMonitor) sendStopLossEvent(ctx context.Context, pos *position.
 	}
 }
 
-func (pm *PositionMonitor) sendTakeProfitEvent(ctx context.Context, pos *position.Position, currentPrice decimal.Decimal) {
-	// Get exchange from account
-	account, err := pm.accountRepo.GetByID(ctx, pos.ExchangeAccountID)
-	exchangeName := "unknown"
-	if err == nil && account != nil {
-		exchangeName = account.Exchange.String()
-	}
+// handleTakeProfitHit handles CRITICAL take profit hit event with immediate action
+func (pm *PositionMonitor) handleTakeProfitHit(ctx context.Context, pos *position.Position, currentPrice decimal.Decimal, exchangeName string) {
 
 	entryPrice, _ := pos.EntryPrice.Float64()
 	exitPrice, _ := currentPrice.Float64()

@@ -23,6 +23,12 @@ import (
 	"prometheus/pkg/templates"
 )
 
+// ToolWithRequirement combines tool definition with its requirement status for a specific agent
+type ToolWithRequirement struct {
+	tools.Definition        // Embedded tool definition (Name, Description, Category, RiskLevel, etc.)
+	Requirement      string `json:"requirement"` // "required", "optional", or "" (default optional)
+}
+
 // FactoryDeps gathers external dependencies needed to instantiate agents.
 type FactoryDeps struct {
 	AIRegistry     *ai.ProviderRegistry
@@ -119,7 +125,7 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 
 	// Collect tools for ADK agent
 	adkTools := make([]tool.Tool, 0, len(cfg.Tools))
-	toolInfo := make([]tools.Definition, 0, len(cfg.Tools))
+	toolInfo := make([]ToolWithRequirement, 0, len(cfg.Tools))
 	hasSaveAnalysisTool := false
 	definitionByName := map[string]tools.Definition{}
 	for _, def := range tools.Definitions() {
@@ -136,14 +142,22 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 		// They were created via functiontool.New() with tool.Context signature
 		adkTools = append(adkTools, t)
 
+		// Get tool definition and requirement status
+		var toolWithReq ToolWithRequirement
 		if def, ok := definitionByName[toolName]; ok {
-			toolInfo = append(toolInfo, def)
+			toolWithReq = ToolWithRequirement{
+				Definition:  def,
+				Requirement: string(GetToolRequirement(cfg.Type, toolName)),
+			}
 			if def.Name == "save_analysis" {
 				hasSaveAnalysisTool = true
 			}
 		} else {
-			toolInfo = append(toolInfo, tools.Definition{Name: toolName, Description: ""})
+			toolWithReq = ToolWithRequirement{
+				Definition: tools.Definition{Name: toolName, Description: ""},
+			}
 		}
+		toolInfo = append(toolInfo, toolWithReq)
 	}
 
 	// Render system prompt from template
@@ -210,6 +224,11 @@ func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
 		return nil, schemas.PreTradeReviewerOutputSchema
 	case AgentPerformanceCommittee:
 		return nil, schemas.PerformanceCommitteeOutputSchema
+	// Phase 3: Research Committee agents
+	case AgentTechnicalAnalyst, AgentStructuralAnalyst, AgentFlowAnalyst, AgentMacroAnalyst:
+		return nil, schemas.AnalystReportSchema
+	case AgentHeadOfResearch:
+		return nil, schemas.HeadOfResearchOutputSchema
 	default:
 		return nil, nil
 	}

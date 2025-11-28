@@ -1,8 +1,15 @@
-.PHONY: help docker-up docker-down db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create gen-encryption-key lint fmt test build run clean deps proto-gen
+.PHONY: help docker-up docker-down db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create test-db-create test-db-drop test-db-reset test-migrate-up gen-encryption-key lint fmt test test-short test-integration build run clean deps proto-gen
 
 # Load environment variables from .env file (if exists)
 -include .env
 export
+
+# Load test environment variables when running test commands
+TEST_ENV_FILE := .env.test
+ifneq (,$(wildcard $(TEST_ENV_FILE)))
+    include $(TEST_ENV_FILE)
+    export
+endif
 
 # Default target
 help:
@@ -22,11 +29,19 @@ help:
 	@echo "  make migrate-force      - Force migration version (fix dirty state)"
 	@echo "  make migrate-create     - Create new migration file"
 	@echo ""
+	@echo "🧪 Test Database:"
+	@echo "  make test-db-create     - Create test database"
+	@echo "  make test-db-drop       - Drop test database"
+	@echo "  make test-db-reset      - Reset test database (drop + create + migrate)"
+	@echo "  make test-migrate-up    - Apply migrations to test database"
+	@echo ""
 	@echo "🔧 Development:"
 	@echo "  make gen-encryption-key - Generate encryption key"
 	@echo "  make lint               - Run linter"
 	@echo "  make fmt                - Format code"
-	@echo "  make test               - Run tests"
+	@echo "  make test               - Run all tests with coverage"
+	@echo "  make test-short         - Run tests without integration tests"
+	@echo "  make test-integration   - Run only integration tests"
 	@echo "  make build              - Build application"
 	@echo "  make run                - Run application"
 	@echo "  make clean              - Clean build artifacts"
@@ -71,6 +86,50 @@ db-drop:
 db-reset: db-drop db-create migrate-up
 	@echo "✓ Databases reset complete"
 
+# Test database commands (use .env.test)
+test-db-create:
+	@echo "Creating test PostgreSQL database..."
+	@if [ -f .env.test ]; then \
+		set -a; . ./.env.test; set +a; \
+		PGPASSWORD=$$POSTGRES_PASSWORD psql -h $$POSTGRES_HOST -p $$POSTGRES_PORT -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE $$POSTGRES_DB;" 2>/dev/null || echo "Test database already exists"; \
+		echo "✓ Test PostgreSQL database ready: $$POSTGRES_DB"; \
+	else \
+		echo "❌ .env.test file not found"; \
+		exit 1; \
+	fi
+
+test-db-drop:
+	@echo "⚠️  WARNING: This will DROP the test database!"
+	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+		if [ -f .env.test ]; then \
+			set -a; . ./.env.test; set +a; \
+			echo "Dropping test PostgreSQL database: $$POSTGRES_DB..."; \
+			PGPASSWORD=$$POSTGRES_PASSWORD psql -h $$POSTGRES_HOST -p $$POSTGRES_PORT -U $$POSTGRES_USER -d postgres -c "DROP DATABASE IF EXISTS $$POSTGRES_DB;"; \
+			echo "✓ Test database dropped"; \
+		else \
+			echo "❌ .env.test file not found"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "Cancelled."; \
+	fi
+
+test-db-reset: test-db-drop test-db-create test-migrate-up
+	@echo "✓ Test database reset complete"
+
+# Test database migrations
+test-migrate-up:
+	@echo "Running PostgreSQL migrations on test database..."
+	@if [ -f .env.test ]; then \
+		set -a; . ./.env.test; set +a; \
+		migrate -database "postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@$$POSTGRES_HOST:$$POSTGRES_PORT/$$POSTGRES_DB?sslmode=$$POSTGRES_SSL_MODE" -path migrations/postgres up; \
+		echo "✓ Test database migrations completed"; \
+	else \
+		echo "❌ .env.test file not found"; \
+		exit 1; \
+	fi
+
 # Database migrations
 migrate-up:
 	@echo "Running PostgreSQL migrations..."
@@ -114,7 +173,12 @@ fmt:
 
 # Testing
 test:
+	@echo "Running all tests (unit + integration)..."
 	go test -v -race -coverprofile=coverage.out ./...
+
+test-short:
+	@echo "Running unit tests only (skipping integration tests)..."
+	go test -v -short -race ./...
 
 test-coverage:
 	go test -v -race -coverprofile=coverage.out ./...
@@ -122,7 +186,25 @@ test-coverage:
 	@echo "Coverage report: coverage.html"
 
 test-integration:
-	go test -v -tags=integration ./...
+	@echo "Running integration tests (requires test database)..."
+	@echo "Make sure test database is ready: make test-db-reset"
+	@if [ -f .env.test ]; then \
+		set -a; . ./.env.test; set +a; \
+		go test -v -race ./internal/repository/postgres/...; \
+	else \
+		echo "❌ .env.test file not found"; \
+		exit 1; \
+	fi
+
+test-repo:
+	@echo "Running repository integration tests..."
+	@if [ -f .env.test ]; then \
+		set -a; . ./.env.test; set +a; \
+		go test -v ./internal/repository/postgres -run $(TEST); \
+	else \
+		echo "❌ .env.test file not found"; \
+		exit 1; \
+	fi
 
 # Build
 build:

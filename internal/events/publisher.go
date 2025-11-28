@@ -75,6 +75,43 @@ func (p *Publisher) PublishWorkerFailed(ctx context.Context, event *eventspb.Wor
 	return p.publish(ctx, TopicWorkerFailed, event)
 }
 
+// Position Guardian event publishers
+
+// PublishStopApproaching publishes a stop approaching event
+func (p *Publisher) PublishStopApproaching(ctx context.Context, event *eventspb.StopApproachingEvent) error {
+	return p.publish(ctx, TopicStopApproaching, event)
+}
+
+// PublishTargetApproaching publishes a target approaching event
+func (p *Publisher) PublishTargetApproaching(ctx context.Context, event *eventspb.TargetApproachingEvent) error {
+	return p.publish(ctx, TopicTargetApproaching, event)
+}
+
+// PublishThesisInvalidation publishes a thesis invalidation event
+func (p *Publisher) PublishThesisInvalidation(ctx context.Context, event *eventspb.ThesisInvalidationEvent) error {
+	return p.publish(ctx, TopicThesisInvalidation, event)
+}
+
+// PublishTimeDecay publishes a time decay event
+func (p *Publisher) PublishTimeDecay(ctx context.Context, event *eventspb.TimeDecayEvent) error {
+	return p.publish(ctx, TopicTimeDecay, event)
+}
+
+// PublishProfitMilestone publishes a profit milestone event
+func (p *Publisher) PublishProfitMilestone(ctx context.Context, event *eventspb.ProfitMilestoneEvent) error {
+	return p.publish(ctx, TopicProfitMilestone, event)
+}
+
+// PublishCorrelationSpike publishes a correlation spike event
+func (p *Publisher) PublishCorrelationSpike(ctx context.Context, event *eventspb.CorrelationSpikeEvent) error {
+	return p.publish(ctx, TopicCorrelationSpike, event)
+}
+
+// PublishVolatilitySpike publishes a volatility spike event
+func (p *Publisher) PublishVolatilitySpike(ctx context.Context, event *eventspb.VolatilitySpikeEvent) error {
+	return p.publish(ctx, TopicVolatilitySpike, event)
+}
+
 // publish is the generic publish method using protobuf serialization
 func (p *Publisher) publish(ctx context.Context, topic string, event proto.Message) error {
 	// Serialize to protobuf binary format

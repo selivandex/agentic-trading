@@ -30,7 +30,7 @@ type TradingPair struct {
 	// State
 	IsActive     bool      `db:"is_active"`
 	IsPaused     bool      `db:"is_paused"`
-	PausedReason string    `db:"paused_reason"`
+	PausedReason *string   `db:"paused_reason"` // NULL when not paused
 	CreatedAt    time.Time `db:"created_at"`
 	UpdatedAt    time.Time `db:"updated_at"`
 }
