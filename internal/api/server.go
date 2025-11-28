@@ -15,10 +15,10 @@ import (
 
 // ServerConfig contains configuration for HTTP server
 type ServerConfig struct {
-	Port             int
-	ServiceName      string
-	Version          string
-	TelegramWebhook  *telegramapi.WebhookHandler // Optional Telegram webhook handler
+	Port            int
+	ServiceName     string
+	Version         string
+	TelegramWebhook *telegramapi.WebhookHandler // Optional Telegram webhook handler
 }
 
 // Server wraps HTTP server with lifecycle management

@@ -414,7 +414,7 @@ func main() {
 	// ========================================
 	// HTTP Server (Health + Metrics API + Telegram Webhook)
 	// ========================================
-	httpServer := provideHTTPServer(cfg, healthHandler, telegramHandlers, log)
+	httpServer := provideHTTPServer(cfg, healthHandler, telegramBot, telegramHandlers, log)
 
 	// Start HTTP server in background (tracked by wg)
 	wg.Add(1)
@@ -427,9 +427,9 @@ func main() {
 	}()
 
 	// Start workers (they use ctx for cancellation)
-	if err := workerScheduler.Start(ctx); err != nil {
-		log.Fatalf("failed to start workers: %v", err)
-	}
+	// if err := workerScheduler.Start(ctx); err != nil {
+	// 	log.Fatalf("failed to start workers: %v", err)
+	// }
 
 	// Suppress unused warnings (will be used in future phases)
 	_ = userService
@@ -1202,11 +1202,11 @@ func provideWorkers(
 	return scheduler
 }
 
-func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, telegramHandler *telegram.Handler, log *logger.Logger) *api.Server {
+func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, telegramBot *telegram.Bot, telegramHandler *telegram.Handler, log *logger.Logger) *api.Server {
 	// Create Telegram webhook handler if webhook URL configured
 	var webhookHandler *telegramapi.WebhookHandler
 	if cfg.Telegram.WebhookURL != "" {
-		webhookHandler = telegramapi.NewWebhookHandler(telegramHandler, log)
+		webhookHandler = telegramapi.NewWebhookHandler(telegramBot, telegramHandler, log)
 		log.Info("Telegram webhook mode enabled", "url", cfg.Telegram.WebhookURL)
 	} else {
 		log.Info("Telegram polling mode enabled (no webhook URL configured)")
@@ -1317,6 +1317,23 @@ func provideTelegramBot(
 
 	// Register handlers with bot
 	handler.RegisterHandlers()
+
+	// Set up webhook if configured
+	if cfg.Telegram.WebhookURL != "" {
+		log.Info("Configuring Telegram webhook...", "url", cfg.Telegram.WebhookURL)
+		if err := bot.SetWebhook(cfg.Telegram.WebhookURL); err != nil {
+			log.Fatalf("Failed to set Telegram webhook: %v", err)
+		}
+
+		// Verify webhook was set
+		if webhookInfo, err := bot.GetWebhookInfo(); err == nil {
+			log.Info("✓ Telegram webhook configured",
+				"url", webhookInfo.URL,
+				"pending_updates", webhookInfo.PendingUpdateCount,
+				"max_connections", webhookInfo.MaxConnections,
+			)
+		}
+	}
 
 	// Create Telegram notification consumer
 	telegramNotificationSvc := consumers.NewTelegramNotificationConsumer(

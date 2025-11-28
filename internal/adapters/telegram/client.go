@@ -300,3 +300,60 @@ func (b *Bot) BroadcastMessage(chatIDs []int64, text string) error {
 
 	return nil
 }
+
+// SetWebhook configures the bot to use webhook mode
+func (b *Bot) SetWebhook(webhookURL string, certificate ...string) error {
+	webhookConfig, err := tgbotapi.NewWebhook(webhookURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to create webhook config")
+	}
+
+	// Optional: set certificate for self-signed cert
+	if len(certificate) > 0 {
+		webhookConfig.Certificate = tgbotapi.FilePath(certificate[0])
+	}
+
+	// Configure webhook settings
+	webhookConfig.MaxConnections = 40
+	webhookConfig.AllowedUpdates = []string{"message", "callback_query"}
+
+	_, err = b.api.Request(webhookConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to set webhook")
+	}
+
+	b.log.Info("Webhook configured successfully", "url", webhookURL)
+	return nil
+}
+
+// DeleteWebhook removes webhook and returns to polling mode
+func (b *Bot) DeleteWebhook(dropPendingUpdates bool) error {
+	deleteConfig := tgbotapi.DeleteWebhookConfig{
+		DropPendingUpdates: dropPendingUpdates,
+	}
+
+	_, err := b.api.Request(deleteConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete webhook")
+	}
+
+	b.log.Info("Webhook deleted successfully")
+	return nil
+}
+
+// GetWebhookInfo returns current webhook information
+func (b *Bot) GetWebhookInfo() (*tgbotapi.WebhookInfo, error) {
+	info, err := b.api.GetWebhookInfo()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get webhook info")
+	}
+
+	b.log.Debug("Retrieved webhook info",
+		"url", info.URL,
+		"has_custom_certificate", info.HasCustomCertificate,
+		"pending_update_count", info.PendingUpdateCount,
+		"max_connections", info.MaxConnections,
+	)
+
+	return &info, nil
+}

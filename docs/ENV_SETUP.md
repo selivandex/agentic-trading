@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # Environment Variables Setup
 
 ## Required Configuration
@@ -139,23 +141,29 @@ WORKER_MARKET_SCANNER_EVENT_DRIVEN=true    # Enable event-driven mode for opport
 ## Environment Variable Details
 
 ### App Configuration
+
 - `APP_NAME`: Application name (default: prometheus)
 - `APP_ENV`: Environment (development/production)
 - `LOG_LEVEL`: Logging level (debug/info/warn/error)
 - `DEBUG`: Enable debug mode (true/false)
 
 ### Database Configuration
+
 All database credentials are required for proper operation.
 
 ### API Keys
+
 At least one AI provider API key is required. The system supports:
+
 - Claude (Anthropic)
 - OpenAI (GPT-4)
 - DeepSeek
 - Google Gemini
 
 ### Encryption
+
 Generate a secure encryption key:
+
 ```bash
 openssl rand -base64 32
 ```
@@ -163,10 +171,12 @@ openssl rand -base64 32
 This key is used to encrypt/decrypt exchange API keys in the database.
 
 ### Market Data API Keys
+
 These are optional but recommended for better data collection performance.
 If not provided, some data sources may not be available.
 
 ### Sentiment API Keys (Optional)
+
 - **CryptoPanic** (NEWS_API_KEY): Free tier available. Sign up at https://cryptopanic.com/developers/api/
   - Free: 25 requests/day
   - Pro: $10/month for 10k requests/day
@@ -178,6 +188,7 @@ If not provided, some data sources may not be available.
   - No paid plans needed for basic usage
 
 ### On-Chain API Keys (Optional)
+
 - **Whale Alert** (WHALE_ALERT_API_KEY): Premium service for large transaction tracking
   - Starter: $49/month (10k transactions/month)
   - Sign up: https://whale-alert.io/
@@ -193,6 +204,7 @@ If not provided, some data sources may not be available.
   - Sign up: https://etherscan.io/apis
 
 ### Macro/Traditional Markets API Keys (Optional)
+
 - **Trading Economics** (TRADING_ECONOMICS_KEY): Economic calendar and indicators
   - Individual: $500/month
   - Sign up: https://tradingeconomics.com/api
@@ -202,13 +214,16 @@ If not provided, some data sources may not be available.
   - Sign up: https://www.alphavantage.co/support/#api-key
 
 ### Derivatives API Keys (Optional)
+
 - **Deribit** (DERIBIT_API_KEY): Crypto options and futures data
   - Free for public market data endpoints
   - Authentication required for historical data
   - Sign up: https://www.deribit.com/
 
 ### Worker Intervals
+
 Worker intervals control how frequently background workers execute. All intervals accept duration strings like:
+
 - `30s` - 30 seconds
 - `1m` - 1 minute
 - `5m` - 5 minutes
@@ -216,31 +231,36 @@ Worker intervals control how frequently background workers execute. All interval
 - `24h` - 24 hours
 
 #### Trading Workers (High Frequency)
+
 - `WORKER_POSITION_MONITOR_INTERVAL`: How often to check open positions and update PnL (default: 1m)
 - `WORKER_ORDER_SYNC_INTERVAL`: How often to sync order status with exchanges (default: 30s)
 - `WORKER_RISK_MONITOR_INTERVAL`: How often to check risk limits and circuit breakers (default: 30s)
 
 #### Market Data Workers
+
 - `WORKER_OHLCV_COLLECTOR_INTERVAL`: How often to collect OHLCV candles from exchanges (default: 1m)
 
 #### Analysis Workers (Agentic System)
+
 - `WORKER_MARKET_SCANNER_INTERVAL`: How often to run full agent analysis for all users (default: 2m)
 - `WORKER_OPPORTUNITY_FINDER_INTERVAL`: How often to scan for quick trading opportunities (default: 30s)
 - `WORKER_REGIME_DETECTOR_INTERVAL`: How often to detect market regime changes (default: 5m)
 - `WORKER_SMC_SCANNER_INTERVAL`: How often to scan for Smart Money Concepts patterns (default: 1m)
 
 #### Evaluation Workers (Low Frequency)
+
 - `WORKER_STRATEGY_EVALUATOR_INTERVAL`: How often to evaluate strategy performance (default: 6h)
 - `WORKER_JOURNAL_COMPILER_INTERVAL`: How often to compile journal entries (default: 1h)
 - `WORKER_DAILY_REPORT_INTERVAL`: How often to generate daily reports (default: 24h)
 
 #### Worker Settings
+
 - `WORKER_MARKET_SCANNER_MAX_CONCURRENCY`: Maximum number of users to process concurrently (default: 5)
 - `WORKER_MARKET_SCANNER_EVENT_DRIVEN`: Enable event-driven mode for immediate response to opportunities (default: true)
 
 **Event-Driven Mode**: When enabled, MarketScanner operates in hybrid mode:
+
 - **Scheduled**: Runs full analysis periodically (every 2 minutes)
 - **Event-driven**: Responds immediately to opportunity events from OpportunityFinder (<30s response time)
 
 This allows the system to balance comprehensive analysis with quick reactions to market opportunities.
-

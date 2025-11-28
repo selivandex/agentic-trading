@@ -14,7 +14,13 @@ import (
 )
 
 //go:embed prompts/**/*.tmpl
-var embeddedFS embed.FS
+var promptsFS embed.FS
+
+//go:embed telegram/*.tmpl
+var telegramFS embed.FS
+
+//go:embed notifications/*.tmpl
+var notificationsFS embed.FS
 
 // Template represents a parsed template loaded from disk.
 type Template struct {
@@ -208,12 +214,34 @@ func (r *Registry) pathToID(rel string) string {
 }
 
 func newEmbeddedRegistry() (*Registry, error) {
-	subFS, err := fs.Sub(embeddedFS, "prompts")
-	if err != nil {
-		return nil, errors.Wrap(err, "prepare embedded templates")
+	r := &Registry{
+		basePath:  "embedded",
+		templates: map[string]*Template{},
 	}
 
-	return NewRegistryFromFS(subFS, "prompts")
+	// Load prompts (agents, tools, workflows, etc.)
+	promptsSubFS, err := fs.Sub(promptsFS, "prompts")
+	if err != nil {
+		return nil, errors.Wrap(err, "prepare prompts templates")
+	}
+	r.fs = promptsSubFS
+	if err := r.loadAll(); err != nil {
+		return nil, errors.Wrap(err, "load prompts templates")
+	}
+
+	// Load telegram templates
+	r.fs = telegramFS
+	if err := r.loadAll(); err != nil {
+		return nil, errors.Wrap(err, "load telegram templates")
+	}
+
+	// Load notification templates
+	r.fs = notificationsFS
+	if err := r.loadAll(); err != nil {
+		return nil, errors.Wrap(err, "load notification templates")
+	}
+
+	return r, nil
 }
 
 var (
