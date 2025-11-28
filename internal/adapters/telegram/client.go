@@ -14,20 +14,22 @@ import (
 
 // Bot represents a Telegram bot instance
 type Bot struct {
-	api        *tgbotapi.BotAPI
-	updates    tgbotapi.UpdatesChannel
-	log        *logger.Logger
-	mu         sync.RWMutex
-	running    bool
-	msgHandler func(tgbotapi.Update) // Handler for incoming updates
+	api         *tgbotapi.BotAPI
+	updates     tgbotapi.UpdatesChannel
+	log         *logger.Logger
+	mu          sync.RWMutex
+	running     bool
+	webhookMode bool                  // If true, use webhook instead of polling
+	msgHandler  func(tgbotapi.Update) // Handler for incoming updates
 }
 
 // Config contains Telegram bot configuration
 type Config struct {
-	Token      string
-	Debug      bool
-	Timeout    int // Update timeout in seconds
-	BufferSize int // Update channel buffer size
+	Token       string
+	Debug       bool
+	Timeout     int  // Update timeout in seconds
+	BufferSize  int  // Update channel buffer size
+	WebhookMode bool // If true, don't start polling (use webhook instead)
 }
 
 // NewBot creates a new Telegram bot instance
@@ -53,12 +55,13 @@ func NewBot(cfg Config, log *logger.Logger) (*Bot, error) {
 	log.Infof("Authorized on account %s", api.Self.UserName)
 
 	return &Bot{
-		api: api,
-		log: log.With("component", "telegram_bot"),
+		api:         api,
+		webhookMode: cfg.WebhookMode,
+		log:         log.With("component", "telegram_bot"),
 	}, nil
 }
 
-// Start begins polling for updates
+// Start begins polling for updates (or just blocks if webhook mode)
 func (b *Bot) Start(ctx context.Context) error {
 	b.mu.Lock()
 	if b.running {
@@ -68,7 +71,18 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.running = true
 	b.mu.Unlock()
 
-	b.log.Info("Starting Telegram bot...")
+	// If webhook mode, just block until context is cancelled
+	// HTTP server handles webhook requests, no polling needed
+	if b.webhookMode {
+		b.log.Info("Telegram bot in webhook mode (no polling)")
+		<-ctx.Done()
+		b.log.Info("Telegram bot stopping (context cancelled)")
+		b.Stop()
+		return nil
+	}
+
+	// Polling mode: get updates from Telegram
+	b.log.Info("Starting Telegram bot in polling mode...")
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60

@@ -11,8 +11,8 @@ import (
 	"google.golang.org/adk/session"
 	"google.golang.org/genai"
 
-	"prometheus/internal/agents/workflows"
 	telegram "prometheus/internal/adapters/telegram"
+	"prometheus/internal/agents/workflows"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/user"
 	"prometheus/pkg/errors"
@@ -158,15 +158,15 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 func (s *Service) buildArchitectPrompt(onboardingSession *telegram.OnboardingSession, exchangeName string) (*genai.Content, error) {
 	// Prepare data for template
 	data := map[string]interface{}{
-		"Capital":      onboardingSession.Capital,
-		"RiskProfile":  onboardingSession.RiskProfile,
-		"Exchange":     exchangeName,
-		"UserID":       onboardingSession.UserID.String(),
-		"Timestamp":    time.Now().Format(time.RFC3339),
+		"Capital":     onboardingSession.Capital,
+		"RiskProfile": onboardingSession.RiskProfile,
+		"Exchange":    exchangeName,
+		"UserID":      onboardingSession.UserID.String(),
+		"Timestamp":   time.Now().Format(time.RFC3339),
 	}
 
 	// Render template
-	promptText, err := s.templates.Render("workflows/portfolio_initialization_input", data)
+	promptText, err := s.templates.Render("prompts/workflows/portfolio_initialization_input", data)
 	if err != nil {
 		// Fallback to simple prompt if template not found
 		s.log.Warn("Template not found, using fallback prompt", "error", err)
@@ -185,7 +185,7 @@ Your Task:
 5. Execute portfolio via execute_trade or place_order tool
 6. Save portfolio strategy to memory
 
-Use tools systematically. Be thorough but decisive.`, 
+Use tools systematically. Be thorough but decisive.`,
 			onboardingSession.Capital,
 			onboardingSession.RiskProfile,
 			exchangeName,
@@ -199,4 +199,3 @@ Use tools systematically. Be thorough but decisive.`,
 		},
 	}, nil
 }
-

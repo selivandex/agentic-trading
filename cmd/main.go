@@ -27,6 +27,7 @@ import (
 	"prometheus/internal/agents/workflows"
 	"prometheus/internal/api"
 	"prometheus/internal/api/health"
+	telegramapi "prometheus/internal/api/telegram"
 	"prometheus/internal/consumers"
 	"prometheus/internal/domain/derivatives"
 	"prometheus/internal/domain/exchange_account"
@@ -411,9 +412,9 @@ func main() {
 	)
 
 	// ========================================
-	// HTTP Server (Health + Metrics API)
+	// HTTP Server (Health + Metrics API + Telegram Webhook)
 	// ========================================
-	httpServer := provideHTTPServer(cfg, healthHandler, log)
+	httpServer := provideHTTPServer(cfg, healthHandler, telegramHandlers, log)
 
 	// Start HTTP server in background (tracked by wg)
 	wg.Add(1)
@@ -1201,12 +1202,22 @@ func provideWorkers(
 	return scheduler
 }
 
-func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, log *logger.Logger) *api.Server {
+func provideHTTPServer(cfg *config.Config, healthHandler *health.Handler, telegramHandler *telegram.Handler, log *logger.Logger) *api.Server {
+	// Create Telegram webhook handler if webhook URL configured
+	var webhookHandler *telegramapi.WebhookHandler
+	if cfg.Telegram.WebhookURL != "" {
+		webhookHandler = telegramapi.NewWebhookHandler(telegramHandler, log)
+		log.Info("Telegram webhook mode enabled", "url", cfg.Telegram.WebhookURL)
+	} else {
+		log.Info("Telegram polling mode enabled (no webhook URL configured)")
+	}
+
 	// HTTP server setup moved to internal/api (Clean Architecture)
 	return api.NewServer(api.ServerConfig{
-		Port:        cfg.HTTP.Port,
-		ServiceName: cfg.App.Name,
-		Version:     cfg.App.Version,
+		Port:            cfg.HTTP.Port,
+		ServiceName:     cfg.App.Name,
+		Version:         cfg.App.Version,
+		TelegramWebhook: webhookHandler,
 	}, healthHandler, log)
 }
 
@@ -1226,11 +1237,13 @@ func provideTelegramBot(
 	log.Info("Initializing Telegram bot...")
 
 	// Create bot client
+	webhookMode := cfg.Telegram.WebhookURL != ""
 	bot, err := telegram.NewBot(telegram.Config{
-		Token:      cfg.Telegram.BotToken,
-		Debug:      cfg.Telegram.Debug,
-		Timeout:    60,
-		BufferSize: 100,
+		Token:       cfg.Telegram.BotToken,
+		Debug:       cfg.Telegram.Debug,
+		Timeout:     60,
+		BufferSize:  100,
+		WebhookMode: webhookMode,
 	}, log)
 	if err != nil {
 		log.Fatalf("Failed to create Telegram bot: %v", err)

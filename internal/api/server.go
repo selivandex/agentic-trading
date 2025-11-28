@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"prometheus/internal/api/health"
+	telegramapi "prometheus/internal/api/telegram"
 	"prometheus/internal/metrics"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -14,9 +15,10 @@ import (
 
 // ServerConfig contains configuration for HTTP server
 type ServerConfig struct {
-	Port        int
-	ServiceName string
-	Version     string
+	Port             int
+	ServiceName      string
+	Version          string
+	TelegramWebhook  *telegramapi.WebhookHandler // Optional Telegram webhook handler
 }
 
 // Server wraps HTTP server with lifecycle management
@@ -36,6 +38,13 @@ func NewServer(cfg ServerConfig, healthHandler *health.Handler, log *logger.Logg
 
 	// Prometheus metrics endpoint
 	mux.Handle("/metrics", metrics.Handler())
+
+	// Telegram webhook endpoint (if configured)
+	if cfg.TelegramWebhook != nil {
+		mux.HandleFunc("/telegram/webhook", cfg.TelegramWebhook.ServeHTTP)
+		mux.HandleFunc("/telegram/health", cfg.TelegramWebhook.HealthCheck)
+		log.Info("✓ Telegram webhook registered at /telegram/webhook")
+	}
 
 	// Root endpoint (service info)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
