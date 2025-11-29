@@ -328,8 +328,11 @@ func (c *WebSocketDepthConsumer) convertProtobufToSnapshot(event *eventspb.WebSo
 	bidsJSON, _ := json.Marshal(bids)
 	asksJSON, _ := json.Marshal(asks)
 
-	// Default to futures (market_type field removed from proto)
-	marketType := "futures"
+	// Use market_type from event, fallback to "futures" for backward compatibility
+	marketType := event.MarketType
+	if marketType == "" {
+		marketType = "futures"
+	}
 
 	return &market_data.OrderBookSnapshot{
 		Exchange:   event.Exchange,

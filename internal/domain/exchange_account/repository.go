@@ -12,6 +12,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*ExchangeAccount, error)
 	GetByUser(ctx context.Context, userID uuid.UUID) ([]*ExchangeAccount, error)
 	GetActiveByUser(ctx context.Context, userID uuid.UUID) ([]*ExchangeAccount, error)
+	GetAllActive(ctx context.Context) ([]*ExchangeAccount, error) // All active accounts across all users
 	Update(ctx context.Context, account *ExchangeAccount) error
 	UpdateLastSync(ctx context.Context, id uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error

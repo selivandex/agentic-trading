@@ -156,6 +156,41 @@ func (r *ExchangeAccountRepository) GetActiveByUser(ctx context.Context, userID 
 	return accounts, nil
 }
 
+// GetAllActive retrieves all active exchange accounts across all users
+// Used by UserDataManager for hot reload and reconciliation
+func (r *ExchangeAccountRepository) GetAllActive(ctx context.Context) ([]*exchange_account.ExchangeAccount, error) {
+	query := `
+		SELECT 
+			id, user_id, exchange, label,
+			api_key_encrypted, secret_encrypted,
+			passphrase, is_testnet, permissions,
+			is_active, last_sync_at, created_at, updated_at
+		FROM exchange_accounts 
+		WHERE is_active = true 
+		ORDER BY user_id, created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to query all active exchange accounts")
+	}
+	defer rows.Close()
+
+	var accounts []*exchange_account.ExchangeAccount
+	for rows.Next() {
+		acc, err := scanExchangeAccount(rows)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to scan exchange account")
+		}
+		accounts = append(accounts, acc)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to iterate all active exchange accounts")
+	}
+
+	return accounts, nil
+}
+
 // Update updates an exchange account
 func (r *ExchangeAccountRepository) Update(ctx context.Context, account *exchange_account.ExchangeAccount) error {
 	query := `

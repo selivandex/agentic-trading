@@ -180,6 +180,47 @@ var (
 		},
 		[]string{"exchange", "channel"},
 	)
+
+	// User Data WebSocket metrics (per-user connections)
+	UserDataConnections = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "prometheus_userdata_connections",
+			Help: "Current number of active User Data WebSocket connections",
+		},
+		[]string{"exchange"},
+	)
+
+	UserDataReconnects = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_userdata_reconnects_total",
+			Help: "Total number of User Data WebSocket reconnections",
+		},
+		[]string{"exchange", "reason"},
+	)
+
+	UserDataReconciliations = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_userdata_reconciliations_total",
+			Help: "Total number of reconciliation cycles",
+		},
+		[]string{"status"}, // status: success|error
+	)
+
+	UserDataHotReload = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_userdata_hotreload_operations_total",
+			Help: "Total number of hot reload operations (add/remove accounts)",
+		},
+		[]string{"operation", "exchange"}, // operation: add|remove
+	)
+
+	UserDataListenKeyRenewals = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_userdata_listenkey_renewals_total",
+			Help: "Total number of listenKey renewal operations",
+		},
+		[]string{"exchange", "status"}, // status: success|error
+	)
 )
 
 // Init registers all metrics with Prometheus
@@ -217,6 +258,13 @@ func Init() {
 	// System metrics
 	prometheus.MustRegister(KafkaMessages)
 	prometheus.MustRegister(WebSocketConnections)
+
+	// User Data WebSocket metrics
+	prometheus.MustRegister(UserDataConnections)
+	prometheus.MustRegister(UserDataReconnects)
+	prometheus.MustRegister(UserDataReconciliations)
+	prometheus.MustRegister(UserDataHotReload)
+	prometheus.MustRegister(UserDataListenKeyRenewals)
 }
 
 // Handler returns Prometheus HTTP handler

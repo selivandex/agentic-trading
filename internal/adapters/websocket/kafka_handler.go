@@ -46,7 +46,7 @@ func (h *KafkaEventHandler) OnKline(event *KlineEvent) error {
 		return errors.Wrap(err, "failed to publish kline event")
 	}
 
-	h.logger.Debug("Published kline event to Kafka",
+	h.logger.Debugw("Published kline event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
 		"market_type", event.MarketType,
@@ -85,7 +85,7 @@ func (h *KafkaEventHandler) OnTicker(event *TickerEvent) error {
 		return errors.Wrap(err, "failed to publish ticker event")
 	}
 
-	h.logger.Debug("Published ticker event to Kafka",
+	h.logger.Debugw("Published ticker event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
 		"market_type", event.MarketType,
@@ -127,7 +127,7 @@ func (h *KafkaEventHandler) OnDepth(event *DepthEvent) error {
 		return errors.Wrap(err, "failed to publish depth event")
 	}
 
-	h.logger.Debug("Published depth event to Kafka",
+	h.logger.Debugw("Published depth event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
 	)
@@ -155,7 +155,7 @@ func (h *KafkaEventHandler) OnTrade(event *TradeEvent) error {
 		return errors.Wrap(err, "failed to publish trade event")
 	}
 
-	h.logger.Debug("Published trade event to Kafka",
+	h.logger.Debugw("Published trade event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
 		"market_type", event.MarketType,
@@ -179,7 +179,7 @@ func (h *KafkaEventHandler) OnFundingRate(event *FundingRateEvent) error {
 		return errors.Wrap(err, "failed to publish funding rate event")
 	}
 
-	h.logger.Debug("Published funding rate event to Kafka",
+	h.logger.Debugw("Published funding rate event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
 	)
@@ -204,7 +204,7 @@ func (h *KafkaEventHandler) OnMarkPrice(event *MarkPriceEvent) error {
 		return errors.Wrap(err, "failed to publish mark price event")
 	}
 
-	h.logger.Debug("Published mark price event to Kafka",
+	h.logger.Debugw("Published mark price event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
 	)
@@ -212,9 +212,37 @@ func (h *KafkaEventHandler) OnMarkPrice(event *MarkPriceEvent) error {
 	return nil
 }
 
+// OnLiquidation handles liquidation events (futures only)
+func (h *KafkaEventHandler) OnLiquidation(event *LiquidationEvent) error {
+	err := h.publisher.PublishLiquidation(
+		context.Background(),
+		event.Exchange,
+		event.Symbol,
+		event.MarketType,
+		event.Side,
+		event.OrderType,
+		event.Price,
+		event.Quantity,
+		event.Value,
+		event.EventTime,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to publish liquidation event")
+	}
+
+	h.logger.Debugw("Published liquidation event to Kafka",
+		"exchange", event.Exchange,
+		"symbol", event.Symbol,
+		"side", event.Side,
+		"value", event.Value,
+	)
+
+	return nil
+}
+
 // OnError handles errors
 func (h *KafkaEventHandler) OnError(err error) {
-	h.logger.Error("WebSocket error",
+	h.logger.Errorw("WebSocket error",
 		"error", err.Error(),
 	)
 }

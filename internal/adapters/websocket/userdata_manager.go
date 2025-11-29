@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"prometheus/internal/domain/exchange_account"
+	"prometheus/internal/metrics"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -47,19 +48,23 @@ type UserDataManager struct {
 	doneChan chan struct{}
 
 	// Health monitoring
-	healthCheckInterval time.Duration
-	listenKeyRenewal    time.Duration
+	healthCheckInterval    time.Duration
+	listenKeyRenewal       time.Duration
+	reconciliationInterval time.Duration
 
 	// Stats
-	activeConnections int
-	totalReconnects   int
-	statsMu           sync.RWMutex
+	activeConnections  int
+	totalReconnects    int
+	totalReconciled    int
+	lastReconciliation time.Time
+	statsMu            sync.RWMutex
 }
 
 // UserDataManagerConfig configures the UserDataManager
 type UserDataManagerConfig struct {
-	HealthCheckInterval time.Duration
-	ListenKeyRenewal    time.Duration
+	HealthCheckInterval    time.Duration // How often to check connection health
+	ListenKeyRenewal       time.Duration // How often to renew listenKeys
+	ReconciliationInterval time.Duration // How often to sync with DB (hot reload)
 }
 
 // NewUserDataManager creates a new User Data WebSocket manager
@@ -77,35 +82,92 @@ func NewUserDataManager(
 	if config.ListenKeyRenewal == 0 {
 		config.ListenKeyRenewal = 30 * time.Minute
 	}
+	if config.ReconciliationInterval == 0 {
+		config.ReconciliationInterval = 20 * time.Second // Default: check DB every 5 minutes
+	}
 
 	return &UserDataManager{
-		accountRepo:         accountRepo,
-		factory:             factory,
-		handler:             handler,
-		encryptor:           encryptor,
-		logger:              log,
-		clients:             make(map[uuid.UUID]UserDataStreamer),
-		stopChan:            make(chan struct{}),
-		doneChan:            make(chan struct{}),
-		healthCheckInterval: config.HealthCheckInterval,
-		listenKeyRenewal:    config.ListenKeyRenewal,
+		accountRepo:            accountRepo,
+		factory:                factory,
+		handler:                handler,
+		encryptor:              encryptor,
+		logger:                 log,
+		clients:                make(map[uuid.UUID]UserDataStreamer),
+		stopChan:               make(chan struct{}),
+		doneChan:               make(chan struct{}),
+		healthCheckInterval:    config.HealthCheckInterval,
+		listenKeyRenewal:       config.ListenKeyRenewal,
+		reconciliationInterval: config.ReconciliationInterval,
 	}
 }
 
 // Start initializes all User Data WebSocket connections for active accounts
 func (m *UserDataManager) Start(ctx context.Context) error {
-	m.logger.Info("User Data Manager initialized (connections will be added dynamically)")
+	m.logger.Info("Starting User Data Manager...")
 
-	// TODO: Implement loading all active accounts from DB
-	// For now, connections are added dynamically via AddAccount() method
-	// when users connect their exchange accounts
+	// Load and connect all active accounts from DB
+	if err := m.loadAllActiveAccounts(ctx); err != nil {
+		m.logger.Error("Failed to load active accounts on startup", "error", err)
+		// Don't fail startup, continue with empty state
+	}
 
-	// Start background monitoring
+	// Start background monitoring loops
 	go m.healthCheckLoop(ctx)
 	go m.listenKeyRenewalLoop(ctx)
+	go m.reconciliationLoop(ctx) // Hot reload: sync with DB periodically
 
 	m.logger.Info("✓ User Data Manager started",
 		"active_connections", m.GetActiveConnectionCount(),
+	)
+
+	return nil
+}
+
+// loadAllActiveAccounts loads all active exchange accounts from DB and connects them
+func (m *UserDataManager) loadAllActiveAccounts(ctx context.Context) error {
+	m.logger.Info("Loading all active exchange accounts from DB...")
+
+	accounts, err := m.accountRepo.GetAllActive(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to get all active accounts")
+	}
+
+	m.logger.Info("Found active accounts to connect",
+		"count", len(accounts),
+	)
+
+	var successCount, failureCount int
+
+	for _, account := range accounts {
+		// Check if shutdown requested during startup
+		select {
+		case <-ctx.Done():
+			m.logger.Warn("Loading accounts interrupted by shutdown",
+				"loaded", successCount,
+				"failed", failureCount,
+				"remaining", len(accounts)-successCount-failureCount,
+			)
+			return errors.Wrap(ctx.Err(), "startup interrupted")
+		default:
+		}
+
+		if err := m.connectAccount(ctx, account); err != nil {
+			m.logger.Error("Failed to connect account on startup",
+				"account_id", account.ID,
+				"user_id", account.UserID,
+				"exchange", account.Exchange,
+				"error", err,
+			)
+			failureCount++
+			continue
+		}
+		successCount++
+	}
+
+	m.logger.Info("✓ Loaded active accounts",
+		"total", len(accounts),
+		"success", successCount,
+		"failures", failureCount,
 	)
 
 	return nil
@@ -157,6 +219,9 @@ func (m *UserDataManager) connectAccount(ctx context.Context, account *exchange_
 	m.clients[account.ID] = client
 	m.activeConnections++
 	m.clientsMu.Unlock()
+
+	// Update metrics
+	metrics.UserDataConnections.WithLabelValues(string(account.Exchange)).Inc()
 
 	m.logger.Info("✓ Connected User Data WebSocket",
 		"account_id", account.ID,
@@ -279,6 +344,14 @@ func (m *UserDataManager) performHealthCheck(ctx context.Context) {
 	m.clientsMu.RUnlock()
 
 	for _, accountID := range accountIDs {
+		// Check if shutdown requested
+		select {
+		case <-ctx.Done():
+			m.logger.Debug("Health check interrupted by shutdown")
+			return
+		default:
+		}
+
 		m.clientsMu.RLock()
 		client, exists := m.clients[accountID]
 		m.clientsMu.RUnlock()
@@ -320,6 +393,149 @@ func (m *UserDataManager) listenKeyRenewalLoop(ctx context.Context) {
 	}
 }
 
+// reconciliationLoop periodically syncs manager state with DB (hot reload)
+// - Connects new active accounts
+// - Disconnects deactivated/deleted accounts
+func (m *UserDataManager) reconciliationLoop(ctx context.Context) {
+	ticker := time.NewTicker(m.reconciliationInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			m.performReconciliation(ctx)
+		case <-m.stopChan:
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// performReconciliation syncs manager state with database
+func (m *UserDataManager) performReconciliation(ctx context.Context) {
+	m.logger.Debug("Performing reconciliation with database...")
+
+	// Get all active accounts from DB
+	activeAccounts, err := m.accountRepo.GetAllActive(ctx)
+	if err != nil {
+		m.logger.Error("Failed to get active accounts for reconciliation", "error", err)
+		metrics.UserDataReconciliations.WithLabelValues("error").Inc()
+		return
+	}
+
+	// Build set of active account IDs from DB
+	activeAccountIDs := make(map[uuid.UUID]bool)
+	for _, acc := range activeAccounts {
+		activeAccountIDs[acc.ID] = true
+	}
+
+	// Get currently connected account IDs
+	m.clientsMu.RLock()
+	connectedAccountIDs := make(map[uuid.UUID]bool)
+	for accountID := range m.clients {
+		connectedAccountIDs[accountID] = true
+	}
+	m.clientsMu.RUnlock()
+
+	var addedCount, removedCount int
+
+	// Step 1: Connect accounts that are active in DB but not connected
+	for _, account := range activeAccounts {
+		// Check if shutdown requested
+		select {
+		case <-ctx.Done():
+			m.logger.Info("Reconciliation interrupted by shutdown",
+				"added_so_far", addedCount,
+				"remaining", len(activeAccounts)-addedCount,
+			)
+			return
+		default:
+		}
+
+		if !connectedAccountIDs[account.ID] {
+			m.logger.Info("Hot reload: connecting new active account",
+				"account_id", account.ID,
+				"user_id", account.UserID,
+				"exchange", account.Exchange,
+			)
+
+			if err := m.connectAccount(ctx, account); err != nil {
+				m.logger.Error("Failed to connect account during reconciliation",
+					"account_id", account.ID,
+					"error", err,
+				)
+				continue
+			}
+
+			// Record hot reload metric
+			metrics.UserDataHotReload.WithLabelValues("add", string(account.Exchange)).Inc()
+			addedCount++
+		}
+	}
+
+	// Step 2: Disconnect accounts that are connected but no longer active in DB
+	for accountID := range connectedAccountIDs {
+		// Check if shutdown requested
+		select {
+		case <-ctx.Done():
+			m.logger.Info("Reconciliation interrupted by shutdown during cleanup",
+				"removed_so_far", removedCount,
+			)
+			return
+		default:
+		}
+
+		if !activeAccountIDs[accountID] {
+			// Get exchange info before removal
+			account, _ := m.accountRepo.GetByID(ctx, accountID)
+			exchange := "unknown"
+			if account != nil {
+				exchange = string(account.Exchange)
+			}
+
+			m.logger.Info("Hot reload: disconnecting deactivated account",
+				"account_id", accountID,
+				"exchange", exchange,
+			)
+
+			if err := m.RemoveAccount(ctx, accountID); err != nil {
+				m.logger.Error("Failed to disconnect account during reconciliation",
+					"account_id", accountID,
+					"error", err,
+				)
+				continue
+			}
+
+			// Record hot reload metric
+			metrics.UserDataHotReload.WithLabelValues("remove", exchange).Inc()
+			removedCount++
+		}
+	}
+
+	// Update stats
+	m.statsMu.Lock()
+	m.totalReconciled++
+	m.lastReconciliation = time.Now()
+	m.statsMu.Unlock()
+
+	// Update metrics
+	metrics.UserDataReconciliations.WithLabelValues("success").Inc()
+
+	if addedCount > 0 || removedCount > 0 {
+		m.logger.Info("✓ Reconciliation completed",
+			"added", addedCount,
+			"removed", removedCount,
+			"total_active", len(activeAccountIDs),
+			"total_connected", m.GetActiveConnectionCount(),
+		)
+	} else {
+		m.logger.Debug("Reconciliation completed, no changes",
+			"total_active", len(activeAccountIDs),
+		)
+	}
+}
+
 // renewAllListenKeys renews listenKeys for all active connections
 func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 	m.clientsMu.RLock()
@@ -330,6 +546,14 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 	m.clientsMu.RUnlock()
 
 	for _, accountID := range accountIDs {
+		// Check if shutdown requested
+		select {
+		case <-ctx.Done():
+			m.logger.Debug("ListenKey renewal interrupted by shutdown")
+			return
+		default:
+		}
+
 		// Load account from DB
 		account, err := m.accountRepo.GetByID(ctx, accountID)
 		if err != nil {
@@ -370,8 +594,12 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 				"account_id", accountID,
 				"error", err,
 			)
+			metrics.UserDataListenKeyRenewals.WithLabelValues(string(account.Exchange), "error").Inc()
 			continue
 		}
+
+		// Update metrics
+		metrics.UserDataListenKeyRenewals.WithLabelValues(string(account.Exchange), "success").Inc()
 
 		// Update expiration in DB (client already updated it internally)
 		// We don't need to persist it again since client handles it
@@ -404,8 +632,13 @@ func (m *UserDataManager) reconnectAccount(ctx context.Context, accountID uuid.U
 	m.totalReconnects++
 	m.statsMu.Unlock()
 
+	// Update metrics
+	exchange := string(account.Exchange)
+	metrics.UserDataReconnects.WithLabelValues(exchange, "health_check").Inc()
+
 	m.logger.Info("✓ Reconnected account",
 		"account_id", accountID,
+		"exchange", exchange,
 	)
 
 	return nil
@@ -442,6 +675,13 @@ func (m *UserDataManager) RemoveAccount(ctx context.Context, accountID uuid.UUID
 		return errors.New("account not connected")
 	}
 
+	// Get account info for metrics
+	account, _ := m.accountRepo.GetByID(ctx, accountID)
+	exchange := "unknown"
+	if account != nil {
+		exchange = string(account.Exchange)
+	}
+
 	// Stop client
 	if err := client.Stop(ctx); err != nil {
 		return errors.Wrap(err, "failed to stop client")
@@ -450,8 +690,12 @@ func (m *UserDataManager) RemoveAccount(ctx context.Context, accountID uuid.UUID
 	delete(m.clients, accountID)
 	m.activeConnections--
 
+	// Update metrics
+	metrics.UserDataConnections.WithLabelValues(exchange).Dec()
+
 	m.logger.Info("Removed account from User Data Manager",
 		"account_id", accountID,
+		"exchange", exchange,
 	)
 
 	return nil
@@ -467,14 +711,19 @@ func (m *UserDataManager) GetActiveConnectionCount() int {
 // GetStats returns manager statistics
 func (m *UserDataManager) GetStats() map[string]interface{} {
 	m.statsMu.RLock()
-	defer m.statsMu.RUnlock()
+	totalReconnects := m.totalReconnects
+	totalReconciled := m.totalReconciled
+	lastReconciliation := m.lastReconciliation
+	m.statsMu.RUnlock()
 
 	m.clientsMu.RLock()
 	activeConns := m.activeConnections
 	m.clientsMu.RUnlock()
 
 	return map[string]interface{}{
-		"active_connections": activeConns,
-		"total_reconnects":   m.totalReconnects,
+		"active_connections":  activeConns,
+		"total_reconnects":    totalReconnects,
+		"total_reconciled":    totalReconciled,
+		"last_reconciliation": lastReconciliation,
 	}
 }

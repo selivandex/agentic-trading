@@ -56,6 +56,7 @@ func (l *Lifecycle) Shutdown(
 	websocketTickerConsumer *kafka.Consumer,
 	websocketTradeConsumer *kafka.Consumer,
 	websocketDepthConsumer *kafka.Consumer,
+	websocketLiquidationConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -122,6 +123,7 @@ func (l *Lifecycle) Shutdown(
 		"websocket_ticker":       websocketTickerConsumer,
 		"websocket_trade":        websocketTradeConsumer,
 		"websocket_depth":        websocketDepthConsumer,
+		"websocket_liquidation":  websocketLiquidationConsumer,
 	}, log)
 	log.Info("✓ Kafka consumers closed")
 

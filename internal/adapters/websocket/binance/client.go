@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -70,7 +71,7 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	// Set testnet flag for the library
 	futures.UseTestnet = c.useTestnet
 
-	c.logger.Info("Connecting to Binance WebSocket streams",
+	c.logger.Infow("Connecting to Binance WebSocket streams",
 		"exchange", c.exchange,
 		"stream_count", len(config.Streams),
 		"testnet", c.useTestnet,
@@ -85,7 +86,8 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	var futuresTradeSymbols []string
 	var spotDepthSymbols []string
 	var futuresDepthSymbols []string
-	var markPriceSymbols []string // Only futures have mark price
+	var markPriceSymbols []string   // Only futures have mark price
+	var liquidationSymbols []string // Only futures have liquidations
 	var otherStreams []websocket.StreamConfig
 
 	for _, stream := range config.Streams {
@@ -114,7 +116,7 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 			if isFutures {
 				markPriceSymbols = append(markPriceSymbols, stream.Symbol)
 			} else {
-				c.logger.Warn("Mark price stream requested for spot market (not supported)",
+				c.logger.Warnw("Mark price stream requested for spot market (not supported)",
 					"symbol", stream.Symbol,
 				)
 			}
@@ -138,6 +140,16 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 				spotDepthSymbols = append(spotDepthSymbols, stream.Symbol)
 			} else if isFutures {
 				futuresDepthSymbols = append(futuresDepthSymbols, stream.Symbol)
+			}
+
+		case websocket.StreamTypeLiquidation:
+			// Liquidations only exist for futures
+			if isFutures {
+				liquidationSymbols = append(liquidationSymbols, stream.Symbol)
+			} else {
+				c.logger.Warnw("Liquidation stream requested for spot market (not supported)",
+					"symbol", stream.Symbol,
+				)
 			}
 
 		default:
@@ -202,9 +214,16 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 		}
 	}
 
-	// TODO: Connect other stream types (depth, liquidations)
+	// Connect liquidation streams (futures only)
+	if len(liquidationSymbols) > 0 {
+		if err := c.connectLiquidationStreams(liquidationSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect liquidation streams")
+		}
+	}
+
+	// Handle other unimplemented stream types
 	if len(otherStreams) > 0 {
-		c.logger.Warn("Some stream types are not yet implemented",
+		c.logger.Warnw("Some stream types are not yet implemented",
 			"count", len(otherStreams),
 			"types", func() []string {
 				types := make(map[websocket.StreamType]bool)
@@ -237,7 +256,7 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("WebSocket error",
+		c.logger.Errorw("WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -252,7 +271,7 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 
 		// Check if we're shutting down - don't process events during shutdown
 		if c.stopping.Load() {
-			c.logger.Debug("Ignoring event during shutdown",
+			c.logger.Debugw("Ignoring event during shutdown",
 				"symbol", event.Symbol,
 			)
 			return
@@ -265,7 +284,7 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 		// Convert Binance event to our generic format
 		genericEvent := c.convertKlineEvent(event)
 		if err := c.handler.OnKline(genericEvent); err != nil {
-			c.logger.Error("Failed to handle kline event",
+			c.logger.Errorw("Failed to handle kline event",
 				"exchange", c.exchange,
 				"symbol", event.Symbol,
 				"error", err.Error(),
@@ -287,7 +306,7 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to futures kline streams",
+	c.logger.Infow("Connected to futures kline streams",
 		"exchange", c.exchange,
 		"market_type", "futures",
 		"symbols", len(symbolIntervals),
@@ -304,7 +323,7 @@ func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) er
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("Spot kline WebSocket error",
+		c.logger.Errorw("Spot kline WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -318,7 +337,7 @@ func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) er
 		c.messagesReceived.Add(1)
 
 		if c.stopping.Load() {
-			c.logger.Debug("Ignoring spot kline event during shutdown",
+			c.logger.Debugw("Ignoring spot kline event during shutdown",
 				"symbol", event.Symbol,
 			)
 			return
@@ -331,7 +350,7 @@ func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) er
 		// Convert to generic format
 		genericEvent := c.convertSpotKlineEvent(event)
 		if err := c.handler.OnKline(genericEvent); err != nil {
-			c.logger.Error("Failed to handle spot kline event",
+			c.logger.Errorw("Failed to handle spot kline event",
 				"exchange", c.exchange,
 				"symbol", event.Symbol,
 				"error", err.Error(),
@@ -353,7 +372,7 @@ func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) er
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to spot kline streams",
+	c.logger.Infow("Connected to spot kline streams",
 		"exchange", c.exchange,
 		"market_type", "spot",
 		"symbols", len(symbolIntervals),
@@ -412,7 +431,7 @@ func (c *Client) connectMarkPriceStreams(symbols []string) error {
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("Mark price WebSocket error",
+		c.logger.Errorw("Mark price WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -436,7 +455,7 @@ func (c *Client) connectMarkPriceStreams(symbols []string) error {
 		// Convert to generic format
 		genericEvent := c.convertMarkPriceEvent(event)
 		if err := c.handler.OnMarkPrice(genericEvent); err != nil {
-			c.logger.Error("Failed to handle mark price event",
+			c.logger.Errorw("Failed to handle mark price event",
 				"exchange", c.exchange,
 				"symbol", event.Symbol,
 				"error", err.Error(),
@@ -458,7 +477,7 @@ func (c *Client) connectMarkPriceStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to mark price streams",
+	c.logger.Infow("Connected to mark price streams",
 		"exchange", c.exchange,
 		"symbols", len(symbols),
 	)
@@ -480,6 +499,97 @@ func (c *Client) convertMarkPriceEvent(event *futures.WsMarkPriceEvent) *websock
 	}
 }
 
+// connectLiquidationStreams connects to liquidation order streams (futures only)
+// Uses !forceOrder@arr stream to get all liquidations across all symbols
+func (c *Client) connectLiquidationStreams(symbols []string) error {
+	errHandler := func(err error) {
+		c.errorCount.Add(1)
+		c.statsMu.Lock()
+		c.stats.LastError = err
+		c.statsMu.Unlock()
+
+		c.logger.Errorw("Liquidation WebSocket error",
+			"exchange", c.exchange,
+			"error", err.Error(),
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
+	liquidationHandler := func(event *futures.WsLiquidationOrderEvent) {
+		c.messagesReceived.Add(1)
+
+		if c.stopping.Load() {
+			return
+		}
+
+		if c.handler == nil {
+			return
+		}
+
+		// Convert to generic format
+		genericEvent := c.convertLiquidationEvent(event)
+		if err := c.handler.OnLiquidation(genericEvent); err != nil {
+			c.logger.Errorw("Failed to handle liquidation event",
+				"exchange", c.exchange,
+				"symbol", event.LiquidationOrder.Symbol,
+				"error", err.Error(),
+			)
+			c.errorCount.Add(1)
+		}
+	}
+
+	// Use all market liquidation stream (!forceOrder@arr)
+	// This covers all symbols, so we don't need individual subscriptions
+	doneC, stopC, err := futures.WsAllLiquidationOrderServe(
+		liquidationHandler,
+		errHandler,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start liquidation WebSocket")
+	}
+
+	c.stopChannels = append(c.stopChannels, stopC)
+	c.doneChannels = append(c.doneChannels, doneC)
+
+	c.logger.Infow("Connected to liquidation stream (all markets)",
+		"exchange", c.exchange,
+		"symbols", len(symbols),
+	)
+
+	return nil
+}
+
+// convertLiquidationEvent converts Binance liquidation event to generic format
+func (c *Client) convertLiquidationEvent(event *futures.WsLiquidationOrderEvent) *websocket.LiquidationEvent {
+	liq := event.LiquidationOrder
+
+	// Calculate value (price * quantity)
+	price, _ := strconv.ParseFloat(liq.Price, 64)
+	qty, _ := strconv.ParseFloat(liq.OrigQuantity, 64)
+	value := price * qty
+
+	// Convert side to generic format
+	side := "long"
+	if liq.Side == futures.SideTypeSell {
+		side = "short"
+	}
+
+	return &websocket.LiquidationEvent{
+		Exchange:   c.exchange,
+		Symbol:     liq.Symbol,
+		MarketType: "futures",
+		Side:       side,
+		OrderType:  string(liq.OrderType),
+		Price:      liq.Price,
+		Quantity:   liq.OrigQuantity,
+		Value:      strconv.FormatFloat(value, 'f', -1, 64),
+		EventTime:  time.UnixMilli(event.Time),
+	}
+}
+
 // connectFuturesTickerStreams connects to futures 24hr ticker streams
 func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 	errHandler := func(err error) {
@@ -488,7 +598,7 @@ func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("Ticker WebSocket error",
+		c.logger.Errorw("Ticker WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -514,7 +624,7 @@ func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 			// Convert to generic format
 			genericEvent := c.convertTickerEvent(event)
 			if err := c.handler.OnTicker(genericEvent); err != nil {
-				c.logger.Error("Failed to handle ticker event",
+				c.logger.Errorw("Failed to handle ticker event",
 					"exchange", c.exchange,
 					"symbol", event.Symbol,
 					"error", err.Error(),
@@ -538,7 +648,7 @@ func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to futures ticker streams",
+	c.logger.Infow("Connected to futures ticker streams",
 		"exchange", c.exchange,
 		"market_type", "futures",
 		"symbols", len(symbols),
@@ -555,7 +665,7 @@ func (c *Client) connectSpotTickerStreams(symbols []string) error {
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("Spot ticker WebSocket error",
+		c.logger.Errorw("Spot ticker WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -580,7 +690,7 @@ func (c *Client) connectSpotTickerStreams(symbols []string) error {
 		for _, tickerEvent := range event {
 			genericEvent := c.convertSpotTickerEvent(*tickerEvent)
 			if err := c.handler.OnTicker(genericEvent); err != nil {
-				c.logger.Error("Failed to handle spot ticker event",
+				c.logger.Errorw("Failed to handle spot ticker event",
 					"exchange", c.exchange,
 					"symbol", tickerEvent.Symbol,
 					"error", err.Error(),
@@ -599,7 +709,7 @@ func (c *Client) connectSpotTickerStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to spot ticker streams",
+	c.logger.Infow("Connected to spot ticker streams",
 		"exchange", c.exchange,
 		"market_type", "spot",
 		"symbols", len(symbols),
@@ -666,7 +776,7 @@ func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("AggTrade WebSocket error",
+		c.logger.Errorw("AggTrade WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -690,7 +800,7 @@ func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 		// Convert to generic format
 		genericEvent := c.convertAggTradeEvent(event)
 		if err := c.handler.OnTrade(genericEvent); err != nil {
-			c.logger.Error("Failed to handle agg trade event",
+			c.logger.Errorw("Failed to handle agg trade event",
 				"exchange", c.exchange,
 				"symbol", event.Symbol,
 				"error", err.Error(),
@@ -712,7 +822,7 @@ func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to futures trade streams",
+	c.logger.Infow("Connected to futures trade streams",
 		"exchange", c.exchange,
 		"market_type", "futures",
 		"symbols", len(symbols),
@@ -729,7 +839,7 @@ func (c *Client) connectSpotTradeStreams(symbols []string) error {
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("Spot trade WebSocket error",
+		c.logger.Errorw("Spot trade WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -753,7 +863,7 @@ func (c *Client) connectSpotTradeStreams(symbols []string) error {
 		// Convert to generic format
 		genericEvent := c.convertSpotTradeEvent(event)
 		if err := c.handler.OnTrade(genericEvent); err != nil {
-			c.logger.Error("Failed to handle spot trade event",
+			c.logger.Errorw("Failed to handle spot trade event",
 				"exchange", c.exchange,
 				"symbol", event.Symbol,
 				"error", err.Error(),
@@ -775,7 +885,7 @@ func (c *Client) connectSpotTradeStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to spot trade streams",
+	c.logger.Infow("Connected to spot trade streams",
 		"exchange", c.exchange,
 		"market_type", "spot",
 		"symbols", len(symbols),
@@ -826,7 +936,7 @@ func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 		c.stats.LastError = err
 		c.statsMu.Unlock()
 
-		c.logger.Error("Depth WebSocket error",
+		c.logger.Errorw("Depth WebSocket error",
 			"exchange", c.exchange,
 			"error", err.Error(),
 		)
@@ -850,7 +960,7 @@ func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 		// Convert to generic format
 		genericEvent := c.convertFuturesDepthEvent(event)
 		if err := c.handler.OnDepth(genericEvent); err != nil {
-			c.logger.Error("Failed to handle depth event",
+			c.logger.Errorw("Failed to handle depth event",
 				"exchange", c.exchange,
 				"symbol", event.Symbol,
 				"error", err.Error(),
@@ -878,7 +988,7 @@ func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to futures depth streams",
+	c.logger.Infow("Connected to futures depth streams",
 		"exchange", c.exchange,
 		"market_type", "futures",
 		"symbols", len(symbols),
@@ -891,14 +1001,71 @@ func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 
 // connectSpotDepthStreams connects to spot depth (order book) streams
 func (c *Client) connectSpotDepthStreams(symbols []string) error {
-	// Spot depth streams not fully implemented yet
-	// WsCombinedPartialDepthServe100Ms may not exist in current library version
-	c.logger.Warn("Spot depth streams not fully implemented yet",
+	errHandler := func(err error) {
+		c.errorCount.Add(1)
+		c.statsMu.Lock()
+		c.stats.LastError = err
+		c.statsMu.Unlock()
+
+		c.logger.Errorw("Spot depth WebSocket error",
+			"exchange", c.exchange,
+			"error", err.Error(),
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
+	depthHandler := func(event *binance.WsPartialDepthEvent) {
+		c.messagesReceived.Add(1)
+
+		if c.stopping.Load() {
+			return
+		}
+
+		if c.handler == nil {
+			return
+		}
+
+		// Convert to generic format
+		genericEvent := c.convertSpotDepthEvent(event)
+		if err := c.handler.OnDepth(genericEvent); err != nil {
+			c.logger.Errorw("Failed to handle spot depth event",
+				"exchange", c.exchange,
+				"symbol", event.Symbol,
+				"error", err.Error(),
+			)
+			c.errorCount.Add(1)
+		}
+	}
+
+	// Build symbol->level map for combined stream
+	symbolLevels := make(map[string]string, len(symbols))
+	for _, symbol := range symbols {
+		symbolLevels[symbol] = "10" // Depth levels: 5, 10, or 20
+	}
+
+	// Use combined stream for multiple symbols
+	doneC, stopC, err := binance.WsCombinedPartialDepthServe(
+		symbolLevels,
+		depthHandler,
+		errHandler,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start spot depth WebSocket")
+	}
+
+	c.stopChannels = append(c.stopChannels, stopC)
+	c.doneChannels = append(c.doneChannels, doneC)
+
+	c.logger.Infow("Connected to spot depth streams",
+		"exchange", c.exchange,
+		"market_type", "spot",
 		"symbols", len(symbols),
-		"reason", "library method unavailable",
+		"depth_levels", 10,
 	)
 
-	// TODO: Implement when library supports it or use individual streams per symbol
 	return nil
 }
 
@@ -966,7 +1133,7 @@ func (c *Client) Start(ctx context.Context) error {
 		return errors.New("client not connected")
 	}
 
-	c.logger.Info("WebSocket client started",
+	c.logger.Infow("WebSocket client started",
 		"exchange", c.exchange,
 	)
 
@@ -974,7 +1141,7 @@ func (c *Client) Start(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		if err := c.Stop(context.Background()); err != nil {
-			c.logger.Error("Error stopping WebSocket client",
+			c.logger.Errorw("Error stopping WebSocket client",
 				"exchange", c.exchange,
 				"error", err.Error(),
 			)
@@ -996,7 +1163,7 @@ func (c *Client) Stop(ctx context.Context) error {
 	// Set stopping flag FIRST to prevent new events from being published
 	c.stopping.Store(true)
 
-	c.logger.Info("Stopping WebSocket client",
+	c.logger.Infow("Stopping WebSocket client",
 		"exchange", c.exchange,
 		"active_streams", len(c.stopChannels),
 	)
@@ -1005,9 +1172,9 @@ func (c *Client) Stop(ctx context.Context) error {
 	for i, stopC := range c.stopChannels {
 		select {
 		case stopC <- struct{}{}:
-			c.logger.Debug("Sent stop signal to stream", "stream", i)
+			c.logger.Debugw("Sent stop signal to stream", "stream", i)
 		default:
-			c.logger.Debug("Stop channel full, forcing close", "stream", i)
+			c.logger.Debugw("Stop channel full, forcing close", "stream", i)
 			close(stopC)
 		}
 	}
@@ -1016,9 +1183,9 @@ func (c *Client) Stop(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		for i, doneC := range c.doneChannels {
-			c.logger.Debug("Waiting for stream to finish", "stream", i)
+			c.logger.Debugw("Waiting for stream to finish", "stream", i)
 			<-doneC
-			c.logger.Debug("Stream finished", "stream", i)
+			c.logger.Debugw("Stream finished", "stream", i)
 		}
 		close(done)
 	}()
@@ -1026,11 +1193,11 @@ func (c *Client) Stop(ctx context.Context) error {
 	timeout := 10 * time.Second
 	select {
 	case <-done:
-		c.logger.Info("All WebSocket streams stopped gracefully",
+		c.logger.Infow("All WebSocket streams stopped gracefully",
 			"exchange", c.exchange,
 		)
 	case <-time.After(timeout):
-		c.logger.Error("WebSocket stop timeout, some streams may still be running",
+		c.logger.Errorw("WebSocket stop timeout, some streams may still be running",
 			"exchange", c.exchange,
 			"timeout", timeout,
 		)
@@ -1041,7 +1208,7 @@ func (c *Client) Stop(ctx context.Context) error {
 	c.stopChannels = nil
 	c.doneChannels = nil
 
-	c.logger.Info("✓ WebSocket client fully stopped",
+	c.logger.Infow("✓ WebSocket client fully stopped",
 		"exchange", c.exchange,
 	)
 

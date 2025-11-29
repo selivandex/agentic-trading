@@ -200,7 +200,6 @@ var DefaultAgentConfigs = map[AgentType]AgentConfig{
 
 // GetRegimeInterpreterConfig returns config for RegimeInterpreter agent
 // This agent is NOT created at startup because its template requires runtime data
-// Template is rendered manually in regime_detector_ml.go with actual data
 func GetRegimeInterpreterConfig() AgentConfig {
 	return AgentConfig{
 		Type:                 AgentRegimeInterpreter,
@@ -208,7 +207,7 @@ func GetRegimeInterpreterConfig() AgentConfig {
 		Description:          "Interprets ML regime classification and provides strategic recommendations",
 		Tools:                []string{}, // No tools needed, pure interpretation
 		OutputKey:            "interpretation",
-		SystemPromptTemplate: "", // Template rendered manually with runtime data
+		SystemPromptTemplate: "agents/regime_interpreter",
 		MaxToolCalls:         0,
 		MaxThinkingTokens:    3000,
 		TimeoutPerTool:       10 * time.Second,

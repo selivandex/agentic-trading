@@ -10,12 +10,13 @@ type StreamType string
 type Interval string
 
 const (
-	StreamTypeKline     StreamType = "kline"
-	StreamTypeTicker    StreamType = "ticker"
-	StreamTypeDepth     StreamType = "depth"
-	StreamTypeTrade     StreamType = "trade"
-	StreamTypeFunding   StreamType = "funding"
-	StreamTypeMarkPrice StreamType = "markPrice"
+	StreamTypeKline       StreamType = "kline"
+	StreamTypeTicker      StreamType = "ticker"
+	StreamTypeDepth       StreamType = "depth"
+	StreamTypeTrade       StreamType = "trade"
+	StreamTypeFunding     StreamType = "funding"
+	StreamTypeMarkPrice   StreamType = "markPrice"
+	StreamTypeLiquidation StreamType = "liquidation"
 )
 
 const (
@@ -158,6 +159,19 @@ type MarkPriceEvent struct {
 	EventTime            time.Time
 }
 
+// LiquidationEvent represents a liquidation event (futures only)
+type LiquidationEvent struct {
+	Exchange   string
+	Symbol     string
+	MarketType string // "futures", "linear_perp", "inverse_perp"
+	Side       string // "long", "short"
+	OrderType  string // "LIMIT", "MARKET"
+	Price      string
+	Quantity   string
+	Value      string // price * quantity in USD
+	EventTime  time.Time
+}
+
 // Client defines the interface for exchange WebSocket clients
 type Client interface {
 	// Connect establishes WebSocket connection(s) based on config
@@ -195,5 +209,6 @@ type EventHandler interface {
 	OnTrade(event *TradeEvent) error
 	OnFundingRate(event *FundingRateEvent) error
 	OnMarkPrice(event *MarkPriceEvent) error
+	OnLiquidation(event *LiquidationEvent) error
 	OnError(err error)
 }

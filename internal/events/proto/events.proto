@@ -501,10 +501,11 @@ message WebSocketDepthEvent {
   BaseEvent base = 1;
   string exchange = 2;
   string symbol = 3;
-  repeated PriceLevel bids = 4;
-  repeated PriceLevel asks = 5;
-  int64 last_update_id = 6;
-  google.protobuf.Timestamp event_time = 7;
+  string market_type = 4;  // spot, futures
+  repeated PriceLevel bids = 5;
+  repeated PriceLevel asks = 6;
+  int64 last_update_id = 7;
+  google.protobuf.Timestamp event_time = 8;
 }
 
 // WebSocketTradeEvent represents a single trade from WebSocket
@@ -545,6 +546,20 @@ message WebSocketMarkPriceEvent {
   string funding_rate = 7;
   google.protobuf.Timestamp next_funding_time = 8;
   google.protobuf.Timestamp event_time = 9;
+}
+
+// WebSocketLiquidationEvent represents a liquidation event from WebSocket (futures only)
+message WebSocketLiquidationEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string market_type = 4;  // futures, linear_perp, inverse_perp
+  string side = 5;         // long, short
+  string order_type = 6;   // LIMIT, MARKET
+  string price = 7;
+  string quantity = 8;
+  string value = 9;        // price * quantity in USD
+  google.protobuf.Timestamp event_time = 10;
 }
 
 // ==========================================

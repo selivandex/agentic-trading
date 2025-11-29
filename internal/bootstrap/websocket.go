@@ -131,6 +131,17 @@ func (c *Container) MustInitWebSocketClients() {
 				c.Repos.MarketData,
 				c.Log,
 			)
+
+		case "liquidation":
+			c.Log.Info("Creating WebSocket liquidation consumer",
+				"topic", events.TopicWebSocketLiquidation,
+				"group_id", c.Config.Kafka.GroupID,
+			)
+			c.Background.WebSocketLiquidationSvc = consumers.NewWebSocketLiquidationConsumer(
+				c.Adapters.WebSocketLiquidationConsumer,
+				c.Repos.MarketData,
+				c.Log,
+			)
 		}
 	}
 
@@ -141,6 +152,7 @@ func (c *Container) MustInitWebSocketClients() {
 		"ticker_consumer", c.Background.WebSocketTickerSvc != nil,
 		"trade_consumer", c.Background.WebSocketTradeSvc != nil,
 		"depth_consumer", c.Background.WebSocketDepthSvc != nil,
+		"liquidation_consumer", c.Background.WebSocketLiquidationSvc != nil,
 	)
 }
 

@@ -82,9 +82,10 @@ const (
 	TopicWebSocketKline       = "websocket.kline"
 	TopicWebSocketTicker      = "websocket.ticker"
 	TopicWebSocketDepth       = "websocket.depth"
-	TopicWebSocketTrade       = "websocket.trade"
-	TopicWebSocketFundingRate = "websocket.funding_rate"
-	TopicWebSocketMarkPrice   = "websocket.mark_price"
+	TopicWebSocketTrade        = "websocket.trade"
+	TopicWebSocketFundingRate  = "websocket.funding_rate"
+	TopicWebSocketMarkPrice    = "websocket.mark_price"
+	TopicWebSocketLiquidation  = "websocket.liquidation"
 )
 
 // NewBaseEvent creates a new base event with defaults

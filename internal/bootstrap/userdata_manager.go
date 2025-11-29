@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -38,8 +39,9 @@ func (c *Container) MustInitUserDataManager() {
 
 	// Create User Data Manager
 	config := websocket.UserDataManagerConfig{
-		HealthCheckInterval: 60, // 60 seconds
-		ListenKeyRenewal:    30, // 30 minutes
+		HealthCheckInterval:    60 * time.Second, // Check connection health every 60 seconds
+		ListenKeyRenewal:       30 * time.Minute, // Renew listenKeys every 30 minutes
+		ReconciliationInterval: 5 * time.Minute,  // Sync with DB every 5 minutes (hot reload)
 	}
 
 	manager := websocket.NewUserDataManager(

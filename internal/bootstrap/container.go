@@ -130,11 +130,12 @@ type Adapters struct {
 	TelegramNotificationConsumer *kafka.Consumer
 
 	// WebSocket consumers (one per stream type)
-	WebSocketKlineConsumer     *kafka.Consumer
-	WebSocketMarkPriceConsumer *kafka.Consumer
-	WebSocketTickerConsumer    *kafka.Consumer
-	WebSocketTradeConsumer     *kafka.Consumer
-	WebSocketDepthConsumer     *kafka.Consumer
+	WebSocketKlineConsumer       *kafka.Consumer
+	WebSocketMarkPriceConsumer   *kafka.Consumer
+	WebSocketTickerConsumer      *kafka.Consumer
+	WebSocketTradeConsumer       *kafka.Consumer
+	WebSocketDepthConsumer       *kafka.Consumer
+	WebSocketLiquidationConsumer *kafka.Consumer
 
 	// User Data WebSocket consumers
 	UserDataOrderConsumer         *kafka.Consumer
@@ -191,11 +192,12 @@ type Background struct {
 	PositionGuardianSvc *consumers.PositionGuardianConsumer
 
 	// WebSocket consumer services
-	WebSocketKlineSvc     *consumers.WebSocketKlineConsumer
-	WebSocketMarkPriceSvc *consumers.WebSocketMarkPriceConsumer
-	WebSocketTickerSvc    *consumers.WebSocketTickerConsumer
-	WebSocketTradeSvc     *consumers.WebSocketTradeConsumer
-	WebSocketDepthSvc     *consumers.WebSocketDepthConsumer
+	WebSocketKlineSvc       *consumers.WebSocketKlineConsumer
+	WebSocketMarkPriceSvc   *consumers.WebSocketMarkPriceConsumer
+	WebSocketTickerSvc      *consumers.WebSocketTickerConsumer
+	WebSocketTradeSvc       *consumers.WebSocketTradeConsumer
+	WebSocketDepthSvc       *consumers.WebSocketDepthConsumer
+	WebSocketLiquidationSvc *consumers.WebSocketLiquidationConsumer
 
 	// User Data WebSocket consumer service
 	UserDataSvc *consumers.UserDataConsumer
@@ -407,6 +409,7 @@ func (c *Container) Shutdown() {
 		c.Adapters.WebSocketTickerConsumer,
 		c.Adapters.WebSocketTradeConsumer,
 		c.Adapters.WebSocketDepthConsumer,
+		c.Adapters.WebSocketLiquidationConsumer,
 		c.PG,
 		c.CH,
 		c.Redis,

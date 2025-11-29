@@ -118,6 +118,7 @@ func (wp *WebSocketPublisher) PublishDepth(
 		Base:         NewBaseEvent(TopicWebSocketDepth, "websocket_"+exchange, ""),
 		Exchange:     exchange,
 		Symbol:       symbol,
+		MarketType:   marketType,
 		Bids:         pbBids,
 		Asks:         pbAsks,
 		LastUpdateId: lastUpdateID,
@@ -201,6 +202,29 @@ func (wp *WebSocketPublisher) PublishMarkPrice(
 	}
 
 	return wp.publishProto(ctx, TopicWebSocketMarkPrice, symbol, event)
+}
+
+// PublishLiquidation publishes a liquidation event from WebSocket (futures only)
+func (wp *WebSocketPublisher) PublishLiquidation(
+	ctx context.Context,
+	exchange, symbol, marketType, side, orderType string,
+	price, quantity, value string,
+	eventTime time.Time,
+) error {
+	event := &eventspb.WebSocketLiquidationEvent{
+		Base:       NewBaseEvent(TopicWebSocketLiquidation, "websocket_"+exchange, ""),
+		Exchange:   exchange,
+		Symbol:     symbol,
+		MarketType: marketType,
+		Side:       side,
+		OrderType:  orderType,
+		Price:      price,
+		Quantity:   quantity,
+		Value:      value,
+		EventTime:  timestamppb.New(eventTime),
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketLiquidation, symbol, event)
 }
 
 // publishProto serializes and publishes a protobuf message
