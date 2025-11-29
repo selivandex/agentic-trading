@@ -333,7 +333,7 @@ func analyzeTradeFlow(trades []market_data.Trade) tradeFlowData {
 
 	// Trade imbalance
 	for _, t := range trades {
-		if t.Side == "buy" {
+		if t.Side() == "buy" {
 			flow.buyVol += t.Quantity
 		} else {
 			flow.sellVol += t.Quantity
@@ -367,7 +367,7 @@ func analyzeTradeFlow(trades []market_data.Trade) tradeFlowData {
 	cvd := 0.0
 	cvdStart := 0.0
 	for i := len(trades) - 1; i >= 0; i-- {
-		if trades[i].Side == "buy" {
+		if trades[i].Side() == "buy" {
 			cvd += trades[i].Quantity
 		} else {
 			cvd -= trades[i].Quantity
@@ -411,7 +411,7 @@ func analyzeTradeFlow(trades []market_data.Trade) tradeFlowData {
 		valueUSD := t.Price * t.Quantity
 		if valueUSD >= 100000.0 {
 			flow.whaleCount++
-			if t.Side == "buy" {
+			if t.Side() == "buy" {
 				flow.whaleBuyUSD += valueUSD
 			} else {
 				flow.whaleSellUSD += valueUSD
@@ -447,7 +447,7 @@ func analyzeVolume(trades []market_data.Trade) volumeData {
 	for _, t := range trades {
 		usd := t.Price * t.Quantity
 		vol.totalUSD += usd
-		if t.Side == "buy" {
+		if t.Side() == "buy" {
 			vol.buyUSD += usd
 		} else {
 			vol.sellUSD += usd

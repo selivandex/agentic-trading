@@ -138,7 +138,7 @@ func (ia *IntervalAdjuster) calculateRegime(ctx context.Context, exchange, symbo
 
 	candles, err := ia.marketDataRepo.GetLatestOHLCV(ctx, exchange, symbol, "1h", 14)
 	if err == nil && len(candles) >= 14 {
-		atrPct := ia.calculateATR(candles, ticker.Price)
+		atrPct := ia.calculateATR(candles, ticker.LastPrice)
 
 		if atrPct > ia.thresholds.HighATRPct {
 			scores += 2 // Strong indicator
@@ -151,8 +151,8 @@ func (ia *IntervalAdjuster) calculateRegime(ctx context.Context, exchange, symbo
 	candles24h, err := ia.marketDataRepo.GetLatestOHLCV(ctx, exchange, symbol, "1h", 24)
 	if err == nil && len(candles24h) > 0 {
 		avgVolume := ia.calculateAverageVolume(candles24h)
-		if avgVolume > 0 && ticker.Volume24h > 0 {
-			volumeRatio := ticker.Volume24h / avgVolume
+		if avgVolume > 0 && ticker.Volume > 0 {
+			volumeRatio := ticker.Volume / avgVolume
 
 			if volumeRatio > ia.thresholds.HighVolumePct {
 				scores += 1

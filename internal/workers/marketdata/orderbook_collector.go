@@ -108,7 +108,7 @@ func (obc *OrderBookCollector) collectExchangeOrderBooks(
 		}
 
 		// Insert order book snapshot to ClickHouse
-		if err := obc.mdRepo.InsertOrderBook(ctx, orderBook); err != nil {
+		if err := obc.mdRepo.InsertOrderBook(ctx, []market_data.OrderBookSnapshot{*orderBook}); err != nil {
 			obc.Log().Error("Failed to insert order book snapshot",
 				"exchange", exchangeName,
 				"symbol", symbol,

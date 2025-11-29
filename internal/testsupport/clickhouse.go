@@ -312,20 +312,24 @@ type TickerFixture struct {
 
 // NewTickerFixture creates a default ticker for testing
 func NewTickerFixture() *TickerFixture {
+	now := time.Now().Truncate(time.Second)
 	return &TickerFixture{
 		ticker: market_data.Ticker{
-			Exchange:     "binance",
-			Symbol:       "BTC/USDT",
-			Timestamp:    time.Now().Truncate(time.Second),
-			Price:        50000.0,
-			Bid:          49995.0,
-			Ask:          50005.0,
-			Volume24h:    10000.0,
-			Change24h:    2.5,
-			High24h:      51000.0,
-			Low24h:       49000.0,
-			FundingRate:  0.0001,
-			OpenInterest: 1000000.0,
+			Exchange:           "binance",
+			Symbol:             "BTC/USDT",
+			MarketType:         "spot",
+			Timestamp:          now,
+			LastPrice:          50000.0,
+			OpenPrice:          49000.0,
+			HighPrice:          51000.0,
+			LowPrice:           48500.0,
+			Volume:             10000.0,
+			QuoteVolume:        500000000.0, // 500M quote volume
+			PriceChange:        1000.0,      // +1000 USD
+			PriceChangePercent: 2.04,        // +2.04%
+			WeightedAvgPrice:   49800.0,
+			TradeCount:         50000,
+			EventTime:          now,
 		},
 	}
 }
@@ -342,31 +346,46 @@ func (f *TickerFixture) WithSymbol(symbol string) *TickerFixture {
 	return f
 }
 
+// WithMarketType sets the market type
+func (f *TickerFixture) WithMarketType(marketType string) *TickerFixture {
+	f.ticker.MarketType = marketType
+	return f
+}
+
 // WithTimestamp sets the timestamp
 func (f *TickerFixture) WithTimestamp(t time.Time) *TickerFixture {
 	f.ticker.Timestamp = t
+	f.ticker.EventTime = t
 	return f
 }
 
-// WithPrice sets the current price and adjusts bid/ask around it
+// WithPrice sets the last price and adjusts other price fields proportionally
 func (f *TickerFixture) WithPrice(price float64) *TickerFixture {
-	f.ticker.Price = price
-	f.ticker.Bid = price * 0.9999
-	f.ticker.Ask = price * 1.0001
+	f.ticker.LastPrice = price
+	f.ticker.OpenPrice = price * 0.98
+	f.ticker.HighPrice = price * 1.02
+	f.ticker.LowPrice = price * 0.97
+	f.ticker.WeightedAvgPrice = price * 0.996
+	f.ticker.PriceChange = price - f.ticker.OpenPrice
+	f.ticker.PriceChangePercent = (f.ticker.PriceChange / f.ticker.OpenPrice) * 100
 	return f
 }
 
-// WithPrices sets price, bid, and ask explicitly
-func (f *TickerFixture) WithPrices(price, bid, ask float64) *TickerFixture {
-	f.ticker.Price = price
-	f.ticker.Bid = bid
-	f.ticker.Ask = ask
+// WithPrices sets OHLC prices explicitly
+func (f *TickerFixture) WithPrices(last, open, high, low float64) *TickerFixture {
+	f.ticker.LastPrice = last
+	f.ticker.OpenPrice = open
+	f.ticker.HighPrice = high
+	f.ticker.LowPrice = low
+	f.ticker.PriceChange = last - open
+	f.ticker.PriceChangePercent = (f.ticker.PriceChange / open) * 100
 	return f
 }
 
-// WithFundingRate sets the funding rate
-func (f *TickerFixture) WithFundingRate(rate float64) *TickerFixture {
-	f.ticker.FundingRate = rate
+// WithVolume sets base and quote volumes
+func (f *TickerFixture) WithVolume(baseVolume, quoteVolume float64) *TickerFixture {
+	f.ticker.Volume = baseVolume
+	f.ticker.QuoteVolume = quoteVolume
 	return f
 }
 
@@ -384,14 +403,18 @@ type TradeFixture struct {
 func NewTradeFixture() *TradeFixture {
 	return &TradeFixture{
 		trade: market_data.Trade{
-			Exchange:  "binance",
-			Symbol:    "BTC/USDT",
-			Timestamp: time.Now().Truncate(time.Millisecond),
-			TradeID:   "test_trade_1",
-			Price:     50000.0,
-			Quantity:  0.1,
-			Side:      "buy",
-			IsBuyer:   true,
+			Exchange:     "binance",
+			Symbol:       "BTC/USDT",
+			MarketType:   "spot",
+			Timestamp:    time.Now().Truncate(time.Millisecond),
+			TradeID:      12345,
+			AggTradeID:   12345,
+			Price:        50000.0,
+			Quantity:     0.1,
+			FirstTradeID: 12345,
+			LastTradeID:  12345,
+			IsBuyerMaker: false, // Default to buy trade (taker is buyer)
+			EventTime:    time.Now().Truncate(time.Millisecond),
 		},
 	}
 }
@@ -408,15 +431,25 @@ func (f *TradeFixture) WithSymbol(symbol string) *TradeFixture {
 	return f
 }
 
+// WithMarketType sets the market type
+func (f *TradeFixture) WithMarketType(marketType string) *TradeFixture {
+	f.trade.MarketType = marketType
+	return f
+}
+
 // WithTimestamp sets the timestamp
 func (f *TradeFixture) WithTimestamp(t time.Time) *TradeFixture {
 	f.trade.Timestamp = t
+	f.trade.EventTime = t
 	return f
 }
 
 // WithTradeID sets the trade ID
-func (f *TradeFixture) WithTradeID(id string) *TradeFixture {
+func (f *TradeFixture) WithTradeID(id int64) *TradeFixture {
 	f.trade.TradeID = id
+	f.trade.AggTradeID = id
+	f.trade.FirstTradeID = id
+	f.trade.LastTradeID = id
 	return f
 }
 
@@ -432,17 +465,15 @@ func (f *TradeFixture) WithQuantity(qty float64) *TradeFixture {
 	return f
 }
 
-// AsBuy makes this a buy trade
+// AsBuy makes this a buy trade (taker is buyer)
 func (f *TradeFixture) AsBuy() *TradeFixture {
-	f.trade.Side = "buy"
-	f.trade.IsBuyer = true
+	f.trade.IsBuyerMaker = false // Buyer is taker (aggressor buy)
 	return f
 }
 
-// AsSell makes this a sell trade
+// AsSell makes this a sell trade (taker is seller)
 func (f *TradeFixture) AsSell() *TradeFixture {
-	f.trade.Side = "sell"
-	f.trade.IsBuyer = false
+	f.trade.IsBuyerMaker = true // Seller is taker (aggressor sell)
 	return f
 }
 
@@ -458,7 +489,9 @@ func (f *TradeFixture) BuildMany(count int) []market_data.Trade {
 	for i := 0; i < count; i++ {
 		trade := f.trade
 		trade.Timestamp = f.trade.Timestamp.Add(time.Duration(i) * time.Millisecond)
-		trade.TradeID = f.trade.TradeID + "_" + string(rune('0'+i))
+		trade.EventTime = f.trade.EventTime.Add(time.Duration(i) * time.Millisecond)
+		trade.TradeID = f.trade.TradeID + int64(i)
+		trade.AggTradeID = f.trade.AggTradeID + int64(i)
 		trades[i] = trade
 	}
 
@@ -521,6 +554,308 @@ func (f *FundingRateFixture) Build() market_data.FundingRate {
 	return f.fundingRate
 }
 
+// MarkPriceFixture provides builder pattern for creating test mark prices
+type MarkPriceFixture struct {
+	markPrice market_data.MarkPrice
+}
+
+// NewMarkPriceFixture creates a default mark price for testing
+func NewMarkPriceFixture() *MarkPriceFixture {
+	now := time.Now().Truncate(time.Second)
+	return &MarkPriceFixture{
+		markPrice: market_data.MarkPrice{
+			Exchange:             "binance",
+			Symbol:               "BTC/USDT",
+			MarketType:           "linear_perp",
+			Timestamp:            now,
+			MarkPrice:            50000.0,
+			IndexPrice:           49995.0,
+			EstimatedSettlePrice: 50005.0,
+			FundingRate:          0.0001,
+			NextFundingTime:      now.Add(8 * time.Hour),
+			EventTime:            now,
+		},
+	}
+}
+
+// WithExchange sets the exchange
+func (f *MarkPriceFixture) WithExchange(exchange string) *MarkPriceFixture {
+	f.markPrice.Exchange = exchange
+	return f
+}
+
+// WithSymbol sets the symbol
+func (f *MarkPriceFixture) WithSymbol(symbol string) *MarkPriceFixture {
+	f.markPrice.Symbol = symbol
+	return f
+}
+
+// WithMarketType sets the market type
+func (f *MarkPriceFixture) WithMarketType(marketType string) *MarkPriceFixture {
+	f.markPrice.MarketType = marketType
+	return f
+}
+
+// WithTimestamp sets the timestamp
+func (f *MarkPriceFixture) WithTimestamp(t time.Time) *MarkPriceFixture {
+	f.markPrice.Timestamp = t
+	return f
+}
+
+// WithMarkPrice sets the mark price
+func (f *MarkPriceFixture) WithMarkPrice(price float64) *MarkPriceFixture {
+	f.markPrice.MarkPrice = price
+	return f
+}
+
+// WithIndexPrice sets the index price
+func (f *MarkPriceFixture) WithIndexPrice(price float64) *MarkPriceFixture {
+	f.markPrice.IndexPrice = price
+	return f
+}
+
+// WithFundingRate sets the funding rate
+func (f *MarkPriceFixture) WithFundingRate(rate float64) *MarkPriceFixture {
+	f.markPrice.FundingRate = rate
+	return f
+}
+
+// Build returns the constructed mark price
+func (f *MarkPriceFixture) Build() market_data.MarkPrice {
+	return f.markPrice
+}
+
+// BuildMany creates multiple mark prices with sequential timestamps
+func (f *MarkPriceFixture) BuildMany(count int) []market_data.MarkPrice {
+	markPrices := make([]market_data.MarkPrice, count)
+
+	for i := 0; i < count; i++ {
+		mp := f.markPrice
+		mp.Timestamp = f.markPrice.Timestamp.Add(time.Duration(i) * time.Second)
+		mp.EventTime = f.markPrice.EventTime.Add(time.Duration(i) * time.Second)
+		markPrices[i] = mp
+	}
+
+	return markPrices
+}
+
+// OrderBookSnapshotFixture provides builder pattern for creating test orderbook snapshots
+type OrderBookSnapshotFixture struct {
+	snapshot market_data.OrderBookSnapshot
+}
+
+// NewOrderBookSnapshotFixture creates a default orderbook snapshot for testing
+func NewOrderBookSnapshotFixture() *OrderBookSnapshotFixture {
+	return &OrderBookSnapshotFixture{
+		snapshot: market_data.OrderBookSnapshot{
+			Exchange:   "binance",
+			Symbol:     "BTC/USDT",
+			MarketType: "spot",
+			Timestamp:  time.Now().Truncate(time.Second),
+			Bids:       `[[49990.0, 1.5], [49980.0, 2.0], [49970.0, 3.5]]`,
+			Asks:       `[[50010.0, 1.2], [50020.0, 2.5], [50030.0, 3.0]]`,
+			BidDepth:   7.0, // Total bid volume
+			AskDepth:   6.7, // Total ask volume
+			EventTime:  time.Now().Truncate(time.Second),
+		},
+	}
+}
+
+// WithExchange sets the exchange
+func (f *OrderBookSnapshotFixture) WithExchange(exchange string) *OrderBookSnapshotFixture {
+	f.snapshot.Exchange = exchange
+	return f
+}
+
+// WithSymbol sets the symbol
+func (f *OrderBookSnapshotFixture) WithSymbol(symbol string) *OrderBookSnapshotFixture {
+	f.snapshot.Symbol = symbol
+	return f
+}
+
+// WithMarketType sets the market type
+func (f *OrderBookSnapshotFixture) WithMarketType(marketType string) *OrderBookSnapshotFixture {
+	f.snapshot.MarketType = marketType
+	return f
+}
+
+// WithTimestamp sets the timestamp
+func (f *OrderBookSnapshotFixture) WithTimestamp(t time.Time) *OrderBookSnapshotFixture {
+	f.snapshot.Timestamp = t
+	f.snapshot.EventTime = t
+	return f
+}
+
+// WithBids sets the bids JSON array
+func (f *OrderBookSnapshotFixture) WithBids(bids string) *OrderBookSnapshotFixture {
+	f.snapshot.Bids = bids
+	return f
+}
+
+// WithAsks sets the asks JSON array
+func (f *OrderBookSnapshotFixture) WithAsks(asks string) *OrderBookSnapshotFixture {
+	f.snapshot.Asks = asks
+	return f
+}
+
+// WithDepth sets the total bid and ask depth
+func (f *OrderBookSnapshotFixture) WithDepth(bidDepth, askDepth float64) *OrderBookSnapshotFixture {
+	f.snapshot.BidDepth = bidDepth
+	f.snapshot.AskDepth = askDepth
+	return f
+}
+
+// Build returns the constructed orderbook snapshot
+func (f *OrderBookSnapshotFixture) Build() market_data.OrderBookSnapshot {
+	return f.snapshot
+}
+
+// LiquidationFixture provides builder pattern for creating test liquidations
+type LiquidationFixture struct {
+	liquidation market_data.Liquidation
+}
+
+// NewLiquidationFixture creates a default liquidation for testing
+func NewLiquidationFixture() *LiquidationFixture {
+	now := time.Now().Truncate(time.Second)
+	return &LiquidationFixture{
+		liquidation: market_data.Liquidation{
+			Exchange:   "binance",
+			Symbol:     "BTC/USDT",
+			MarketType: "linear_perp",
+			Timestamp:  now,
+			Side:       "LONG",
+			OrderType:  "MARKET",
+			Price:      49000.0,
+			Quantity:   2.5,
+			Value:      122500.0, // 49000 * 2.5
+			EventTime:  now,
+		},
+	}
+}
+
+// WithExchange sets the exchange
+func (f *LiquidationFixture) WithExchange(exchange string) *LiquidationFixture {
+	f.liquidation.Exchange = exchange
+	return f
+}
+
+// WithSymbol sets the symbol
+func (f *LiquidationFixture) WithSymbol(symbol string) *LiquidationFixture {
+	f.liquidation.Symbol = symbol
+	return f
+}
+
+// WithMarketType sets the market type
+func (f *LiquidationFixture) WithMarketType(marketType string) *LiquidationFixture {
+	f.liquidation.MarketType = marketType
+	return f
+}
+
+// WithTimestamp sets the timestamp
+func (f *LiquidationFixture) WithTimestamp(t time.Time) *LiquidationFixture {
+	f.liquidation.Timestamp = t
+	f.liquidation.EventTime = t
+	return f
+}
+
+// WithSide sets the side (LONG or SHORT)
+func (f *LiquidationFixture) WithSide(side string) *LiquidationFixture {
+	f.liquidation.Side = side
+	return f
+}
+
+// WithPrice sets the price and recalculates value
+func (f *LiquidationFixture) WithPrice(price float64) *LiquidationFixture {
+	f.liquidation.Price = price
+	f.liquidation.Value = price * f.liquidation.Quantity
+	return f
+}
+
+// WithQuantity sets the quantity and recalculates value
+func (f *LiquidationFixture) WithQuantity(quantity float64) *LiquidationFixture {
+	f.liquidation.Quantity = quantity
+	f.liquidation.Value = f.liquidation.Price * quantity
+	return f
+}
+
+// AsLongLiquidation makes this a long position liquidation
+func (f *LiquidationFixture) AsLongLiquidation() *LiquidationFixture {
+	f.liquidation.Side = "LONG"
+	return f
+}
+
+// AsShortLiquidation makes this a short position liquidation
+func (f *LiquidationFixture) AsShortLiquidation() *LiquidationFixture {
+	f.liquidation.Side = "SHORT"
+	return f
+}
+
+// Build returns the constructed liquidation
+func (f *LiquidationFixture) Build() market_data.Liquidation {
+	return f.liquidation
+}
+
+// BuildMany creates multiple liquidations with sequential timestamps
+func (f *LiquidationFixture) BuildMany(count int) []market_data.Liquidation {
+	liquidations := make([]market_data.Liquidation, count)
+
+	for i := 0; i < count; i++ {
+		liq := f.liquidation
+		liq.Timestamp = f.liquidation.Timestamp.Add(time.Duration(i) * time.Second)
+		liq.EventTime = f.liquidation.EventTime.Add(time.Duration(i) * time.Second)
+		liquidations[i] = liq
+	}
+
+	return liquidations
+}
+
+// OpenInterestFixture provides builder pattern for creating test open interest
+type OpenInterestFixture struct {
+	openInterest market_data.OpenInterest
+}
+
+// NewOpenInterestFixture creates a default open interest for testing
+func NewOpenInterestFixture() *OpenInterestFixture {
+	return &OpenInterestFixture{
+		openInterest: market_data.OpenInterest{
+			Exchange:  "binance",
+			Symbol:    "BTC/USDT",
+			Timestamp: time.Now().Truncate(time.Minute),
+			Amount:    1000000.0, // 1M USD worth of open contracts
+		},
+	}
+}
+
+// WithExchange sets the exchange
+func (f *OpenInterestFixture) WithExchange(exchange string) *OpenInterestFixture {
+	f.openInterest.Exchange = exchange
+	return f
+}
+
+// WithSymbol sets the symbol
+func (f *OpenInterestFixture) WithSymbol(symbol string) *OpenInterestFixture {
+	f.openInterest.Symbol = symbol
+	return f
+}
+
+// WithTimestamp sets the timestamp
+func (f *OpenInterestFixture) WithTimestamp(t time.Time) *OpenInterestFixture {
+	f.openInterest.Timestamp = t
+	return f
+}
+
+// WithAmount sets the open interest amount
+func (f *OpenInterestFixture) WithAmount(amount float64) *OpenInterestFixture {
+	f.openInterest.Amount = amount
+	return f
+}
+
+// Build returns the constructed open interest
+func (f *OpenInterestFixture) Build() market_data.OpenInterest {
+	return f.openInterest
+}
+
 // ========================================
 // Generic Helper Functions
 // ========================================
@@ -580,7 +915,9 @@ func OHLCVSequence(base market_data.OHLCV, count int, timeframe string) []market
 func TradeSequence(base market_data.Trade, count int) []market_data.Trade {
 	return BuildManyWith(base, count, func(trade market_data.Trade, i int) market_data.Trade {
 		trade.Timestamp = base.Timestamp.Add(time.Duration(i) * time.Millisecond)
-		trade.TradeID = fmt.Sprintf("%s_%d", base.TradeID, i)
+		trade.EventTime = base.EventTime.Add(time.Duration(i) * time.Millisecond)
+		trade.TradeID = base.TradeID + int64(i)
+		trade.AggTradeID = base.AggTradeID + int64(i)
 		return trade
 	})
 }

@@ -122,7 +122,7 @@ func (ps *PreScreener) ShouldAnalyze(ctx context.Context, exchange, symbol strin
 
 	// Check price movement
 	if ps.config.CheckPriceMovement {
-		priceChangePct := math.Abs(ticker.Change24h)
+		priceChangePct := math.Abs(ticker.PriceChangePercent / 100.0) // Convert from percentage to decimal
 		result.Metrics.PriceChangePct = priceChangePct
 
 		if priceChangePct < ps.config.MinPriceChangePct {
@@ -141,7 +141,7 @@ func (ps *PreScreener) ShouldAnalyze(ctx context.Context, exchange, symbol strin
 			ps.log.Warn("Failed to get OHLCV for volume check", "error", err)
 		} else if len(candles) > 0 {
 			avgVolume := ps.calculateAverageVolume(candles)
-			currentVolume := ticker.Volume24h
+			currentVolume := ticker.Volume
 
 			if avgVolume > 0 {
 				volumePct := currentVolume / avgVolume
@@ -163,7 +163,7 @@ func (ps *PreScreener) ShouldAnalyze(ctx context.Context, exchange, symbol strin
 		if err != nil {
 			ps.log.Warn("Failed to get OHLCV for ATR check", "error", err)
 		} else if len(candles) >= 14 {
-			atrPct := ps.calculateATR(candles, ticker.Price)
+			atrPct := ps.calculateATR(candles, ticker.LastPrice)
 			result.Metrics.ATRPct = atrPct
 
 			if atrPct < ps.config.MinATRPct {

@@ -2,6 +2,7 @@ package marketdata
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"prometheus/internal/adapters/exchanges"
@@ -137,23 +138,35 @@ func (tc *TradesCollector) collectTrades(
 	// Convert and insert trades in batch
 	trades := make([]market_data.Trade, 0, len(exchangeTrades))
 	for _, et := range exchangeTrades {
-		// Determine side and buyer flag
-		side := "buy"
+		// Determine buyer flag based on exchange trade side
 		isBuyer := true
 		if et.Side == exchanges.OrderSideSell {
-			side = "sell"
 			isBuyer = false
 		}
 
+		// Convert string ID to int64 (best effort)
+		tradeID := int64(0)
+		// If exchange provides numeric ID in string format, parse it
+		// Otherwise use timestamp as fallback
+		if parsed, err := strconv.ParseInt(et.ID, 10, 64); err == nil {
+			tradeID = parsed
+		} else {
+			tradeID = et.Timestamp.UnixNano()
+		}
+
 		trade := market_data.Trade{
-			Exchange:  exchangeName,
-			Symbol:    symbol,
-			TradeID:   et.ID,
-			Timestamp: et.Timestamp,
-			Price:     et.Price.InexactFloat64(),
-			Quantity:  et.Amount.InexactFloat64(),
-			Side:      side,
-			IsBuyer:   isBuyer,
+			Exchange:     exchangeName,
+			Symbol:       symbol,
+			MarketType:   "spot", // Default
+			TradeID:      tradeID,
+			AggTradeID:   tradeID, // Same as TradeID for non-aggregated
+			Timestamp:    et.Timestamp,
+			Price:        et.Price.InexactFloat64(),
+			Quantity:     et.Amount.InexactFloat64(),
+			FirstTradeID: tradeID,
+			LastTradeID:  tradeID,
+			IsBuyerMaker: !isBuyer, // IsBuyerMaker is opposite of isBuyer
+			EventTime:    et.Timestamp,
 		}
 		trades = append(trades, trade)
 	}
@@ -177,7 +190,7 @@ func (tc *TradesCollector) collectTrades(
 func (tc *TradesCollector) CalculateTradeImbalance(trades []market_data.Trade) (buyVolume, sellVolume float64) {
 	for _, trade := range trades {
 		volume := trade.Quantity
-		if trade.Side == "buy" {
+		if trade.Side() == "buy" {
 			buyVolume += volume
 		} else {
 			sellVolume += volume

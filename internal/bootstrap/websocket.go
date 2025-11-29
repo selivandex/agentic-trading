@@ -77,7 +77,7 @@ func (c *Container) MustInitWebSocketClients() {
 		"topic", events.TopicWebSocketKline,
 		"group_id", c.Config.Kafka.GroupID,
 	)
-	
+
 	klineConsumer := consumers.NewWebSocketKlineConsumer(
 		c.Adapters.WebSocketKlineConsumer,
 		c.Repos.MarketData,

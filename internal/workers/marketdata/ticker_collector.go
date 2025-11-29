@@ -123,7 +123,7 @@ func (tc *TickerCollector) collectExchangeTickers(
 		}
 
 		// Insert ticker to ClickHouse
-		if err := tc.mdRepo.InsertTicker(ctx, ticker); err != nil {
+		if err := tc.mdRepo.InsertTicker(ctx, []market_data.Ticker{*ticker}); err != nil {
 			tc.Log().Error("Failed to insert ticker",
 				"exchange", exchangeName,
 				"symbol", symbol,
@@ -157,19 +157,21 @@ func (tc *TickerCollector) collectTicker(
 
 	// Convert exchanges.Ticker to market_data.Ticker
 	ticker := &market_data.Ticker{
-		Exchange:  exchangeName,
-		Symbol:    exchangeTicker.Symbol,
-		Timestamp: time.Now(),
-		Price:     exchangeTicker.LastPrice.InexactFloat64(),
-		Bid:       exchangeTicker.BidPrice.InexactFloat64(),
-		Ask:       exchangeTicker.AskPrice.InexactFloat64(),
-		Volume24h: exchangeTicker.VolumeBase.InexactFloat64(),
-		Change24h: exchangeTicker.Change24hPct.InexactFloat64(),
-		High24h:   exchangeTicker.High24h.InexactFloat64(),
-		Low24h:    exchangeTicker.Low24h.InexactFloat64(),
-		// FundingRate and OpenInterest would need additional API calls for futures
-		FundingRate:  0,
-		OpenInterest: 0,
+		Exchange:           exchangeName,
+		Symbol:             exchangeTicker.Symbol,
+		MarketType:         "spot", // Default, would need to be determined from exchange
+		Timestamp:          time.Now(),
+		LastPrice:          exchangeTicker.LastPrice.InexactFloat64(),
+		OpenPrice:          exchangeTicker.LastPrice.InexactFloat64(), // Approximation
+		HighPrice:          exchangeTicker.High24h.InexactFloat64(),
+		LowPrice:           exchangeTicker.Low24h.InexactFloat64(),
+		Volume:             exchangeTicker.VolumeBase.InexactFloat64(),
+		QuoteVolume:        exchangeTicker.VolumeQuote.InexactFloat64(),
+		PriceChange:        0, // Would need calculation
+		PriceChangePercent: exchangeTicker.Change24hPct.InexactFloat64(),
+		WeightedAvgPrice:   exchangeTicker.LastPrice.InexactFloat64(), // Approximation
+		TradeCount:         0,                                         // Not available in basic ticker
+		EventTime:          time.Now(),
 	}
 
 	return ticker, nil

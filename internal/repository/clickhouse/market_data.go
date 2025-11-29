@@ -113,23 +113,103 @@ func (r *MarketDataRepository) GetLatestOHLCV(ctx context.Context, exchange, sym
 	return candles, err
 }
 
-// InsertTicker inserts a ticker
-func (r *MarketDataRepository) InsertTicker(ctx context.Context, ticker *market_data.Ticker) error {
-	query := `
-		INSERT INTO tickers (
-			exchange, symbol, timestamp, price, bid, ask,
-			volume_24h, change_24h, high_24h, low_24h,
-			funding_rate, open_interest
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-		)`
+// InsertMarkPrice inserts mark price data in batch (derivatives only)
+func (r *MarketDataRepository) InsertMarkPrice(ctx context.Context, markPrices []market_data.MarkPrice) error {
+	if len(markPrices) == 0 {
+		return nil
+	}
 
-	return r.conn.Exec(ctx, query,
-		ticker.Exchange, ticker.Symbol, ticker.Timestamp,
-		ticker.Price, ticker.Bid, ticker.Ask,
-		ticker.Volume24h, ticker.Change24h, ticker.High24h, ticker.Low24h,
-		ticker.FundingRate, ticker.OpenInterest,
-	)
+	batch, err := r.conn.PrepareBatch(ctx, `
+		INSERT INTO mark_price (
+			exchange, symbol, market_type, timestamp, mark_price, index_price,
+			estimated_settle_price, funding_rate, next_funding_time, event_time
+		)
+	`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare mark_price batch")
+	}
+
+	for _, mp := range markPrices {
+		err := batch.Append(
+			mp.Exchange, mp.Symbol, mp.MarketType, mp.Timestamp,
+			mp.MarkPrice, mp.IndexPrice, mp.EstimatedSettlePrice,
+			mp.FundingRate, mp.NextFundingTime, mp.EventTime,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to append mark_price")
+		}
+	}
+
+	return batch.Send()
+}
+
+// GetLatestMarkPrice retrieves the latest mark price for a symbol
+func (r *MarketDataRepository) GetLatestMarkPrice(ctx context.Context, exchange, symbol string) (*market_data.MarkPrice, error) {
+	var mp market_data.MarkPrice
+
+	query := `
+		SELECT exchange, symbol, market_type, timestamp, mark_price, index_price,
+		       estimated_settle_price, funding_rate, next_funding_time, event_time
+		FROM mark_price
+		WHERE exchange = $1 AND symbol = $2
+		ORDER BY timestamp DESC
+		LIMIT 1`
+
+	err := r.conn.QueryRow(ctx, query, exchange, symbol).ScanStruct(&mp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mp, nil
+}
+
+// GetMarkPriceHistory retrieves historical mark price data
+func (r *MarketDataRepository) GetMarkPriceHistory(ctx context.Context, exchange, symbol string, limit int) ([]market_data.MarkPrice, error) {
+	var markPrices []market_data.MarkPrice
+
+	query := `
+		SELECT exchange, symbol, market_type, timestamp, mark_price, index_price,
+		       estimated_settle_price, funding_rate, next_funding_time, event_time
+		FROM mark_price
+		WHERE exchange = $1 AND symbol = $2
+		ORDER BY timestamp DESC
+		LIMIT $3`
+
+	err := r.conn.Select(ctx, &markPrices, query, exchange, symbol, limit)
+	return markPrices, err
+}
+
+// InsertTicker inserts tickers in batch (24hr statistics)
+func (r *MarketDataRepository) InsertTicker(ctx context.Context, tickers []market_data.Ticker) error {
+	if len(tickers) == 0 {
+		return nil
+	}
+
+	batch, err := r.conn.PrepareBatch(ctx, `
+		INSERT INTO tickers (
+			exchange, symbol, market_type, timestamp, last_price, open_price,
+			high_price, low_price, volume, quote_volume, price_change,
+			price_change_percent, weighted_avg_price, trade_count, event_time
+		)
+	`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare tickers batch")
+	}
+
+	for _, ticker := range tickers {
+		err := batch.Append(
+			ticker.Exchange, ticker.Symbol, ticker.MarketType, ticker.Timestamp,
+			ticker.LastPrice, ticker.OpenPrice, ticker.HighPrice, ticker.LowPrice,
+			ticker.Volume, ticker.QuoteVolume, ticker.PriceChange,
+			ticker.PriceChangePercent, ticker.WeightedAvgPrice, ticker.TradeCount,
+			ticker.EventTime,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to append ticker")
+		}
+	}
+
+	return batch.Send()
 }
 
 // GetLatestTicker retrieves the latest ticker for a symbol
@@ -150,19 +230,34 @@ func (r *MarketDataRepository) GetLatestTicker(ctx context.Context, exchange, sy
 	return &ticker, nil
 }
 
-// InsertOrderBook inserts an order book snapshot
-func (r *MarketDataRepository) InsertOrderBook(ctx context.Context, snapshot *market_data.OrderBookSnapshot) error {
-	query := `
-		INSERT INTO orderbook_snapshots (
-			exchange, symbol, timestamp, bids, asks, bid_depth, ask_depth
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7
-		)`
+// InsertOrderBook inserts order book snapshots in batch
+func (r *MarketDataRepository) InsertOrderBook(ctx context.Context, snapshots []market_data.OrderBookSnapshot) error {
+	if len(snapshots) == 0 {
+		return nil
+	}
 
-	return r.conn.Exec(ctx, query,
-		snapshot.Exchange, snapshot.Symbol, snapshot.Timestamp,
-		snapshot.Bids, snapshot.Asks, snapshot.BidDepth, snapshot.AskDepth,
-	)
+	batch, err := r.conn.PrepareBatch(ctx, `
+		INSERT INTO orderbook_snapshots (
+			exchange, symbol, market_type, timestamp, bids, asks,
+			bid_depth, ask_depth, event_time
+		)
+	`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare orderbook batch")
+	}
+
+	for _, snapshot := range snapshots {
+		err := batch.Append(
+			snapshot.Exchange, snapshot.Symbol, snapshot.MarketType, snapshot.Timestamp,
+			snapshot.Bids, snapshot.Asks, snapshot.BidDepth, snapshot.AskDepth,
+			snapshot.EventTime,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to append orderbook")
+		}
+	}
+
+	return batch.Send()
 }
 
 // GetLatestOrderBook retrieves the latest order book snapshot
@@ -183,30 +278,79 @@ func (r *MarketDataRepository) GetLatestOrderBook(ctx context.Context, exchange,
 	return &snapshot, nil
 }
 
-// InsertTrades inserts trades in batch
+// InsertTrades inserts aggregated trades in batch
 func (r *MarketDataRepository) InsertTrades(ctx context.Context, trades []market_data.Trade) error {
 	if len(trades) == 0 {
 		return nil
 	}
 
 	batch, err := r.conn.PrepareBatch(ctx, `
-		INSERT INTO trades (exchange, symbol, timestamp, trade_id, price, quantity, side, is_buyer)
+		INSERT INTO trades (
+			exchange, symbol, market_type, timestamp, trade_id, agg_trade_id,
+			price, quantity, first_trade_id, last_trade_id, is_buyer_maker, event_time
+		)
 	`)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to prepare trades batch")
 	}
 
 	for _, trade := range trades {
 		err := batch.Append(
-			trade.Exchange, trade.Symbol, trade.Timestamp, trade.TradeID,
-			trade.Price, trade.Quantity, trade.Side, trade.IsBuyer,
+			trade.Exchange, trade.Symbol, trade.MarketType, trade.Timestamp,
+			trade.TradeID, trade.AggTradeID, trade.Price, trade.Quantity,
+			trade.FirstTradeID, trade.LastTradeID, trade.IsBuyerMaker, trade.EventTime,
 		)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to append trade")
 		}
 	}
 
 	return batch.Send()
+}
+
+// InsertLiquidations inserts liquidations in batch (derivatives only)
+func (r *MarketDataRepository) InsertLiquidations(ctx context.Context, liquidations []market_data.Liquidation) error {
+	if len(liquidations) == 0 {
+		return nil
+	}
+
+	batch, err := r.conn.PrepareBatch(ctx, `
+		INSERT INTO liquidations (
+			exchange, symbol, market_type, timestamp, side, order_type,
+			price, quantity, value, event_time
+		)
+	`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare liquidations batch")
+	}
+
+	for _, liq := range liquidations {
+		err := batch.Append(
+			liq.Exchange, liq.Symbol, liq.MarketType, liq.Timestamp,
+			liq.Side, liq.OrderType, liq.Price, liq.Quantity, liq.Value, liq.EventTime,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to append liquidation")
+		}
+	}
+
+	return batch.Send()
+}
+
+// GetRecentLiquidations retrieves recent liquidations
+func (r *MarketDataRepository) GetRecentLiquidations(ctx context.Context, exchange, symbol string, limit int) ([]market_data.Liquidation, error) {
+	var liquidations []market_data.Liquidation
+
+	query := `
+		SELECT exchange, symbol, market_type, timestamp, side, order_type,
+		       price, quantity, value, event_time
+		FROM liquidations
+		WHERE exchange = $1 AND symbol = $2
+		ORDER BY timestamp DESC
+		LIMIT $3`
+
+	err := r.conn.Select(ctx, &liquidations, query, exchange, symbol, limit)
+	return liquidations, err
 }
 
 // GetRecentTrades retrieves recent trades
