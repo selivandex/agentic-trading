@@ -31,8 +31,9 @@ func (r *MarketDataRepository) InsertOHLCV(ctx context.Context, candles []market
 
 	batch, err := r.conn.PrepareBatch(ctx, `
 		INSERT INTO ohlcv (
-			exchange, symbol, timeframe, open_time,
-			open, high, low, close, volume, quote_volume, trades
+			exchange, symbol, timeframe, market_type, open_time, close_time,
+			open, high, low, close, volume, quote_volume, trades,
+			taker_buy_base_volume, taker_buy_quote_volume
 		)
 	`)
 	if err != nil {
@@ -41,9 +42,11 @@ func (r *MarketDataRepository) InsertOHLCV(ctx context.Context, candles []market
 
 	for _, candle := range candles {
 		err := batch.Append(
-			candle.Exchange, candle.Symbol, candle.Timeframe, candle.OpenTime,
+			candle.Exchange, candle.Symbol, candle.Timeframe, candle.MarketType,
+			candle.OpenTime, candle.CloseTime,
 			candle.Open, candle.High, candle.Low, candle.Close,
 			candle.Volume, candle.QuoteVolume, candle.Trades,
+			candle.TakerBuyBaseVolume, candle.TakerBuyQuoteVolume,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to append candle")
@@ -58,7 +61,9 @@ func (r *MarketDataRepository) GetOHLCV(ctx context.Context, query market_data.O
 	var candles []market_data.OHLCV
 
 	sql := `
-		SELECT exchange, symbol, timeframe, open_time, open, high, low, close, volume, quote_volume, trades
+		SELECT exchange, symbol, timeframe, market_type, open_time, close_time,
+		       open, high, low, close, volume, quote_volume, trades,
+		       taker_buy_base_volume, taker_buy_quote_volume
 		FROM ohlcv
 		WHERE symbol = $1 AND timeframe = $2`
 
@@ -95,7 +100,9 @@ func (r *MarketDataRepository) GetLatestOHLCV(ctx context.Context, exchange, sym
 	var candles []market_data.OHLCV
 
 	sql := `
-		SELECT exchange, symbol, timeframe, open_time, open, high, low, close, volume, quote_volume, trades
+		SELECT exchange, symbol, timeframe, market_type, open_time, close_time,
+		       open, high, low, close, volume, quote_volume, trades,
+		       taker_buy_base_volume, taker_buy_quote_volume
 		FROM ohlcv
 		WHERE exchange = $1 AND symbol = $2 AND timeframe = $3
 		ORDER BY open_time DESC

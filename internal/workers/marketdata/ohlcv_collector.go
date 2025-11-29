@@ -154,17 +154,25 @@ func (oc *OHLCVCollector) collectOHLCVFromExchange(
 	}
 
 	// Convert exchange OHLCV to domain OHLCV
+	exchangeName := exchange.Name()
 	candles := make([]market_data.OHLCV, 0, len(exchangeCandles))
 	for _, ec := range exchangeCandles {
 		candle := market_data.OHLCV{
-			Symbol:    symbol,
-			Timeframe: timeframe,
-			OpenTime:  ec.OpenTime,
-			Open:      ec.Open.InexactFloat64(),
-			High:      ec.High.InexactFloat64(),
-			Low:       ec.Low.InexactFloat64(),
-			Close:     ec.Close.InexactFloat64(),
-			Volume:    ec.Volume.InexactFloat64(),
+			Exchange:              exchangeName,
+			Symbol:                symbol,
+			Timeframe:             timeframe,
+			MarketType:            "spot", // TODO: detect market type from exchange
+			OpenTime:              ec.OpenTime,
+			CloseTime:             ec.CloseTime,
+			Open:                  ec.Open.InexactFloat64(),
+			High:                  ec.High.InexactFloat64(),
+			Low:                   ec.Low.InexactFloat64(),
+			Close:                 ec.Close.InexactFloat64(),
+			Volume:                ec.Volume.InexactFloat64(),
+			QuoteVolume:           ec.QuoteVolume.InexactFloat64(),
+			Trades:                ec.Trades,
+			TakerBuyBaseVolume:    ec.TakerBuyBaseVolume.InexactFloat64(),
+			TakerBuyQuoteVolume:   ec.TakerBuyQuoteVolume.InexactFloat64(),
 		}
 		candles = append(candles, candle)
 	}

@@ -6,14 +6,19 @@ CREATE TABLE
     exchange LowCardinality (String),
     symbol LowCardinality (String),
     timeframe LowCardinality (String),
+    market_type LowCardinality (String) DEFAULT 'spot',
     open_time DateTime,
+    close_time DateTime,
     open Float64,
     high Float64,
     low Float64,
     close Float64,
     volume Float64,
     quote_volume Float64,
-    trades UInt64
+    trades UInt64,
+    taker_buy_base_volume Float64,
+    taker_buy_quote_volume Float64,
+    collected_at DateTime DEFAULT now ()
   ) ENGINE = ReplacingMergeTree ()
 PARTITION BY
   toYYYYMM (open_time)

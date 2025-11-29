@@ -4,17 +4,21 @@ import "time"
 
 // OHLCV represents candlestick data
 type OHLCV struct {
-	Exchange    string    `ch:"exchange"`
-	Symbol      string    `ch:"symbol"`
-	Timeframe   string    `ch:"timeframe"` // 1m, 5m, 15m, 1h, 4h, 1d
-	OpenTime    time.Time `ch:"open_time"`
-	Open        float64   `ch:"open"`
-	High        float64   `ch:"high"`
-	Low         float64   `ch:"low"`
-	Close       float64   `ch:"close"`
-	Volume      float64   `ch:"volume"`
-	QuoteVolume float64   `ch:"quote_volume"`
-	Trades      int64     `ch:"trades"`
+	Exchange            string    `ch:"exchange"`
+	Symbol              string    `ch:"symbol"`
+	Timeframe           string    `ch:"timeframe"`   // 1m, 5m, 15m, 1h, 4h, 1d
+	MarketType          string    `ch:"market_type"` // spot, linear_perp, inverse_perp
+	OpenTime            time.Time `ch:"open_time"`
+	CloseTime           time.Time `ch:"close_time"`
+	Open                float64   `ch:"open"`
+	High                float64   `ch:"high"`
+	Low                 float64   `ch:"low"`
+	Close               float64   `ch:"close"`
+	Volume              float64   `ch:"volume"`
+	QuoteVolume         float64   `ch:"quote_volume"`
+	Trades              int64     `ch:"trades"`
+	TakerBuyBaseVolume  float64   `ch:"taker_buy_base_volume"`  // Buying pressure indicator
+	TakerBuyQuoteVolume float64   `ch:"taker_buy_quote_volume"` // Quote volume from buy orders
 }
 
 // Ticker represents real-time ticker data

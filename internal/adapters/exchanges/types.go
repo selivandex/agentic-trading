@@ -129,15 +129,19 @@ type OrderBook struct {
 
 // OHLCV candle.
 type OHLCV struct {
-	Symbol    string
-	Timeframe string
-	OpenTime  time.Time
-	CloseTime time.Time
-	Open      decimal.Decimal
-	High      decimal.Decimal
-	Low       decimal.Decimal
-	Close     decimal.Decimal
-	Volume    decimal.Decimal
+	Symbol              string
+	Timeframe           string
+	OpenTime            time.Time
+	CloseTime           time.Time
+	Open                decimal.Decimal
+	High                decimal.Decimal
+	Low                 decimal.Decimal
+	Close               decimal.Decimal
+	Volume              decimal.Decimal
+	QuoteVolume         decimal.Decimal // Quote asset volume (e.g., USDT volume)
+	Trades              int64           // Number of trades during the period
+	TakerBuyBaseVolume  decimal.Decimal // Taker buy base asset volume (buying pressure)
+	TakerBuyQuoteVolume decimal.Decimal // Taker buy quote asset volume
 }
 
 // Trade describes a recent trade print.

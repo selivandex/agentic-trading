@@ -179,18 +179,26 @@ func (c *client) GetOHLCV(ctx context.Context, symbol string, timeframe string, 
 
 	candles := make([]exchanges.OHLCV, 0, len(raw))
 	for _, row := range raw {
+		// Binance klines format:
+		// [0] Open time, [1] Open, [2] High, [3] Low, [4] Close, [5] Volume,
+		// [6] Close time, [7] Quote volume, [8] Number of trades,
+		// [9] Taker buy base volume, [10] Taker buy quote volume, [11] Unused
 		openTime := toInt64(row[0])
 		closeTime := toInt64(row[6])
 		candles = append(candles, exchanges.OHLCV{
-			Symbol:    normalizeSymbol(symbol),
-			Timeframe: timeframe,
-			OpenTime:  time.UnixMilli(openTime),
-			CloseTime: time.UnixMilli(closeTime),
-			Open:      parseDecimal(fmt.Sprint(row[1])),
-			High:      parseDecimal(fmt.Sprint(row[2])),
-			Low:       parseDecimal(fmt.Sprint(row[3])),
-			Close:     parseDecimal(fmt.Sprint(row[4])),
-			Volume:    parseDecimal(fmt.Sprint(row[5])),
+			Symbol:              normalizeSymbol(symbol),
+			Timeframe:           timeframe,
+			OpenTime:            time.UnixMilli(openTime),
+			CloseTime:           time.UnixMilli(closeTime),
+			Open:                parseDecimal(fmt.Sprint(row[1])),
+			High:                parseDecimal(fmt.Sprint(row[2])),
+			Low:                 parseDecimal(fmt.Sprint(row[3])),
+			Close:               parseDecimal(fmt.Sprint(row[4])),
+			Volume:              parseDecimal(fmt.Sprint(row[5])),
+			QuoteVolume:         parseDecimal(fmt.Sprint(row[7])),
+			Trades:              toInt64(row[8]),
+			TakerBuyBaseVolume:  parseDecimal(fmt.Sprint(row[9])),
+			TakerBuyQuoteVolume: parseDecimal(fmt.Sprint(row[10])),
 		})
 	}
 
