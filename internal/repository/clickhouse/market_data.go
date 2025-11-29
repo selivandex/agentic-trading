@@ -33,7 +33,7 @@ func (r *MarketDataRepository) InsertOHLCV(ctx context.Context, candles []market
 		INSERT INTO ohlcv (
 			exchange, symbol, timeframe, market_type, open_time, close_time,
 			open, high, low, close, volume, quote_volume, trades,
-			taker_buy_base_volume, taker_buy_quote_volume
+			taker_buy_base_volume, taker_buy_quote_volume, is_closed, event_time
 		)
 	`)
 	if err != nil {
@@ -47,6 +47,7 @@ func (r *MarketDataRepository) InsertOHLCV(ctx context.Context, candles []market
 			candle.Open, candle.High, candle.Low, candle.Close,
 			candle.Volume, candle.QuoteVolume, candle.Trades,
 			candle.TakerBuyBaseVolume, candle.TakerBuyQuoteVolume,
+			candle.IsClosed, candle.EventTime,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to append candle")
@@ -63,7 +64,7 @@ func (r *MarketDataRepository) GetOHLCV(ctx context.Context, query market_data.O
 	sql := `
 		SELECT exchange, symbol, timeframe, market_type, open_time, close_time,
 		       open, high, low, close, volume, quote_volume, trades,
-		       taker_buy_base_volume, taker_buy_quote_volume
+		       taker_buy_base_volume, taker_buy_quote_volume, is_closed, event_time
 		FROM ohlcv
 		WHERE symbol = $1 AND timeframe = $2`
 
@@ -102,7 +103,7 @@ func (r *MarketDataRepository) GetLatestOHLCV(ctx context.Context, exchange, sym
 	sql := `
 		SELECT exchange, symbol, timeframe, market_type, open_time, close_time,
 		       open, high, low, close, volume, quote_volume, trades,
-		       taker_buy_base_volume, taker_buy_quote_volume
+		       taker_buy_base_volume, taker_buy_quote_volume, is_closed, event_time
 		FROM ohlcv
 		WHERE exchange = $1 AND symbol = $2 AND timeframe = $3
 		ORDER BY open_time DESC

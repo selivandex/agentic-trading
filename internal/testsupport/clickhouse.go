@@ -97,7 +97,7 @@ func CreateBatch[T any](t *testing.T, helper *ClickHouseTestHelper, insertQuery 
 	}
 
 	for _, item := range items {
-		if err := batch.AppendStruct(item); err != nil {
+		if err := batch.AppendStruct(&item); err != nil {
 			t.Fatalf("failed to append item to batch: %v", err)
 		}
 	}
@@ -173,6 +173,8 @@ func NewOHLCVFixture() *OHLCVFixture {
 			Trades:              1000,
 			TakerBuyBaseVolume:  55.0, // 55% buy pressure
 			TakerBuyQuoteVolume: 2750000.0,
+			IsClosed:            true,
+			EventTime:           now,
 		},
 	}
 }
@@ -232,7 +234,7 @@ func (f *OHLCVFixture) WithVolume(baseVolume, quoteVolume float64) *OHLCVFixture
 }
 
 // WithTrades sets the number of trades
-func (f *OHLCVFixture) WithTrades(trades int64) *OHLCVFixture {
+func (f *OHLCVFixture) WithTrades(trades uint64) *OHLCVFixture {
 	f.candle.Trades = trades
 	return f
 }
@@ -249,6 +251,18 @@ func (f *OHLCVFixture) WithBuyPressure(buyPressurePct float64) *OHLCVFixture {
 func (f *OHLCVFixture) WithTakerBuyVolumes(baseVolume, quoteVolume float64) *OHLCVFixture {
 	f.candle.TakerBuyBaseVolume = baseVolume
 	f.candle.TakerBuyQuoteVolume = quoteVolume
+	return f
+}
+
+// WithIsClosed sets whether the candle is closed/final
+func (f *OHLCVFixture) WithIsClosed(isClosed bool) *OHLCVFixture {
+	f.candle.IsClosed = isClosed
+	return f
+}
+
+// WithEventTime sets the exchange event timestamp
+func (f *OHLCVFixture) WithEventTime(t time.Time) *OHLCVFixture {
+	f.candle.EventTime = t
 	return f
 }
 
@@ -284,6 +298,7 @@ func (f *OHLCVFixture) BuildMany(count int) []market_data.OHLCV {
 		candle := f.candle
 		candle.OpenTime = f.candle.OpenTime.Add(time.Duration(i) * duration)
 		candle.CloseTime = candle.OpenTime.Add(duration)
+		candle.EventTime = f.candle.EventTime.Add(time.Duration(i) * duration)
 		candles[i] = candle
 	}
 

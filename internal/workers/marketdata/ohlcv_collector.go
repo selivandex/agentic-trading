@@ -173,6 +173,8 @@ func (oc *OHLCVCollector) collectOHLCVFromExchange(
 			Trades:                ec.Trades,
 			TakerBuyBaseVolume:    ec.TakerBuyBaseVolume.InexactFloat64(),
 			TakerBuyQuoteVolume:   ec.TakerBuyQuoteVolume.InexactFloat64(),
+			IsClosed:              true,      // Historical candles from REST API are always closed
+			EventTime:             time.Now(), // Use current time as event_time for historical data
 		}
 		candles = append(candles, candle)
 	}

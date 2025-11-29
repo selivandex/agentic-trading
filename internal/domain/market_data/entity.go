@@ -16,9 +16,11 @@ type OHLCV struct {
 	Close               float64   `ch:"close"`
 	Volume              float64   `ch:"volume"`
 	QuoteVolume         float64   `ch:"quote_volume"`
-	Trades              int64     `ch:"trades"`
+	Trades              uint64    `ch:"trades"`
 	TakerBuyBaseVolume  float64   `ch:"taker_buy_base_volume"`  // Buying pressure indicator
 	TakerBuyQuoteVolume float64   `ch:"taker_buy_quote_volume"` // Quote volume from buy orders
+	IsClosed            bool      `ch:"is_closed"`              // Whether kline is closed (final)
+	EventTime           time.Time `ch:"event_time"`             // Exchange event timestamp (used for versioning)
 }
 
 // Ticker represents real-time ticker data

@@ -52,10 +52,13 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify data was inserted
-		var count uint64
-		err = helper.Client().Query(ctx, &count, "SELECT count() FROM ohlcv WHERE exchange = 'binance' AND symbol IN ('BTC/USDT', 'ETH/USDT')")
+		var result []struct {
+			Count uint64 `ch:"count()"`
+		}
+		err = helper.Client().Query(ctx, &result, "SELECT count() FROM ohlcv WHERE exchange = 'binance' AND symbol IN ('BTC/USDT', 'ETH/USDT')")
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, count, uint64(2))
+		require.Len(t, result, 1)
+		assert.GreaterOrEqual(t, result[0].Count, uint64(2))
 	})
 
 	t.Run("InsertOHLCV_EmptySlice", func(t *testing.T) {
@@ -90,7 +93,7 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 		assert.Equal(t, "bybit", result[0].Exchange)
 		assert.Equal(t, "SOL/USDT", result[0].Symbol)
 		assert.Equal(t, "5m", result[0].Timeframe)
-		assert.Equal(t, int64(250), result[0].Trades)
+		assert.Equal(t, uint64(250), result[0].Trades)
 
 		// Test: Get latest 2 candles
 		result, err = repo.GetLatestOHLCV(ctx, "bybit", "SOL/USDT", "5m", 2)
@@ -115,6 +118,8 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 				Low:        295.0,
 				Close:      305.0,
 				Volume:     500.0,
+				IsClosed:   true,
+				EventTime:  baseTime.Add(-3 * time.Hour),
 			},
 			{
 				Exchange:   "okx",
@@ -128,6 +133,8 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 				Low:        302.0,
 				Close:      310.0,
 				Volume:     600.0,
+				IsClosed:   true,
+				EventTime:  baseTime.Add(-2 * time.Hour),
 			},
 			{
 				Exchange:   "okx",
@@ -141,6 +148,8 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 				Low:        308.0,
 				Close:      315.0,
 				Volume:     700.0,
+				IsClosed:   true,
+				EventTime:  baseTime.Add(-1 * time.Hour),
 			},
 		}
 
@@ -152,8 +161,8 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 			Exchange:  "okx",
 			Symbol:    "BNB/USDT",
 			Timeframe: "1h",
-			StartTime: baseTime.Add(-2*time.Hour - 1*time.Minute), // Include second candle
-			EndTime:   baseTime.Add(-30 * time.Minute),            // Exclude last candle
+			StartTime: baseTime.Add(-2*time.Hour - 1*time.Minute), // Include second candle (01:00)
+			EndTime:   baseTime.Add(-90 * time.Minute),            // Exclude last candle (01:30 < 02:00)
 			Limit:     10,
 		}
 
@@ -182,6 +191,8 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 			Trades:              5000,
 			TakerBuyBaseVolume:  650000.0, // 65% buying pressure
 			TakerBuyQuoteVolume: 325000.0,
+			IsClosed:            true,
+			EventTime:           baseTime,
 		}
 
 		err := repo.InsertOHLCV(ctx, []market_data.OHLCV{candle})
