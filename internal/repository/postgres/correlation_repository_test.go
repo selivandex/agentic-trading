@@ -34,21 +34,21 @@ func (m *MockMacroDataReader) GetAllCorrelations(ctx context.Context, cryptoSymb
 
 func TestCorrelationRepository_GetCorrelations(t *testing.T) {
 	log := logger.Get()
-	
+
 	// Setup mock data
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"BTC/USDT": {
-				"SP500":      0.65,
-				"GOLD":       0.45,
-				"DXY":        -0.35,
-				"ETH/USDT":   0.85,
-				"NASDAQ":     0.72,
+				"SP500":    0.65,
+				"GOLD":     0.45,
+				"DXY":      -0.35,
+				"ETH/USDT": 0.85,
+				"NASDAQ":   0.72,
 			},
 			"ETH/USDT": {
-				"SP500":      0.60,
-				"BTC/USDT":   0.85,
-				"NASDAQ":     0.68,
+				"SP500":    0.60,
+				"BTC/USDT": 0.85,
+				"NASDAQ":   0.68,
 			},
 		},
 	}
@@ -59,7 +59,7 @@ func TestCorrelationRepository_GetCorrelations(t *testing.T) {
 	// Test GetCorrelations for BTC
 	correlations, err := repo.GetCorrelations(ctx, "BTC/USDT")
 	require.NoError(t, err)
-	
+
 	// Verify correlations
 	assert.True(t, correlations["SP500"].Equal(decimal.NewFromFloat(0.65)))
 	assert.True(t, correlations["GOLD"].Equal(decimal.NewFromFloat(0.45)))
@@ -74,7 +74,7 @@ func TestCorrelationRepository_GetCorrelations(t *testing.T) {
 
 func TestCorrelationRepository_GetBTCCorrelation(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"ETH/USDT": {
@@ -111,7 +111,7 @@ func TestCorrelationRepository_GetBTCCorrelation(t *testing.T) {
 
 func TestCorrelationRepository_DefaultCorrelations(t *testing.T) {
 	log := logger.Get()
-	
+
 	// Mock with no data
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{},
@@ -123,18 +123,18 @@ func TestCorrelationRepository_DefaultCorrelations(t *testing.T) {
 	// Test GetCorrelations for unknown symbol (should return defaults)
 	correlations, err := repo.GetCorrelations(ctx, "UNKNOWN/USDT")
 	require.NoError(t, err)
-	
+
 	// Should have some default correlations
 	assert.NotEmpty(t, correlations, "Should return default correlations for unknown symbol")
 }
 
 func TestCorrelationRepository_HighCorrelation(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"ETH/USDT": {
-				"BTC/USDT": 0.95, // Very high correlation
+				"BTC/USDT":  0.95, // Very high correlation
 				"LINK/USDT": 0.88,
 			},
 		},
@@ -145,21 +145,21 @@ func TestCorrelationRepository_HighCorrelation(t *testing.T) {
 
 	correlations, err := repo.GetCorrelations(ctx, "ETH/USDT")
 	require.NoError(t, err)
-	
+
 	// Verify high correlations
 	btcCorr := correlations["BTC/USDT"]
-	assert.True(t, btcCorr.GreaterThan(decimal.NewFromFloat(0.9)), 
+	assert.True(t, btcCorr.GreaterThan(decimal.NewFromFloat(0.9)),
 		"ETH should have high correlation with BTC")
 }
 
 func TestCorrelationRepository_NegativeCorrelation(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"BTC/USDT": {
-				"DXY":  -0.45, // Negative correlation with dollar index
-				"VIX":  -0.35, // Negative correlation with volatility
+				"DXY": -0.45, // Negative correlation with dollar index
+				"VIX": -0.35, // Negative correlation with volatility
 			},
 		},
 	}
@@ -169,20 +169,20 @@ func TestCorrelationRepository_NegativeCorrelation(t *testing.T) {
 
 	correlations, err := repo.GetCorrelations(ctx, "BTC/USDT")
 	require.NoError(t, err)
-	
+
 	// Verify negative correlations
 	dxyCorr := correlations["DXY"]
-	assert.True(t, dxyCorr.LessThan(decimal.Zero), 
+	assert.True(t, dxyCorr.LessThan(decimal.Zero),
 		"BTC should have negative correlation with DXY")
-	
+
 	vixCorr := correlations["VIX"]
-	assert.True(t, vixCorr.LessThan(decimal.Zero), 
+	assert.True(t, vixCorr.LessThan(decimal.Zero),
 		"BTC should have negative correlation with VIX")
 }
 
 func TestCorrelationRepository_CacheExpiration(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"BTC/USDT": {
@@ -209,7 +209,7 @@ func TestCorrelationRepository_CacheExpiration(t *testing.T) {
 
 func TestCorrelationRepository_MultipleSymbols(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"BTC/USDT": {
@@ -232,7 +232,7 @@ func TestCorrelationRepository_MultipleSymbols(t *testing.T) {
 
 	// Test multiple symbols
 	symbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT"}
-	
+
 	for _, symbol := range symbols {
 		correlations, err := repo.GetCorrelations(ctx, symbol)
 		require.NoError(t, err, "Should get correlations for "+symbol)
@@ -242,7 +242,7 @@ func TestCorrelationRepository_MultipleSymbols(t *testing.T) {
 
 func TestCorrelationRepository_ZeroCorrelation(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"STABLE/USDT": {
@@ -257,24 +257,24 @@ func TestCorrelationRepository_ZeroCorrelation(t *testing.T) {
 
 	correlations, err := repo.GetCorrelations(ctx, "STABLE/USDT")
 	require.NoError(t, err)
-	
+
 	// Verify near-zero correlations
 	btcCorr := correlations["BTC/USDT"]
-	assert.True(t, btcCorr.Abs().LessThan(decimal.NewFromFloat(0.1)), 
+	assert.True(t, btcCorr.Abs().LessThan(decimal.NewFromFloat(0.1)),
 		"Stablecoin should have near-zero correlation with BTC")
 }
 
 func TestCorrelationRepository_TradFiCorrelations(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"BTC/USDT": {
-				"SP500":   0.65,
-				"NASDAQ":  0.72,
-				"GOLD":    0.45,
-				"BONDS":   -0.25,
-				"DXY":     -0.35,
+				"SP500":  0.65,
+				"NASDAQ": 0.72,
+				"GOLD":   0.45,
+				"BONDS":  -0.25,
+				"DXY":    -0.35,
 			},
 		},
 	}
@@ -284,7 +284,7 @@ func TestCorrelationRepository_TradFiCorrelations(t *testing.T) {
 
 	correlations, err := repo.GetCorrelations(ctx, "BTC/USDT")
 	require.NoError(t, err)
-	
+
 	// Verify TradFi correlations
 	assert.True(t, correlations["SP500"].GreaterThan(decimal.Zero))
 	assert.True(t, correlations["NASDAQ"].GreaterThan(decimal.Zero))
@@ -295,7 +295,7 @@ func TestCorrelationRepository_TradFiCorrelations(t *testing.T) {
 
 func TestCorrelationRepository_AltcoinBTCCorrelation(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"ETH/USDT": {
@@ -315,18 +315,18 @@ func TestCorrelationRepository_AltcoinBTCCorrelation(t *testing.T) {
 
 	// Test BTC correlation for different altcoins
 	altcoins := []string{"ETH/USDT", "ADA/USDT", "DOT/USDT"}
-	
+
 	for _, symbol := range altcoins {
 		btcCorr, err := repo.GetBTCCorrelation(ctx, symbol)
 		require.NoError(t, err)
-		assert.True(t, btcCorr.GreaterThan(decimal.NewFromFloat(0.7)), 
+		assert.True(t, btcCorr.GreaterThan(decimal.NewFromFloat(0.7)),
 			symbol+" should have strong positive correlation with BTC")
 	}
 }
 
 func TestCorrelationRepository_CacheClearing(t *testing.T) {
 	log := logger.Get()
-	
+
 	mockRepo := &MockMacroDataReader{
 		correlations: map[string]map[string]float64{
 			"BTC/USDT": {
@@ -347,9 +347,8 @@ func TestCorrelationRepository_CacheClearing(t *testing.T) {
 
 	// Test ClearCache
 	repo.ClearCache()
-	
+
 	// Verify cache is cleared
 	assert.Empty(t, repo.cache)
 	assert.Equal(t, int64(0), repo.cacheTTL)
 }
-

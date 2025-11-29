@@ -42,15 +42,15 @@ func DefaultCacheConfig() CacheConfig {
 
 // CachedAnalysis represents a cached analysis result
 type CachedAnalysis struct {
-	Tool       string                 `json:"tool"`
-	Symbol     string                 `json:"symbol"`
-	Exchange   string                 `json:"exchange"`
-	Timeframe  string                 `json:"timeframe"`
-	Result     string                 `json:"result"`
-	Price      float64                `json:"price"`
-	Volume     float64                `json:"volume"`
-	Timestamp  time.Time              `json:"timestamp"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+	Tool      string                 `json:"tool"`
+	Symbol    string                 `json:"symbol"`
+	Exchange  string                 `json:"exchange"`
+	Timeframe string                 `json:"timeframe"`
+	Result    string                 `json:"result"`
+	Price     float64                `json:"price"`
+	Volume    float64                `json:"volume"`
+	Timestamp time.Time              `json:"timestamp"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // AnalysisCache provides caching for analysis tool results
@@ -58,7 +58,7 @@ type AnalysisCache struct {
 	config      CacheConfig
 	redisClient *redis.Client
 	log         *logger.Logger
-	
+
 	// Metrics
 	hits      int64
 	misses    int64
@@ -86,7 +86,7 @@ func (ac *AnalysisCache) Get(
 	}
 
 	key := ac.buildCacheKey(tool, exchange, symbol, timeframe, currentPrice)
-	
+
 	var cached CachedAnalysis
 	err := ac.redisClient.Get(ctx, key, &cached)
 	if err != nil {
@@ -141,7 +141,7 @@ func (ac *AnalysisCache) Set(
 	}
 
 	key := ac.buildCacheKey(tool, exchange, symbol, timeframe, price)
-	
+
 	// Determine TTL based on volatility (if provided in metadata)
 	ttl := ac.config.TTL
 	if metadata != nil {
@@ -195,7 +195,7 @@ func (ac *AnalysisCache) InvalidateSymbol(ctx context.Context, exchange, symbol 
 
 	// Pattern: analysis:{exchange}:{symbol}:*
 	pattern := fmt.Sprintf("analysis:%s:%s:*", exchange, symbol)
-	
+
 	// Note: This requires SCAN command which is safe for production
 	// Implementation would use redis SCAN to avoid blocking
 	// For now, we'll log and let entries expire naturally
@@ -215,14 +215,14 @@ func (ac *AnalysisCache) buildCacheKey(
 ) string {
 	// Round price to bucket
 	priceBucket := ac.roundToBucket(price)
-	
+
 	// Create deterministic key
 	keyData := fmt.Sprintf("%s:%s:%s:%s:%.8f", tool, exchange, symbol, timeframe, priceBucket)
-	
+
 	// Hash for consistent key length
 	hash := sha256.Sum256([]byte(keyData))
 	hashStr := fmt.Sprintf("%x", hash[:8]) // Use first 8 bytes
-	
+
 	return fmt.Sprintf("analysis:%s:%s:%s:%s", exchange, symbol, tool, hashStr)
 }
 
@@ -231,7 +231,7 @@ func (ac *AnalysisCache) roundToBucket(price float64) float64 {
 	if price == 0 {
 		return 0
 	}
-	
+
 	bucketSize := price * ac.config.PriceBucketPct
 	return math.Round(price/bucketSize) * bucketSize
 }
@@ -298,14 +298,14 @@ func (ac *AnalysisCache) GetMetrics() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"enabled":    ac.config.Enabled,
-		"hits":       ac.hits,
-		"misses":     ac.misses,
-		"sets":       ac.sets,
-		"evictions":  ac.evictions,
-		"hit_rate":   hitRate,
-		"total":      total,
-		"ttl":        ac.config.TTL.String(),
+		"enabled":   ac.config.Enabled,
+		"hits":      ac.hits,
+		"misses":    ac.misses,
+		"sets":      ac.sets,
+		"evictions": ac.evictions,
+		"hit_rate":  hitRate,
+		"total":     total,
+		"ttl":       ac.config.TTL.String(),
 		"ttl_config": map[string]string{
 			"volatile": ac.config.TTLVolatile.String(),
 			"normal":   ac.config.TTLNormal.String(),
@@ -321,4 +321,3 @@ func (ac *AnalysisCache) ResetMetrics() {
 	ac.sets = 0
 	ac.evictions = 0
 }
-

@@ -39,26 +39,26 @@ type PreScreenConfig struct {
 	CooldownDuration  time.Duration // Min time between analyses (default: 2h)
 
 	// Feature flags
-	CheckPriceMovement   bool
-	CheckVolume          bool
-	CheckVolatility      bool
-	CheckOrderBook       bool
-	CheckCooldown        bool
+	CheckPriceMovement bool
+	CheckVolume        bool
+	CheckVolatility    bool
+	CheckOrderBook     bool
+	CheckCooldown      bool
 }
 
 // DefaultPreScreenConfig returns default configuration
 func DefaultPreScreenConfig() PreScreenConfig {
 	return PreScreenConfig{
-		Enabled:              true,
-		MinPriceChangePct:    0.002, // 0.2%
-		MinVolumePct:         0.50,  // 50%
-		MinATRPct:            0.01,  // 1%
-		CooldownDuration:     2 * time.Hour,
-		CheckPriceMovement:   true,
-		CheckVolume:          true,
-		CheckVolatility:      true,
-		CheckOrderBook:       false, // Optional, can be expensive
-		CheckCooldown:        true,
+		Enabled:            true,
+		MinPriceChangePct:  0.002, // 0.2%
+		MinVolumePct:       0.50,  // 50%
+		MinATRPct:          0.01,  // 1%
+		CooldownDuration:   2 * time.Hour,
+		CheckPriceMovement: true,
+		CheckVolume:        true,
+		CheckVolatility:    true,
+		CheckOrderBook:     false, // Optional, can be expensive
+		CheckCooldown:      true,
 	}
 }
 
@@ -277,4 +277,3 @@ func (ps *PreScreener) GetMetrics() map[string]interface{} {
 		},
 	}
 }
-

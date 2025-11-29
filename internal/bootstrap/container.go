@@ -1,0 +1,307 @@
+package bootstrap
+
+import (
+	"context"
+	"sync"
+
+	"google.golang.org/adk/session"
+
+	chclient "prometheus/internal/adapters/clickhouse"
+	"prometheus/internal/adapters/config"
+	"prometheus/internal/adapters/embeddings"
+	"prometheus/internal/adapters/exchanges"
+	"prometheus/internal/adapters/kafka"
+	pgclient "prometheus/internal/adapters/postgres"
+	redisclient "prometheus/internal/adapters/redis"
+	telegram "prometheus/internal/adapters/telegram"
+	"prometheus/internal/agents"
+	"prometheus/internal/agents/workflows"
+	"prometheus/internal/api"
+	"prometheus/internal/api/health"
+	"prometheus/internal/consumers"
+	"prometheus/internal/domain/derivatives"
+	"prometheus/internal/domain/exchange_account"
+	"prometheus/internal/domain/journal"
+	"prometheus/internal/domain/macro"
+	"prometheus/internal/domain/market_data"
+	"prometheus/internal/domain/memory"
+	"prometheus/internal/domain/onchain"
+	"prometheus/internal/domain/order"
+	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/regime"
+	domainRisk "prometheus/internal/domain/risk"
+	"prometheus/internal/domain/sentiment"
+	domainsession "prometheus/internal/domain/session"
+	"prometheus/internal/domain/trading_pair"
+	"prometheus/internal/domain/user"
+	chrepo "prometheus/internal/repository/clickhouse"
+	pgrepo "prometheus/internal/repository/postgres"
+	riskservice "prometheus/internal/services/risk"
+	"prometheus/internal/tools"
+	"prometheus/internal/workers"
+	"prometheus/pkg/crypto"
+	"prometheus/pkg/errors"
+	"prometheus/pkg/logger"
+	"prometheus/pkg/templates"
+)
+
+// Container holds all application dependencies and their lifecycle
+// Components are organized in initialization order
+type Container struct {
+	// Core configuration & logging
+	Config       *config.Config
+	Log          *logger.Logger
+	ErrorTracker errors.Tracker
+
+	// Infrastructure Layer (Data stores)
+	PG    *pgclient.Client
+	CH    *chclient.Client
+	Redis *redisclient.Client
+
+	// Domain Layer - Repositories
+	Repos *Repositories
+
+	// Domain Layer - Services
+	Services *Services
+
+	// External Adapters
+	Adapters *Adapters
+
+	// Business Logic
+	Business *Business
+
+	// Application Layer
+	Application *Application
+
+	// Background Processing
+	Background *Background
+
+	// Lifecycle management
+	Lifecycle *Lifecycle
+	WG        *sync.WaitGroup
+	Context   context.Context
+	Cancel    context.CancelFunc
+}
+
+// Repositories groups all domain repositories
+type Repositories struct {
+	User            user.Repository
+	ExchangeAccount exchange_account.Repository
+	TradingPair     trading_pair.Repository
+	Order           order.Repository
+	Position        position.Repository
+	Memory          memory.Repository
+	Journal         journal.Repository
+	Risk            domainRisk.Repository
+	Session         domainsession.Repository
+	Reasoning       *pgrepo.ReasoningRepository
+	MarketData      market_data.Repository
+	Regime          regime.Repository
+	Sentiment       sentiment.Repository
+	OnChain         onchain.Repository
+	Derivatives     derivatives.Repository
+	Macro           macro.Repository
+	AIUsage         *chrepo.AIUsageRepository
+}
+
+// Services groups all domain services
+type Services struct {
+	User            *user.Service
+	ExchangeAccount *exchange_account.Service
+	TradingPair     *trading_pair.Service
+	Order           *order.Service
+	Position        *position.Service
+	Memory          *memory.Service
+	Journal         *journal.Service
+	Session         *domainsession.Service
+	ADKSession      session.Service // ADK interface
+}
+
+// Adapters groups all external adapters
+type Adapters struct {
+	// Kafka
+	KafkaProducer                *kafka.Producer
+	NotificationConsumer         *kafka.Consumer
+	RiskConsumer                 *kafka.Consumer
+	AnalyticsConsumer            *kafka.Consumer
+	OpportunityConsumer          *kafka.Consumer
+	AIUsageConsumer              *kafka.Consumer
+	PositionGuardianConsumer     *kafka.Consumer
+	TelegramNotificationConsumer *kafka.Consumer
+
+	// Crypto & Exchanges
+	Encryptor         *crypto.Encryptor
+	ExchangeFactory   exchanges.Factory
+	MarketDataFactory exchanges.CentralFactory
+
+	// AI & Embeddings
+	EmbeddingProvider embeddings.Provider
+}
+
+// Business groups business logic components
+type Business struct {
+	RiskEngine      *riskservice.RiskEngine
+	ToolRegistry    *tools.Registry
+	AgentFactory    *agents.Factory
+	AgentRegistry   *agents.Registry
+	WorkflowFactory *workflows.Factory
+	DefaultProvider string
+	DefaultModel    string
+}
+
+// Application groups application layer components
+type Application struct {
+	HTTPServer      *api.Server
+	HealthHandler   *health.Handler
+	TelegramBot     *telegram.Bot
+	TelegramHandler *telegram.Handler
+
+	// Notification services
+	TelegramNotificationSvc *consumers.TelegramNotificationConsumer
+}
+
+// Background groups all background processing components
+type Background struct {
+	WorkerScheduler *workers.Scheduler
+
+	// Event consumers
+	NotificationSvc     *consumers.NotificationConsumer
+	RiskSvc             *consumers.RiskConsumer
+	AnalyticsSvc        *consumers.AnalyticsConsumer
+	OpportunitySvc      *consumers.OpportunityConsumer
+	AIUsageSvc          *consumers.AIUsageConsumer
+	PositionGuardianSvc *consumers.PositionGuardianConsumer
+}
+
+// NewContainer creates a new dependency container
+func NewContainer() *Container {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	return &Container{
+		Repos:       &Repositories{},
+		Services:    &Services{},
+		Adapters:    &Adapters{},
+		Business:    &Business{},
+		Application: &Application{},
+		Background:  &Background{},
+		Lifecycle:   NewLifecycle(),
+		WG:          &sync.WaitGroup{},
+		Context:     ctx,
+		Cancel:      cancel,
+	}
+}
+
+// MustInit initializes all components in the correct order
+// Panics on any initialization error (fail-fast at startup)
+func (c *Container) MustInit() {
+	c.MustInitConfig()
+	c.MustInitInfrastructure()
+	c.MustInitRepositories()
+	c.MustInitAdapters()
+	c.MustInitServices()
+	c.MustInitBusiness()
+	c.MustInitApplication()
+	c.MustInitBackground()
+}
+
+// Start starts all background components
+func (c *Container) Start() error {
+	c.Log.Info("Starting all systems...")
+
+	// Start background consumers
+	if err := c.startConsumers(); err != nil {
+		return err
+	}
+
+	// Start HTTP server
+	c.WG.Add(1)
+	go func() {
+		defer c.WG.Done()
+		if err := c.Application.HTTPServer.Start(); err != nil {
+			c.Log.Errorf("HTTP server failed: %v", err)
+			c.Cancel() // Trigger shutdown on fatal HTTP error
+		}
+	}()
+
+	// Start workers (optional - currently commented out in original)
+	// if err := c.Background.WorkerScheduler.Start(c.Context); err != nil {
+	// 	return fmt.Errorf("failed to start workers: %w", err)
+	// }
+
+	c.Log.Info("✓ All systems operational")
+	return nil
+}
+
+// startConsumers starts all Kafka consumers in background goroutines
+func (c *Container) startConsumers() error {
+	consumers := []struct {
+		name string
+		svc  interface{ Start(context.Context) error }
+	}{
+		{"notification", c.Background.NotificationSvc},
+		{"risk", c.Background.RiskSvc},
+		{"analytics", c.Background.AnalyticsSvc},
+		{"opportunity", c.Background.OpportunitySvc},
+		{"ai_usage", c.Background.AIUsageSvc},
+		{"position_guardian", c.Background.PositionGuardianSvc},
+		{"telegram_bot", c.Application.TelegramBot},
+		{"telegram_notifications", c.Application.TelegramNotificationSvc},
+	}
+
+	c.WG.Add(len(consumers))
+	for _, consumer := range consumers {
+		svc := consumer.svc
+		name := consumer.name
+		go func() {
+			defer c.WG.Done()
+			if err := svc.Start(c.Context); err != nil && c.Context.Err() == nil {
+				c.Log.Error(name+" consumer failed", "error", err)
+			}
+		}()
+	}
+
+	c.Log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian, telegram_bot, telegram_notifications")
+	return nil
+}
+
+// Shutdown performs graceful shutdown in the correct order
+func (c *Container) Shutdown() {
+	c.Log.Info("Initiating graceful shutdown...")
+
+	// Cancel application context to signal all components to stop
+	c.Cancel()
+
+	// Perform coordinated cleanup with explicit order
+	c.Lifecycle.Shutdown(
+		c.WG,
+		c.Application.HTTPServer,
+		c.Background.WorkerScheduler,
+		c.Adapters.MarketDataFactory,
+		c.Adapters.KafkaProducer,
+		c.Adapters.NotificationConsumer,
+		c.Adapters.RiskConsumer,
+		c.Adapters.AnalyticsConsumer,
+		c.Adapters.OpportunityConsumer,
+		c.Adapters.AIUsageConsumer,
+		c.Adapters.PositionGuardianConsumer,
+		c.Adapters.TelegramNotificationConsumer,
+		c.PG,
+		c.CH,
+		c.Redis,
+		c.ErrorTracker,
+		c.Log,
+	)
+}
+
+// GetMetrics returns metrics for observability
+func (c *Container) GetMetrics() map[string]interface{} {
+	return map[string]interface{}{
+		"tools":  len(c.Business.ToolRegistry.List()),
+		"agents": len(c.Business.AgentRegistry.List()),
+	}
+}
+
+// TemplateRegistry returns the global template registry
+func (c *Container) TemplateRegistry() *templates.Registry {
+	return templates.Get()
+}

@@ -483,4 +483,3 @@ func TestExchangeAccountRepository_MultipleExchangeTypes(t *testing.T) {
 		assert.True(t, exchangeMap[exch], exch.String()+" should be present")
 	}
 }
-

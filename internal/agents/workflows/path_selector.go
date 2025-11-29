@@ -22,11 +22,11 @@ const (
 
 // AnalysisRequest represents a request for market analysis
 type AnalysisRequest struct {
-	Symbol            string
-	Exchange          string
-	Priority          Priority
-	PositionSizePct   float64 // Position size as % of portfolio (for high-stakes detection)
-	Volatility        float64 // Current volatility (for high-stakes detection)
+	Symbol             string
+	Exchange           string
+	Priority           Priority
+	PositionSizePct    float64 // Position size as % of portfolio (for high-stakes detection)
+	Volatility         float64 // Current volatility (for high-stakes detection)
 	ConflictingSignals bool    // Fast-path detected conflicts (escalate to committee)
 }
 
@@ -209,4 +209,3 @@ func (ps *PathSelector) ResetMetrics() {
 	ps.totalRequests = 0
 	ps.committeeRequests = 0
 }
-

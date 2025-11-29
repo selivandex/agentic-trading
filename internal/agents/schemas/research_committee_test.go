@@ -337,4 +337,3 @@ func TestPhase3Schemas_Integration(t *testing.T) {
 		})
 	}
 }
-

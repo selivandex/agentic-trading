@@ -270,7 +270,7 @@ func TestRiskRepository_AcknowledgeEvent(t *testing.T) {
 	// Verify acknowledged
 	events, err := repo.GetEvents(ctx, userID, 10)
 	require.NoError(t, err)
-	
+
 	var found bool
 	for _, e := range events {
 		if e.ID == event.ID {
@@ -415,13 +415,13 @@ func TestRiskRepository_MultipleEventTypes(t *testing.T) {
 
 	for i, eventType := range eventTypes {
 		event := &risk.RiskEvent{
-			ID:        uuid.New(),
-			UserID:    userID,
-			Timestamp: time.Now(),
-			EventType: eventType,
-			Severity:  "warning",
-			Message:   "Event type: " + eventType.String(),
-			Data:      "{}",
+			ID:           uuid.New(),
+			UserID:       userID,
+			Timestamp:    time.Now(),
+			EventType:    eventType,
+			Severity:     "warning",
+			Message:      "Event type: " + eventType.String(),
+			Data:         "{}",
 			Acknowledged: i%2 == 0, // Alternate acknowledged status
 		}
 		err := repo.CreateEvent(ctx, event)
@@ -561,4 +561,3 @@ func TestRiskRepository_ConsecutiveLossesTracking(t *testing.T) {
 	assert.Equal(t, 3, finalState.DailyLosses)
 	assert.Equal(t, 0, finalState.DailyWins)
 }
-

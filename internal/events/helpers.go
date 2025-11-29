@@ -53,13 +53,13 @@ const (
 	TopicPositionPnLUpdated  = "position.pnl_updated"
 
 	// Position Guardian events (event-driven monitoring)
-	TopicStopApproaching     = "position.stop_approaching"
-	TopicTargetApproaching   = "position.target_approaching"
-	TopicThesisInvalidation  = "position.thesis_invalidation"
-	TopicTimeDecay           = "position.time_decay"
-	TopicProfitMilestone     = "position.profit_milestone"
-	TopicCorrelationSpike    = "position.correlation_spike"
-	TopicVolatilitySpike     = "position.volatility_spike"
+	TopicStopApproaching    = "position.stop_approaching"
+	TopicTargetApproaching  = "position.target_approaching"
+	TopicThesisInvalidation = "position.thesis_invalidation"
+	TopicTimeDecay          = "position.time_decay"
+	TopicProfitMilestone    = "position.profit_milestone"
+	TopicCorrelationSpike   = "position.correlation_spike"
+	TopicVolatilitySpike    = "position.volatility_spike"
 
 	// SMC (Smart Money Concepts) events
 	TopicFVGDetected        = "smc.fvg_detected"

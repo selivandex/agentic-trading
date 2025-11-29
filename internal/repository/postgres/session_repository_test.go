@@ -30,8 +30,8 @@ func TestSessionRepository_Create(t *testing.T) {
 		UserID:    uuid.New().String(),
 		SessionID: uuid.New().String(),
 		State: map[string]interface{}{
-			"current_mode":   "analysis",
-			"last_symbol":    "BTC/USDT",
+			"current_mode":    "analysis",
+			"last_symbol":     "BTC/USDT",
 			"conversation_id": "conv789",
 		},
 		Events:    []session.Event{},
@@ -69,7 +69,7 @@ func TestSessionRepository_Get(t *testing.T) {
 		UserID:    uuid.New().String(),
 		SessionID: uuid.New().String(),
 		State: map[string]interface{}{
-			"strategy": "momentum",
+			"strategy":   "momentum",
 			"risk_level": "moderate",
 		},
 		Events:    []session.Event{},
@@ -360,8 +360,8 @@ func TestSessionRepository_SetGetAppState(t *testing.T) {
 
 	appName := "trading_agent"
 	appState := map[string]interface{}{
-		"global_mode":    "production",
-		"max_agents":     10,
+		"global_mode": "production",
+		"max_agents":  10,
 		"feature_flags": map[string]interface{}{
 			"enable_options": true,
 			"enable_futures": false,
@@ -378,7 +378,7 @@ func TestSessionRepository_SetGetAppState(t *testing.T) {
 	assert.Equal(t, appName, retrieved.AppName)
 	assert.Equal(t, "production", retrieved.State["global_mode"])
 	assert.Equal(t, 10.0, retrieved.State["max_agents"]) // JSON number
-	
+
 	// Verify nested map
 	featureFlags, ok := retrieved.State["feature_flags"].(map[string]interface{})
 	assert.True(t, ok)
@@ -400,9 +400,9 @@ func TestSessionRepository_SetGetUserState(t *testing.T) {
 	userID := "user123"
 	userState := map[string]interface{}{
 		"preferences": map[string]interface{}{
-			"language":    "en",
-			"timezone":    "UTC",
-			"theme":       "dark",
+			"language": "en",
+			"timezone": "UTC",
+			"theme":    "dark",
 		},
 		"total_trades": 42,
 		"last_login":   time.Now().Format(time.RFC3339),
@@ -485,7 +485,7 @@ func TestSessionRepository_EventWithUsageMetadata(t *testing.T) {
 	events, err := repo.GetEvents(ctx, sess.ID, eventsOpts)
 	require.NoError(t, err)
 	assert.Len(t, events, 1)
-	
+
 	assert.NotNil(t, events[0].UsageMetadata)
 	assert.Equal(t, int32(2500), events[0].UsageMetadata.PromptTokenCount)
 	assert.Equal(t, int32(1500), events[0].UsageMetadata.CandidatesTokenCount)
@@ -503,7 +503,7 @@ func TestSessionRepository_MultipleApps(t *testing.T) {
 	repo := NewSessionRepository(testDB.DB())
 	ctx := context.Background()
 
-	userID := uuid.New().String() // Unique user for this test
+	userID := uuid.New().String()    // Unique user for this test
 	sessionID := uuid.New().String() // Unique session ID
 	apps := []string{"trading_agent", "analysis_agent", "portfolio_agent"}
 
@@ -593,4 +593,3 @@ func TestSessionRepository_EventActions(t *testing.T) {
 	assert.True(t, events[0].Actions.SkipSummarization)
 	assert.Equal(t, "portfolio_manager", events[0].Actions.StateDelta["transferred_to"])
 }
-

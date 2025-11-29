@@ -158,7 +158,7 @@ func TestPositionRepository_GetOpenByUser(t *testing.T) {
 			OpenedAt:          time.Now(),
 			UpdatedAt:         time.Now(),
 		}
-		
+
 		if statuses[i] == position.PositionClosed {
 			now := time.Now()
 			pos.ClosedAt = &now
@@ -218,7 +218,7 @@ func TestPositionRepository_UpdatePnL(t *testing.T) {
 	// Test UpdatePnL - price increased
 	newPrice := decimal.NewFromFloat(42000.0)
 	unrealizedPnL := decimal.NewFromFloat(2000.0) // (42000 - 40000) * 1.0
-	unrealizedPnLPct := decimal.NewFromFloat(5.0)  // 5% gain
+	unrealizedPnLPct := decimal.NewFromFloat(5.0) // 5% gain
 
 	err = repo.UpdatePnL(ctx, pos.ID, newPrice, unrealizedPnL, unrealizedPnLPct)
 	require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestPositionRepository_UpdatePnL(t *testing.T) {
 	// Test UpdatePnL - price decreased (loss)
 	newPrice = decimal.NewFromFloat(38000.0)
 	unrealizedPnL = decimal.NewFromFloat(-2000.0) // (38000 - 40000) * 1.0
-	unrealizedPnLPct = decimal.NewFromFloat(-5.0)  // -5% loss
+	unrealizedPnLPct = decimal.NewFromFloat(-5.0) // -5% loss
 
 	err = repo.UpdatePnL(ctx, pos.ID, newPrice, unrealizedPnL, unrealizedPnLPct)
 	require.NoError(t, err)
@@ -556,7 +556,7 @@ func TestPositionRepository_GetClosedInRange(t *testing.T) {
 
 	// Create closed positions at different times
 	closeTimes := []time.Time{yesterday, yesterday, twoDaysAgo}
-	
+
 	for _, closeTime := range closeTimes {
 		pos := &position.Position{
 			ID:                uuid.New(),
@@ -582,7 +582,7 @@ func TestPositionRepository_GetClosedInRange(t *testing.T) {
 	// Test GetClosedInRange - last 24 hours
 	start := yesterday.Add(-1 * time.Hour)
 	end := now.Add(1 * time.Hour)
-	
+
 	positions, err := repo.GetClosedInRange(ctx, userID, start, end)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(positions), 2, "Should find positions closed in last 24 hours")
@@ -593,4 +593,3 @@ func TestPositionRepository_GetClosedInRange(t *testing.T) {
 		assert.NotNil(t, pos.ClosedAt)
 	}
 }
-

@@ -425,8 +425,8 @@ func TestJournalRepository_GetByUserAndDateRange(t *testing.T) {
 	repo := NewJournalRepository(testDB.DB())
 	ctx := context.Background()
 	now := time.Now()
-	start := now.Add(-7 * 24 * time.Hour)  // 7 days ago
-	end := now.Add(-3 * 24 * time.Hour)    // 3 days ago
+	start := now.Add(-7 * 24 * time.Hour)    // 7 days ago
+	end := now.Add(-3 * 24 * time.Hour)      // 3 days ago
 	outside := now.Add(-10 * 24 * time.Hour) // 10 days ago (outside range)
 
 	// Create entry outside range
@@ -548,4 +548,3 @@ func TestJournalRepository_LessonsAndImprovement(t *testing.T) {
 	assert.False(t, retrieved.WasCorrectEntry)
 	assert.True(t, retrieved.WasCorrectExit)
 }
-

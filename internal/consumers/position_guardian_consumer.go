@@ -18,10 +18,10 @@ import (
 // PositionGuardianConsumer handles position monitoring events with event-driven architecture
 // Routes events by urgency: CRITICAL → algorithmic, HIGH/MEDIUM → LLM agent
 type PositionGuardianConsumer struct {
-	consumer       *kafka.Consumer
+	consumer        *kafka.Consumer
 	criticalHandler *position.CriticalEventHandler
 	agentHandler    *position.AgentEventHandler
-	log            *logger.Logger
+	log             *logger.Logger
 }
 
 // NewPositionGuardianConsumer creates a new position guardian consumer
@@ -32,10 +32,10 @@ func NewPositionGuardianConsumer(
 	log *logger.Logger,
 ) *PositionGuardianConsumer {
 	return &PositionGuardianConsumer{
-		consumer:       consumer,
+		consumer:        consumer,
 		criticalHandler: criticalHandler,
 		agentHandler:    agentHandler,
-		log:            log,
+		log:             log,
 	}
 }
 
@@ -301,4 +301,3 @@ func (pgc *PositionGuardianConsumer) handleVolatilitySpike(ctx context.Context, 
 	// For now, just log the event
 	return nil
 }
-

@@ -399,7 +399,7 @@ func (e *RiskEngine) buildUserRiskState(state *risk.CircuitBreakerState, canTrad
 	if state.TriggerReason != nil {
 		tripReason = *state.TriggerReason
 	}
-	
+
 	return UserRiskState{
 		UserID:             state.UserID,
 		CanTrade:           canTrade,

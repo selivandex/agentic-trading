@@ -97,4 +97,3 @@ func (f *Factory) CreateResearchCommitteeWorkflow() (agent.Agent, error) {
 	f.log.Info("Research Committee workflow created successfully (4 analysts + 1 synthesizer)")
 	return researchCommittee, nil
 }
-

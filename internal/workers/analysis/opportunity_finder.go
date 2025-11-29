@@ -24,19 +24,19 @@ import (
 // for each monitored symbol, publishing high-quality signals to Kafka for user consumption.
 type OpportunityFinder struct {
 	*workers.BaseWorker
-	workflow       agent.Agent                       // MarketResearchWorkflow (ADK)
-	runner         *runner.Runner                    // ADK runner
-	sessionService session.Service                   // Session persistence
-	templates      *templates.Registry               // Template registry for workflow prompts
-	preScreener    *analysisservice.PreScreener      // Pre-screening service (Phase 5 optimization)
-	symbols        []string                          // List of symbols to monitor
-	exchange       string              // Primary exchange for analysis
+	workflow       agent.Agent                  // MarketResearchWorkflow (ADK)
+	runner         *runner.Runner               // ADK runner
+	sessionService session.Service              // Session persistence
+	templates      *templates.Registry          // Template registry for workflow prompts
+	preScreener    *analysisservice.PreScreener // Pre-screening service (Phase 5 optimization)
+	symbols        []string                     // List of symbols to monitor
+	exchange       string                       // Primary exchange for analysis
 	log            *logger.Logger
-	
+
 	// Metrics (Phase 5)
-	totalRuns      int64
-	skippedRuns    int64
-	analyzedRuns   int64
+	totalRuns    int64
+	skippedRuns  int64
+	analyzedRuns int64
 }
 
 // NewOpportunityFinder creates a new opportunity finder using ADK workflow
@@ -117,7 +117,7 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 		// Phase 5: Pre-screening before expensive LLM analysis
 		if of.preScreener != nil {
 			of.totalRuns++
-			
+
 			preScreen, err := of.preScreener.ShouldAnalyze(ctx, of.exchange, symbol)
 			if err != nil {
 				of.Log().Warn("Pre-screening failed, proceeding with analysis",

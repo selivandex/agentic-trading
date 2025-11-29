@@ -84,7 +84,7 @@ func (t *SentimentAggregationTool) formatAnalysis(
 		avgNewsSentiment := t.calculateAverageNewsSentiment(news)
 		sb.WriteString(fmt.Sprintf("NEWS SENTIMENT (24h): %.2f (%s)\n", avgNewsSentiment, t.classifySentiment(avgNewsSentiment)))
 		sb.WriteString(fmt.Sprintf("Headlines analyzed: %d\n\n", len(news)))
-		
+
 		// Show top 3 recent headlines
 		sb.WriteString("RECENT HEADLINES:\n")
 		for i, article := range news {
@@ -122,7 +122,7 @@ func (t *SentimentAggregationTool) formatAnalysis(
 
 	// Data quality note
 	sb.WriteString(fmt.Sprintf("\nDATA QUALITY: %s\n", dataQuality))
-	
+
 	// Contrarian signal
 	if fearGreed != nil {
 		sb.WriteString(fmt.Sprintf("\nCONTRARIAN SIGNAL: %s\n", t.getContrarianSignal(fearGreed.Value)))
@@ -301,4 +301,3 @@ func (t *SentimentAggregationTool) GetDefinition() map[string]interface{} {
 		},
 	}
 }
-
