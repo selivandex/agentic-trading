@@ -116,13 +116,35 @@ type arbitrageOpportunity struct {
 // aggregateFundingRates fetches and aggregates funding rates across exchanges
 func (fa *FundingAggregator) aggregateFundingRates(ctx context.Context, symbol string) (*aggregatedFunding, error) {
 	rates := make(map[string]float64)
-	// Note: would use since for querying historical rates if needed
-	// since := time.Now().Add(-1 * time.Hour)
 
 	// Fetch funding rate from each exchange
-	for range fa.exchanges {
-		// TODO: Query from market_data repository using GetLatestFundingRate
-		// For now, skip as proper repository integration is pending
+	for _, exchange := range fa.exchanges {
+		markPrice, err := fa.marketDataRepo.GetLatestMarkPrice(ctx, exchange, symbol)
+		if err != nil {
+			fa.Log().Debug("Failed to get mark price from exchange",
+				"exchange", exchange,
+				"symbol", symbol,
+				"error", err,
+			)
+			continue
+		}
+
+		if markPrice == nil {
+			fa.Log().Debug("No mark price data from exchange",
+				"exchange", exchange,
+				"symbol", symbol,
+			)
+			continue
+		}
+
+		// Store funding rate
+		rates[exchange] = markPrice.FundingRate
+
+		fa.Log().Debug("Fetched funding rate",
+			"exchange", exchange,
+			"symbol", symbol,
+			"funding_rate", markPrice.FundingRate,
+		)
 	}
 
 	if len(rates) == 0 {

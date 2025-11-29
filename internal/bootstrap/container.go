@@ -412,6 +412,7 @@ func (c *Container) Shutdown() {
 		c.Application.HTTPServer,
 		c.Background.WorkerScheduler,
 		c.Adapters.MarketDataFactory,
+		c.Adapters.WebSocketClients,
 		c.Adapters.UserDataManager,
 		c.Adapters.KafkaProducer,
 		c.Adapters.NotificationConsumer,

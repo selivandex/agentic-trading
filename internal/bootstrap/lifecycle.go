@@ -32,16 +32,18 @@ func NewLifecycle() *Lifecycle {
 // This is critical for a trading system - we must ensure:
 // 1. No new requests accepted
 // 2. Workers finish cleanly
-// 3. User Data WebSocket connections closed
-// 4. Kafka consumers unblock before waiting for goroutines
-// 5. Producer closes after consumers
-// 6. Logs and errors flushed
-// 7. Database connections last (other components may need them)
+// 3. Market Data WebSocket connections closed (Binance, Bybit, OKX)
+// 4. User Data WebSocket connections closed
+// 5. Kafka consumers unblock before waiting for goroutines
+// 6. Producer closes after consumers
+// 7. Logs and errors flushed
+// 8. Database connections last (other components may need them)
 func (l *Lifecycle) Shutdown(
 	wg *sync.WaitGroup,
 	httpServer *api.Server,
 	workerScheduler *workers.Scheduler,
 	marketDataFactory exchanges.CentralFactory,
+	websocketClients *WebSocketClients,
 	userDataManager *UserDataManager,
 	kafkaProducer *kafka.Producer,
 	notificationConsumer *kafka.Consumer,
@@ -91,9 +93,19 @@ func (l *Lifecycle) Shutdown(
 	}
 
 	// ========================================
-	// Step 3: Stop User Data WebSocket Manager
+	// Step 3: Stop Market Data WebSocket Clients (Binance, Bybit, OKX)
 	// ========================================
-	log.Info("[3/10] Stopping User Data WebSocket Manager...")
+	log.Info("[3/11] Stopping Market Data WebSocket clients...")
+	if websocketClients != nil {
+		wsCtx, wsCancel := context.WithTimeout(shutdownCtx, 10*time.Second)
+		l.stopWebSocketClients(wsCtx, websocketClients, log)
+		wsCancel()
+	}
+
+	// ========================================
+	// Step 4: Stop User Data WebSocket Manager
+	// ========================================
+	log.Info("[4/11] Stopping User Data WebSocket Manager...")
 	if userDataManager != nil && userDataManager.Manager != nil {
 		wsCtx, wsCancel := context.WithTimeout(shutdownCtx, 30*time.Second)
 		if err := userDataManager.Manager.Stop(wsCtx); err != nil {
@@ -105,11 +117,11 @@ func (l *Lifecycle) Shutdown(
 	}
 
 	// ========================================
-	// Step 4: Close Kafka Consumers
+	// Step 5: Close Kafka Consumers
 	// Critical: Close consumers BEFORE waiting for goroutines
 	// This unblocks ReadMessage() calls
 	// ========================================
-	log.Info("[4/10] Closing Kafka consumers...")
+	log.Info("[5/11] Closing Kafka consumers...")
 	l.closeKafkaConsumers(map[string]*kafka.Consumer{
 		"notification":           notificationConsumer,
 		"risk":                   riskConsumer,
@@ -128,15 +140,15 @@ func (l *Lifecycle) Shutdown(
 	log.Info("✓ Kafka consumers closed")
 
 	// ========================================
-	// Step 5: Wait for Consumer Goroutines
+	// Step 6: Wait for Consumer Goroutines
 	// ========================================
-	log.Info("[5/10] Waiting for consumer goroutines...")
+	log.Info("[6/11] Waiting for consumer goroutines...")
 	l.waitForGoroutines(wg, 5*time.Second, log)
 
 	// ========================================
-	// Step 6: Close Kafka Producer
+	// Step 7: Close Kafka Producer
 	// ========================================
-	log.Info("[6/10] Closing Kafka producer...")
+	log.Info("[7/11] Closing Kafka producer...")
 	if kafkaProducer != nil {
 		if err := kafkaProducer.Close(); err != nil {
 			log.Error("Kafka producer close failed", "error", err)
@@ -146,15 +158,15 @@ func (l *Lifecycle) Shutdown(
 	}
 
 	// ========================================
-	// Step 7: Flush Error Tracker
+	// Step 8: Flush Error Tracker
 	// ========================================
-	log.Info("[7/10] Flushing error tracker...")
+	log.Info("[8/11] Flushing error tracker...")
 	l.flushErrorTracker(errorTracker, shutdownCtx, log)
 
 	// ========================================
-	// Step 8: Sync Logs
+	// Step 9: Sync Logs
 	// ========================================
-	log.Info("[8/10] Syncing logs...")
+	log.Info("[9/11] Syncing logs...")
 	if err := logger.Sync(); err != nil {
 		log.Warn("Log sync completed with warnings")
 	} else {
@@ -162,10 +174,10 @@ func (l *Lifecycle) Shutdown(
 	}
 
 	// ========================================
-	// Step 9: Close Database Connections
+	// Step 10: Close Database Connections
 	// LAST - other components may need them during shutdown
 	// ========================================
-	log.Info("[9/10] Closing database connections...")
+	log.Info("[10/11] Closing database connections...")
 	l.closeDatabases(pgClient, chClient, redisClient, log)
 
 	log.Info("✅ Graceful shutdown complete")
@@ -245,5 +257,48 @@ func (l *Lifecycle) closeDatabases(
 		log.Error("Database close errors", "errors", dbErrors)
 	} else {
 		log.Info("✓ Database connections closed")
+	}
+}
+
+// stopWebSocketClients stops all market data WebSocket clients
+func (l *Lifecycle) stopWebSocketClients(ctx context.Context, clients *WebSocketClients, log *logger.Logger) {
+	if clients == nil {
+		return
+	}
+
+	var wsErrors []error
+
+	// Stop Binance client
+	if clients.Binance != nil {
+		if err := clients.Binance.Stop(ctx); err != nil {
+			wsErrors = append(wsErrors, errors.Wrap(err, "binance"))
+			log.Error("Binance WebSocket stop failed", "error", err)
+		} else {
+			log.Info("✓ Binance WebSocket stopped")
+		}
+	}
+
+	// Stop Bybit client
+	if clients.Bybit != nil {
+		if err := clients.Bybit.Stop(ctx); err != nil {
+			wsErrors = append(wsErrors, errors.Wrap(err, "bybit"))
+			log.Error("Bybit WebSocket stop failed", "error", err)
+		} else {
+			log.Info("✓ Bybit WebSocket stopped")
+		}
+	}
+
+	// Stop OKX client
+	if clients.OKX != nil {
+		if err := clients.OKX.Stop(ctx); err != nil {
+			wsErrors = append(wsErrors, errors.Wrap(err, "okx"))
+			log.Error("OKX WebSocket stop failed", "error", err)
+		} else {
+			log.Info("✓ OKX WebSocket stopped")
+		}
+	}
+
+	if len(wsErrors) == 0 {
+		log.Info("✓ All Market Data WebSocket clients stopped")
 	}
 }
