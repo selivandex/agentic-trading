@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"prometheus/internal/adapters/kafka"
@@ -44,29 +45,34 @@ func (p *UserDataPublisher) PublishOrderUpdate(
 			UserId:    userID.String(),
 			Version:   "1.0",
 		},
-		AccountId:        accountID.String(),
-		Exchange:         exchange,
-		OrderId:          orderID,
-		ClientOrderId:    clientOrderID,
-		Symbol:           symbol,
-		Side:             side,
-		PositionSide:     positionSide,
-		Type:             orderType,
-		Status:           status,
-		ExecutionType:    executionType,
-		OriginalQty:      originalQty,
-		FilledQty:        filledQty,
-		AvgPrice:         avgPrice,
-		StopPrice:        stopPrice,
-		LastFilledQty:    lastFilledQty,
-		LastFilledPrice:  lastFilledPrice,
-		Commission:       commission,
-		CommissionAsset:  commissionAsset,
-		TradeTime:        timestamppb.New(tradeTime),
-		EventTime:        timestamppb.New(eventTime),
+		AccountId:       accountID.String(),
+		Exchange:        exchange,
+		OrderId:         orderID,
+		ClientOrderId:   clientOrderID,
+		Symbol:          symbol,
+		Side:            side,
+		PositionSide:    positionSide,
+		Type:            orderType,
+		Status:          status,
+		ExecutionType:   executionType,
+		OriginalQty:     originalQty,
+		FilledQty:       filledQty,
+		AvgPrice:        avgPrice,
+		StopPrice:       stopPrice,
+		LastFilledQty:   lastFilledQty,
+		LastFilledPrice: lastFilledPrice,
+		Commission:      commission,
+		CommissionAsset: commissionAsset,
+		TradeTime:       timestamppb.New(tradeTime),
+		EventTime:       timestamppb.New(eventTime),
 	}
 
-	if err := p.producer.PublishProto(ctx, "user-data-order-updates", userID.String(), event); err != nil {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal order update event")
+	}
+
+	if err := p.producer.PublishBinary(ctx, "user-data-order-updates", []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish order update event")
 	}
 
@@ -110,7 +116,12 @@ func (p *UserDataPublisher) PublishPositionUpdate(
 		EventTime:         timestamppb.New(eventTime),
 	}
 
-	if err := p.producer.PublishProto(ctx, "user-data-position-updates", userID.String(), event); err != nil {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal position update event")
+	}
+
+	if err := p.producer.PublishBinary(ctx, "user-data-position-updates", []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish position update event")
 	}
 
@@ -150,7 +161,12 @@ func (p *UserDataPublisher) PublishBalanceUpdate(
 		EventTime:          timestamppb.New(eventTime),
 	}
 
-	if err := p.producer.PublishProto(ctx, "user-data-balance-updates", userID.String(), event); err != nil {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal balance update event")
+	}
+
+	if err := p.producer.PublishBinary(ctx, "user-data-balance-updates", []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish balance update event")
 	}
 
@@ -202,7 +218,12 @@ func (p *UserDataPublisher) PublishMarginCall(
 		EventTime:          timestamppb.New(eventTime),
 	}
 
-	if err := p.producer.PublishProto(ctx, "user-data-margin-calls", userID.String(), event); err != nil {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal margin call event")
+	}
+
+	if err := p.producer.PublishBinary(ctx, "user-data-margin-calls", []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish margin call event")
 	}
 
@@ -239,7 +260,12 @@ func (p *UserDataPublisher) PublishAccountConfigUpdate(
 		EventTime: timestamppb.New(eventTime),
 	}
 
-	if err := p.producer.PublishProto(ctx, "user-data-account-config", userID.String(), event); err != nil {
+	data, err := proto.Marshal(event)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal account config update event")
+	}
+
+	if err := p.producer.PublishBinary(ctx, "user-data-account-config", []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish account config update event")
 	}
 
@@ -263,4 +289,3 @@ type PositionAtRiskData struct {
 	MaintenanceMargin string
 	PositionSide      string
 }
-

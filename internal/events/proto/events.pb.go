@@ -2546,7 +2546,7 @@ type WhaleAlertEvent struct {
 	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
 	Exchange      string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
 	Symbol        string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	TradeId       string                 `protobuf:"bytes,4,opt,name=trade_id,json=tradeId,proto3" json:"trade_id,omitempty"`
+	TradeId       int64                  `protobuf:"varint,4,opt,name=trade_id,json=tradeId,proto3" json:"trade_id,omitempty"`
 	Price         float64                `protobuf:"fixed64,5,opt,name=price,proto3" json:"price,omitempty"`
 	Quantity      float64                `protobuf:"fixed64,6,opt,name=quantity,proto3" json:"quantity,omitempty"`
 	ValueUsd      float64                `protobuf:"fixed64,7,opt,name=value_usd,json=valueUsd,proto3" json:"value_usd,omitempty"`
@@ -2607,11 +2607,11 @@ func (x *WhaleAlertEvent) GetSymbol() string {
 	return ""
 }
 
-func (x *WhaleAlertEvent) GetTradeId() string {
+func (x *WhaleAlertEvent) GetTradeId() int64 {
 	if x != nil {
 		return x.TradeId
 	}
-	return ""
+	return 0
 }
 
 func (x *WhaleAlertEvent) GetPrice() float64 {
@@ -5448,7 +5448,7 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
 	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
 	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x19\n" +
-	"\btrade_id\x18\x04 \x01(\tR\atradeId\x12\x14\n" +
+	"\btrade_id\x18\x04 \x01(\x03R\atradeId\x12\x14\n" +
 	"\x05price\x18\x05 \x01(\x01R\x05price\x12\x1a\n" +
 	"\bquantity\x18\x06 \x01(\x01R\bquantity\x12\x1b\n" +
 	"\tvalue_usd\x18\a \x01(\x01R\bvalueUsd\x12\x12\n" +

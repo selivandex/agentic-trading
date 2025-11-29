@@ -152,12 +152,13 @@ func (c *Container) MustInitAdapters() {
 	c.Adapters.AIUsageConsumer = provideKafkaConsumer(c.Config, events.TopicAIUsage, c.Log)
 	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionGuardian, c.Log)
 	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicTelegramNotifications, c.Log)
-	
+
 	// WebSocket consumers (one per stream type)
 	c.Adapters.WebSocketKlineConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketKline, c.Log)
 	c.Adapters.WebSocketMarkPriceConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketMarkPrice, c.Log)
 	c.Adapters.WebSocketTickerConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketTicker, c.Log)
 	c.Adapters.WebSocketTradeConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketTrade, c.Log)
+	c.Adapters.WebSocketDepthConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketDepth, c.Log)
 
 	// Crypto
 	c.Adapters.Encryptor, err = crypto.NewEncryptor(c.Config.Crypto.EncryptionKey)

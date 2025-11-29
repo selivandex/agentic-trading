@@ -428,7 +428,7 @@ func (wp *WorkerPublisher) PublishMarketScanComplete(
 // PublishWhaleAlert publishes whale trade alert event
 func (wp *WorkerPublisher) PublishWhaleAlert(
 	ctx context.Context,
-	exchange, symbol, tradeID, side, sentiment string,
+	exchange, symbol string, tradeID int64, side, sentiment string,
 	price, quantity, valueUSD float64,
 ) error {
 	event := &eventspb.WhaleAlertEvent{

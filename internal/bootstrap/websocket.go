@@ -120,6 +120,17 @@ func (c *Container) MustInitWebSocketClients() {
 				c.Repos.MarketData,
 				c.Log,
 			)
+
+		case "depth":
+			c.Log.Info("Creating WebSocket depth consumer",
+				"topic", events.TopicWebSocketDepth,
+				"group_id", c.Config.Kafka.GroupID,
+			)
+			c.Background.WebSocketDepthSvc = consumers.NewWebSocketDepthConsumer(
+				c.Adapters.WebSocketDepthConsumer,
+				c.Repos.MarketData,
+				c.Log,
+			)
 		}
 	}
 
@@ -129,6 +140,7 @@ func (c *Container) MustInitWebSocketClients() {
 		"markprice_consumer", c.Background.WebSocketMarkPriceSvc != nil,
 		"ticker_consumer", c.Background.WebSocketTickerSvc != nil,
 		"trade_consumer", c.Background.WebSocketTradeSvc != nil,
+		"depth_consumer", c.Background.WebSocketDepthSvc != nil,
 	)
 }
 

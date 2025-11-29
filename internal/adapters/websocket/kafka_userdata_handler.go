@@ -115,8 +115,8 @@ func (h *KafkaUserDataHandler) OnBalanceUpdate(ctx context.Context, event *Balan
 		event.WalletBalance,
 		event.CrossWalletBalance,
 		event.AvailableBalance,
-		event.EventTime,
 		event.ReasonType,
+		event.EventTime,
 	)
 
 	if err != nil {
@@ -216,4 +216,3 @@ func (h *KafkaUserDataHandler) OnError(err error) {
 	// Don't publish errors to Kafka - just log them
 	// Could add metrics/alerting here if needed
 }
-

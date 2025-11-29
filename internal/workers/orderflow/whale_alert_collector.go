@@ -115,7 +115,7 @@ func (wac *WhaleAlertCollector) analyzeSymbol(ctx context.Context, exchange, sym
 		// Check if it's a whale trade
 		if tradeValueUSD >= wac.thresholdUSD {
 			// Check if we've already alerted on this trade
-			cacheKey := fmt.Sprintf("%s:%s:%s", exchange, symbol, trade.TradeID)
+			cacheKey := fmt.Sprintf("%s:%s:%d", exchange, symbol, trade.TradeID)
 			if wac.whaleTradesCache[cacheKey] {
 				continue
 			}
@@ -126,7 +126,7 @@ func (wac *WhaleAlertCollector) analyzeSymbol(ctx context.Context, exchange, sym
 			// Determine trade direction and sentiment
 			direction := "BUY"
 			sentiment := "bullish"
-			if trade.Side == "sell" {
+			if trade.Side() == "sell" {
 				direction = "SELL"
 				sentiment = "bearish"
 			}
@@ -164,7 +164,7 @@ func (wac *WhaleAlertCollector) publishWhaleAlert(
 		exchange,
 		symbol,
 		trade.TradeID,
-		trade.Side,
+		trade.Side(),
 		sentiment,
 		trade.Price,
 		trade.Quantity,

@@ -246,14 +246,12 @@ func (fe *FeatureExtractor) extractStructureFeatures(features *regime.Features, 
 // extractDerivativesFeatures calculates derivatives-related features
 func (fe *FeatureExtractor) extractDerivativesFeatures(ctx context.Context, features *regime.Features, symbol string) {
 	// Funding rate (from latest ticker or funding rate data)
-	fundingRate, err := fe.mdRepo.GetLatestFundingRate(ctx, "binance", symbol)
-	if err == nil && fundingRate != nil {
-		features.FundingRate = fundingRate.FundingRate
-
-		// Calculate funding rate MA (simplified: just use current for now)
-		// TODO: Implement proper MA calculation from historical funding rates
-		features.FundingRateMA = fundingRate.FundingRate
-	}
+	// TODO: Implement GetLatestFundingRate method in market_data repository
+	// fundingRate, err := fe.mdRepo.GetLatestFundingRate(ctx, "binance", symbol)
+	// if err == nil && fundingRate != nil {
+	// 	features.FundingRate = fundingRate.FundingRate
+	// 	features.FundingRateMA = fundingRate.FundingRate
+	// }
 
 	// 24h liquidations (placeholder - need liquidation data)
 	// TODO: Implement liquidation aggregation when liquidation collector is available

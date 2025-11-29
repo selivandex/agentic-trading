@@ -13,6 +13,18 @@ import (
 	"prometheus/pkg/logger"
 )
 
+// UserDataFactory is an interface for creating exchange-specific User Data clients
+// Implementation is in bootstrap to avoid import cycles
+type UserDataFactory interface {
+	Create(
+		exchange exchange_account.ExchangeType,
+		accountID uuid.UUID,
+		userID uuid.UUID,
+		handler UserDataEventHandler,
+		useTestnet bool,
+	) (UserDataStreamer, error)
+}
+
 // UserDataManager manages User Data WebSocket connections for all active exchange accounts
 // - Loads active accounts from DB on startup
 // - Creates/renews listenKeys for each account
@@ -20,11 +32,11 @@ import (
 // - Handles reconnections and health monitoring
 // - Persists listenKeys to DB for crash recovery
 type UserDataManager struct {
-	accountRepo  exchange_account.Repository
-	factory      *UserDataStreamFactory
-	handler      UserDataEventHandler
-	encryptor    *crypto.Encryptor
-	logger       *logger.Logger
+	accountRepo exchange_account.Repository
+	factory     UserDataFactory
+	handler     UserDataEventHandler
+	encryptor   *crypto.Encryptor
+	logger      *logger.Logger
 
 	// Connection pool: accountID -> client
 	clients   map[uuid.UUID]UserDataStreamer
@@ -53,7 +65,7 @@ type UserDataManagerConfig struct {
 // NewUserDataManager creates a new User Data WebSocket manager
 func NewUserDataManager(
 	accountRepo exchange_account.Repository,
-	factory *UserDataStreamFactory,
+	factory UserDataFactory,
 	handler UserDataEventHandler,
 	encryptor *crypto.Encryptor,
 	config UserDataManagerConfig,
@@ -82,49 +94,11 @@ func NewUserDataManager(
 
 // Start initializes all User Data WebSocket connections for active accounts
 func (m *UserDataManager) Start(ctx context.Context) error {
-	m.logger.Info("Starting User Data Manager...")
+	m.logger.Info("User Data Manager initialized (connections will be added dynamically)")
 
-	// Load all active exchange accounts
-	accounts, err := m.accountRepo.ListActive(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to load active accounts")
-	}
-
-	m.logger.Info("Found active exchange accounts",
-		"count", len(accounts),
-	)
-
-	// Connect to each account
-	var wg sync.WaitGroup
-	errChan := make(chan error, len(accounts))
-
-	for _, account := range accounts {
-		wg.Add(1)
-		go func(acc *exchange_account.ExchangeAccount) {
-			defer wg.Done()
-			if err := m.connectAccount(ctx, acc); err != nil {
-				m.logger.Error("Failed to connect account",
-					"account_id", acc.ID,
-					"user_id", acc.UserID,
-					"exchange", acc.Exchange,
-					"error", err,
-				)
-				errChan <- err
-			}
-		}(account)
-	}
-
-	wg.Wait()
-	close(errChan)
-
-	// Check if any connections failed
-	failedCount := len(errChan)
-	if failedCount > 0 {
-		m.logger.Warn("Some accounts failed to connect",
-			"failed_count", failedCount,
-			"total_count", len(accounts),
-		)
-	}
+	// TODO: Implement loading all active accounts from DB
+	// For now, connections are added dynamically via AddAccount() method
+	// when users connect their exchange accounts
 
 	// Start background monitoring
 	go m.healthCheckLoop(ctx)
@@ -504,4 +478,3 @@ func (m *UserDataManager) GetStats() map[string]interface{} {
 		"total_reconnects":   m.totalReconnects,
 	}
 }
-

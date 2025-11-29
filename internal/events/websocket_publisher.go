@@ -92,7 +92,7 @@ func (wp *WebSocketPublisher) PublishTicker(
 // PublishDepth publishes an order book depth event from WebSocket
 func (wp *WebSocketPublisher) PublishDepth(
 	ctx context.Context,
-	exchange, symbol string,
+	exchange, symbol, marketType string,
 	bids, asks []PriceLevel,
 	lastUpdateID int64,
 	eventTime time.Time,

@@ -134,12 +134,13 @@ type Adapters struct {
 	WebSocketMarkPriceConsumer *kafka.Consumer
 	WebSocketTickerConsumer    *kafka.Consumer
 	WebSocketTradeConsumer     *kafka.Consumer
-	
+	WebSocketDepthConsumer     *kafka.Consumer
+
 	// User Data WebSocket consumers
-	UserDataOrderConsumer     *kafka.Consumer
-	UserDataPositionConsumer  *kafka.Consumer
-	UserDataBalanceConsumer   *kafka.Consumer
-	UserDataMarginCallConsumer *kafka.Consumer
+	UserDataOrderConsumer         *kafka.Consumer
+	UserDataPositionConsumer      *kafka.Consumer
+	UserDataBalanceConsumer       *kafka.Consumer
+	UserDataMarginCallConsumer    *kafka.Consumer
 	UserDataAccountConfigConsumer *kafka.Consumer
 
 	// Crypto & Exchanges
@@ -194,7 +195,8 @@ type Background struct {
 	WebSocketMarkPriceSvc *consumers.WebSocketMarkPriceConsumer
 	WebSocketTickerSvc    *consumers.WebSocketTickerConsumer
 	WebSocketTradeSvc     *consumers.WebSocketTradeConsumer
-	
+	WebSocketDepthSvc     *consumers.WebSocketDepthConsumer
+
 	// User Data WebSocket consumer service
 	UserDataSvc *consumers.UserDataConsumer
 }
@@ -330,6 +332,14 @@ func (c *Container) startConsumers() error {
 				}{"websocket_trade", c.Background.WebSocketTradeSvc})
 				consumerNames = append(consumerNames, "websocket_trade")
 			}
+		case "depth":
+			if c.Background.WebSocketDepthSvc != nil {
+				consumers = append(consumers, struct {
+					name string
+					svc  interface{ Start(context.Context) error }
+				}{"websocket_depth", c.Background.WebSocketDepthSvc})
+				consumerNames = append(consumerNames, "websocket_depth")
+			}
 		}
 	}
 
@@ -396,6 +406,7 @@ func (c *Container) Shutdown() {
 		c.Adapters.WebSocketMarkPriceConsumer,
 		c.Adapters.WebSocketTickerConsumer,
 		c.Adapters.WebSocketTradeConsumer,
+		c.Adapters.WebSocketDepthConsumer,
 		c.PG,
 		c.CH,
 		c.Redis,

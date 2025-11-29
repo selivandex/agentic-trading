@@ -90,7 +90,7 @@ func generateSampleCandles(count int) []market_data.OHLCV {
 			Close:       price,
 			Volume:      1000.0 + float64(i)*10,
 			QuoteVolume: price * (1000.0 + float64(i)*10),
-			Trades:      1000 + int64(i),
+			Trades:      1000 + uint64(i),
 		}
 	}
 

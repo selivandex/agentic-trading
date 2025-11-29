@@ -108,6 +108,7 @@ type TickerEvent struct {
 type DepthEvent struct {
 	Exchange     string
 	Symbol       string
+	MarketType   string // "spot" or "futures"
 	Bids         []PriceLevel
 	Asks         []PriceLevel
 	LastUpdateID int64

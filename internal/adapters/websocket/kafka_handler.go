@@ -117,6 +117,7 @@ func (h *KafkaEventHandler) OnDepth(event *DepthEvent) error {
 		context.Background(),
 		event.Exchange,
 		event.Symbol,
+		event.MarketType,
 		bids,
 		asks,
 		event.LastUpdateID,

@@ -1,9 +1,16 @@
 package bootstrap
 
 import (
+	"fmt"
+
+	"github.com/google/uuid"
+
 	"prometheus/internal/adapters/websocket"
+	"prometheus/internal/adapters/websocket/binance"
 	"prometheus/internal/consumers"
+	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/events"
+	"prometheus/pkg/logger"
 )
 
 // UserDataManager wraps the websocket user data manager
@@ -26,8 +33,8 @@ func (c *Container) MustInitUserDataManager() {
 	// Create Kafka handler for User Data events (WebSocket → Kafka)
 	kafkaHandler := websocket.NewKafkaUserDataHandler(userDataPublisher, c.Log)
 
-	// Create User Data Stream Factory
-	factory := websocket.NewUserDataStreamFactory(c.Log)
+	// Create inline factory (to avoid import cycle)
+	factory := &inlineUserDataFactory{log: c.Log}
 
 	// Create User Data Manager
 	config := websocket.UserDataManagerConfig{
@@ -49,6 +56,40 @@ func (c *Container) MustInitUserDataManager() {
 	}
 
 	c.Log.Info("✓ User Data WebSocket Manager initialized")
+}
+
+// inlineUserDataFactory creates exchange-specific User Data clients
+type inlineUserDataFactory struct {
+	log *logger.Logger
+}
+
+func (f *inlineUserDataFactory) Create(
+	exchange exchange_account.ExchangeType,
+	accountID uuid.UUID,
+	userID uuid.UUID,
+	handler websocket.UserDataEventHandler,
+	useTestnet bool,
+) (websocket.UserDataStreamer, error) {
+	switch exchange {
+	case exchange_account.ExchangeBinance:
+		return binance.NewUserDataClient(
+			accountID,
+			userID,
+			string(exchange),
+			handler,
+			useTestnet,
+			f.log,
+		), nil
+
+	case exchange_account.ExchangeBybit:
+		return nil, fmt.Errorf("bybit user data websocket not yet implemented")
+
+	case exchange_account.ExchangeOKX:
+		return nil, fmt.Errorf("okx user data websocket not yet implemented")
+
+	default:
+		return nil, fmt.Errorf("unsupported exchange for user data websocket: %s", exchange)
+	}
 }
 
 // provideUserDataConsumer creates a unified User Data consumer service
@@ -78,4 +119,3 @@ func (c *Container) MustInitUserDataConsumer() {
 
 	c.Log.Info("✓ User Data Consumer initialized")
 }
-

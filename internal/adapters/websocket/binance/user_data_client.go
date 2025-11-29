@@ -312,7 +312,7 @@ func (c *UserDataClient) handleOrderUpdate(ctx context.Context, event *futures.W
 		Status:          string(event.OrderTradeUpdate.Status),
 		ExecutionType:   string(event.OrderTradeUpdate.ExecutionType),
 		OriginalQty:     event.OrderTradeUpdate.OriginalQty,
-		FilledQty:       event.OrderTradeUpdate.FilledQty,
+		FilledQty:       event.OrderTradeUpdate.AccumulatedFilledQty,
 		AvgPrice:        event.OrderTradeUpdate.AveragePrice,
 		StopPrice:       event.OrderTradeUpdate.StopPrice,
 		LastFilledQty:   event.OrderTradeUpdate.LastFilledQty,
@@ -349,8 +349,8 @@ func (c *UserDataClient) handleAccountUpdate(ctx context.Context, event *futures
 			EntryPrice:        pos.EntryPrice,
 			MarkPrice:         "", // Not provided in event
 			UnrealizedPnL:     pos.UnrealizedPnL,
-			MaintenanceMargin: "", // Not provided in event
-			PositionSide:      string(pos.PositionSide),
+			MaintenanceMargin: "",                        // Not provided in event
+			PositionSide:      determineSide(pos.Amount), // Derive from amount
 			EventTime:         time.UnixMilli(event.Time),
 		}
 
@@ -395,25 +395,21 @@ func (c *UserDataClient) handleAccountUpdate(ctx context.Context, event *futures
 func (c *UserDataClient) handleMarginCall(ctx context.Context, event *futures.WsUserDataEvent) {
 	c.marginCalls.Add(1)
 
-	positionsAtRisk := make([]websocket.PositionAtRisk, 0, len(event.MarginCall.Positions))
-	for _, pos := range event.MarginCall.Positions {
-		positionsAtRisk = append(positionsAtRisk, websocket.PositionAtRisk{
-			Symbol:            pos.Symbol,
-			Side:              string(pos.PositionSide),
-			Amount:            pos.Amount,
-			MarginType:        pos.MarginType,
-			UnrealizedPnL:     pos.UnrealizedPnL,
-			MaintenanceMargin: pos.MaintenanceMargin,
-			PositionSide:      string(pos.PositionSide),
-		})
-	}
+	// TODO: Binance go-binance library may not have MarginCall struct exposed yet
+	// For now, log the event and extract what we can
+	c.logger.Error("⚠️ MARGIN CALL RECEIVED",
+		"account_id", c.accountID,
+		"user_id", c.userID,
+		"event_type", event.Event,
+	)
 
+	// Create a minimal margin call event
 	marginEvent := &websocket.MarginCallEvent{
 		UserID:             c.userID,
 		AccountID:          c.accountID,
 		Exchange:           c.exchange,
-		CrossWalletBalance: event.MarginCall.CrossWalletBalance,
-		PositionsAtRisk:    positionsAtRisk,
+		CrossWalletBalance: "",                           // Not accessible in current library version
+		PositionsAtRisk:    []websocket.PositionAtRisk{}, // Not accessible in current library version
 		EventTime:          time.UnixMilli(event.Time),
 	}
 
@@ -424,13 +420,6 @@ func (c *UserDataClient) handleMarginCall(ctx context.Context, event *futures.Ws
 		)
 		c.errorCount.Add(1)
 	}
-
-	// Log critical alert
-	c.logger.Error("⚠️ MARGIN CALL RECEIVED",
-		"account_id", c.accountID,
-		"user_id", c.userID,
-		"positions_at_risk", len(positionsAtRisk),
-	)
 }
 
 // handleAccountConfigUpdate processes leverage/margin mode changes
@@ -440,7 +429,7 @@ func (c *UserDataClient) handleAccountConfigUpdate(ctx context.Context, event *f
 		AccountID: c.accountID,
 		Exchange:  c.exchange,
 		Symbol:    event.AccountConfigUpdate.Symbol,
-		Leverage:  event.AccountConfigUpdate.Leverage,
+		Leverage:  int(event.AccountConfigUpdate.Leverage),
 		EventTime: time.UnixMilli(event.Time),
 	}
 

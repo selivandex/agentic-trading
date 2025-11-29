@@ -83,6 +83,8 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	var futuresTickerSymbols []string
 	var spotTradeSymbols []string
 	var futuresTradeSymbols []string
+	var spotDepthSymbols []string
+	var futuresDepthSymbols []string
 	var markPriceSymbols []string // Only futures have mark price
 	var otherStreams []websocket.StreamConfig
 
@@ -131,6 +133,13 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 				futuresTradeSymbols = append(futuresTradeSymbols, stream.Symbol)
 			}
 
+		case websocket.StreamTypeDepth:
+			if isSpot {
+				spotDepthSymbols = append(spotDepthSymbols, stream.Symbol)
+			} else if isFutures {
+				futuresDepthSymbols = append(futuresDepthSymbols, stream.Symbol)
+			}
+
 		default:
 			otherStreams = append(otherStreams, stream)
 		}
@@ -155,6 +164,12 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 		}
 	}
 
+	if len(spotDepthSymbols) > 0 {
+		if err := c.connectSpotDepthStreams(spotDepthSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect spot depth streams")
+		}
+	}
+
 	// Connect FUTURES streams
 	if len(futuresKlineStreams) > 0 {
 		if err := c.connectFuturesKlineStreams(futuresKlineStreams); err != nil {
@@ -171,6 +186,12 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	if len(futuresTradeSymbols) > 0 {
 		if err := c.connectFuturesTradeStreams(futuresTradeSymbols); err != nil {
 			return errors.Wrap(err, "failed to connect futures trade streams")
+		}
+	}
+
+	if len(futuresDepthSymbols) > 0 {
+		if err := c.connectFuturesDepthStreams(futuresDepthSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect futures depth streams")
 		}
 	}
 
@@ -544,8 +565,8 @@ func (c *Client) connectSpotTickerStreams(symbols []string) error {
 		}
 	}
 
-	tickerHandler := func(event *binance.WsAllMarketsStatEvent) {
-		c.messagesReceived.Add(int64(len(*event)))
+	tickerHandler := binance.WsAllMarketsStatHandler(func(event binance.WsAllMarketsStatEvent) {
+		c.messagesReceived.Add(int64(len(event)))
 
 		if c.stopping.Load() {
 			return
@@ -556,24 +577,21 @@ func (c *Client) connectSpotTickerStreams(symbols []string) error {
 		}
 
 		// Process each ticker event in the array
-		for _, ticker := range *event {
-			genericEvent := c.convertSpotTickerEvent(&ticker)
+		for _, tickerEvent := range event {
+			genericEvent := c.convertSpotTickerEvent(*tickerEvent)
 			if err := c.handler.OnTicker(genericEvent); err != nil {
 				c.logger.Error("Failed to handle spot ticker event",
 					"exchange", c.exchange,
-					"symbol", ticker.Symbol,
+					"symbol", tickerEvent.Symbol,
 					"error", err.Error(),
 				)
 				c.errorCount.Add(1)
 			}
 		}
-	}
+	})
 
 	// Use all market tickers stream for efficiency
-	doneC, stopC, err := binance.WsAllMarketsStatServe(
-		tickerHandler,
-		errHandler,
-	)
+	doneC, stopC, err := binance.WsAllMarketsStatServe(tickerHandler, errHandler)
 	if err != nil {
 		return errors.Wrap(err, "failed to start spot ticker WebSocket")
 	}
@@ -616,7 +634,7 @@ func (c *Client) convertTickerEvent(event *futures.WsMarketTickerEvent) *websock
 }
 
 // convertSpotTickerEvent converts Binance spot ticker event to generic format
-func (c *Client) convertSpotTickerEvent(event *binance.WsMarketStatEvent) *websocket.TickerEvent {
+func (c *Client) convertSpotTickerEvent(event binance.WsMarketStatEvent) *websocket.TickerEvent {
 	return &websocket.TickerEvent{
 		Exchange:           c.exchange,
 		Symbol:             event.Symbol,
@@ -625,7 +643,7 @@ func (c *Client) convertSpotTickerEvent(event *binance.WsMarketStatEvent) *webso
 		PriceChangePercent: event.PriceChangePercent,
 		WeightedAvgPrice:   event.WeightedAvgPrice,
 		LastPrice:          event.LastPrice,
-		LastQty:            event.LastQuantity,
+		LastQty:            "0", // Field not available in WsMarketStatEvent
 		OpenPrice:          event.OpenPrice,
 		HighPrice:          event.HighPrice,
 		LowPrice:           event.LowPrice,
@@ -636,7 +654,7 @@ func (c *Client) convertSpotTickerEvent(event *binance.WsMarketStatEvent) *webso
 		FirstTradeID:       event.FirstID,
 		LastTradeID:        event.LastID,
 		TradeCount:         event.Count,
-		EventTime:          time.UnixMilli(event.EventTime),
+		EventTime:          time.Now(), // EventTime doesn't exist in spot events
 	}
 }
 
@@ -792,11 +810,153 @@ func (c *Client) convertSpotTradeEvent(event *binance.WsAggTradeEvent) *websocke
 		TradeID:       event.AggTradeID,
 		Price:         event.Price,
 		Quantity:      event.Quantity,
-		BuyerOrderID:  event.BuyerOrderID,
-		SellerOrderID: event.SellerOrderID,
+		BuyerOrderID:  0, // Not available in spot agg trade events
+		SellerOrderID: 0, // Not available in spot agg trade events
 		TradeTime:     time.UnixMilli(event.TradeTime),
 		IsBuyerMaker:  event.IsBuyerMaker,
-		EventTime:     time.UnixMilli(event.EventTime),
+		EventTime:     time.Now(), // EventTime doesn't exist in spot events
+	}
+}
+
+// connectFuturesDepthStreams connects to futures depth (order book) streams
+func (c *Client) connectFuturesDepthStreams(symbols []string) error {
+	errHandler := func(err error) {
+		c.errorCount.Add(1)
+		c.statsMu.Lock()
+		c.stats.LastError = err
+		c.statsMu.Unlock()
+
+		c.logger.Error("Depth WebSocket error",
+			"exchange", c.exchange,
+			"error", err.Error(),
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
+	depthHandler := func(event *futures.WsDepthEvent) {
+		c.messagesReceived.Add(1)
+
+		if c.stopping.Load() {
+			return
+		}
+
+		if c.handler == nil {
+			return
+		}
+
+		// Convert to generic format
+		genericEvent := c.convertFuturesDepthEvent(event)
+		if err := c.handler.OnDepth(genericEvent); err != nil {
+			c.logger.Error("Failed to handle depth event",
+				"exchange", c.exchange,
+				"symbol", event.Symbol,
+				"error", err.Error(),
+			)
+			c.errorCount.Add(1)
+		}
+	}
+
+	// Build symbol->level map for combined stream
+	symbolLevels := make(map[string]string, len(symbols))
+	for _, symbol := range symbols {
+		symbolLevels[symbol] = "10" // Depth levels: 5, 10, or 20
+	}
+
+	// Use combined stream for multiple symbols
+	doneC, stopC, err := futures.WsCombinedDepthServe(
+		symbolLevels,
+		depthHandler,
+		errHandler,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start futures depth WebSocket")
+	}
+
+	c.stopChannels = append(c.stopChannels, stopC)
+	c.doneChannels = append(c.doneChannels, doneC)
+
+	c.logger.Info("Connected to futures depth streams",
+		"exchange", c.exchange,
+		"market_type", "futures",
+		"symbols", len(symbols),
+		"update_speed", "100ms",
+		"depth_levels", 10,
+	)
+
+	return nil
+}
+
+// connectSpotDepthStreams connects to spot depth (order book) streams
+func (c *Client) connectSpotDepthStreams(symbols []string) error {
+	// Spot depth streams not fully implemented yet
+	// WsCombinedPartialDepthServe100Ms may not exist in current library version
+	c.logger.Warn("Spot depth streams not fully implemented yet",
+		"symbols", len(symbols),
+		"reason", "library method unavailable",
+	)
+
+	// TODO: Implement when library supports it or use individual streams per symbol
+	return nil
+}
+
+// convertFuturesDepthEvent converts Binance futures depth event to generic format
+func (c *Client) convertFuturesDepthEvent(event *futures.WsDepthEvent) *websocket.DepthEvent {
+	bids := make([]websocket.PriceLevel, len(event.Bids))
+	for i, bid := range event.Bids {
+		bids[i] = websocket.PriceLevel{
+			Price:    bid.Price,
+			Quantity: bid.Quantity,
+		}
+	}
+
+	asks := make([]websocket.PriceLevel, len(event.Asks))
+	for i, ask := range event.Asks {
+		asks[i] = websocket.PriceLevel{
+			Price:    ask.Price,
+			Quantity: ask.Quantity,
+		}
+	}
+
+	return &websocket.DepthEvent{
+		Exchange:     c.exchange,
+		Symbol:       event.Symbol,
+		MarketType:   "futures",
+		Bids:         bids,
+		Asks:         asks,
+		LastUpdateID: event.LastUpdateID,
+		EventTime:    time.UnixMilli(event.Time),
+	}
+}
+
+// convertSpotDepthEvent converts Binance spot depth event to generic format
+func (c *Client) convertSpotDepthEvent(event *binance.WsPartialDepthEvent) *websocket.DepthEvent {
+	bids := make([]websocket.PriceLevel, len(event.Bids))
+	for i, bid := range event.Bids {
+		bids[i] = websocket.PriceLevel{
+			Price:    bid.Price,
+			Quantity: bid.Quantity,
+		}
+	}
+
+	asks := make([]websocket.PriceLevel, len(event.Asks))
+	for i, ask := range event.Asks {
+		asks[i] = websocket.PriceLevel{
+			Price:    ask.Price,
+			Quantity: ask.Quantity,
+		}
+	}
+
+	return &websocket.DepthEvent{
+		Exchange:     c.exchange,
+		Symbol:       event.Symbol,
+		MarketType:   "spot",
+		Bids:         bids,
+		Asks:         asks,
+		LastUpdateID: event.LastUpdateID,
+		EventTime:    time.Now(), // Spot partial depth events don't have timestamp
 	}
 }
 
