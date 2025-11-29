@@ -1190,25 +1190,38 @@ func (c *Client) Stop(ctx context.Context) error {
 		close(done)
 	}()
 
-	timeout := 10 * time.Second
+	// Reduced timeout: WebSocketPublisher.Shutdown() prevents further events from being published
+	// so it's safe to force-stop streams that don't respond quickly
+	timeout := 5 * time.Second
 	select {
 	case <-done:
 		c.logger.Infow("All WebSocket streams stopped gracefully",
 			"exchange", c.exchange,
 		)
 	case <-time.After(timeout):
-		c.logger.Errorw("WebSocket stop timeout, some streams may still be running",
+		c.logger.Warnw("WebSocket stop timeout, forcing shutdown",
 			"exchange", c.exchange,
 			"timeout", timeout,
+			"note", "WebSocketPublisher already stopped, so no new events will be published",
 		)
-		return errors.New("websocket stop timeout")
+		// Force close all stop channels to unblock any remaining goroutines
+		for i, stopC := range c.stopChannels {
+			select {
+			case <-stopC:
+				// Already closed
+			default:
+				c.logger.Debugw("Force closing stop channel", "stream", i)
+				close(stopC)
+			}
+		}
 	}
 
+	// Always mark as disconnected, even on timeout
 	c.connected.Store(false)
 	c.stopChannels = nil
 	c.doneChannels = nil
 
-	c.logger.Infow("✓ WebSocket client fully stopped",
+	c.logger.Infow("✓ WebSocket client stopped",
 		"exchange", c.exchange,
 	)
 

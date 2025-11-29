@@ -53,4 +53,7 @@ func main() {
 	container.Shutdown()
 
 	log.Info("👋 Shutdown complete. Goodbye!")
+
+	// Exit with success code - graceful shutdown completed
+	os.Exit(0)
 }

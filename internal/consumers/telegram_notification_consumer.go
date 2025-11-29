@@ -59,7 +59,7 @@ func (tnc *TelegramNotificationConsumer) Start(ctx context.Context) error {
 
 	// Consume messages (blocks until message or ctx cancelled)
 	for {
-		msg, err := tnc.consumer.ReadMessage(ctx)
+		msg, err := tnc.consumer.ReadMessageWithShutdownCheck(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				tnc.log.Info("Telegram notification consumer stopping (context cancelled)")

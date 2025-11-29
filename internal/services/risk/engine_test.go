@@ -54,7 +54,7 @@ func (m *mockRiskRepo) ResetDaily(ctx context.Context) error {
 		state.ConsecutiveLosses = 0
 		state.IsTriggered = false
 		state.TriggeredAt = nil
-		state.TriggerReason = ""
+		state.TriggerReason = nil
 	}
 	return nil
 }

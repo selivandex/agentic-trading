@@ -34,6 +34,7 @@ import (
 	domainsession "prometheus/internal/domain/session"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
+	"prometheus/internal/events"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
 	riskservice "prometheus/internal/services/risk"
@@ -153,8 +154,9 @@ type Adapters struct {
 	EmbeddingProvider embeddings.Provider
 
 	// WebSocket
-	WebSocketClients *WebSocketClients
-	UserDataManager  *UserDataManager
+	WebSocketClients   *WebSocketClients
+	WebSocketPublisher *events.WebSocketPublisher
+	UserDataManager    *UserDataManager
 }
 
 // Business groups business logic components
@@ -342,6 +344,14 @@ func (c *Container) startConsumers() error {
 				}{"websocket_depth", c.Background.WebSocketDepthSvc})
 				consumerNames = append(consumerNames, "websocket_depth")
 			}
+		case "liquidation":
+			if c.Background.WebSocketLiquidationSvc != nil {
+				consumers = append(consumers, struct {
+					name string
+					svc  interface{ Start(context.Context) error }
+				}{"websocket_liquidation", c.Background.WebSocketLiquidationSvc})
+				consumerNames = append(consumerNames, "websocket_liquidation")
+			}
 		}
 	}
 
@@ -384,6 +394,13 @@ func (c *Container) Shutdown() {
 		c.Log.Error("Error stopping WebSocket clients", "error", err)
 	} else {
 		c.Log.Info("✓ WebSocket clients stopped")
+	}
+
+	// Step 0.5: Shutdown WebSocketPublisher to prevent any remaining goroutines from publishing
+	// This is critical: even if WebSocket clients timeout, no more events will reach Kafka
+	if c.Adapters.WebSocketPublisher != nil {
+		c.Adapters.WebSocketPublisher.Shutdown()
+		c.Log.Info("✓ WebSocket publisher stopped accepting new events")
 	}
 
 	// Cancel application context to signal all other components to stop

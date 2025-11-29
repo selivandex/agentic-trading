@@ -67,7 +67,7 @@ func (c *AIUsageConsumer) Start(ctx context.Context) error {
 
 	// Consume messages from Kafka
 	for {
-		msg, err := c.consumer.ReadMessage(ctx)
+		msg, err := c.consumer.ReadMessageWithShutdownCheck(ctx)
 		if err != nil {
 			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {

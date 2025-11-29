@@ -64,7 +64,7 @@ func (nc *NotificationConsumer) Start(ctx context.Context) error {
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
-		msg, err := nc.consumer.ReadMessage(ctx)
+		msg, err := nc.consumer.ReadMessageWithShutdownCheck(ctx)
 		if err != nil {
 			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {

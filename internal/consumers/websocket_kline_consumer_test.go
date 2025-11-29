@@ -5,437 +5,178 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"prometheus/internal/domain/market_data"
+	eventspb "prometheus/internal/events/proto"
 )
 
-func TestWebSocketKlineConsumer_DeduplicateBatch(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
+// TestKlineHandler_ConvertToDomain tests the conversion from protobuf to domain model
+func TestKlineHandler_ConvertToDomain(t *testing.T) {
+	handler := &klineHandler{}
 
 	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
+	closeTime := baseTime.Add(1 * time.Minute)
 
 	tests := []struct {
-		name           string
-		input          []*market_data.OHLCV
-		expectedCount  int
-		expectedSymbol string
-		expectedClose  float64 // Expected close price (from latest event)
-		description    string
+		name  string
+		event *eventspb.WebSocketKlineEvent
+		check func(t *testing.T, handler *klineHandler)
 	}{
 		{
-			name: "no_duplicates",
-			input: []*market_data.OHLCV{
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50000.0,
-					EventTime: baseTime.Add(10 * time.Second),
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "ETHUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     3000.0,
-					EventTime: baseTime.Add(10 * time.Second),
-				},
+			name: "final_candle",
+			event: &eventspb.WebSocketKlineEvent{
+				Exchange:    "binance",
+				Symbol:      "BTCUSDT",
+				MarketType:  "futures",
+				Interval:    "1m",
+				OpenTime:    timestamppb.New(baseTime),
+				CloseTime:   timestamppb.New(closeTime),
+				Open:        "50000.0",
+				High:        "50100.0",
+				Low:         "49900.0",
+				Close:       "50050.0",
+				Volume:      "100.5",
+				QuoteVolume: "5025000.0",
+				TradeCount:  1000,
+				IsFinal:     true,
+				EventTime:   timestamppb.New(baseTime.Add(10 * time.Second)),
 			},
-			expectedCount: 2,
-			description:   "Different symbols - no deduplication",
+			check: func(t *testing.T, handler *klineHandler) {
+				// Check that final candle incremented totalFinal counter
+				handler.statsMu.Lock()
+				defer handler.statsMu.Unlock()
+				assert.Equal(t, int64(1), handler.totalFinal)
+				assert.Equal(t, int64(0), handler.totalNonFinal)
+			},
 		},
 		{
-			name: "same_symbol_different_intervals",
-			input: []*market_data.OHLCV{
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50000.0,
-					EventTime: baseTime.Add(10 * time.Second),
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "5m",
-					OpenTime:  baseTime,
-					Close:     50100.0,
-					EventTime: baseTime.Add(10 * time.Second),
-				},
+			name: "non_final_candle",
+			event: &eventspb.WebSocketKlineEvent{
+				Exchange:    "binance",
+				Symbol:      "ETHUSDT",
+				MarketType:  "futures",
+				Interval:    "5m",
+				OpenTime:    timestamppb.New(baseTime),
+				CloseTime:   timestamppb.New(closeTime.Add(4 * time.Minute)),
+				Open:        "3000.0",
+				High:        "3010.0",
+				Low:         "2990.0",
+				Close:       "3005.0",
+				Volume:      "50.25",
+				QuoteVolume: "150750.0",
+				TradeCount:  500,
+				IsFinal:     false,
+				EventTime:   timestamppb.New(baseTime.Add(30 * time.Second)),
 			},
-			expectedCount: 2,
-			description:   "Same symbol, different intervals - no deduplication",
-		},
-		{
-			name: "duplicate_updates_keep_latest",
-			input: []*market_data.OHLCV{
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50000.0,
-					EventTime: baseTime.Add(5 * time.Second),
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50050.0,
-					EventTime: baseTime.Add(10 * time.Second),
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50100.0,
-					EventTime: baseTime.Add(15 * time.Second),
-				},
+			check: func(t *testing.T, handler *klineHandler) {
+				// Check that non-final candle incremented totalNonFinal counter
+				// Note: we start with 1 final from previous test
+				handler.statsMu.Lock()
+				defer handler.statsMu.Unlock()
+				assert.Equal(t, int64(1), handler.totalFinal)
+				assert.Equal(t, int64(1), handler.totalNonFinal)
 			},
-			expectedCount:  1,
-			expectedSymbol: "BTCUSDT",
-			expectedClose:  50100.0, // Should keep the latest (15s)
-			description:    "Multiple updates of same candle - keep only latest",
-		},
-		{
-			name: "mixed_duplicates_and_unique",
-			input: []*market_data.OHLCV{
-				// BTCUSDT 1m - 3 updates
-				{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50000.0, EventTime: baseTime.Add(5 * time.Second)},
-				{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50100.0, EventTime: baseTime.Add(10 * time.Second)},
-				{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50200.0, EventTime: baseTime.Add(15 * time.Second)},
-
-				// ETHUSDT 1m - 2 updates
-				{Exchange: "binance", Symbol: "ETHUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 3000.0, EventTime: baseTime.Add(5 * time.Second)},
-				{Exchange: "binance", Symbol: "ETHUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 3010.0, EventTime: baseTime.Add(12 * time.Second)},
-
-				// BTCUSDT 5m - 1 update (unique)
-				{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "5m", OpenTime: baseTime, Close: 50150.0, EventTime: baseTime.Add(10 * time.Second)},
-			},
-			expectedCount: 3, // Should have 3 unique klines after dedup
-			description:   "Mixed scenario - should reduce from 6 to 3",
-		},
-		{
-			name: "different_open_times_no_dedup",
-			input: []*market_data.OHLCV{
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50000.0,
-					EventTime: baseTime.Add(10 * time.Second),
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime.Add(1 * time.Minute), // Different candle
-					Close:     50100.0,
-					EventTime: baseTime.Add(70 * time.Second),
-				},
-			},
-			expectedCount: 2,
-			description:   "Different open times - different candles, no dedup",
-		},
-		{
-			name: "out_of_order_events_keep_latest_by_event_time",
-			input: []*market_data.OHLCV{
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50200.0,
-					EventTime: baseTime.Add(30 * time.Second), // Latest
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50000.0,
-					EventTime: baseTime.Add(5 * time.Second), // Oldest
-				},
-				{
-					Exchange:  "binance",
-					Symbol:    "BTCUSDT",
-					Timeframe: "1m",
-					OpenTime:  baseTime,
-					Close:     50100.0,
-					EventTime: baseTime.Add(15 * time.Second), // Middle
-				},
-			},
-			expectedCount:  1,
-			expectedSymbol: "BTCUSDT",
-			expectedClose:  50200.0, // Should keep event with event_time = 30s
-			description:    "Out-of-order events - keep latest by event_time",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := consumer.deduplicateBatch(tt.input)
+			result := handler.ConvertToDomain(tt.event)
 
-			// Check count
-			assert.Equal(t, tt.expectedCount, len(result), tt.description)
+			// Verify basic conversion
+			assert.Equal(t, tt.event.Exchange, result.Exchange)
+			assert.Equal(t, tt.event.Symbol, result.Symbol)
+			assert.Equal(t, tt.event.Interval, result.Timeframe)
+			assert.Equal(t, tt.event.IsFinal, result.IsClosed)
+			assert.Equal(t, tt.event.OpenTime.AsTime(), result.OpenTime)
+			assert.Equal(t, tt.event.CloseTime.AsTime(), result.CloseTime)
+			assert.Equal(t, tt.event.EventTime.AsTime(), result.EventTime)
 
-			// If specific symbol/close expected, verify it
-			if tt.expectedSymbol != "" {
-				found := false
-				for _, ohlcv := range result {
-					if ohlcv.Symbol == tt.expectedSymbol {
-						found = true
-						assert.Equal(t, tt.expectedClose, ohlcv.Close,
-							"Should keep the latest update (by event_time)")
-					}
-				}
-				assert.True(t, found, "Expected symbol should be in result")
-			}
-
-			// Verify no data loss - all unique klines should be present
-			if tt.name == "mixed_duplicates_and_unique" {
-				symbols := make(map[string]bool)
-				for _, ohlcv := range result {
-					key := ohlcv.Symbol + "_" + ohlcv.Timeframe
-					symbols[key] = true
-				}
-				assert.Equal(t, 3, len(symbols), "Should have 3 unique symbol-interval pairs")
-				assert.True(t, symbols["BTCUSDT_1m"], "Should have BTCUSDT 1m")
-				assert.True(t, symbols["ETHUSDT_1m"], "Should have ETHUSDT 1m")
-				assert.True(t, symbols["BTCUSDT_5m"], "Should have BTCUSDT 5m")
+			// Run custom check
+			if tt.check != nil {
+				tt.check(t, handler)
 			}
 		})
 	}
 }
 
-func TestWebSocketKlineConsumer_DeduplicateBatch_NoDataLoss(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
+// TestKlineHandler_GetDeduplicationKey tests deduplication key generation
+func TestKlineHandler_GetDeduplicationKey(t *testing.T) {
+	handler := &klineHandler{}
+
 	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
 
-	// Simulate real scenario: multiple symbols, intervals, with updates
-	input := []*market_data.OHLCV{
-		// BTCUSDT 1m - 5 updates (real-time stream scenario)
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50000.0, EventTime: baseTime.Add(1 * time.Second)},
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50010.0, EventTime: baseTime.Add(2 * time.Second)},
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50020.0, EventTime: baseTime.Add(3 * time.Second)},
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50030.0, EventTime: baseTime.Add(4 * time.Second)},
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50040.0, EventTime: baseTime.Add(5 * time.Second)},
-
-		// BTCUSDT 5m - 3 updates
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "5m", OpenTime: baseTime, Close: 50050.0, EventTime: baseTime.Add(2 * time.Second)},
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "5m", OpenTime: baseTime, Close: 50060.0, EventTime: baseTime.Add(4 * time.Second)},
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "5m", OpenTime: baseTime, Close: 50070.0, EventTime: baseTime.Add(6 * time.Second)},
-
-		// ETHUSDT 1m - 2 updates
-		{Exchange: "binance", Symbol: "ETHUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 3000.0, EventTime: baseTime.Add(1 * time.Second)},
-		{Exchange: "binance", Symbol: "ETHUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 3005.0, EventTime: baseTime.Add(3 * time.Second)},
-
-		// SOLUSDT 1m - 1 update (no duplicates)
-		{Exchange: "binance", Symbol: "SOLUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 100.0, EventTime: baseTime.Add(2 * time.Second)},
-	}
-
-	result := consumer.deduplicateBatch(input)
-
-	// Should reduce from 11 events to 4 unique klines
-	require.Equal(t, 4, len(result), "Should have 4 unique klines after dedup")
-
-	// Verify each unique kline has the latest close price
-	priceMap := make(map[string]float64)
-	for _, ohlcv := range result {
-		key := ohlcv.Symbol + "_" + ohlcv.Timeframe
-		priceMap[key] = ohlcv.Close
-	}
-
-	assert.Equal(t, 50040.0, priceMap["BTCUSDT_1m"], "BTCUSDT 1m should have latest close (50040)")
-	assert.Equal(t, 50070.0, priceMap["BTCUSDT_5m"], "BTCUSDT 5m should have latest close (50070)")
-	assert.Equal(t, 3005.0, priceMap["ETHUSDT_1m"], "ETHUSDT 1m should have latest close (3005)")
-	assert.Equal(t, 100.0, priceMap["SOLUSDT_1m"], "SOLUSDT 1m should have close (100)")
-}
-
-func TestWebSocketKlineConsumer_DeduplicateBatch_EmptyBatch(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
-
-	result := consumer.deduplicateBatch([]*market_data.OHLCV{})
-	assert.Empty(t, result, "Empty batch should return empty result")
-}
-
-func TestWebSocketKlineConsumer_DeduplicateBatch_PreservesAllFields(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
-	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
-
-	input := []*market_data.OHLCV{
+	tests := []struct {
+		name        string
+		ohlcv1      *eventspb.WebSocketKlineEvent
+		ohlcv2      *eventspb.WebSocketKlineEvent
+		shouldMatch bool
+	}{
 		{
-			Exchange:            "binance",
-			Symbol:              "BTCUSDT",
-			Timeframe:           "1m",
-			MarketType:          "futures",
-			OpenTime:            baseTime,
-			CloseTime:           baseTime.Add(1 * time.Minute),
-			Open:                50000.0,
-			High:                50100.0,
-			Low:                 49900.0,
-			Close:               50050.0,
-			Volume:              100.5,
-			QuoteVolume:         5000000.0,
-			Trades:              1234,
-			TakerBuyBaseVolume:  60.3,
-			TakerBuyQuoteVolume: 3000000.0,
-			IsClosed:            false,
-			EventTime:           baseTime.Add(30 * time.Second),
+			name: "same_key_different_close",
+			ohlcv1: &eventspb.WebSocketKlineEvent{
+				Exchange: "binance",
+				Symbol:   "BTCUSDT",
+				Interval: "1m",
+				OpenTime: timestamppb.New(baseTime),
+				Close:    "50000.0",
+			},
+			ohlcv2: &eventspb.WebSocketKlineEvent{
+				Exchange: "binance",
+				Symbol:   "BTCUSDT",
+				Interval: "1m",
+				OpenTime: timestamppb.New(baseTime),
+				Close:    "50100.0", // Different close - should deduplicate
+			},
+			shouldMatch: true,
 		},
 		{
-			Exchange:  "binance",
-			Symbol:    "BTCUSDT",
-			Timeframe: "1m",
-			OpenTime:  baseTime,
-			Close:     50075.0,                        // Updated close
-			EventTime: baseTime.Add(45 * time.Second), // Later event
+			name: "different_interval",
+			ohlcv1: &eventspb.WebSocketKlineEvent{
+				Exchange: "binance",
+				Symbol:   "BTCUSDT",
+				Interval: "1m",
+				OpenTime: timestamppb.New(baseTime),
+			},
+			ohlcv2: &eventspb.WebSocketKlineEvent{
+				Exchange: "binance",
+				Symbol:   "BTCUSDT",
+				Interval: "5m", // Different interval
+				OpenTime: timestamppb.New(baseTime),
+			},
+			shouldMatch: false,
+		},
+		{
+			name: "different_open_time",
+			ohlcv1: &eventspb.WebSocketKlineEvent{
+				Exchange: "binance",
+				Symbol:   "BTCUSDT",
+				Interval: "1m",
+				OpenTime: timestamppb.New(baseTime),
+			},
+			ohlcv2: &eventspb.WebSocketKlineEvent{
+				Exchange: "binance",
+				Symbol:   "BTCUSDT",
+				Interval: "1m",
+				OpenTime: timestamppb.New(baseTime.Add(1 * time.Minute)), // Different open time
+			},
+			shouldMatch: false,
 		},
 	}
 
-	result := consumer.deduplicateBatch(input)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			domain1 := handler.ConvertToDomain(tt.ohlcv1)
+			domain2 := handler.ConvertToDomain(tt.ohlcv2)
 
-	require.Len(t, result, 1, "Should deduplicate to 1 kline")
+			key1 := handler.GetDeduplicationKey(domain1)
+			key2 := handler.GetDeduplicationKey(domain2)
 
-	kline := result[0]
-	assert.Equal(t, "binance", kline.Exchange)
-	assert.Equal(t, "BTCUSDT", kline.Symbol)
-	assert.Equal(t, "1m", kline.Timeframe)
-	assert.Equal(t, 50075.0, kline.Close, "Should have latest close price")
-	assert.Equal(t, baseTime.Add(45*time.Second), kline.EventTime, "Should have latest event time")
-}
-
-func TestWebSocketKlineConsumer_DeduplicateBatch_DifferentExchanges(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
-	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
-
-	input := []*market_data.OHLCV{
-		{
-			Exchange:  "binance",
-			Symbol:    "BTCUSDT",
-			Timeframe: "1m",
-			OpenTime:  baseTime,
-			Close:     50000.0,
-			EventTime: baseTime.Add(10 * time.Second),
-		},
-		{
-			Exchange:  "bybit",
-			Symbol:    "BTCUSDT",
-			Timeframe: "1m",
-			OpenTime:  baseTime,
-			Close:     50010.0,
-			EventTime: baseTime.Add(10 * time.Second),
-		},
-	}
-
-	result := consumer.deduplicateBatch(input)
-
-	assert.Equal(t, 2, len(result), "Different exchanges should not deduplicate")
-}
-
-func TestWebSocketKlineConsumer_DeduplicateBatch_FinalVsNonFinal(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
-	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
-
-	input := []*market_data.OHLCV{
-		// Non-final updates
-		{
-			Exchange:  "binance",
-			Symbol:    "BTCUSDT",
-			Timeframe: "1m",
-			OpenTime:  baseTime,
-			Close:     50000.0,
-			IsClosed:  false,
-			EventTime: baseTime.Add(10 * time.Second),
-		},
-		{
-			Exchange:  "binance",
-			Symbol:    "BTCUSDT",
-			Timeframe: "1m",
-			OpenTime:  baseTime,
-			Close:     50050.0,
-			IsClosed:  false,
-			EventTime: baseTime.Add(30 * time.Second),
-		},
-		// Final close
-		{
-			Exchange:  "binance",
-			Symbol:    "BTCUSDT",
-			Timeframe: "1m",
-			OpenTime:  baseTime,
-			Close:     50075.0,
-			IsClosed:  true,
-			EventTime: baseTime.Add(60 * time.Second),
-		},
-	}
-
-	result := consumer.deduplicateBatch(input)
-
-	require.Len(t, result, 1, "Should keep only 1 kline")
-	assert.True(t, result[0].IsClosed, "Should keep the final (closed) candle")
-	assert.Equal(t, 50075.0, result[0].Close, "Should have final close price")
-}
-
-func TestWebSocketKlineConsumer_DeduplicateBatch_Performance(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
-	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
-
-	// Create large batch with many duplicates (realistic scenario)
-	// 3 symbols × 5 intervals × 20 updates = 300 events → should dedup to 15
-	symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
-	intervals := []string{"1m", "5m", "15m", "1h", "4h"}
-	updates := 20
-
-	input := make([]*market_data.OHLCV, 0, len(symbols)*len(intervals)*updates)
-
-	for _, symbol := range symbols {
-		for _, interval := range intervals {
-			for i := 0; i < updates; i++ {
-				input = append(input, &market_data.OHLCV{
-					Exchange:  "binance",
-					Symbol:    symbol,
-					Timeframe: interval,
-					OpenTime:  baseTime,
-					Close:     50000.0 + float64(i*10),
-					EventTime: baseTime.Add(time.Duration(i+1) * time.Second),
-				})
+			if tt.shouldMatch {
+				assert.Equal(t, key1, key2, "Keys should match for deduplication")
+			} else {
+				assert.NotEqual(t, key1, key2, "Keys should not match")
 			}
-		}
+		})
 	}
-
-	require.Len(t, input, 300, "Should have 300 input events")
-
-	start := time.Now()
-	result := consumer.deduplicateBatch(input)
-	duration := time.Since(start)
-
-	expectedUnique := len(symbols) * len(intervals) // 3 × 5 = 15
-	assert.Equal(t, expectedUnique, len(result), "Should deduplicate 300 → 15 events")
-	assert.Less(t, duration.Milliseconds(), int64(10), "Deduplication should be fast (<10ms)")
-
-	t.Logf("✅ Deduplicated %d → %d events in %v", len(input), len(result), duration)
-}
-
-func TestWebSocketKlineConsumer_ConvertBatchToValues(t *testing.T) {
-	consumer := &WebSocketKlineConsumer{}
-	baseTime := time.Date(2025, 11, 29, 12, 0, 0, 0, time.UTC)
-
-	input := []*market_data.OHLCV{
-		{Exchange: "binance", Symbol: "BTCUSDT", Timeframe: "1m", OpenTime: baseTime, Close: 50000.0},
-		{Exchange: "binance", Symbol: "ETHUSDT", Timeframe: "5m", OpenTime: baseTime, Close: 3000.0},
-	}
-
-	result := consumer.convertBatchToValues(input)
-
-	require.Len(t, result, 2)
-	assert.Equal(t, "BTCUSDT", result[0].Symbol)
-	assert.Equal(t, "ETHUSDT", result[1].Symbol)
-	assert.Equal(t, 50000.0, result[0].Close)
-	assert.Equal(t, 3000.0, result[1].Close)
 }

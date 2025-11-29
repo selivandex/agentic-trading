@@ -59,27 +59,27 @@ func NewConsumer(cfg ConsumerConfig) *Consumer {
 type MessageHandler func(ctx context.Context, msg kafka.Message) error
 
 // Consume starts consuming messages and calling the handler
+// Uses ReadMessageWithShutdownCheck internally for graceful shutdown
 func (c *Consumer) Consume(ctx context.Context, handler MessageHandler) error {
 	c.log.Info("Starting consumer...")
 
 	for {
-		select {
-		case <-ctx.Done():
-			c.log.Info("Consumer stopped")
-			return ctx.Err()
-		default:
-			msg, err := c.reader.ReadMessage(ctx)
-			if err != nil {
-				c.log.Errorf("Failed to read message: %v", err)
-				continue
+		msg, err := c.ReadMessageWithShutdownCheck(ctx)
+		if err != nil {
+			// Check if shutdown was requested
+			if ctx.Err() != nil {
+				c.log.Info("Consumer stopped")
+				return ctx.Err()
 			}
+			c.log.Errorf("Failed to read message: %v", err)
+			continue
+		}
 
-			c.log.Debugf("Received message: key=%s", string(msg.Key))
+		c.log.Debugf("Received message: key=%s", string(msg.Key))
 
-			if err := handler(ctx, msg); err != nil {
-				c.log.Errorf("Failed to handle message: %v", err)
-				// Continue processing other messages even if one fails
-			}
+		if err := handler(ctx, msg); err != nil {
+			c.log.Errorf("Failed to handle message: %v", err)
+			// Continue processing other messages even if one fails
 		}
 	}
 }
@@ -87,6 +87,49 @@ func (c *Consumer) Consume(ctx context.Context, handler MessageHandler) error {
 // ReadMessage reads the next message (blocking until message available or ctx cancelled)
 func (c *Consumer) ReadMessage(ctx context.Context) (kafka.Message, error) {
 	return c.reader.ReadMessage(ctx)
+}
+
+// ReadMessageWithShutdownCheck reads the next message with explicit shutdown check before blocking.
+// This prevents the consumer from blocking on ReadMessage when shutdown is requested.
+//
+// Returns:
+//   - kafka.Message: the read message
+//   - error: context.Canceled if shutdown requested, or any read error
+//
+// Usage pattern:
+//
+//	for {
+//	    msg, err := consumer.ReadMessageWithShutdownCheck(ctx)
+//	    if err != nil {
+//	        if errors.Is(err, context.Canceled) {
+//	            log.Info("Consumer stopping (shutdown requested)")
+//	            return nil
+//	        }
+//	        log.Error("Failed to read message", "error", err)
+//	        continue
+//	    }
+//	    // Process message...
+//	}
+func (c *Consumer) ReadMessageWithShutdownCheck(ctx context.Context) (kafka.Message, error) {
+	// Check for shutdown signal BEFORE blocking on ReadMessage
+	// This ensures we don't block on I/O when shutdown is requested
+	select {
+	case <-ctx.Done():
+		return kafka.Message{}, ctx.Err()
+	default:
+	}
+
+	// Now safe to block on ReadMessage
+	msg, err := c.reader.ReadMessage(ctx)
+	if err != nil {
+		// Double-check if error is due to context cancellation
+		if ctx.Err() != nil {
+			return kafka.Message{}, ctx.Err()
+		}
+		return kafka.Message{}, err
+	}
+
+	return msg, nil
 }
 
 // Close closes the consumer

@@ -77,7 +77,7 @@ func (oc *OpportunityConsumer) Start(ctx context.Context) error {
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
-		msg, err := oc.consumer.ReadMessage(ctx)
+		msg, err := oc.consumer.ReadMessageWithShutdownCheck(ctx)
 		if err != nil {
 			// Check if error is due to context cancellation or reader closure
 			if ctx.Err() != nil {

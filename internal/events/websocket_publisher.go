@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"prometheus/internal/adapters/kafka"
@@ -14,7 +15,8 @@ import (
 
 // WebSocketPublisher provides methods for publishing WebSocket market data events
 type WebSocketPublisher struct {
-	kafka *kafka.Producer
+	kafka    *kafka.Producer
+	stopping atomic.Bool // Flag to prevent publishing during shutdown
 }
 
 // NewWebSocketPublisher creates a new WebSocket event publisher
@@ -227,8 +229,18 @@ func (wp *WebSocketPublisher) PublishLiquidation(
 	return wp.publishProto(ctx, TopicWebSocketLiquidation, symbol, event)
 }
 
+// Shutdown sets the stopping flag to prevent new publications
+func (wp *WebSocketPublisher) Shutdown() {
+	wp.stopping.Store(true)
+}
+
 // publishProto serializes and publishes a protobuf message
 func (wp *WebSocketPublisher) publishProto(ctx context.Context, topic, key string, msg proto.Message) error {
+	// Check if we're shutting down - silently ignore new events
+	if wp.stopping.Load() {
+		return nil
+	}
+
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return errors.Wrap(err, "marshal protobuf")

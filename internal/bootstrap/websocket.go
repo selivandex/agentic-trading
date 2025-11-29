@@ -34,6 +34,9 @@ func (c *Container) MustInitWebSocketClients() {
 	wsPublisher := events.NewWebSocketPublisher(c.Adapters.KafkaProducer)
 	wsHandler := websocket.NewKafkaEventHandler(wsPublisher, c.Log)
 
+	// Store publisher in container for graceful shutdown
+	c.Adapters.WebSocketPublisher = wsPublisher
+
 	// Initialize clients for each exchange
 	clients := &WebSocketClients{}
 
@@ -257,6 +260,22 @@ func (c *Container) buildStreamConfig() websocket.ConnectionConfig {
 						Symbol:     symbol,
 						MarketType: marketType,
 					})
+				}
+
+			case "liquidation":
+				// Create liquidation streams for all symbols (futures only!)
+				if marketType == websocket.MarketTypeFutures {
+					for _, symbol := range symbols {
+						streams = append(streams, websocket.StreamConfig{
+							Type:       websocket.StreamTypeLiquidation,
+							Symbol:     symbol,
+							MarketType: marketType,
+						})
+					}
+				} else {
+					c.Log.Debug("Skipping liquidation for spot (not supported)",
+						"market_type", marketType,
+					)
 				}
 
 			default:
