@@ -19,7 +19,7 @@ CREATE TABLE
     taker_buy_base_volume Float64,
     taker_buy_quote_volume Float64,
     is_closed Bool DEFAULT true,
-    event_time DateTime64(3),
+    event_time DateTime64 (3),
     collected_at DateTime DEFAULT now ()
   ) ENGINE = ReplacingMergeTree (event_time)
 PARTITION BY

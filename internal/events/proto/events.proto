@@ -442,3 +442,105 @@ message VolatilitySpikeEvent {
   string timeframe = 9;
 }
 
+// ==========================================
+// WebSocket Market Data Events
+// ==========================================
+
+// WebSocketKlineEvent represents a kline/candlestick event from WebSocket
+message WebSocketKlineEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string interval = 4;  // 1m, 5m, 15m, 1h, 4h, 1d, etc.
+  google.protobuf.Timestamp open_time = 5;
+  google.protobuf.Timestamp close_time = 6;
+  string open = 7;   // Price as string to avoid precision loss
+  string high = 8;
+  string low = 9;
+  string close = 10;
+  string volume = 11;
+  string quote_volume = 12;
+  int64 trade_count = 13;
+  bool is_final = 14;  // Whether the candle is closed
+  google.protobuf.Timestamp event_time = 15;
+}
+
+// WebSocketTickerEvent represents 24hr ticker statistics from WebSocket
+message WebSocketTickerEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string price_change = 4;
+  string price_change_percent = 5;
+  string weighted_avg_price = 6;
+  string last_price = 7;
+  string last_qty = 8;
+  string open_price = 9;
+  string high_price = 10;
+  string low_price = 11;
+  string volume = 12;
+  string quote_volume = 13;
+  google.protobuf.Timestamp open_time = 14;
+  google.protobuf.Timestamp close_time = 15;
+  int64 first_trade_id = 16;
+  int64 last_trade_id = 17;
+  int64 trade_count = 18;
+  google.protobuf.Timestamp event_time = 19;
+}
+
+// PriceLevel represents a single level in the order book
+message PriceLevel {
+  string price = 1;
+  string quantity = 2;
+}
+
+// WebSocketDepthEvent represents order book depth from WebSocket
+message WebSocketDepthEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  repeated PriceLevel bids = 4;
+  repeated PriceLevel asks = 5;
+  int64 last_update_id = 6;
+  google.protobuf.Timestamp event_time = 7;
+}
+
+// WebSocketTradeEvent represents a single trade from WebSocket
+message WebSocketTradeEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  int64 trade_id = 4;
+  string price = 5;
+  string quantity = 6;
+  int64 buyer_order_id = 7;
+  int64 seller_order_id = 8;
+  google.protobuf.Timestamp trade_time = 9;
+  bool is_buyer_maker = 10;
+  google.protobuf.Timestamp event_time = 11;
+}
+
+// WebSocketFundingRateEvent represents funding rate for perpetual contracts
+message WebSocketFundingRateEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string funding_rate = 4;
+  google.protobuf.Timestamp funding_time = 5;
+  google.protobuf.Timestamp next_funding_time = 6;
+  google.protobuf.Timestamp event_time = 7;
+}
+
+// WebSocketMarkPriceEvent represents mark price for derivatives
+message WebSocketMarkPriceEvent {
+  BaseEvent base = 1;
+  string exchange = 2;
+  string symbol = 3;
+  string mark_price = 4;
+  string index_price = 5;
+  string estimated_settle_price = 6;
+  string funding_rate = 7;
+  google.protobuf.Timestamp next_funding_time = 8;
+  google.protobuf.Timestamp event_time = 9;
+}
+

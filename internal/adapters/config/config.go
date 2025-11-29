@@ -25,6 +25,7 @@ type Config struct {
 	MarketData    MarketDataConfig
 	ErrorTracking ErrorTrackingConfig
 	Workers       WorkerConfig
+	WebSocket     WebSocketConfig
 }
 
 type AppConfig struct {
@@ -338,6 +339,35 @@ func (wc WorkerConfig) GetOptionsSymbols() []string {
 // GetMacroEventTypesAsStrings returns macro event types as strings
 func (wc WorkerConfig) GetMacroEventTypesAsStrings() []string {
 	return splitAndTrim(wc.MacroEventTypes)
+}
+
+// WebSocketConfig contains configuration for WebSocket connections to exchanges
+type WebSocketConfig struct {
+	Enabled          bool          `envconfig:"WEBSOCKET_ENABLED" default:"true"`
+	UseTestnet       bool          `envconfig:"WEBSOCKET_USE_TESTNET" default:"false"`
+	Symbols          string        `envconfig:"WEBSOCKET_SYMBOLS" default:"BTCUSDT,ETHUSDT,SOLUSDT"` // Comma-separated symbols
+	Intervals        string        `envconfig:"WEBSOCKET_INTERVALS" default:"1m,5m,15m,1h,4h"`       // Comma-separated intervals
+	Exchanges        string        `envconfig:"WEBSOCKET_EXCHANGES" default:"binance"`               // Comma-separated exchanges
+	ReconnectBackoff time.Duration `envconfig:"WEBSOCKET_RECONNECT_BACKOFF" default:"5s"`            // Backoff between reconnects
+	MaxReconnects    int           `envconfig:"WEBSOCKET_MAX_RECONNECTS" default:"10"`               // Max reconnection attempts
+	PingInterval     time.Duration `envconfig:"WEBSOCKET_PING_INTERVAL" default:"60s"`               // Ping interval
+	ReadBufferSize   int           `envconfig:"WEBSOCKET_READ_BUFFER_SIZE" default:"4096"`           // Read buffer size
+	WriteBufferSize  int           `envconfig:"WEBSOCKET_WRITE_BUFFER_SIZE" default:"4096"`          // Write buffer size
+}
+
+// GetSymbols returns WebSocket symbols as a slice
+func (wc WebSocketConfig) GetSymbols() []string {
+	return splitAndTrim(wc.Symbols)
+}
+
+// GetIntervals returns WebSocket intervals as a slice
+func (wc WebSocketConfig) GetIntervals() []string {
+	return splitAndTrim(wc.Intervals)
+}
+
+// GetExchanges returns WebSocket exchanges as a slice
+func (wc WebSocketConfig) GetExchanges() []string {
+	return splitAndTrim(wc.Exchanges)
 }
 
 // Load reads configuration from environment variables

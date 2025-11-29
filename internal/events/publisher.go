@@ -112,6 +112,24 @@ func (p *Publisher) PublishVolatilitySpike(ctx context.Context, event *eventspb.
 	return p.publish(ctx, TopicVolatilitySpike, event)
 }
 
+// Publish publishes raw bytes to a topic (for non-protobuf events like WebSocket data)
+func (p *Publisher) Publish(ctx context.Context, topic string, data []byte) error {
+	if err := p.producer.PublishBinary(ctx, topic, nil, data); err != nil {
+		p.log.Error("Failed to publish raw event",
+			"topic", topic,
+			"error", err,
+		)
+		return errors.Wrap(err, "send to kafka")
+	}
+
+	p.log.Debug("Raw event published",
+		"topic", topic,
+		"size_bytes", len(data),
+	)
+
+	return nil
+}
+
 // publish is the generic publish method using protobuf serialization
 func (p *Publisher) publish(ctx context.Context, topic string, event proto.Message) error {
 	// Serialize to protobuf binary format

@@ -49,6 +49,7 @@ func (l *Lifecycle) Shutdown(
 	aiUsageKafkaConsumer *kafka.Consumer,
 	positionGuardianConsumer *kafka.Consumer,
 	telegramNotificationConsumer *kafka.Consumer,
+	websocketKlineConsumer *kafka.Consumer,
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -62,7 +63,7 @@ func (l *Lifecycle) Shutdown(
 	// ========================================
 	// Step 1: Stop HTTP Server (5s timeout)
 	// ========================================
-	log.Info("[1/8] Stopping HTTP server...")
+	log.Info("[1/9] Stopping HTTP server...")
 	httpCtx, httpCancel := context.WithTimeout(shutdownCtx, 5*time.Second)
 	defer httpCancel()
 
@@ -75,7 +76,7 @@ func (l *Lifecycle) Shutdown(
 	// ========================================
 	// Step 2: Stop Background Workers
 	// ========================================
-	log.Info("[2/8] Stopping background workers...")
+	log.Info("[2/9] Stopping background workers...")
 	if err := workerScheduler.Stop(); err != nil {
 		log.Error("Workers shutdown failed", "error", err)
 	} else {
@@ -87,7 +88,7 @@ func (l *Lifecycle) Shutdown(
 	// Critical: Close consumers BEFORE waiting for goroutines
 	// This unblocks ReadMessage() calls
 	// ========================================
-	log.Info("[3/8] Closing Kafka consumers...")
+	log.Info("[3/9] Closing Kafka consumers...")
 	l.closeKafkaConsumers(map[string]*kafka.Consumer{
 		"notification":           notificationConsumer,
 		"risk":                   riskConsumer,
@@ -96,19 +97,20 @@ func (l *Lifecycle) Shutdown(
 		"ai_usage":               aiUsageKafkaConsumer,
 		"position_guardian":      positionGuardianConsumer,
 		"telegram_notifications": telegramNotificationConsumer,
+		"websocket_kline":        websocketKlineConsumer,
 	}, log)
 	log.Info("✓ Kafka consumers closed")
 
 	// ========================================
 	// Step 4: Wait for Consumer Goroutines
 	// ========================================
-	log.Info("[4/8] Waiting for consumer goroutines...")
+	log.Info("[4/9] Waiting for consumer goroutines...")
 	l.waitForGoroutines(wg, 5*time.Second, log)
 
 	// ========================================
 	// Step 5: Close Kafka Producer
 	// ========================================
-	log.Info("[5/8] Closing Kafka producer...")
+	log.Info("[5/9] Closing Kafka producer...")
 	if kafkaProducer != nil {
 		if err := kafkaProducer.Close(); err != nil {
 			log.Error("Kafka producer close failed", "error", err)
@@ -120,13 +122,13 @@ func (l *Lifecycle) Shutdown(
 	// ========================================
 	// Step 6: Flush Error Tracker
 	// ========================================
-	log.Info("[6/8] Flushing error tracker...")
+	log.Info("[6/9] Flushing error tracker...")
 	l.flushErrorTracker(errorTracker, shutdownCtx, log)
 
 	// ========================================
 	// Step 7: Sync Logs
 	// ========================================
-	log.Info("[7/8] Syncing logs...")
+	log.Info("[7/9] Syncing logs...")
 	if err := logger.Sync(); err != nil {
 		log.Warn("Log sync completed with warnings")
 	} else {
@@ -137,7 +139,7 @@ func (l *Lifecycle) Shutdown(
 	// Step 8: Close Database Connections
 	// LAST - other components may need them during shutdown
 	// ========================================
-	log.Info("[8/8] Closing database connections...")
+	log.Info("[8/9] Closing database connections...")
 	l.closeDatabases(pgClient, chClient, redisClient, log)
 
 	log.Info("✅ Graceful shutdown complete")

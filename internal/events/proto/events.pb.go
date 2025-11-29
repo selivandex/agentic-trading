@@ -7,13 +7,12 @@
 package eventspb
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -3607,6 +3606,825 @@ func (x *VolatilitySpikeEvent) GetTimeframe() string {
 	return ""
 }
 
+// WebSocketKlineEvent represents a kline/candlestick event from WebSocket
+type WebSocketKlineEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Exchange      string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol        string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Interval      string                 `protobuf:"bytes,4,opt,name=interval,proto3" json:"interval,omitempty"` // 1m, 5m, 15m, 1h, 4h, 1d, etc.
+	OpenTime      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=open_time,json=openTime,proto3" json:"open_time,omitempty"`
+	CloseTime     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=close_time,json=closeTime,proto3" json:"close_time,omitempty"`
+	Open          string                 `protobuf:"bytes,7,opt,name=open,proto3" json:"open,omitempty"` // Price as string to avoid precision loss
+	High          string                 `protobuf:"bytes,8,opt,name=high,proto3" json:"high,omitempty"`
+	Low           string                 `protobuf:"bytes,9,opt,name=low,proto3" json:"low,omitempty"`
+	Close         string                 `protobuf:"bytes,10,opt,name=close,proto3" json:"close,omitempty"`
+	Volume        string                 `protobuf:"bytes,11,opt,name=volume,proto3" json:"volume,omitempty"`
+	QuoteVolume   string                 `protobuf:"bytes,12,opt,name=quote_volume,json=quoteVolume,proto3" json:"quote_volume,omitempty"`
+	TradeCount    int64                  `protobuf:"varint,13,opt,name=trade_count,json=tradeCount,proto3" json:"trade_count,omitempty"`
+	IsFinal       bool                   `protobuf:"varint,14,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"` // Whether the candle is closed
+	EventTime     *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebSocketKlineEvent) Reset() {
+	*x = WebSocketKlineEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketKlineEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketKlineEvent) ProtoMessage() {}
+
+func (x *WebSocketKlineEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketKlineEvent.ProtoReflect.Descriptor instead.
+func (*WebSocketKlineEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *WebSocketKlineEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *WebSocketKlineEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetInterval() string {
+	if x != nil {
+		return x.Interval
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetOpenTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OpenTime
+	}
+	return nil
+}
+
+func (x *WebSocketKlineEvent) GetCloseTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CloseTime
+	}
+	return nil
+}
+
+func (x *WebSocketKlineEvent) GetOpen() string {
+	if x != nil {
+		return x.Open
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetHigh() string {
+	if x != nil {
+		return x.High
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetLow() string {
+	if x != nil {
+		return x.Low
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetClose() string {
+	if x != nil {
+		return x.Close
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetVolume() string {
+	if x != nil {
+		return x.Volume
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetQuoteVolume() string {
+	if x != nil {
+		return x.QuoteVolume
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetTradeCount() int64 {
+	if x != nil {
+		return x.TradeCount
+	}
+	return 0
+}
+
+func (x *WebSocketKlineEvent) GetIsFinal() bool {
+	if x != nil {
+		return x.IsFinal
+	}
+	return false
+}
+
+func (x *WebSocketKlineEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// WebSocketTickerEvent represents 24hr ticker statistics from WebSocket
+type WebSocketTickerEvent struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Base               *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Exchange           string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol             string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	PriceChange        string                 `protobuf:"bytes,4,opt,name=price_change,json=priceChange,proto3" json:"price_change,omitempty"`
+	PriceChangePercent string                 `protobuf:"bytes,5,opt,name=price_change_percent,json=priceChangePercent,proto3" json:"price_change_percent,omitempty"`
+	WeightedAvgPrice   string                 `protobuf:"bytes,6,opt,name=weighted_avg_price,json=weightedAvgPrice,proto3" json:"weighted_avg_price,omitempty"`
+	LastPrice          string                 `protobuf:"bytes,7,opt,name=last_price,json=lastPrice,proto3" json:"last_price,omitempty"`
+	LastQty            string                 `protobuf:"bytes,8,opt,name=last_qty,json=lastQty,proto3" json:"last_qty,omitempty"`
+	OpenPrice          string                 `protobuf:"bytes,9,opt,name=open_price,json=openPrice,proto3" json:"open_price,omitempty"`
+	HighPrice          string                 `protobuf:"bytes,10,opt,name=high_price,json=highPrice,proto3" json:"high_price,omitempty"`
+	LowPrice           string                 `protobuf:"bytes,11,opt,name=low_price,json=lowPrice,proto3" json:"low_price,omitempty"`
+	Volume             string                 `protobuf:"bytes,12,opt,name=volume,proto3" json:"volume,omitempty"`
+	QuoteVolume        string                 `protobuf:"bytes,13,opt,name=quote_volume,json=quoteVolume,proto3" json:"quote_volume,omitempty"`
+	OpenTime           *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=open_time,json=openTime,proto3" json:"open_time,omitempty"`
+	CloseTime          *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=close_time,json=closeTime,proto3" json:"close_time,omitempty"`
+	FirstTradeId       int64                  `protobuf:"varint,16,opt,name=first_trade_id,json=firstTradeId,proto3" json:"first_trade_id,omitempty"`
+	LastTradeId        int64                  `protobuf:"varint,17,opt,name=last_trade_id,json=lastTradeId,proto3" json:"last_trade_id,omitempty"`
+	TradeCount         int64                  `protobuf:"varint,18,opt,name=trade_count,json=tradeCount,proto3" json:"trade_count,omitempty"`
+	EventTime          *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *WebSocketTickerEvent) Reset() {
+	*x = WebSocketTickerEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketTickerEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketTickerEvent) ProtoMessage() {}
+
+func (x *WebSocketTickerEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketTickerEvent.ProtoReflect.Descriptor instead.
+func (*WebSocketTickerEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *WebSocketTickerEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *WebSocketTickerEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetPriceChange() string {
+	if x != nil {
+		return x.PriceChange
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetPriceChangePercent() string {
+	if x != nil {
+		return x.PriceChangePercent
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetWeightedAvgPrice() string {
+	if x != nil {
+		return x.WeightedAvgPrice
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetLastPrice() string {
+	if x != nil {
+		return x.LastPrice
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetLastQty() string {
+	if x != nil {
+		return x.LastQty
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetOpenPrice() string {
+	if x != nil {
+		return x.OpenPrice
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetHighPrice() string {
+	if x != nil {
+		return x.HighPrice
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetLowPrice() string {
+	if x != nil {
+		return x.LowPrice
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetVolume() string {
+	if x != nil {
+		return x.Volume
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetQuoteVolume() string {
+	if x != nil {
+		return x.QuoteVolume
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetOpenTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OpenTime
+	}
+	return nil
+}
+
+func (x *WebSocketTickerEvent) GetCloseTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CloseTime
+	}
+	return nil
+}
+
+func (x *WebSocketTickerEvent) GetFirstTradeId() int64 {
+	if x != nil {
+		return x.FirstTradeId
+	}
+	return 0
+}
+
+func (x *WebSocketTickerEvent) GetLastTradeId() int64 {
+	if x != nil {
+		return x.LastTradeId
+	}
+	return 0
+}
+
+func (x *WebSocketTickerEvent) GetTradeCount() int64 {
+	if x != nil {
+		return x.TradeCount
+	}
+	return 0
+}
+
+func (x *WebSocketTickerEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// PriceLevel represents a single level in the order book
+type PriceLevel struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Price         string                 `protobuf:"bytes,1,opt,name=price,proto3" json:"price,omitempty"`
+	Quantity      string                 `protobuf:"bytes,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PriceLevel) Reset() {
+	*x = PriceLevel{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PriceLevel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PriceLevel) ProtoMessage() {}
+
+func (x *PriceLevel) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PriceLevel.ProtoReflect.Descriptor instead.
+func (*PriceLevel) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *PriceLevel) GetPrice() string {
+	if x != nil {
+		return x.Price
+	}
+	return ""
+}
+
+func (x *PriceLevel) GetQuantity() string {
+	if x != nil {
+		return x.Quantity
+	}
+	return ""
+}
+
+// WebSocketDepthEvent represents order book depth from WebSocket
+type WebSocketDepthEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Exchange      string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol        string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Bids          []*PriceLevel          `protobuf:"bytes,4,rep,name=bids,proto3" json:"bids,omitempty"`
+	Asks          []*PriceLevel          `protobuf:"bytes,5,rep,name=asks,proto3" json:"asks,omitempty"`
+	LastUpdateId  int64                  `protobuf:"varint,6,opt,name=last_update_id,json=lastUpdateId,proto3" json:"last_update_id,omitempty"`
+	EventTime     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebSocketDepthEvent) Reset() {
+	*x = WebSocketDepthEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketDepthEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketDepthEvent) ProtoMessage() {}
+
+func (x *WebSocketDepthEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketDepthEvent.ProtoReflect.Descriptor instead.
+func (*WebSocketDepthEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *WebSocketDepthEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *WebSocketDepthEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *WebSocketDepthEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketDepthEvent) GetBids() []*PriceLevel {
+	if x != nil {
+		return x.Bids
+	}
+	return nil
+}
+
+func (x *WebSocketDepthEvent) GetAsks() []*PriceLevel {
+	if x != nil {
+		return x.Asks
+	}
+	return nil
+}
+
+func (x *WebSocketDepthEvent) GetLastUpdateId() int64 {
+	if x != nil {
+		return x.LastUpdateId
+	}
+	return 0
+}
+
+func (x *WebSocketDepthEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// WebSocketTradeEvent represents a single trade from WebSocket
+type WebSocketTradeEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Exchange      string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol        string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	TradeId       int64                  `protobuf:"varint,4,opt,name=trade_id,json=tradeId,proto3" json:"trade_id,omitempty"`
+	Price         string                 `protobuf:"bytes,5,opt,name=price,proto3" json:"price,omitempty"`
+	Quantity      string                 `protobuf:"bytes,6,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	BuyerOrderId  int64                  `protobuf:"varint,7,opt,name=buyer_order_id,json=buyerOrderId,proto3" json:"buyer_order_id,omitempty"`
+	SellerOrderId int64                  `protobuf:"varint,8,opt,name=seller_order_id,json=sellerOrderId,proto3" json:"seller_order_id,omitempty"`
+	TradeTime     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=trade_time,json=tradeTime,proto3" json:"trade_time,omitempty"`
+	IsBuyerMaker  bool                   `protobuf:"varint,10,opt,name=is_buyer_maker,json=isBuyerMaker,proto3" json:"is_buyer_maker,omitempty"`
+	EventTime     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebSocketTradeEvent) Reset() {
+	*x = WebSocketTradeEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketTradeEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketTradeEvent) ProtoMessage() {}
+
+func (x *WebSocketTradeEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketTradeEvent.ProtoReflect.Descriptor instead.
+func (*WebSocketTradeEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *WebSocketTradeEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *WebSocketTradeEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *WebSocketTradeEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketTradeEvent) GetTradeId() int64 {
+	if x != nil {
+		return x.TradeId
+	}
+	return 0
+}
+
+func (x *WebSocketTradeEvent) GetPrice() string {
+	if x != nil {
+		return x.Price
+	}
+	return ""
+}
+
+func (x *WebSocketTradeEvent) GetQuantity() string {
+	if x != nil {
+		return x.Quantity
+	}
+	return ""
+}
+
+func (x *WebSocketTradeEvent) GetBuyerOrderId() int64 {
+	if x != nil {
+		return x.BuyerOrderId
+	}
+	return 0
+}
+
+func (x *WebSocketTradeEvent) GetSellerOrderId() int64 {
+	if x != nil {
+		return x.SellerOrderId
+	}
+	return 0
+}
+
+func (x *WebSocketTradeEvent) GetTradeTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TradeTime
+	}
+	return nil
+}
+
+func (x *WebSocketTradeEvent) GetIsBuyerMaker() bool {
+	if x != nil {
+		return x.IsBuyerMaker
+	}
+	return false
+}
+
+func (x *WebSocketTradeEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// WebSocketFundingRateEvent represents funding rate for perpetual contracts
+type WebSocketFundingRateEvent struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Base            *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Exchange        string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol          string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	FundingRate     string                 `protobuf:"bytes,4,opt,name=funding_rate,json=fundingRate,proto3" json:"funding_rate,omitempty"`
+	FundingTime     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=funding_time,json=fundingTime,proto3" json:"funding_time,omitempty"`
+	NextFundingTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=next_funding_time,json=nextFundingTime,proto3" json:"next_funding_time,omitempty"`
+	EventTime       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *WebSocketFundingRateEvent) Reset() {
+	*x = WebSocketFundingRateEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketFundingRateEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketFundingRateEvent) ProtoMessage() {}
+
+func (x *WebSocketFundingRateEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketFundingRateEvent.ProtoReflect.Descriptor instead.
+func (*WebSocketFundingRateEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *WebSocketFundingRateEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *WebSocketFundingRateEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *WebSocketFundingRateEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketFundingRateEvent) GetFundingRate() string {
+	if x != nil {
+		return x.FundingRate
+	}
+	return ""
+}
+
+func (x *WebSocketFundingRateEvent) GetFundingTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FundingTime
+	}
+	return nil
+}
+
+func (x *WebSocketFundingRateEvent) GetNextFundingTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NextFundingTime
+	}
+	return nil
+}
+
+func (x *WebSocketFundingRateEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// WebSocketMarkPriceEvent represents mark price for derivatives
+type WebSocketMarkPriceEvent struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Base                 *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Exchange             string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol               string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	MarkPrice            string                 `protobuf:"bytes,4,opt,name=mark_price,json=markPrice,proto3" json:"mark_price,omitempty"`
+	IndexPrice           string                 `protobuf:"bytes,5,opt,name=index_price,json=indexPrice,proto3" json:"index_price,omitempty"`
+	EstimatedSettlePrice string                 `protobuf:"bytes,6,opt,name=estimated_settle_price,json=estimatedSettlePrice,proto3" json:"estimated_settle_price,omitempty"`
+	FundingRate          string                 `protobuf:"bytes,7,opt,name=funding_rate,json=fundingRate,proto3" json:"funding_rate,omitempty"`
+	NextFundingTime      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=next_funding_time,json=nextFundingTime,proto3" json:"next_funding_time,omitempty"`
+	EventTime            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *WebSocketMarkPriceEvent) Reset() {
+	*x = WebSocketMarkPriceEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketMarkPriceEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketMarkPriceEvent) ProtoMessage() {}
+
+func (x *WebSocketMarkPriceEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketMarkPriceEvent.ProtoReflect.Descriptor instead.
+func (*WebSocketMarkPriceEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *WebSocketMarkPriceEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *WebSocketMarkPriceEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *WebSocketMarkPriceEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketMarkPriceEvent) GetMarkPrice() string {
+	if x != nil {
+		return x.MarkPrice
+	}
+	return ""
+}
+
+func (x *WebSocketMarkPriceEvent) GetIndexPrice() string {
+	if x != nil {
+		return x.IndexPrice
+	}
+	return ""
+}
+
+func (x *WebSocketMarkPriceEvent) GetEstimatedSettlePrice() string {
+	if x != nil {
+		return x.EstimatedSettlePrice
+	}
+	return ""
+}
+
+func (x *WebSocketMarkPriceEvent) GetFundingRate() string {
+	if x != nil {
+		return x.FundingRate
+	}
+	return ""
+}
+
+func (x *WebSocketMarkPriceEvent) GetNextFundingTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NextFundingTime
+	}
+	return nil
+}
+
+func (x *WebSocketMarkPriceEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
 var File_internal_events_proto_events_proto protoreflect.FileDescriptor
 
 const file_internal_events_proto_events_proto_rawDesc = "" +
@@ -4003,7 +4821,104 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"spikeRatio\x12.\n" +
 	"\aurgency\x18\a \x01(\x0e2\x14.events.EventUrgencyR\aurgency\x12-\n" +
 	"\x12affected_positions\x18\b \x03(\tR\x11affectedPositions\x12\x1c\n" +
-	"\ttimeframe\x18\t \x01(\tR\ttimeframe*;\n" +
+	"\ttimeframe\x18\t \x01(\tR\ttimeframe\"\x82\x04\n" +
+	"\x13WebSocketKlineEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
+	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x1a\n" +
+	"\binterval\x18\x04 \x01(\tR\binterval\x127\n" +
+	"\topen_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bopenTime\x129\n" +
+	"\n" +
+	"close_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcloseTime\x12\x12\n" +
+	"\x04open\x18\a \x01(\tR\x04open\x12\x12\n" +
+	"\x04high\x18\b \x01(\tR\x04high\x12\x10\n" +
+	"\x03low\x18\t \x01(\tR\x03low\x12\x14\n" +
+	"\x05close\x18\n" +
+	" \x01(\tR\x05close\x12\x16\n" +
+	"\x06volume\x18\v \x01(\tR\x06volume\x12!\n" +
+	"\fquote_volume\x18\f \x01(\tR\vquoteVolume\x12\x1f\n" +
+	"\vtrade_count\x18\r \x01(\x03R\n" +
+	"tradeCount\x12\x19\n" +
+	"\bis_final\x18\x0e \x01(\bR\aisFinal\x129\n" +
+	"\n" +
+	"event_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xde\x05\n" +
+	"\x14WebSocketTickerEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
+	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12!\n" +
+	"\fprice_change\x18\x04 \x01(\tR\vpriceChange\x120\n" +
+	"\x14price_change_percent\x18\x05 \x01(\tR\x12priceChangePercent\x12,\n" +
+	"\x12weighted_avg_price\x18\x06 \x01(\tR\x10weightedAvgPrice\x12\x1d\n" +
+	"\n" +
+	"last_price\x18\a \x01(\tR\tlastPrice\x12\x19\n" +
+	"\blast_qty\x18\b \x01(\tR\alastQty\x12\x1d\n" +
+	"\n" +
+	"open_price\x18\t \x01(\tR\topenPrice\x12\x1d\n" +
+	"\n" +
+	"high_price\x18\n" +
+	" \x01(\tR\thighPrice\x12\x1b\n" +
+	"\tlow_price\x18\v \x01(\tR\blowPrice\x12\x16\n" +
+	"\x06volume\x18\f \x01(\tR\x06volume\x12!\n" +
+	"\fquote_volume\x18\r \x01(\tR\vquoteVolume\x127\n" +
+	"\topen_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\bopenTime\x129\n" +
+	"\n" +
+	"close_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tcloseTime\x12$\n" +
+	"\x0efirst_trade_id\x18\x10 \x01(\x03R\ffirstTradeId\x12\"\n" +
+	"\rlast_trade_id\x18\x11 \x01(\x03R\vlastTradeId\x12\x1f\n" +
+	"\vtrade_count\x18\x12 \x01(\x03R\n" +
+	"tradeCount\x129\n" +
+	"\n" +
+	"event_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\">\n" +
+	"\n" +
+	"PriceLevel\x12\x14\n" +
+	"\x05price\x18\x01 \x01(\tR\x05price\x12\x1a\n" +
+	"\bquantity\x18\x02 \x01(\tR\bquantity\"\xa1\x02\n" +
+	"\x13WebSocketDepthEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
+	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12&\n" +
+	"\x04bids\x18\x04 \x03(\v2\x12.events.PriceLevelR\x04bids\x12&\n" +
+	"\x04asks\x18\x05 \x03(\v2\x12.events.PriceLevelR\x04asks\x12$\n" +
+	"\x0elast_update_id\x18\x06 \x01(\x03R\flastUpdateId\x129\n" +
+	"\n" +
+	"event_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xa7\x03\n" +
+	"\x13WebSocketTradeEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
+	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x19\n" +
+	"\btrade_id\x18\x04 \x01(\x03R\atradeId\x12\x14\n" +
+	"\x05price\x18\x05 \x01(\tR\x05price\x12\x1a\n" +
+	"\bquantity\x18\x06 \x01(\tR\bquantity\x12$\n" +
+	"\x0ebuyer_order_id\x18\a \x01(\x03R\fbuyerOrderId\x12&\n" +
+	"\x0fseller_order_id\x18\b \x01(\x03R\rsellerOrderId\x129\n" +
+	"\n" +
+	"trade_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttradeTime\x12$\n" +
+	"\x0eis_buyer_maker\x18\n" +
+	" \x01(\bR\fisBuyerMaker\x129\n" +
+	"\n" +
+	"event_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xdb\x02\n" +
+	"\x19WebSocketFundingRateEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
+	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12!\n" +
+	"\ffunding_rate\x18\x04 \x01(\tR\vfundingRate\x12=\n" +
+	"\ffunding_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\vfundingTime\x12F\n" +
+	"\x11next_funding_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0fnextFundingTime\x129\n" +
+	"\n" +
+	"event_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\x90\x03\n" +
+	"\x17WebSocketMarkPriceEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
+	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x1d\n" +
+	"\n" +
+	"mark_price\x18\x04 \x01(\tR\tmarkPrice\x12\x1f\n" +
+	"\vindex_price\x18\x05 \x01(\tR\n" +
+	"indexPrice\x124\n" +
+	"\x16estimated_settle_price\x18\x06 \x01(\tR\x14estimatedSettlePrice\x12!\n" +
+	"\ffunding_rate\x18\a \x01(\tR\vfundingRate\x12F\n" +
+	"\x11next_funding_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0fnextFundingTime\x129\n" +
+	"\n" +
+	"event_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\teventTime*;\n" +
 	"\fEventUrgency\x12\a\n" +
 	"\x03LOW\x10\x00\x12\n" +
 	"\n" +
@@ -4024,7 +4939,7 @@ func file_internal_events_proto_events_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_events_proto_events_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
+var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_internal_events_proto_events_proto_goTypes = []any{
 	(EventUrgency)(0),                  // 0: events.EventUrgency
 	(*BaseEvent)(nil),                  // 1: events.BaseEvent
@@ -4061,27 +4976,34 @@ var file_internal_events_proto_events_proto_goTypes = []any{
 	(*ProfitMilestoneEvent)(nil),       // 32: events.ProfitMilestoneEvent
 	(*CorrelationSpikeEvent)(nil),      // 33: events.CorrelationSpikeEvent
 	(*VolatilitySpikeEvent)(nil),       // 34: events.VolatilitySpikeEvent
-	nil,                                // 35: events.OpportunityFoundEvent.IndicatorsEntry
-	nil,                                // 36: events.DecisionMadeEvent.ContextEntry
-	(*timestamppb.Timestamp)(nil),      // 37: google.protobuf.Timestamp
+	(*WebSocketKlineEvent)(nil),        // 35: events.WebSocketKlineEvent
+	(*WebSocketTickerEvent)(nil),       // 36: events.WebSocketTickerEvent
+	(*PriceLevel)(nil),                 // 37: events.PriceLevel
+	(*WebSocketDepthEvent)(nil),        // 38: events.WebSocketDepthEvent
+	(*WebSocketTradeEvent)(nil),        // 39: events.WebSocketTradeEvent
+	(*WebSocketFundingRateEvent)(nil),  // 40: events.WebSocketFundingRateEvent
+	(*WebSocketMarkPriceEvent)(nil),    // 41: events.WebSocketMarkPriceEvent
+	nil,                                // 42: events.OpportunityFoundEvent.IndicatorsEntry
+	nil,                                // 43: events.DecisionMadeEvent.ContextEntry
+	(*timestamppb.Timestamp)(nil),      // 44: google.protobuf.Timestamp
 }
 var file_internal_events_proto_events_proto_depIdxs = []int32{
-	37, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
+	44, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
 	1,  // 1: events.AIUsageEvent.base:type_name -> events.BaseEvent
 	1,  // 2: events.OpportunityFoundEvent.base:type_name -> events.BaseEvent
-	35, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
+	42, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
 	1,  // 4: events.RegimeChangedEvent.base:type_name -> events.BaseEvent
 	1,  // 5: events.OrderPlacedEvent.base:type_name -> events.BaseEvent
 	1,  // 6: events.OrderFilledEvent.base:type_name -> events.BaseEvent
 	1,  // 7: events.PositionOpenedEvent.base:type_name -> events.BaseEvent
 	1,  // 8: events.PositionClosedEvent.base:type_name -> events.BaseEvent
 	1,  // 9: events.CircuitBreakerTrippedEvent.base:type_name -> events.BaseEvent
-	37, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
+	44, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
 	1,  // 11: events.AgentExecutedEvent.base:type_name -> events.BaseEvent
 	1,  // 12: events.DecisionMadeEvent.base:type_name -> events.BaseEvent
-	36, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
+	43, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
 	1,  // 14: events.WorkerFailedEvent.base:type_name -> events.BaseEvent
-	37, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
+	44, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
 	1,  // 16: events.DrawdownAlert.base:type_name -> events.BaseEvent
 	1,  // 17: events.ConsecutiveLossesAlert.base:type_name -> events.BaseEvent
 	1,  // 18: events.PnLUpdatedEvent.base:type_name -> events.BaseEvent
@@ -4111,11 +5033,33 @@ var file_internal_events_proto_events_proto_depIdxs = []int32{
 	0,  // 42: events.CorrelationSpikeEvent.urgency:type_name -> events.EventUrgency
 	1,  // 43: events.VolatilitySpikeEvent.base:type_name -> events.BaseEvent
 	0,  // 44: events.VolatilitySpikeEvent.urgency:type_name -> events.EventUrgency
-	45, // [45:45] is the sub-list for method output_type
-	45, // [45:45] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	1,  // 45: events.WebSocketKlineEvent.base:type_name -> events.BaseEvent
+	44, // 46: events.WebSocketKlineEvent.open_time:type_name -> google.protobuf.Timestamp
+	44, // 47: events.WebSocketKlineEvent.close_time:type_name -> google.protobuf.Timestamp
+	44, // 48: events.WebSocketKlineEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 49: events.WebSocketTickerEvent.base:type_name -> events.BaseEvent
+	44, // 50: events.WebSocketTickerEvent.open_time:type_name -> google.protobuf.Timestamp
+	44, // 51: events.WebSocketTickerEvent.close_time:type_name -> google.protobuf.Timestamp
+	44, // 52: events.WebSocketTickerEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 53: events.WebSocketDepthEvent.base:type_name -> events.BaseEvent
+	37, // 54: events.WebSocketDepthEvent.bids:type_name -> events.PriceLevel
+	37, // 55: events.WebSocketDepthEvent.asks:type_name -> events.PriceLevel
+	44, // 56: events.WebSocketDepthEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 57: events.WebSocketTradeEvent.base:type_name -> events.BaseEvent
+	44, // 58: events.WebSocketTradeEvent.trade_time:type_name -> google.protobuf.Timestamp
+	44, // 59: events.WebSocketTradeEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 60: events.WebSocketFundingRateEvent.base:type_name -> events.BaseEvent
+	44, // 61: events.WebSocketFundingRateEvent.funding_time:type_name -> google.protobuf.Timestamp
+	44, // 62: events.WebSocketFundingRateEvent.next_funding_time:type_name -> google.protobuf.Timestamp
+	44, // 63: events.WebSocketFundingRateEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 64: events.WebSocketMarkPriceEvent.base:type_name -> events.BaseEvent
+	44, // 65: events.WebSocketMarkPriceEvent.next_funding_time:type_name -> google.protobuf.Timestamp
+	44, // 66: events.WebSocketMarkPriceEvent.event_time:type_name -> google.protobuf.Timestamp
+	67, // [67:67] is the sub-list for method output_type
+	67, // [67:67] is the sub-list for method input_type
+	67, // [67:67] is the sub-list for extension type_name
+	67, // [67:67] is the sub-list for extension extendee
+	0,  // [0:67] is the sub-list for field type_name
 }
 
 func init() { file_internal_events_proto_events_proto_init() }
@@ -4129,7 +5073,7 @@ func file_internal_events_proto_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_events_proto_events_proto_rawDesc), len(file_internal_events_proto_events_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   36,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

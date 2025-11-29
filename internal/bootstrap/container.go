@@ -128,6 +128,7 @@ type Adapters struct {
 	AIUsageConsumer              *kafka.Consumer
 	PositionGuardianConsumer     *kafka.Consumer
 	TelegramNotificationConsumer *kafka.Consumer
+	WebSocketKlineConsumer       *kafka.Consumer
 
 	// Crypto & Exchanges
 	Encryptor         *crypto.Encryptor
@@ -136,6 +137,9 @@ type Adapters struct {
 
 	// AI & Embeddings
 	EmbeddingProvider embeddings.Provider
+
+	// WebSocket
+	WebSocketClients *WebSocketClients
 }
 
 // Business groups business logic components
@@ -171,6 +175,7 @@ type Background struct {
 	OpportunitySvc      *consumers.OpportunityConsumer
 	AIUsageSvc          *consumers.AIUsageConsumer
 	PositionGuardianSvc *consumers.PositionGuardianConsumer
+	WebSocketKlineSvc   *consumers.WebSocketKlineConsumer
 }
 
 // NewContainer creates a new dependency container
@@ -202,11 +207,17 @@ func (c *Container) MustInit() {
 	c.MustInitBusiness()
 	c.MustInitApplication()
 	c.MustInitBackground()
+	c.MustInitWebSocketClients()
 }
 
 // Start starts all background components
 func (c *Container) Start() error {
 	c.Log.Info("Starting all systems...")
+
+	// Start WebSocket connections
+	if err := c.connectWebSocketClients(c.Context); err != nil {
+		return errors.Wrap(err, "failed to connect WebSocket clients")
+	}
 
 	// Start background consumers
 	if err := c.startConsumers(); err != nil {
@@ -246,6 +257,7 @@ func (c *Container) startConsumers() error {
 		{"position_guardian", c.Background.PositionGuardianSvc},
 		{"telegram_bot", c.Application.TelegramBot},
 		{"telegram_notifications", c.Application.TelegramNotificationSvc},
+		{"websocket_kline", c.Background.WebSocketKlineSvc},
 	}
 
 	c.WG.Add(len(consumers))
@@ -260,7 +272,7 @@ func (c *Container) startConsumers() error {
 		}()
 	}
 
-	c.Log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian, telegram_bot, telegram_notifications")
+	c.Log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian, telegram_bot, telegram_notifications, websocket_kline")
 	return nil
 }
 
@@ -268,7 +280,17 @@ func (c *Container) startConsumers() error {
 func (c *Container) Shutdown() {
 	c.Log.Info("Initiating graceful shutdown...")
 
-	// Cancel application context to signal all components to stop
+	// Step 0: Stop WebSocket clients FIRST (before cancelling context)
+	// This prevents new events from being published to Kafka
+	c.Log.Info("[0/9] Stopping WebSocket clients...")
+	shutdownCtx := context.Background()
+	if err := c.stopWebSocketClients(shutdownCtx); err != nil {
+		c.Log.Error("Error stopping WebSocket clients", "error", err)
+	} else {
+		c.Log.Info("✓ WebSocket clients stopped")
+	}
+
+	// Cancel application context to signal all other components to stop
 	c.Cancel()
 
 	// Perform coordinated cleanup with explicit order
@@ -285,6 +307,7 @@ func (c *Container) Shutdown() {
 		c.Adapters.AIUsageConsumer,
 		c.Adapters.PositionGuardianConsumer,
 		c.Adapters.TelegramNotificationConsumer,
+		c.Adapters.WebSocketKlineConsumer,
 		c.PG,
 		c.CH,
 		c.Redis,

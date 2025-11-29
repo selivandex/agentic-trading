@@ -166,12 +166,12 @@ func (oc *OHLCVCollector) collectOHLCVFromExchange(
 			CloseTime:             ec.CloseTime,
 			Open:                  ec.Open.InexactFloat64(),
 			High:                  ec.High.InexactFloat64(),
-			Low:                   ec.Low.InexactFloat64(),
-			Close:                 ec.Close.InexactFloat64(),
-			Volume:                ec.Volume.InexactFloat64(),
-			QuoteVolume:           ec.QuoteVolume.InexactFloat64(),
-			Trades:                ec.Trades,
-			TakerBuyBaseVolume:    ec.TakerBuyBaseVolume.InexactFloat64(),
+		Low:                   ec.Low.InexactFloat64(),
+		Close:                 ec.Close.InexactFloat64(),
+		Volume:                ec.Volume.InexactFloat64(),
+		QuoteVolume:           ec.QuoteVolume.InexactFloat64(),
+		Trades:                uint64(ec.Trades),
+		TakerBuyBaseVolume:    ec.TakerBuyBaseVolume.InexactFloat64(),
 			TakerBuyQuoteVolume:   ec.TakerBuyQuoteVolume.InexactFloat64(),
 			IsClosed:              true,      // Historical candles from REST API are always closed
 			EventTime:             time.Now(), // Use current time as event_time for historical data

@@ -32,17 +32,26 @@ func NewConsumer(cfg ConsumerConfig) *Consumer {
 		cfg.MaxBytes = 10e6 // 10MB
 	}
 
+	log := logger.Get().With("component", "kafka_consumer", "topic", cfg.Topic)
+
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  cfg.Brokers,
-		GroupID:  cfg.GroupID,
-		Topic:    cfg.Topic,
-		MinBytes: cfg.MinBytes,
-		MaxBytes: cfg.MaxBytes,
+		Brokers:     cfg.Brokers,
+		GroupID:     cfg.GroupID,
+		Topic:       cfg.Topic,
+		MinBytes:    cfg.MinBytes,
+		MaxBytes:    cfg.MaxBytes,
+		StartOffset: kafka.FirstOffset, // Start from beginning if no offset committed
 	})
+
+	log.Info("Kafka consumer created",
+		"brokers", cfg.Brokers,
+		"group_id", cfg.GroupID,
+		"topic", cfg.Topic,
+	)
 
 	return &Consumer{
 		reader: reader,
-		log:    logger.Get().With("component", "kafka_consumer", "topic", cfg.Topic),
+		log:    log,
 	}
 }
 

@@ -293,3 +293,30 @@ Worker intervals control how frequently background workers execute. All interval
 - **Event-driven**: Responds immediately to opportunity events from OpportunityFinder (<30s response time)
 
 This allows the system to balance comprehensive analysis with quick reactions to market opportunities.
+
+### WebSocket Configuration (Real-time Market Data)
+
+WebSocket connections provide real-time market data streams for low-latency analysis:
+
+```bash
+# WebSocket Settings
+WEBSOCKET_ENABLED=true                                  # Enable/disable WebSocket connections
+WEBSOCKET_USE_TESTNET=false                            # Use testnet endpoints for testing
+WEBSOCKET_SYMBOLS=BTCUSDT,ETHUSDT,SOLUSDT              # Symbols to stream (comma-separated)
+WEBSOCKET_INTERVALS=1m,5m,15m,1h,4h                    # Timeframes to collect (comma-separated)
+WEBSOCKET_EXCHANGES=binance                             # Exchanges to connect (comma-separated)
+WEBSOCKET_RECONNECT_BACKOFF=5s                         # Backoff between reconnection attempts
+WEBSOCKET_MAX_RECONNECTS=10                            # Maximum reconnection attempts before giving up
+WEBSOCKET_PING_INTERVAL=60s                            # Ping interval to keep connection alive
+WEBSOCKET_READ_BUFFER_SIZE=4096                        # Read buffer size in bytes
+WEBSOCKET_WRITE_BUFFER_SIZE=4096                       # Write buffer size in bytes
+```
+
+**Supported Timeframes**: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M`
+
+**Notes**:
+- **Public streams** (klines, ticker, depth) don't require API keys
+- **Private streams** (orders, positions) require `BINANCE_MARKET_DATA_API_KEY` and `BINANCE_MARKET_DATA_SECRET`
+- Events are published to Kafka and consumed by batch writer to ClickHouse
+- Deduplication happens at batch level to avoid redundant writes
+- See `docs/WEBSOCKET_AUTH.md` for authentication details

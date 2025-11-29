@@ -34,6 +34,7 @@ const (
 	TopicDrawdownAlert         = "risk.drawdown_alert"
 	TopicMarginCall            = "risk.margin_call"
 	TopicRiskLimitExceeded     = "risk.limit_exceeded"
+	TopicRiskEvents            = "risk_events" // General risk events stream
 
 	// Agent events
 	TopicAgentExecuted = "agent.executed"
@@ -43,6 +44,11 @@ const (
 	// System events
 	TopicHealthCheckFailed = "system.health_check_failed"
 	TopicWorkerFailed      = "system.worker_failed"
+
+	// Notification events
+	TopicNotifications         = "notifications"          // General notification stream
+	TopicTelegramNotifications = "telegram_notifications" // Telegram-specific notifications
+	TopicAnalytics             = "analytics"              // Analytics events stream
 
 	// Worker-specific events
 	TopicPnLUpdated          = "user.pnl_updated"
@@ -60,6 +66,7 @@ const (
 	TopicProfitMilestone    = "position.profit_milestone"
 	TopicCorrelationSpike   = "position.correlation_spike"
 	TopicVolatilitySpike    = "position.volatility_spike"
+	TopicPositionGuardian   = "position_guardian" // General position guardian stream
 
 	// SMC (Smart Money Concepts) events
 	TopicFVGDetected        = "smc.fvg_detected"
@@ -70,6 +77,14 @@ const (
 	TopicScanComplete      = "market.scan_complete"
 	TopicWhaleAlert        = "market.whale_alerts"
 	TopicLiquidationAlert  = "market.liquidations"
+
+	// WebSocket stream events (real-time market data)
+	TopicWebSocketKline       = "websocket.kline"
+	TopicWebSocketTicker      = "websocket.ticker"
+	TopicWebSocketDepth       = "websocket.depth"
+	TopicWebSocketTrade       = "websocket.trade"
+	TopicWebSocketFundingRate = "websocket.funding_rate"
+	TopicWebSocketMarkPrice   = "websocket.mark_price"
 )
 
 // NewBaseEvent creates a new base event with defaults

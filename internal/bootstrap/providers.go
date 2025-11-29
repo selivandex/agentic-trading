@@ -145,13 +145,14 @@ func (c *Container) MustInitAdapters() {
 
 	// Kafka
 	c.Adapters.KafkaProducer = provideKafkaProducer(c.Config, c.Log)
-	c.Adapters.NotificationConsumer = provideKafkaConsumer(c.Config, "notifications", c.Log)
-	c.Adapters.RiskConsumer = provideKafkaConsumer(c.Config, "risk_events", c.Log)
-	c.Adapters.AnalyticsConsumer = provideKafkaConsumer(c.Config, "analytics", c.Log)
+	c.Adapters.NotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
+	c.Adapters.RiskConsumer = provideKafkaConsumer(c.Config, events.TopicRiskEvents, c.Log)
+	c.Adapters.AnalyticsConsumer = provideKafkaConsumer(c.Config, events.TopicAnalytics, c.Log)
 	c.Adapters.OpportunityConsumer = provideKafkaConsumer(c.Config, events.TopicOpportunityFound, c.Log)
 	c.Adapters.AIUsageConsumer = provideKafkaConsumer(c.Config, events.TopicAIUsage, c.Log)
-	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, "position_guardian", c.Log)
-	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, "telegram_notifications", c.Log)
+	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionGuardian, c.Log)
+	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicTelegramNotifications, c.Log)
+	c.Adapters.WebSocketKlineConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketKline, c.Log)
 
 	// Crypto
 	c.Adapters.Encryptor, err = crypto.NewEncryptor(c.Config.Crypto.EncryptionKey)
