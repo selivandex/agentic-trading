@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"strings"
 	"time"
 
 	"google.golang.org/adk/session"
@@ -85,8 +86,19 @@ func provideWorkers(
 		"target_committee_pct", pathSelector.GetMetrics()["target_committee_pct"],
 	)
 
-	// Default monitored symbols
-	defaultSymbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"}
+	// Get configuration values
+	baseAssets := cfg.Workers.GetBaseAssets()
+	quoteCurrency := cfg.Workers.QuoteCurrency
+	exchanges := cfg.Workers.GetExchanges()
+	timeframes := cfg.Workers.GetTimeframes()
+	primaryExchange := cfg.Workers.PrimaryExch
+	orderBookDepth := cfg.Workers.OrderBookDepth
+
+	// Build default symbols from base assets + quote currency
+	defaultSymbols := make([]string, len(baseAssets))
+	for i, asset := range baseAssets {
+		defaultSymbols[i] = asset + "/" + quoteCurrency
+	}
 
 	// ========================================
 	// Trading Workers (high frequency)
@@ -149,11 +161,13 @@ func provideWorkers(
 	// ========================================
 
 	// OHLCV collector: Collects candles
+	// Pass base assets and quote currency - each exchange will format symbols accordingly
 	scheduler.RegisterWorker(marketdata.NewOHLCVCollector(
 		marketDataRepo,
 		exchFactory,
-		defaultSymbols,
-		[]string{"1m", "5m", "15m", "1h", "4h", "1d"}, // Timeframes
+		baseAssets,
+		quoteCurrency,
+		timeframes,
 		cfg.Workers.OHLCVCollectorInterval,
 		true, // enabled
 	))
@@ -163,7 +177,7 @@ func provideWorkers(
 		marketDataRepo,
 		marketDataFactory,
 		defaultSymbols,
-		[]string{"binance", "bybit", "okx"},
+		exchanges,
 		cfg.Workers.TickerCollectorInterval,
 		true, // enabled
 	))
@@ -173,8 +187,8 @@ func provideWorkers(
 		marketDataRepo,
 		marketDataFactory,
 		defaultSymbols,
-		[]string{"binance", "bybit", "okx"},
-		20, // depth
+		exchanges,
+		orderBookDepth,
 		cfg.Workers.OrderBookCollectorInterval,
 		true, // enabled
 	))
@@ -184,7 +198,7 @@ func provideWorkers(
 		marketDataRepo,
 		marketDataFactory,
 		defaultSymbols,
-		[]string{"binance", "bybit", "okx"},
+		exchanges,
 		100, // limit per request
 		cfg.Workers.TradesCollectorInterval,
 		true, // enabled
@@ -195,7 +209,7 @@ func provideWorkers(
 		marketDataRepo,
 		marketDataFactory,
 		defaultSymbols,
-		[]string{"binance", "bybit", "okx"},
+		exchanges,
 		cfg.Workers.FundingCollectorInterval,
 		true, // enabled
 	))
@@ -204,32 +218,30 @@ func provideWorkers(
 	// Sentiment Workers (low frequency)
 	// ========================================
 
-	defaultCurrencies := []string{"BTC", "ETH", "SOL"}
+	// Use base assets from config for sentiment tracking
 	scheduler.RegisterWorker(sentimentworkers.NewNewsCollector(
 		sentimentRepo,
 		cfg.MarketData.NewsAPIKey,
-		defaultCurrencies,
+		baseAssets,
 		cfg.Workers.NewsCollectorInterval,
 		true, // enabled
 	))
 
-	trackedAccounts := []string{"APompliano", "100trillionUSD", "saylor", "elonmusk"}
 	scheduler.RegisterWorker(sentimentworkers.NewTwitterCollector(
 		sentimentRepo,
 		cfg.MarketData.TwitterAPIKey,
 		cfg.MarketData.TwitterAPISecret,
-		trackedAccounts,
+		cfg.Workers.GetTwitterAccounts(),
 		defaultSymbols,
 		cfg.Workers.TwitterCollectorInterval,
 		cfg.MarketData.TwitterAPIKey != "",
 	))
 
-	subreddits := []string{"CryptoCurrency", "Bitcoin", "ethereum", "ethtrader"}
 	scheduler.RegisterWorker(sentimentworkers.NewRedditCollector(
 		sentimentRepo,
 		cfg.MarketData.RedditClientID,
 		cfg.MarketData.RedditClientSecret,
-		subreddits,
+		cfg.Workers.GetRedditSubs(),
 		defaultSymbols,
 		cfg.Workers.RedditCollectorInterval,
 		cfg.MarketData.RedditClientID != "",
@@ -245,23 +257,20 @@ func provideWorkers(
 	// On-Chain Workers (medium frequency)
 	// ========================================
 
-	blockchains := []string{"bitcoin", "ethereum"}
 	scheduler.RegisterWorker(onchainworkers.NewWhaleMovementCollector(
 		onchainRepo,
 		cfg.MarketData.WhaleAlertAPIKey,
-		blockchains,
-		1_000_000, // Min $1M transfers
+		cfg.Workers.GetBlockchains(),
+		float64(cfg.Workers.MinWhaleAmount),
 		cfg.Workers.WhaleMovementCollectorInterval,
 		cfg.MarketData.WhaleAlertAPIKey != "",
 	))
 
-	exchanges := []string{"binance", "coinbase", "kraken"}
-	tokens := []string{"BTC", "ETH"}
 	scheduler.RegisterWorker(onchainworkers.NewExchangeFlowCollector(
 		onchainRepo,
 		cfg.MarketData.CryptoquantAPIKey,
-		exchanges,
-		tokens,
+		exchanges,  // Use same exchanges as market data
+		baseAssets, // Use base assets for on-chain flow tracking
 		cfg.Workers.ExchangeFlowCollectorInterval,
 		cfg.MarketData.CryptoquantAPIKey != "",
 	))
@@ -270,16 +279,15 @@ func provideWorkers(
 		onchainRepo,
 		cfg.MarketData.BlockchainAPIKey,
 		cfg.MarketData.EtherscanAPIKey,
-		blockchains,
+		cfg.Workers.GetBlockchains(),
 		cfg.Workers.NetworkMetricsCollectorInterval,
 		true, // Always enabled
 	))
 
-	miningPools := []string{"AntPool", "Foundry USA", "F2Pool", "ViaBTC", "Binance Pool"}
 	scheduler.RegisterWorker(onchainworkers.NewMinerMetricsCollector(
 		onchainRepo,
 		cfg.MarketData.GlassnodeAPIKey,
-		miningPools,
+		cfg.Workers.GetMiningPools(),
 		cfg.Workers.MinerMetricsCollectorInterval,
 		cfg.MarketData.GlassnodeAPIKey != "",
 	))
@@ -288,25 +296,28 @@ func provideWorkers(
 	// Macro Workers (low frequency)
 	// ========================================
 
-	countries := []string{"United States", "Euro Area", "China"}
-	eventTypes := []macro.EventType{macro.EventCPI, macro.EventNFP, macro.EventFOMC, macro.EventGDP}
+	// Convert event type strings to EventType constants
+	eventTypeStrs := cfg.Workers.GetMacroEventTypesAsStrings()
+	eventTypes := make([]macro.EventType, 0, len(eventTypeStrs))
+	for _, et := range eventTypeStrs {
+		eventTypes = append(eventTypes, macro.EventType(strings.ToLower(et)))
+	}
+
 	scheduler.RegisterWorker(macroworkers.NewEconomicCalendarCollector(
 		macroRepo,
 		cfg.MarketData.TradingEconomicsKey,
-		countries,
+		cfg.Workers.GetMacroCountries(),
 		eventTypes,
 		cfg.Workers.EconomicCalendarCollectorInterval,
 		cfg.MarketData.TradingEconomicsKey != "",
 	))
 
-	cryptoSymbolsForCorr := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT"}
-	traditionalAssets := []string{"SPY", "GLD", "DXY", "TLT"}
 	scheduler.RegisterWorker(macroworkers.NewMarketCorrelationCollector(
 		marketDataRepo,
 		macroRepo,
 		cfg.MarketData.AlphaVantageKey,
-		cryptoSymbolsForCorr,
-		traditionalAssets,
+		cfg.Workers.GetCorrelationSymbols(),
+		cfg.Workers.GetTraditionalAssets(),
 		cfg.Workers.MarketCorrelationCollectorInterval,
 		cfg.MarketData.AlphaVantageKey != "",
 	))
@@ -315,13 +326,12 @@ func provideWorkers(
 	// Derivatives Workers (medium frequency)
 	// ========================================
 
-	optionsSymbols := []string{"BTC", "ETH"}
 	scheduler.RegisterWorker(derivworkers.NewOptionsFlowCollector(
 		derivRepo,
 		cfg.MarketData.DeribitAPIKey,
 		cfg.MarketData.DeribitAPISecret,
-		optionsSymbols,
-		100_000, // Min $100k premium
+		cfg.Workers.GetOptionsSymbols(),
+		float64(cfg.Workers.MinOptionsPremium),
 		cfg.Workers.OptionsFlowCollectorInterval,
 		cfg.MarketData.DeribitAPIKey != "",
 	))
@@ -329,7 +339,7 @@ func provideWorkers(
 	scheduler.RegisterWorker(derivworkers.NewGammaExposureCollector(
 		derivRepo,
 		cfg.MarketData.DeribitAPIKey,
-		optionsSymbols,
+		cfg.Workers.GetOptionsSymbols(),
 		cfg.Workers.GammaExposureCollectorInterval,
 		cfg.MarketData.DeribitAPIKey != "",
 	))
@@ -379,7 +389,7 @@ func provideWorkers(
 		templates.Get(),
 		preScreener,
 		defaultSymbols,
-		"binance", // Primary exchange
+		primaryExchange,
 		cfg.Workers.OpportunityFinderInterval,
 		true, // enabled
 	)

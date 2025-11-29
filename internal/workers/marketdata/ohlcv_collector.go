@@ -13,28 +13,44 @@ import (
 // OHLCVCollector collects OHLCV data from exchanges
 type OHLCVCollector struct {
 	*workers.BaseWorker
-	mdRepo      market_data.Repository
-	exchFactory exchanges.Factory
-	symbols     []string
-	timeframes  []string
+	mdRepo        market_data.Repository
+	exchFactory   exchanges.Factory
+	baseAssets    []string // Base assets like BTC, ETH, SOL
+	quoteCurrency string   // Quote currency like USDT
+	timeframes    []string
 }
 
 // NewOHLCVCollector creates a new OHLCV collector worker
+// baseAssets: list of base assets to track (e.g., ["BTC", "ETH", "SOL"])
+// quoteCurrency: quote currency for pairs (e.g., "USDT")
+// Each exchange will format symbols according to their own requirements
 func NewOHLCVCollector(
 	mdRepo market_data.Repository,
 	exchFactory exchanges.Factory,
-	symbols []string,
+	baseAssets []string,
+	quoteCurrency string,
 	timeframes []string,
 	interval time.Duration,
 	enabled bool,
 ) *OHLCVCollector {
 	return &OHLCVCollector{
-		BaseWorker:  workers.NewBaseWorker("ohlcv_collector", interval, enabled),
-		mdRepo:      mdRepo,
-		exchFactory: exchFactory,
-		symbols:     symbols,
-		timeframes:  timeframes,
+		BaseWorker:    workers.NewBaseWorker("ohlcv_collector", interval, enabled),
+		mdRepo:        mdRepo,
+		exchFactory:   exchFactory,
+		baseAssets:    baseAssets,
+		quoteCurrency: quoteCurrency,
+		timeframes:    timeframes,
 	}
+}
+
+// formatSymbol formats base asset and quote currency for the given exchange
+// Each exchange has its own symbol format:
+// - Binance: BTCUSDT (no slash)
+// - Others: BTC/USDT (with slash)
+func (oc *OHLCVCollector) formatSymbol(exchangeName, baseAsset string) string {
+	// Most exchanges use slash notation (BTC/USDT)
+	// Binance normalizeSymbol will handle removing the slash
+	return baseAsset + "/" + oc.quoteCurrency
 }
 
 // Run executes one iteration of OHLCV collection
@@ -52,20 +68,25 @@ func (oc *OHLCVCollector) Run(ctx context.Context) error {
 
 	totalCandles := 0
 
-	// For each symbol and timeframe, collect OHLCV data
-	for symbolIdx, symbol := range oc.symbols {
+	// For each base asset and timeframe, collect OHLCV data
+	for assetIdx, baseAsset := range oc.baseAssets {
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
 			oc.Log().Info("OHLCV collection interrupted by shutdown",
 				"candles_collected", totalCandles,
-				"symbols_processed", symbolIdx,
-				"symbols_remaining", len(oc.symbols)-symbolIdx,
-				"current_symbol", symbol,
+				"assets_processed", assetIdx,
+				"assets_remaining", len(oc.baseAssets)-assetIdx,
+				"current_asset", baseAsset,
 			)
 			return ctx.Err()
 		default:
 		}
+
+		// Format symbol for the exchange
+		// Note: Each exchange will normalize the symbol according to its requirements
+		// e.g., Binance will convert "BTC/USDT" to "BTCUSDT"
+		symbol := oc.formatSymbol("", baseAsset)
 
 		for tfIdx, timeframe := range oc.timeframes {
 			// Check for context cancellation within nested loop
@@ -73,10 +94,10 @@ func (oc *OHLCVCollector) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				oc.Log().Info("OHLCV collection interrupted by shutdown",
 					"candles_collected", totalCandles,
-					"symbols_processed", symbolIdx,
-					"current_symbol", symbol,
+					"assets_processed", assetIdx,
+					"current_asset", baseAsset,
 					"current_timeframe", timeframe,
-					"timeframes_completed_for_symbol", tfIdx,
+					"timeframes_completed_for_asset", tfIdx,
 				)
 				return ctx.Err()
 			default:
@@ -85,6 +106,7 @@ func (oc *OHLCVCollector) Run(ctx context.Context) error {
 			candles, err := oc.collectOHLCV(ctx, symbol, timeframe)
 			if err != nil {
 				oc.Log().Error("Failed to collect OHLCV",
+					"base_asset", baseAsset,
 					"symbol", symbol,
 					"timeframe", timeframe,
 					"error", err,

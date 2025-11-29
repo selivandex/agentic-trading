@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -181,6 +182,33 @@ type ErrorTrackingConfig struct {
 // Intervals are optimized for production with reasonable defaults
 // that balance responsiveness with resource usage and API rate limits
 type WorkerConfig struct {
+	// Market data collection settings
+	BaseAssets     string `envconfig:"MARKET_DATA_BASE_ASSETS" default:"BTC,ETH,SOL,BNB,XRP"` // Comma-separated list of base assets to track
+	QuoteCurrency  string `envconfig:"MARKET_DATA_QUOTE_CURRENCY" default:"USDT"`             // Quote currency for trading pairs
+	Exchanges      string `envconfig:"MARKET_DATA_EXCHANGES" default:"binance,bybit,okx"`     // Comma-separated list of exchanges
+	PrimaryExch    string `envconfig:"MARKET_DATA_PRIMARY_EXCHANGE" default:"binance"`        // Primary exchange for analysis
+	Timeframes     string `envconfig:"MARKET_DATA_TIMEFRAMES" default:"1m,5m,15m,1h,4h,1d"`   // Comma-separated timeframes
+	OrderBookDepth int    `envconfig:"MARKET_DATA_ORDERBOOK_DEPTH" default:"20"`              // Order book depth to collect
+
+	// Sentiment data sources
+	TwitterAccounts string `envconfig:"SENTIMENT_TWITTER_ACCOUNTS" default:"APompliano,100trillionUSD,saylor,elonmusk"` // Twitter accounts to track
+	RedditSubs      string `envconfig:"SENTIMENT_REDDIT_SUBS" default:"CryptoCurrency,Bitcoin,ethereum,ethtrader"`      // Reddit subreddits to track
+
+	// On-chain data sources
+	Blockchains    string `envconfig:"ONCHAIN_BLOCKCHAINS" default:"bitcoin,ethereum"`                                // Blockchains to track
+	MiningPools    string `envconfig:"ONCHAIN_MINING_POOLS" default:"AntPool,Foundry USA,F2Pool,ViaBTC,Binance Pool"` // Mining pools to track
+	MinWhaleAmount int64  `envconfig:"ONCHAIN_MIN_WHALE_AMOUNT" default:"1000000"`                                    // Min whale transfer amount in USD
+
+	// Macro data sources
+	MacroCountries     string `envconfig:"MACRO_COUNTRIES" default:"United States,Euro Area,China"`        // Countries for macro events
+	MacroEventTypes    string `envconfig:"MACRO_EVENT_TYPES" default:"CPI,NFP,FOMC,GDP"`                   // Economic event types to track
+	TraditionalAssets  string `envconfig:"MACRO_TRADITIONAL_ASSETS" default:"SPY,GLD,DXY,TLT"`             // Traditional assets for correlation
+	CorrelationSymbols string `envconfig:"MACRO_CORRELATION_SYMBOLS" default:"BTC/USDT,ETH/USDT,SOL/USDT"` // Crypto symbols for correlation analysis
+
+	// Derivatives data sources
+	OptionsSymbols    string `envconfig:"DERIVATIVES_OPTIONS_SYMBOLS" default:"BTC,ETH"`    // Symbols for options tracking
+	MinOptionsPremium int64  `envconfig:"DERIVATIVES_MIN_OPTIONS_PREMIUM" default:"100000"` // Min options premium in USD
+
 	// Trading workers (high frequency - critical for execution)
 	PositionMonitorInterval time.Duration `envconfig:"WORKER_POSITION_MONITOR_INTERVAL" default:"1m"` // Check positions every minute
 	OrderSyncInterval       time.Duration `envconfig:"WORKER_ORDER_SYNC_INTERVAL" default:"30s"`      // Sync orders every 30s
@@ -229,6 +257,87 @@ type WorkerConfig struct {
 	// Worker concurrency settings
 	MarketScannerMaxConcurrency int  `envconfig:"WORKER_MARKET_SCANNER_MAX_CONCURRENCY" default:"5"` // Max users processed concurrently
 	MarketScannerEventDriven    bool `envconfig:"WORKER_MARKET_SCANNER_EVENT_DRIVEN" default:"true"` // Enable event-driven mode for opportunities
+}
+
+// splitAndTrim splits comma-separated string and trims whitespace
+func splitAndTrim(s string) []string {
+	if s == "" {
+		return []string{}
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+// GetBaseAssets returns base assets as a slice
+func (wc WorkerConfig) GetBaseAssets() []string {
+	return splitAndTrim(wc.BaseAssets)
+}
+
+// GetExchanges returns exchanges as a slice
+func (wc WorkerConfig) GetExchanges() []string {
+	return splitAndTrim(wc.Exchanges)
+}
+
+// GetTimeframes returns timeframes as a slice
+func (wc WorkerConfig) GetTimeframes() []string {
+	return splitAndTrim(wc.Timeframes)
+}
+
+// GetTwitterAccounts returns Twitter accounts as a slice
+func (wc WorkerConfig) GetTwitterAccounts() []string {
+	return splitAndTrim(wc.TwitterAccounts)
+}
+
+// GetRedditSubs returns Reddit subreddits as a slice
+func (wc WorkerConfig) GetRedditSubs() []string {
+	return splitAndTrim(wc.RedditSubs)
+}
+
+// GetBlockchains returns blockchains as a slice
+func (wc WorkerConfig) GetBlockchains() []string {
+	return splitAndTrim(wc.Blockchains)
+}
+
+// GetMiningPools returns mining pools as a slice
+func (wc WorkerConfig) GetMiningPools() []string {
+	return splitAndTrim(wc.MiningPools)
+}
+
+// GetMacroCountries returns macro countries as a slice
+func (wc WorkerConfig) GetMacroCountries() []string {
+	return splitAndTrim(wc.MacroCountries)
+}
+
+// GetMacroEventTypes returns macro event types as a slice
+func (wc WorkerConfig) GetMacroEventTypes() []string {
+	return splitAndTrim(wc.MacroEventTypes)
+}
+
+// GetTraditionalAssets returns traditional assets as a slice
+func (wc WorkerConfig) GetTraditionalAssets() []string {
+	return splitAndTrim(wc.TraditionalAssets)
+}
+
+// GetCorrelationSymbols returns correlation symbols as a slice
+func (wc WorkerConfig) GetCorrelationSymbols() []string {
+	return splitAndTrim(wc.CorrelationSymbols)
+}
+
+// GetOptionsSymbols returns options symbols as a slice
+func (wc WorkerConfig) GetOptionsSymbols() []string {
+	return splitAndTrim(wc.OptionsSymbols)
+}
+
+// GetMacroEventTypesAsStrings returns macro event types as strings
+func (wc WorkerConfig) GetMacroEventTypesAsStrings() []string {
+	return splitAndTrim(wc.MacroEventTypes)
 }
 
 // Load reads configuration from environment variables

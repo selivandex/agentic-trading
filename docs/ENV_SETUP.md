@@ -93,6 +93,35 @@ ERROR_TRACKING_PROVIDER=sentry
 SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 SENTRY_ENVIRONMENT=production
 
+# Market Data Collection Settings
+# Base assets to track across all exchanges (comma-separated)
+# Each exchange will format symbols according to their requirements (BTC/USDT or BTCUSDT)
+MARKET_DATA_BASE_ASSETS=BTC,ETH,SOL,BNB,XRP
+MARKET_DATA_QUOTE_CURRENCY=USDT
+MARKET_DATA_EXCHANGES=binance,bybit,okx
+MARKET_DATA_PRIMARY_EXCHANGE=binance
+MARKET_DATA_TIMEFRAMES=1m,5m,15m,1h,4h,1d
+MARKET_DATA_ORDERBOOK_DEPTH=20
+
+# Sentiment Data Sources
+SENTIMENT_TWITTER_ACCOUNTS=APompliano,100trillionUSD,saylor,elonmusk
+SENTIMENT_REDDIT_SUBS=CryptoCurrency,Bitcoin,ethereum,ethtrader
+
+# On-Chain Data Sources
+ONCHAIN_BLOCKCHAINS=bitcoin,ethereum
+ONCHAIN_MINING_POOLS=AntPool,Foundry USA,F2Pool,ViaBTC,Binance Pool
+ONCHAIN_MIN_WHALE_AMOUNT=1000000  # Min whale transfer amount in USD
+
+# Macro Data Sources
+MACRO_COUNTRIES=United States,Euro Area,China
+MACRO_EVENT_TYPES=CPI,NFP,FOMC,GDP
+MACRO_TRADITIONAL_ASSETS=SPY,GLD,DXY,TLT
+MACRO_CORRELATION_SYMBOLS=BTC/USDT,ETH/USDT,SOL/USDT
+
+# Derivatives Data Sources
+DERIVATIVES_OPTIONS_SYMBOLS=BTC,ETH
+DERIVATIVES_MIN_OPTIONS_PREMIUM=100000  # Min options premium in USD
+
 # Worker Intervals Configuration (Optional - defaults shown)
 # Trading workers (high frequency - critical for execution)
 WORKER_POSITION_MONITOR_INTERVAL=1m   # Check positions every minute
