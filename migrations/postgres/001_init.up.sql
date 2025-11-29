@@ -51,6 +51,11 @@ CREATE TABLE exchange_accounts (
     permissions TEXT[] DEFAULT '{}',
     is_active BOOLEAN DEFAULT true,
     last_sync_at TIMESTAMPTZ,
+    
+    -- User Data WebSocket fields (for real-time order/position updates)
+    listen_key_encrypted BYTEA,
+    listen_key_expires_at TIMESTAMPTZ,
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
 
@@ -59,6 +64,8 @@ CREATE TABLE exchange_accounts (
 
 CREATE INDEX idx_exchange_accounts_user ON exchange_accounts(user_id);
 CREATE INDEX idx_exchange_accounts_active ON exchange_accounts(is_active) WHERE is_active = true;
+CREATE INDEX idx_exchange_accounts_listen_key_expires ON exchange_accounts(listen_key_expires_at) 
+    WHERE listen_key_expires_at IS NOT NULL AND is_active = true;
 
 -- Trading Pairs table
 CREATE TABLE trading_pairs (

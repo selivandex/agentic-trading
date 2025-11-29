@@ -345,14 +345,16 @@ func (wc WorkerConfig) GetMacroEventTypesAsStrings() []string {
 type WebSocketConfig struct {
 	Enabled          bool          `envconfig:"WEBSOCKET_ENABLED" default:"true"`
 	UseTestnet       bool          `envconfig:"WEBSOCKET_USE_TESTNET" default:"false"`
-	Symbols          string        `envconfig:"WEBSOCKET_SYMBOLS" default:"BTCUSDT,ETHUSDT,SOLUSDT"` // Comma-separated symbols
-	Intervals        string        `envconfig:"WEBSOCKET_INTERVALS" default:"1m,5m,15m,1h,4h"`       // Comma-separated intervals
-	Exchanges        string        `envconfig:"WEBSOCKET_EXCHANGES" default:"binance"`               // Comma-separated exchanges
-	ReconnectBackoff time.Duration `envconfig:"WEBSOCKET_RECONNECT_BACKOFF" default:"5s"`            // Backoff between reconnects
-	MaxReconnects    int           `envconfig:"WEBSOCKET_MAX_RECONNECTS" default:"10"`               // Max reconnection attempts
-	PingInterval     time.Duration `envconfig:"WEBSOCKET_PING_INTERVAL" default:"60s"`               // Ping interval
-	ReadBufferSize   int           `envconfig:"WEBSOCKET_READ_BUFFER_SIZE" default:"4096"`           // Read buffer size
-	WriteBufferSize  int           `envconfig:"WEBSOCKET_WRITE_BUFFER_SIZE" default:"4096"`          // Write buffer size
+	Symbols          string        `envconfig:"WEBSOCKET_SYMBOLS" default:"BTCUSDT,ETHUSDT,SOLUSDT"`     // Comma-separated symbols
+	Intervals        string        `envconfig:"WEBSOCKET_INTERVALS" default:"1m,5m,15m,1h,4h"`           // Comma-separated intervals
+	StreamTypes      string        `envconfig:"WEBSOCKET_STREAM_TYPES" default:"kline,markPrice,ticker"` // Comma-separated stream types: kline,markPrice,ticker,trade
+	MarketTypes      string        `envconfig:"WEBSOCKET_MARKET_TYPES" default:"spot,futures"`           // Comma-separated market types: spot,futures
+	Exchanges        string        `envconfig:"WEBSOCKET_EXCHANGES" default:"binance"`                   // Comma-separated exchanges
+	ReconnectBackoff time.Duration `envconfig:"WEBSOCKET_RECONNECT_BACKOFF" default:"5s"`                // Backoff between reconnects
+	MaxReconnects    int           `envconfig:"WEBSOCKET_MAX_RECONNECTS" default:"10"`                   // Max reconnection attempts
+	PingInterval     time.Duration `envconfig:"WEBSOCKET_PING_INTERVAL" default:"60s"`                   // Ping interval
+	ReadBufferSize   int           `envconfig:"WEBSOCKET_READ_BUFFER_SIZE" default:"4096"`               // Read buffer size
+	WriteBufferSize  int           `envconfig:"WEBSOCKET_WRITE_BUFFER_SIZE" default:"4096"`              // Write buffer size
 }
 
 // GetSymbols returns WebSocket symbols as a slice
@@ -368,6 +370,16 @@ func (wc WebSocketConfig) GetIntervals() []string {
 // GetExchanges returns WebSocket exchanges as a slice
 func (wc WebSocketConfig) GetExchanges() []string {
 	return splitAndTrim(wc.Exchanges)
+}
+
+// GetStreamTypes returns WebSocket stream types as a slice
+func (wc WebSocketConfig) GetStreamTypes() []string {
+	return splitAndTrim(wc.StreamTypes)
+}
+
+// GetMarketTypes returns WebSocket market types as a slice
+func (wc WebSocketConfig) GetMarketTypes() []string {
+	return splitAndTrim(wc.MarketTypes)
 }
 
 // Load reads configuration from environment variables

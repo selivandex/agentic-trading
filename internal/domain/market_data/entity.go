@@ -111,18 +111,6 @@ type Liquidation struct {
 	EventTime  time.Time `ch:"event_time"`
 }
 
-// FundingRate represents funding rate for perpetual futures
-// Deprecated: Use MarkPrice instead, it contains all this data
-type FundingRate struct {
-	Exchange        string    `ch:"exchange"`
-	Symbol          string    `ch:"symbol"`
-	Timestamp       time.Time `ch:"timestamp"`
-	FundingRate     float64   `ch:"funding_rate"`
-	NextFundingTime time.Time `ch:"next_funding_time"`
-	MarkPrice       float64   `ch:"mark_price"`
-	IndexPrice      float64   `ch:"index_price"`
-}
-
 // OpenInterest represents open interest for futures contracts
 // Note: On Binance, only available via REST API (updates every ~5min)
 type OpenInterest struct {

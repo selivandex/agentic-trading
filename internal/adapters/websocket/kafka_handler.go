@@ -28,6 +28,7 @@ func (h *KafkaEventHandler) OnKline(event *KlineEvent) error {
 		context.Background(),
 		event.Exchange,
 		event.Symbol,
+		event.MarketType,
 		event.Interval,
 		event.OpenTime,
 		event.CloseTime,
@@ -48,6 +49,7 @@ func (h *KafkaEventHandler) OnKline(event *KlineEvent) error {
 	h.logger.Debug("Published kline event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
+		"market_type", event.MarketType,
 		"interval", event.Interval,
 		"is_final", event.IsFinal,
 	)
@@ -61,6 +63,7 @@ func (h *KafkaEventHandler) OnTicker(event *TickerEvent) error {
 		context.Background(),
 		event.Exchange,
 		event.Symbol,
+		event.MarketType,
 		event.PriceChange,
 		event.PriceChangePercent,
 		event.WeightedAvgPrice,
@@ -85,6 +88,7 @@ func (h *KafkaEventHandler) OnTicker(event *TickerEvent) error {
 	h.logger.Debug("Published ticker event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
+		"market_type", event.MarketType,
 	)
 
 	return nil
@@ -136,6 +140,7 @@ func (h *KafkaEventHandler) OnTrade(event *TradeEvent) error {
 		context.Background(),
 		event.Exchange,
 		event.Symbol,
+		event.MarketType,
 		event.TradeID,
 		event.Price,
 		event.Quantity,
@@ -152,6 +157,7 @@ func (h *KafkaEventHandler) OnTrade(event *TradeEvent) error {
 	h.logger.Debug("Published trade event to Kafka",
 		"exchange", event.Exchange,
 		"symbol", event.Symbol,
+		"market_type", event.MarketType,
 	)
 
 	return nil

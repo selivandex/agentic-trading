@@ -451,18 +451,19 @@ message WebSocketKlineEvent {
   BaseEvent base = 1;
   string exchange = 2;
   string symbol = 3;
-  string interval = 4;  // 1m, 5m, 15m, 1h, 4h, 1d, etc.
-  google.protobuf.Timestamp open_time = 5;
-  google.protobuf.Timestamp close_time = 6;
-  string open = 7;   // Price as string to avoid precision loss
-  string high = 8;
-  string low = 9;
-  string close = 10;
-  string volume = 11;
-  string quote_volume = 12;
-  int64 trade_count = 13;
-  bool is_final = 14;  // Whether the candle is closed
-  google.protobuf.Timestamp event_time = 15;
+  string market_type = 4;  // spot, futures
+  string interval = 5;  // 1m, 5m, 15m, 1h, 4h, 1d, etc.
+  google.protobuf.Timestamp open_time = 6;
+  google.protobuf.Timestamp close_time = 7;
+  string open = 8;   // Price as string to avoid precision loss
+  string high = 9;
+  string low = 10;
+  string close = 11;
+  string volume = 12;
+  string quote_volume = 13;
+  int64 trade_count = 14;
+  bool is_final = 15;  // Whether the candle is closed
+  google.protobuf.Timestamp event_time = 16;
 }
 
 // WebSocketTickerEvent represents 24hr ticker statistics from WebSocket
@@ -470,22 +471,23 @@ message WebSocketTickerEvent {
   BaseEvent base = 1;
   string exchange = 2;
   string symbol = 3;
-  string price_change = 4;
-  string price_change_percent = 5;
-  string weighted_avg_price = 6;
-  string last_price = 7;
-  string last_qty = 8;
-  string open_price = 9;
-  string high_price = 10;
-  string low_price = 11;
-  string volume = 12;
-  string quote_volume = 13;
-  google.protobuf.Timestamp open_time = 14;
-  google.protobuf.Timestamp close_time = 15;
-  int64 first_trade_id = 16;
-  int64 last_trade_id = 17;
-  int64 trade_count = 18;
-  google.protobuf.Timestamp event_time = 19;
+  string market_type = 4;  // spot, futures
+  string price_change = 5;
+  string price_change_percent = 6;
+  string weighted_avg_price = 7;
+  string last_price = 8;
+  string last_qty = 9;
+  string open_price = 10;
+  string high_price = 11;
+  string low_price = 12;
+  string volume = 13;
+  string quote_volume = 14;
+  google.protobuf.Timestamp open_time = 15;
+  google.protobuf.Timestamp close_time = 16;
+  int64 first_trade_id = 17;
+  int64 last_trade_id = 18;
+  int64 trade_count = 19;
+  google.protobuf.Timestamp event_time = 20;
 }
 
 // PriceLevel represents a single level in the order book
@@ -510,14 +512,15 @@ message WebSocketTradeEvent {
   BaseEvent base = 1;
   string exchange = 2;
   string symbol = 3;
-  int64 trade_id = 4;
-  string price = 5;
-  string quantity = 6;
-  int64 buyer_order_id = 7;
-  int64 seller_order_id = 8;
-  google.protobuf.Timestamp trade_time = 9;
-  bool is_buyer_maker = 10;
-  google.protobuf.Timestamp event_time = 11;
+  string market_type = 4;  // spot, futures
+  int64 trade_id = 5;
+  string price = 6;
+  string quantity = 7;
+  int64 buyer_order_id = 8;
+  int64 seller_order_id = 9;
+  google.protobuf.Timestamp trade_time = 10;
+  bool is_buyer_maker = 11;
+  google.protobuf.Timestamp event_time = 12;
 }
 
 // WebSocketFundingRateEvent represents funding rate for perpetual contracts
@@ -542,5 +545,95 @@ message WebSocketMarkPriceEvent {
   string funding_rate = 7;
   google.protobuf.Timestamp next_funding_time = 8;
   google.protobuf.Timestamp event_time = 9;
+}
+
+// ==========================================
+// User Data WebSocket Events
+// Real-time order, position, balance, and margin updates
+// ==========================================
+
+// UserDataOrderUpdateEvent represents real-time order status changes
+message UserDataOrderUpdateEvent {
+  BaseEvent base = 1;
+  string account_id = 2;
+  string exchange = 3;
+  string order_id = 4;
+  string client_order_id = 5;
+  string symbol = 6;
+  string side = 7;  // BUY, SELL
+  string position_side = 8;  // LONG, SHORT, BOTH
+  string type = 9;  // LIMIT, MARKET, STOP, etc.
+  string status = 10;  // NEW, PARTIALLY_FILLED, FILLED, CANCELED, REJECTED
+  string execution_type = 11;  // NEW, TRADE, CANCELED, EXPIRED
+  string original_qty = 12;
+  string filled_qty = 13;
+  string avg_price = 14;
+  string stop_price = 15;
+  string last_filled_qty = 16;
+  string last_filled_price = 17;
+  string commission = 18;
+  string commission_asset = 19;
+  google.protobuf.Timestamp trade_time = 20;
+  google.protobuf.Timestamp event_time = 21;
+}
+
+// UserDataPositionUpdateEvent represents real-time position changes
+message UserDataPositionUpdateEvent {
+  BaseEvent base = 1;
+  string account_id = 2;
+  string exchange = 3;
+  string symbol = 4;
+  string side = 5;  // LONG, SHORT
+  string amount = 6;
+  string entry_price = 7;
+  string mark_price = 8;
+  string unrealized_pnl = 9;
+  string maintenance_margin = 10;
+  string position_side = 11;  // LONG, SHORT, BOTH (for hedge mode)
+  google.protobuf.Timestamp event_time = 12;
+}
+
+// UserDataBalanceUpdateEvent represents real-time balance changes
+message UserDataBalanceUpdateEvent {
+  BaseEvent base = 1;
+  string account_id = 2;
+  string exchange = 3;
+  string asset = 4;
+  string wallet_balance = 5;
+  string cross_wallet_balance = 6;
+  string available_balance = 7;
+  string reason_type = 8;  // DEPOSIT, WITHDRAW, ORDER, FUNDING_FEE, etc.
+  google.protobuf.Timestamp event_time = 9;
+}
+
+// PositionAtRisk describes a position that may be liquidated
+message PositionAtRisk {
+  string symbol = 1;
+  string side = 2;
+  string amount = 3;
+  string margin_type = 4;
+  string unrealized_pnl = 5;
+  string maintenance_margin = 6;
+  string position_side = 7;
+}
+
+// UserDataMarginCallEvent represents liquidation risk warning (CRITICAL!)
+message UserDataMarginCallEvent {
+  BaseEvent base = 1;
+  string account_id = 2;
+  string exchange = 3;
+  string cross_wallet_balance = 4;
+  repeated PositionAtRisk positions_at_risk = 5;
+  google.protobuf.Timestamp event_time = 6;
+}
+
+// UserDataAccountConfigEvent represents leverage or margin mode changes
+message UserDataAccountConfigEvent {
+  BaseEvent base = 1;
+  string account_id = 2;
+  string exchange = 3;
+  string symbol = 4;
+  int32 leverage = 5;
+  google.protobuf.Timestamp event_time = 6;
 }
 

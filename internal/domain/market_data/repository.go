@@ -32,10 +32,6 @@ type Repository interface {
 	InsertLiquidations(ctx context.Context, liquidations []Liquidation) error
 	GetRecentLiquidations(ctx context.Context, exchange, symbol string, limit int) ([]Liquidation, error)
 
-	// Funding rate operations (deprecated, use MarkPrice)
-	InsertFundingRate(ctx context.Context, fundingRate *FundingRate) error
-	GetLatestFundingRate(ctx context.Context, exchange, symbol string) (*FundingRate, error)
-
 	// Open interest operations (REST API only, not WebSocket)
 	InsertOpenInterest(ctx context.Context, oi *OpenInterest) error
 	GetLatestOpenInterest(ctx context.Context, exchange, symbol string) (*OpenInterest, error)

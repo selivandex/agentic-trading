@@ -25,7 +25,7 @@ func NewWebSocketPublisher(kafka *kafka.Producer) *WebSocketPublisher {
 // PublishKline publishes a kline/candlestick event from WebSocket
 func (wp *WebSocketPublisher) PublishKline(
 	ctx context.Context,
-	exchange, symbol, interval string,
+	exchange, symbol, marketType, interval string,
 	openTime, closeTime, eventTime time.Time,
 	open, high, low, close, volume, quoteVolume string,
 	tradeCount int64,
@@ -35,6 +35,7 @@ func (wp *WebSocketPublisher) PublishKline(
 		Base:        NewBaseEvent(TopicWebSocketKline, "websocket_"+exchange, ""),
 		Exchange:    exchange,
 		Symbol:      symbol,
+		MarketType:  marketType,
 		Interval:    interval,
 		OpenTime:    timestamppb.New(openTime),
 		CloseTime:   timestamppb.New(closeTime),
@@ -55,7 +56,7 @@ func (wp *WebSocketPublisher) PublishKline(
 // PublishTicker publishes a 24hr ticker statistics event from WebSocket
 func (wp *WebSocketPublisher) PublishTicker(
 	ctx context.Context,
-	exchange, symbol string,
+	exchange, symbol, marketType string,
 	priceChange, priceChangePercent, weightedAvgPrice string,
 	lastPrice, lastQty, openPrice, highPrice, lowPrice string,
 	volume, quoteVolume string,
@@ -66,6 +67,7 @@ func (wp *WebSocketPublisher) PublishTicker(
 		Base:               NewBaseEvent(TopicWebSocketTicker, "websocket_"+exchange, ""),
 		Exchange:           exchange,
 		Symbol:             symbol,
+		MarketType:         marketType,
 		PriceChange:        priceChange,
 		PriceChangePercent: priceChangePercent,
 		WeightedAvgPrice:   weightedAvgPrice,
@@ -134,7 +136,7 @@ type PriceLevel struct {
 // PublishTrade publishes a single trade event from WebSocket
 func (wp *WebSocketPublisher) PublishTrade(
 	ctx context.Context,
-	exchange, symbol string,
+	exchange, symbol, marketType string,
 	tradeID int64,
 	price, quantity string,
 	buyerOrderID, sellerOrderID int64,
@@ -145,6 +147,7 @@ func (wp *WebSocketPublisher) PublishTrade(
 		Base:          NewBaseEvent(TopicWebSocketTrade, "websocket_"+exchange, ""),
 		Exchange:      exchange,
 		Symbol:        symbol,
+		MarketType:    marketType,
 		TradeId:       tradeID,
 		Price:         price,
 		Quantity:      quantity,

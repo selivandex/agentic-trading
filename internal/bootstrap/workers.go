@@ -32,7 +32,6 @@ import (
 	derivworkers "prometheus/internal/workers/derivatives"
 	"prometheus/internal/workers/evaluation"
 	macroworkers "prometheus/internal/workers/macro"
-	"prometheus/internal/workers/marketdata"
 	onchainworkers "prometheus/internal/workers/onchain"
 	sentimentworkers "prometheus/internal/workers/sentiment"
 	"prometheus/internal/workers/trading"
@@ -90,9 +89,7 @@ func provideWorkers(
 	baseAssets := cfg.Workers.GetBaseAssets()
 	quoteCurrency := cfg.Workers.QuoteCurrency
 	exchanges := cfg.Workers.GetExchanges()
-	timeframes := cfg.Workers.GetTimeframes()
 	primaryExchange := cfg.Workers.PrimaryExch
-	orderBookDepth := cfg.Workers.OrderBookDepth
 
 	// Build default symbols from base assets + quote currency
 	defaultSymbols := make([]string, len(baseAssets))
@@ -123,18 +120,8 @@ func provideWorkers(
 		true, // enabled
 	))
 
-	// Order sync: Syncs order status with exchanges
-	scheduler.RegisterWorker(trading.NewOrderSync(
-		userRepo,
-		orderRepo,
-		positionRepo,
-		exchangeAccountRepo,
-		exchFactory,
-		*encryptor,
-		kafkaProducer,
-		cfg.Workers.OrderSyncInterval,
-		true, // enabled
-	))
+	// NOTE: OrderSync worker removed - replaced with User Data WebSocket (real-time updates)
+	// Orders and positions are now updated via WebSocket → Kafka → Consumer pipeline
 
 	// Risk monitor: Checks circuit breakers and risk limits
 	scheduler.RegisterWorker(trading.NewRiskMonitor(
@@ -153,64 +140,6 @@ func provideWorkers(
 		riskEngine,
 		kafkaProducer,
 		cfg.Workers.PnLCalculatorInterval,
-		true, // enabled
-	))
-
-	// ========================================
-	// Market Data Workers (medium frequency)
-	// ========================================
-
-	// OHLCV collector: Collects candles
-	// Pass base assets and quote currency - each exchange will format symbols accordingly
-	scheduler.RegisterWorker(marketdata.NewOHLCVCollector(
-		marketDataRepo,
-		exchFactory,
-		baseAssets,
-		quoteCurrency,
-		timeframes,
-		cfg.Workers.OHLCVCollectorInterval,
-		true, // enabled
-	))
-
-	// Ticker collector: Collects real-time prices
-	scheduler.RegisterWorker(marketdata.NewTickerCollector(
-		marketDataRepo,
-		marketDataFactory,
-		defaultSymbols,
-		exchanges,
-		cfg.Workers.TickerCollectorInterval,
-		true, // enabled
-	))
-
-	// OrderBook collector: Collects order book snapshots
-	scheduler.RegisterWorker(marketdata.NewOrderBookCollector(
-		marketDataRepo,
-		marketDataFactory,
-		defaultSymbols,
-		exchanges,
-		orderBookDepth,
-		cfg.Workers.OrderBookCollectorInterval,
-		true, // enabled
-	))
-
-	// Trades collector: Collects real-time trades
-	scheduler.RegisterWorker(marketdata.NewTradesCollector(
-		marketDataRepo,
-		marketDataFactory,
-		defaultSymbols,
-		exchanges,
-		100, // limit per request
-		cfg.Workers.TradesCollectorInterval,
-		true, // enabled
-	))
-
-	// Funding collector: Collects funding rates from futures
-	scheduler.RegisterWorker(marketdata.NewFundingCollector(
-		marketDataRepo,
-		marketDataFactory,
-		defaultSymbols,
-		exchanges,
-		cfg.Workers.FundingCollectorInterval,
 		true, // enabled
 	))
 
@@ -354,7 +283,6 @@ func provideWorkers(
 
 	log.Info("Worker intervals configured",
 		"position_monitor", cfg.Workers.PositionMonitorInterval,
-		"order_sync", cfg.Workers.OrderSyncInterval,
 		"risk_monitor", cfg.Workers.RiskMonitorInterval,
 		"pnl_calculator", cfg.Workers.PnLCalculatorInterval,
 		"market_scanner", cfg.Workers.MarketScannerMaxConcurrency,

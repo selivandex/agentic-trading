@@ -128,7 +128,19 @@ type Adapters struct {
 	AIUsageConsumer              *kafka.Consumer
 	PositionGuardianConsumer     *kafka.Consumer
 	TelegramNotificationConsumer *kafka.Consumer
-	WebSocketKlineConsumer       *kafka.Consumer
+
+	// WebSocket consumers (one per stream type)
+	WebSocketKlineConsumer     *kafka.Consumer
+	WebSocketMarkPriceConsumer *kafka.Consumer
+	WebSocketTickerConsumer    *kafka.Consumer
+	WebSocketTradeConsumer     *kafka.Consumer
+	
+	// User Data WebSocket consumers
+	UserDataOrderConsumer     *kafka.Consumer
+	UserDataPositionConsumer  *kafka.Consumer
+	UserDataBalanceConsumer   *kafka.Consumer
+	UserDataMarginCallConsumer *kafka.Consumer
+	UserDataAccountConfigConsumer *kafka.Consumer
 
 	// Crypto & Exchanges
 	Encryptor         *crypto.Encryptor
@@ -140,6 +152,7 @@ type Adapters struct {
 
 	// WebSocket
 	WebSocketClients *WebSocketClients
+	UserDataManager  *UserDataManager
 }
 
 // Business groups business logic components
@@ -175,7 +188,15 @@ type Background struct {
 	OpportunitySvc      *consumers.OpportunityConsumer
 	AIUsageSvc          *consumers.AIUsageConsumer
 	PositionGuardianSvc *consumers.PositionGuardianConsumer
-	WebSocketKlineSvc   *consumers.WebSocketKlineConsumer
+
+	// WebSocket consumer services
+	WebSocketKlineSvc     *consumers.WebSocketKlineConsumer
+	WebSocketMarkPriceSvc *consumers.WebSocketMarkPriceConsumer
+	WebSocketTickerSvc    *consumers.WebSocketTickerConsumer
+	WebSocketTradeSvc     *consumers.WebSocketTradeConsumer
+	
+	// User Data WebSocket consumer service
+	UserDataSvc *consumers.UserDataConsumer
 }
 
 // NewContainer creates a new dependency container
@@ -208,6 +229,8 @@ func (c *Container) MustInit() {
 	c.MustInitApplication()
 	c.MustInitBackground()
 	c.MustInitWebSocketClients()
+	c.MustInitUserDataManager()
+	c.MustInitUserDataConsumer()
 }
 
 // Start starts all background components
@@ -217,6 +240,16 @@ func (c *Container) Start() error {
 	// Start WebSocket connections
 	if err := c.connectWebSocketClients(c.Context); err != nil {
 		return errors.Wrap(err, "failed to connect WebSocket clients")
+	}
+
+	// Start User Data WebSocket Manager
+	if c.Adapters.UserDataManager != nil && c.Adapters.UserDataManager.Manager != nil {
+		if err := c.Adapters.UserDataManager.Manager.Start(c.Context); err != nil {
+			return errors.Wrap(err, "failed to start User Data Manager")
+		}
+		c.Log.Info("✓ User Data Manager started",
+			"active_connections", c.Adapters.UserDataManager.Manager.GetActiveConnectionCount(),
+		)
 	}
 
 	// Start background consumers
@@ -257,7 +290,56 @@ func (c *Container) startConsumers() error {
 		{"position_guardian", c.Background.PositionGuardianSvc},
 		{"telegram_bot", c.Application.TelegramBot},
 		{"telegram_notifications", c.Application.TelegramNotificationSvc},
-		{"websocket_kline", c.Background.WebSocketKlineSvc},
+	}
+
+	// Add WebSocket consumers based on enabled stream types
+	streamTypes := c.Config.WebSocket.GetStreamTypes()
+	consumerNames := []string{"notification", "risk", "analytics", "opportunity", "ai_usage", "position_guardian", "telegram_bot", "telegram_notifications"}
+
+	for _, streamType := range streamTypes {
+		switch streamType {
+		case "kline":
+			if c.Background.WebSocketKlineSvc != nil {
+				consumers = append(consumers, struct {
+					name string
+					svc  interface{ Start(context.Context) error }
+				}{"websocket_kline", c.Background.WebSocketKlineSvc})
+				consumerNames = append(consumerNames, "websocket_kline")
+			}
+		case "markPrice":
+			if c.Background.WebSocketMarkPriceSvc != nil {
+				consumers = append(consumers, struct {
+					name string
+					svc  interface{ Start(context.Context) error }
+				}{"websocket_markprice", c.Background.WebSocketMarkPriceSvc})
+				consumerNames = append(consumerNames, "websocket_markprice")
+			}
+		case "ticker":
+			if c.Background.WebSocketTickerSvc != nil {
+				consumers = append(consumers, struct {
+					name string
+					svc  interface{ Start(context.Context) error }
+				}{"websocket_ticker", c.Background.WebSocketTickerSvc})
+				consumerNames = append(consumerNames, "websocket_ticker")
+			}
+		case "trade":
+			if c.Background.WebSocketTradeSvc != nil {
+				consumers = append(consumers, struct {
+					name string
+					svc  interface{ Start(context.Context) error }
+				}{"websocket_trade", c.Background.WebSocketTradeSvc})
+				consumerNames = append(consumerNames, "websocket_trade")
+			}
+		}
+	}
+
+	// Add User Data consumer if enabled
+	if c.Background.UserDataSvc != nil {
+		consumers = append(consumers, struct {
+			name string
+			svc  interface{ Start(context.Context) error }
+		}{"user_data", c.Background.UserDataSvc})
+		consumerNames = append(consumerNames, "user_data")
 	}
 
 	c.WG.Add(len(consumers))
@@ -266,13 +348,15 @@ func (c *Container) startConsumers() error {
 		name := consumer.name
 		go func() {
 			defer c.WG.Done()
-			if err := svc.Start(c.Context); err != nil && c.Context.Err() == nil {
-				c.Log.Error(name+" consumer failed", "error", err)
+			if svc != nil {
+				if err := svc.Start(c.Context); err != nil && c.Context.Err() == nil {
+					c.Log.Error(name+" consumer failed", "error", err)
+				}
 			}
 		}()
 	}
 
-	c.Log.Info("✓ Event consumers started: notification, risk, analytics, opportunity, ai_usage, position_guardian, telegram_bot, telegram_notifications, websocket_kline")
+	c.Log.Info("✓ Event consumers started", "consumers", consumerNames)
 	return nil
 }
 
@@ -299,6 +383,7 @@ func (c *Container) Shutdown() {
 		c.Application.HTTPServer,
 		c.Background.WorkerScheduler,
 		c.Adapters.MarketDataFactory,
+		c.Adapters.UserDataManager,
 		c.Adapters.KafkaProducer,
 		c.Adapters.NotificationConsumer,
 		c.Adapters.RiskConsumer,
@@ -308,6 +393,9 @@ func (c *Container) Shutdown() {
 		c.Adapters.PositionGuardianConsumer,
 		c.Adapters.TelegramNotificationConsumer,
 		c.Adapters.WebSocketKlineConsumer,
+		c.Adapters.WebSocketMarkPriceConsumer,
+		c.Adapters.WebSocketTickerConsumer,
+		c.Adapters.WebSocketTradeConsumer,
 		c.PG,
 		c.CH,
 		c.Redis,

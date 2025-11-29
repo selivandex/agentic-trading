@@ -130,12 +130,6 @@ const (
 			exchange, symbol, timestamp, trade_id, price, quantity, side, is_buyer
 		)
 	`
-
-	InsertFundingRates = `
-		INSERT INTO funding_rates (
-			exchange, symbol, timestamp, funding_rate, next_funding_time, mark_price, index_price
-		)
-	`
 )
 
 // Client exposes the raw ClickHouse client for queries.
@@ -496,62 +490,6 @@ func (f *TradeFixture) BuildMany(count int) []market_data.Trade {
 	}
 
 	return trades
-}
-
-// FundingRateFixture provides builder pattern for creating test funding rates
-type FundingRateFixture struct {
-	fundingRate market_data.FundingRate
-}
-
-// NewFundingRateFixture creates a default funding rate for testing
-func NewFundingRateFixture() *FundingRateFixture {
-	now := time.Now().Truncate(time.Hour)
-	return &FundingRateFixture{
-		fundingRate: market_data.FundingRate{
-			Exchange:        "binance",
-			Symbol:          "BTC/USDT",
-			Timestamp:       now,
-			FundingRate:     0.0001,
-			NextFundingTime: now.Add(8 * time.Hour),
-			MarkPrice:       50000.0,
-			IndexPrice:      49995.0,
-		},
-	}
-}
-
-// WithExchange sets the exchange
-func (f *FundingRateFixture) WithExchange(exchange string) *FundingRateFixture {
-	f.fundingRate.Exchange = exchange
-	return f
-}
-
-// WithSymbol sets the symbol
-func (f *FundingRateFixture) WithSymbol(symbol string) *FundingRateFixture {
-	f.fundingRate.Symbol = symbol
-	return f
-}
-
-// WithTimestamp sets the timestamp
-func (f *FundingRateFixture) WithTimestamp(t time.Time) *FundingRateFixture {
-	f.fundingRate.Timestamp = t
-	return f
-}
-
-// WithFundingRate sets the funding rate
-func (f *FundingRateFixture) WithFundingRate(rate float64) *FundingRateFixture {
-	f.fundingRate.FundingRate = rate
-	return f
-}
-
-// WithMarkPrice sets the mark price
-func (f *FundingRateFixture) WithMarkPrice(price float64) *FundingRateFixture {
-	f.fundingRate.MarkPrice = price
-	return f
-}
-
-// Build returns the constructed funding rate
-func (f *FundingRateFixture) Build() market_data.FundingRate {
-	return f.fundingRate
 }
 
 // MarkPriceFixture provides builder pattern for creating test mark prices

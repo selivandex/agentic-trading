@@ -72,21 +72,63 @@ func (c *Container) MustInitWebSocketClients() {
 		c.Adapters.WebSocketClients = clients
 	}
 
-	// Create WebSocket consumer for kline events
-	c.Log.Info("Creating WebSocket kline consumer",
-		"topic", events.TopicWebSocketKline,
-		"group_id", c.Config.Kafka.GroupID,
-	)
+	// Create WebSocket consumers for all stream types
+	streamTypes := c.Config.WebSocket.GetStreamTypes()
 
-	klineConsumer := consumers.NewWebSocketKlineConsumer(
-		c.Adapters.WebSocketKlineConsumer,
-		c.Repos.MarketData,
-		c.Log,
-	)
-	c.Background.WebSocketKlineSvc = klineConsumer
+	for _, streamType := range streamTypes {
+		switch streamType {
+		case "kline":
+			c.Log.Info("Creating WebSocket kline consumer",
+				"topic", events.TopicWebSocketKline,
+				"group_id", c.Config.Kafka.GroupID,
+			)
+			c.Background.WebSocketKlineSvc = consumers.NewWebSocketKlineConsumer(
+				c.Adapters.WebSocketKlineConsumer,
+				c.Repos.MarketData,
+				c.Log,
+			)
+
+		case "markPrice":
+			c.Log.Info("Creating WebSocket mark price consumer",
+				"topic", events.TopicWebSocketMarkPrice,
+				"group_id", c.Config.Kafka.GroupID,
+			)
+			c.Background.WebSocketMarkPriceSvc = consumers.NewWebSocketMarkPriceConsumer(
+				c.Adapters.WebSocketMarkPriceConsumer,
+				c.Repos.MarketData,
+				c.Log,
+			)
+
+		case "ticker":
+			c.Log.Info("Creating WebSocket ticker consumer",
+				"topic", events.TopicWebSocketTicker,
+				"group_id", c.Config.Kafka.GroupID,
+			)
+			c.Background.WebSocketTickerSvc = consumers.NewWebSocketTickerConsumer(
+				c.Adapters.WebSocketTickerConsumer,
+				c.Repos.MarketData,
+				c.Log,
+			)
+
+		case "trade":
+			c.Log.Info("Creating WebSocket trade consumer",
+				"topic", events.TopicWebSocketTrade,
+				"group_id", c.Config.Kafka.GroupID,
+			)
+			c.Background.WebSocketTradeSvc = consumers.NewWebSocketTradeConsumer(
+				c.Adapters.WebSocketTradeConsumer,
+				c.Repos.MarketData,
+				c.Log,
+			)
+		}
+	}
 
 	c.Log.Info("✓ WebSocket infrastructure initialized",
-		"consumer_created", c.Background.WebSocketKlineSvc != nil,
+		"stream_types", streamTypes,
+		"kline_consumer", c.Background.WebSocketKlineSvc != nil,
+		"markprice_consumer", c.Background.WebSocketMarkPriceSvc != nil,
+		"ticker_consumer", c.Background.WebSocketTickerSvc != nil,
+		"trade_consumer", c.Background.WebSocketTradeSvc != nil,
 	)
 }
 
@@ -123,19 +165,89 @@ func (c *Container) connectWebSocketClients(ctx context.Context) error {
 func (c *Container) buildStreamConfig() websocket.ConnectionConfig {
 	symbols := c.Config.WebSocket.GetSymbols()
 	intervals := c.Config.WebSocket.GetIntervals()
+	streamTypes := c.Config.WebSocket.GetStreamTypes()
+	marketTypes := c.Config.WebSocket.GetMarketTypes()
 
 	var streams []websocket.StreamConfig
 
-	// Create kline streams for all symbol-interval combinations
-	for _, symbol := range symbols {
-		for _, interval := range intervals {
-			streams = append(streams, websocket.StreamConfig{
-				Type:     websocket.StreamTypeKline,
-				Symbol:   symbol,
-				Interval: websocket.Interval(interval), // Convert string to Interval type
-			})
+	// Build streams based on configured types and market types
+	for _, streamType := range streamTypes {
+		for _, marketTypeStr := range marketTypes {
+			marketType := websocket.MarketType(marketTypeStr)
+
+			switch streamType {
+			case "kline":
+				// Create kline streams for all symbol-interval combinations
+				for _, symbol := range symbols {
+					for _, interval := range intervals {
+						streams = append(streams, websocket.StreamConfig{
+							Type:       websocket.StreamTypeKline,
+							Symbol:     symbol,
+							Interval:   websocket.Interval(interval),
+							MarketType: marketType,
+						})
+					}
+				}
+
+			case "markPrice":
+				// Create mark price streams for all symbols (futures only!)
+				if marketType == websocket.MarketTypeFutures {
+					for _, symbol := range symbols {
+						streams = append(streams, websocket.StreamConfig{
+							Type:       websocket.StreamTypeMarkPrice,
+							Symbol:     symbol,
+							MarketType: marketType,
+						})
+					}
+				} else {
+					c.Log.Debug("Skipping mark price for spot (not supported)",
+						"market_type", marketType,
+					)
+				}
+
+			case "ticker":
+				// Create ticker streams for all symbols
+				for _, symbol := range symbols {
+					streams = append(streams, websocket.StreamConfig{
+						Type:       websocket.StreamTypeTicker,
+						Symbol:     symbol,
+						MarketType: marketType,
+					})
+				}
+
+			case "trade":
+				// Create trade streams for all symbols
+				for _, symbol := range symbols {
+					streams = append(streams, websocket.StreamConfig{
+						Type:       websocket.StreamTypeTrade,
+						Symbol:     symbol,
+						MarketType: marketType,
+					})
+				}
+
+			case "depth":
+				// Create depth streams for all symbols
+				for _, symbol := range symbols {
+					streams = append(streams, websocket.StreamConfig{
+						Type:       websocket.StreamTypeDepth,
+						Symbol:     symbol,
+						MarketType: marketType,
+					})
+				}
+
+			default:
+				c.Log.Warn("Unknown stream type in config", "type", streamType)
+			}
 		}
 	}
+
+	c.Log.Info("Built stream configuration",
+		"total_streams", len(streams),
+		"stream_types", streamTypes,
+		"market_types", marketTypes,
+		"symbols", len(symbols),
+		"intervals", len(intervals),
+	)
 
 	return websocket.ConnectionConfig{
 		Streams:          streams,

@@ -3612,18 +3612,19 @@ type WebSocketKlineEvent struct {
 	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
 	Exchange      string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
 	Symbol        string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	Interval      string                 `protobuf:"bytes,4,opt,name=interval,proto3" json:"interval,omitempty"` // 1m, 5m, 15m, 1h, 4h, 1d, etc.
-	OpenTime      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=open_time,json=openTime,proto3" json:"open_time,omitempty"`
-	CloseTime     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=close_time,json=closeTime,proto3" json:"close_time,omitempty"`
-	Open          string                 `protobuf:"bytes,7,opt,name=open,proto3" json:"open,omitempty"` // Price as string to avoid precision loss
-	High          string                 `protobuf:"bytes,8,opt,name=high,proto3" json:"high,omitempty"`
-	Low           string                 `protobuf:"bytes,9,opt,name=low,proto3" json:"low,omitempty"`
-	Close         string                 `protobuf:"bytes,10,opt,name=close,proto3" json:"close,omitempty"`
-	Volume        string                 `protobuf:"bytes,11,opt,name=volume,proto3" json:"volume,omitempty"`
-	QuoteVolume   string                 `protobuf:"bytes,12,opt,name=quote_volume,json=quoteVolume,proto3" json:"quote_volume,omitempty"`
-	TradeCount    int64                  `protobuf:"varint,13,opt,name=trade_count,json=tradeCount,proto3" json:"trade_count,omitempty"`
-	IsFinal       bool                   `protobuf:"varint,14,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"` // Whether the candle is closed
-	EventTime     *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	MarketType    string                 `protobuf:"bytes,4,opt,name=market_type,json=marketType,proto3" json:"market_type,omitempty"` // spot, futures
+	Interval      string                 `protobuf:"bytes,5,opt,name=interval,proto3" json:"interval,omitempty"`                       // 1m, 5m, 15m, 1h, 4h, 1d, etc.
+	OpenTime      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=open_time,json=openTime,proto3" json:"open_time,omitempty"`
+	CloseTime     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=close_time,json=closeTime,proto3" json:"close_time,omitempty"`
+	Open          string                 `protobuf:"bytes,8,opt,name=open,proto3" json:"open,omitempty"` // Price as string to avoid precision loss
+	High          string                 `protobuf:"bytes,9,opt,name=high,proto3" json:"high,omitempty"`
+	Low           string                 `protobuf:"bytes,10,opt,name=low,proto3" json:"low,omitempty"`
+	Close         string                 `protobuf:"bytes,11,opt,name=close,proto3" json:"close,omitempty"`
+	Volume        string                 `protobuf:"bytes,12,opt,name=volume,proto3" json:"volume,omitempty"`
+	QuoteVolume   string                 `protobuf:"bytes,13,opt,name=quote_volume,json=quoteVolume,proto3" json:"quote_volume,omitempty"`
+	TradeCount    int64                  `protobuf:"varint,14,opt,name=trade_count,json=tradeCount,proto3" json:"trade_count,omitempty"`
+	IsFinal       bool                   `protobuf:"varint,15,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"` // Whether the candle is closed
+	EventTime     *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3675,6 +3676,13 @@ func (x *WebSocketKlineEvent) GetExchange() string {
 func (x *WebSocketKlineEvent) GetSymbol() string {
 	if x != nil {
 		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketKlineEvent) GetMarketType() string {
+	if x != nil {
+		return x.MarketType
 	}
 	return ""
 }
@@ -3769,22 +3777,23 @@ type WebSocketTickerEvent struct {
 	Base               *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
 	Exchange           string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
 	Symbol             string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	PriceChange        string                 `protobuf:"bytes,4,opt,name=price_change,json=priceChange,proto3" json:"price_change,omitempty"`
-	PriceChangePercent string                 `protobuf:"bytes,5,opt,name=price_change_percent,json=priceChangePercent,proto3" json:"price_change_percent,omitempty"`
-	WeightedAvgPrice   string                 `protobuf:"bytes,6,opt,name=weighted_avg_price,json=weightedAvgPrice,proto3" json:"weighted_avg_price,omitempty"`
-	LastPrice          string                 `protobuf:"bytes,7,opt,name=last_price,json=lastPrice,proto3" json:"last_price,omitempty"`
-	LastQty            string                 `protobuf:"bytes,8,opt,name=last_qty,json=lastQty,proto3" json:"last_qty,omitempty"`
-	OpenPrice          string                 `protobuf:"bytes,9,opt,name=open_price,json=openPrice,proto3" json:"open_price,omitempty"`
-	HighPrice          string                 `protobuf:"bytes,10,opt,name=high_price,json=highPrice,proto3" json:"high_price,omitempty"`
-	LowPrice           string                 `protobuf:"bytes,11,opt,name=low_price,json=lowPrice,proto3" json:"low_price,omitempty"`
-	Volume             string                 `protobuf:"bytes,12,opt,name=volume,proto3" json:"volume,omitempty"`
-	QuoteVolume        string                 `protobuf:"bytes,13,opt,name=quote_volume,json=quoteVolume,proto3" json:"quote_volume,omitempty"`
-	OpenTime           *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=open_time,json=openTime,proto3" json:"open_time,omitempty"`
-	CloseTime          *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=close_time,json=closeTime,proto3" json:"close_time,omitempty"`
-	FirstTradeId       int64                  `protobuf:"varint,16,opt,name=first_trade_id,json=firstTradeId,proto3" json:"first_trade_id,omitempty"`
-	LastTradeId        int64                  `protobuf:"varint,17,opt,name=last_trade_id,json=lastTradeId,proto3" json:"last_trade_id,omitempty"`
-	TradeCount         int64                  `protobuf:"varint,18,opt,name=trade_count,json=tradeCount,proto3" json:"trade_count,omitempty"`
-	EventTime          *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	MarketType         string                 `protobuf:"bytes,4,opt,name=market_type,json=marketType,proto3" json:"market_type,omitempty"` // spot, futures
+	PriceChange        string                 `protobuf:"bytes,5,opt,name=price_change,json=priceChange,proto3" json:"price_change,omitempty"`
+	PriceChangePercent string                 `protobuf:"bytes,6,opt,name=price_change_percent,json=priceChangePercent,proto3" json:"price_change_percent,omitempty"`
+	WeightedAvgPrice   string                 `protobuf:"bytes,7,opt,name=weighted_avg_price,json=weightedAvgPrice,proto3" json:"weighted_avg_price,omitempty"`
+	LastPrice          string                 `protobuf:"bytes,8,opt,name=last_price,json=lastPrice,proto3" json:"last_price,omitempty"`
+	LastQty            string                 `protobuf:"bytes,9,opt,name=last_qty,json=lastQty,proto3" json:"last_qty,omitempty"`
+	OpenPrice          string                 `protobuf:"bytes,10,opt,name=open_price,json=openPrice,proto3" json:"open_price,omitempty"`
+	HighPrice          string                 `protobuf:"bytes,11,opt,name=high_price,json=highPrice,proto3" json:"high_price,omitempty"`
+	LowPrice           string                 `protobuf:"bytes,12,opt,name=low_price,json=lowPrice,proto3" json:"low_price,omitempty"`
+	Volume             string                 `protobuf:"bytes,13,opt,name=volume,proto3" json:"volume,omitempty"`
+	QuoteVolume        string                 `protobuf:"bytes,14,opt,name=quote_volume,json=quoteVolume,proto3" json:"quote_volume,omitempty"`
+	OpenTime           *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=open_time,json=openTime,proto3" json:"open_time,omitempty"`
+	CloseTime          *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=close_time,json=closeTime,proto3" json:"close_time,omitempty"`
+	FirstTradeId       int64                  `protobuf:"varint,17,opt,name=first_trade_id,json=firstTradeId,proto3" json:"first_trade_id,omitempty"`
+	LastTradeId        int64                  `protobuf:"varint,18,opt,name=last_trade_id,json=lastTradeId,proto3" json:"last_trade_id,omitempty"`
+	TradeCount         int64                  `protobuf:"varint,19,opt,name=trade_count,json=tradeCount,proto3" json:"trade_count,omitempty"`
+	EventTime          *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -3836,6 +3845,13 @@ func (x *WebSocketTickerEvent) GetExchange() string {
 func (x *WebSocketTickerEvent) GetSymbol() string {
 	if x != nil {
 		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketTickerEvent) GetMarketType() string {
+	if x != nil {
+		return x.MarketType
 	}
 	return ""
 }
@@ -4104,14 +4120,15 @@ type WebSocketTradeEvent struct {
 	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
 	Exchange      string                 `protobuf:"bytes,2,opt,name=exchange,proto3" json:"exchange,omitempty"`
 	Symbol        string                 `protobuf:"bytes,3,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	TradeId       int64                  `protobuf:"varint,4,opt,name=trade_id,json=tradeId,proto3" json:"trade_id,omitempty"`
-	Price         string                 `protobuf:"bytes,5,opt,name=price,proto3" json:"price,omitempty"`
-	Quantity      string                 `protobuf:"bytes,6,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	BuyerOrderId  int64                  `protobuf:"varint,7,opt,name=buyer_order_id,json=buyerOrderId,proto3" json:"buyer_order_id,omitempty"`
-	SellerOrderId int64                  `protobuf:"varint,8,opt,name=seller_order_id,json=sellerOrderId,proto3" json:"seller_order_id,omitempty"`
-	TradeTime     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=trade_time,json=tradeTime,proto3" json:"trade_time,omitempty"`
-	IsBuyerMaker  bool                   `protobuf:"varint,10,opt,name=is_buyer_maker,json=isBuyerMaker,proto3" json:"is_buyer_maker,omitempty"`
-	EventTime     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	MarketType    string                 `protobuf:"bytes,4,opt,name=market_type,json=marketType,proto3" json:"market_type,omitempty"` // spot, futures
+	TradeId       int64                  `protobuf:"varint,5,opt,name=trade_id,json=tradeId,proto3" json:"trade_id,omitempty"`
+	Price         string                 `protobuf:"bytes,6,opt,name=price,proto3" json:"price,omitempty"`
+	Quantity      string                 `protobuf:"bytes,7,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	BuyerOrderId  int64                  `protobuf:"varint,8,opt,name=buyer_order_id,json=buyerOrderId,proto3" json:"buyer_order_id,omitempty"`
+	SellerOrderId int64                  `protobuf:"varint,9,opt,name=seller_order_id,json=sellerOrderId,proto3" json:"seller_order_id,omitempty"`
+	TradeTime     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=trade_time,json=tradeTime,proto3" json:"trade_time,omitempty"`
+	IsBuyerMaker  bool                   `protobuf:"varint,11,opt,name=is_buyer_maker,json=isBuyerMaker,proto3" json:"is_buyer_maker,omitempty"`
+	EventTime     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4163,6 +4180,13 @@ func (x *WebSocketTradeEvent) GetExchange() string {
 func (x *WebSocketTradeEvent) GetSymbol() string {
 	if x != nil {
 		return x.Symbol
+	}
+	return ""
+}
+
+func (x *WebSocketTradeEvent) GetMarketType() string {
+	if x != nil {
+		return x.MarketType
 	}
 	return ""
 }
@@ -4419,6 +4443,716 @@ func (x *WebSocketMarkPriceEvent) GetNextFundingTime() *timestamppb.Timestamp {
 }
 
 func (x *WebSocketMarkPriceEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// UserDataOrderUpdateEvent represents real-time order status changes
+type UserDataOrderUpdateEvent struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Base            *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	AccountId       string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Exchange        string                 `protobuf:"bytes,3,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	OrderId         string                 `protobuf:"bytes,4,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	ClientOrderId   string                 `protobuf:"bytes,5,opt,name=client_order_id,json=clientOrderId,proto3" json:"client_order_id,omitempty"`
+	Symbol          string                 `protobuf:"bytes,6,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Side            string                 `protobuf:"bytes,7,opt,name=side,proto3" json:"side,omitempty"`                                         // BUY, SELL
+	PositionSide    string                 `protobuf:"bytes,8,opt,name=position_side,json=positionSide,proto3" json:"position_side,omitempty"`     // LONG, SHORT, BOTH
+	Type            string                 `protobuf:"bytes,9,opt,name=type,proto3" json:"type,omitempty"`                                         // LIMIT, MARKET, STOP, etc.
+	Status          string                 `protobuf:"bytes,10,opt,name=status,proto3" json:"status,omitempty"`                                    // NEW, PARTIALLY_FILLED, FILLED, CANCELED, REJECTED
+	ExecutionType   string                 `protobuf:"bytes,11,opt,name=execution_type,json=executionType,proto3" json:"execution_type,omitempty"` // NEW, TRADE, CANCELED, EXPIRED
+	OriginalQty     string                 `protobuf:"bytes,12,opt,name=original_qty,json=originalQty,proto3" json:"original_qty,omitempty"`
+	FilledQty       string                 `protobuf:"bytes,13,opt,name=filled_qty,json=filledQty,proto3" json:"filled_qty,omitempty"`
+	AvgPrice        string                 `protobuf:"bytes,14,opt,name=avg_price,json=avgPrice,proto3" json:"avg_price,omitempty"`
+	StopPrice       string                 `protobuf:"bytes,15,opt,name=stop_price,json=stopPrice,proto3" json:"stop_price,omitempty"`
+	LastFilledQty   string                 `protobuf:"bytes,16,opt,name=last_filled_qty,json=lastFilledQty,proto3" json:"last_filled_qty,omitempty"`
+	LastFilledPrice string                 `protobuf:"bytes,17,opt,name=last_filled_price,json=lastFilledPrice,proto3" json:"last_filled_price,omitempty"`
+	Commission      string                 `protobuf:"bytes,18,opt,name=commission,proto3" json:"commission,omitempty"`
+	CommissionAsset string                 `protobuf:"bytes,19,opt,name=commission_asset,json=commissionAsset,proto3" json:"commission_asset,omitempty"`
+	TradeTime       *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=trade_time,json=tradeTime,proto3" json:"trade_time,omitempty"`
+	EventTime       *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UserDataOrderUpdateEvent) Reset() {
+	*x = UserDataOrderUpdateEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDataOrderUpdateEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDataOrderUpdateEvent) ProtoMessage() {}
+
+func (x *UserDataOrderUpdateEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDataOrderUpdateEvent.ProtoReflect.Descriptor instead.
+func (*UserDataOrderUpdateEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *UserDataOrderUpdateEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *UserDataOrderUpdateEvent) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetClientOrderId() string {
+	if x != nil {
+		return x.ClientOrderId
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetSide() string {
+	if x != nil {
+		return x.Side
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetPositionSide() string {
+	if x != nil {
+		return x.PositionSide
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetExecutionType() string {
+	if x != nil {
+		return x.ExecutionType
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetOriginalQty() string {
+	if x != nil {
+		return x.OriginalQty
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetFilledQty() string {
+	if x != nil {
+		return x.FilledQty
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetAvgPrice() string {
+	if x != nil {
+		return x.AvgPrice
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetStopPrice() string {
+	if x != nil {
+		return x.StopPrice
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetLastFilledQty() string {
+	if x != nil {
+		return x.LastFilledQty
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetLastFilledPrice() string {
+	if x != nil {
+		return x.LastFilledPrice
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetCommission() string {
+	if x != nil {
+		return x.Commission
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetCommissionAsset() string {
+	if x != nil {
+		return x.CommissionAsset
+	}
+	return ""
+}
+
+func (x *UserDataOrderUpdateEvent) GetTradeTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TradeTime
+	}
+	return nil
+}
+
+func (x *UserDataOrderUpdateEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// UserDataPositionUpdateEvent represents real-time position changes
+type UserDataPositionUpdateEvent struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Base              *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	AccountId         string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Exchange          string                 `protobuf:"bytes,3,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol            string                 `protobuf:"bytes,4,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Side              string                 `protobuf:"bytes,5,opt,name=side,proto3" json:"side,omitempty"` // LONG, SHORT
+	Amount            string                 `protobuf:"bytes,6,opt,name=amount,proto3" json:"amount,omitempty"`
+	EntryPrice        string                 `protobuf:"bytes,7,opt,name=entry_price,json=entryPrice,proto3" json:"entry_price,omitempty"`
+	MarkPrice         string                 `protobuf:"bytes,8,opt,name=mark_price,json=markPrice,proto3" json:"mark_price,omitempty"`
+	UnrealizedPnl     string                 `protobuf:"bytes,9,opt,name=unrealized_pnl,json=unrealizedPnl,proto3" json:"unrealized_pnl,omitempty"`
+	MaintenanceMargin string                 `protobuf:"bytes,10,opt,name=maintenance_margin,json=maintenanceMargin,proto3" json:"maintenance_margin,omitempty"`
+	PositionSide      string                 `protobuf:"bytes,11,opt,name=position_side,json=positionSide,proto3" json:"position_side,omitempty"` // LONG, SHORT, BOTH (for hedge mode)
+	EventTime         *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *UserDataPositionUpdateEvent) Reset() {
+	*x = UserDataPositionUpdateEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDataPositionUpdateEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDataPositionUpdateEvent) ProtoMessage() {}
+
+func (x *UserDataPositionUpdateEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDataPositionUpdateEvent.ProtoReflect.Descriptor instead.
+func (*UserDataPositionUpdateEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *UserDataPositionUpdateEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *UserDataPositionUpdateEvent) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetSide() string {
+	if x != nil {
+		return x.Side
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetEntryPrice() string {
+	if x != nil {
+		return x.EntryPrice
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetMarkPrice() string {
+	if x != nil {
+		return x.MarkPrice
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetUnrealizedPnl() string {
+	if x != nil {
+		return x.UnrealizedPnl
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetMaintenanceMargin() string {
+	if x != nil {
+		return x.MaintenanceMargin
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetPositionSide() string {
+	if x != nil {
+		return x.PositionSide
+	}
+	return ""
+}
+
+func (x *UserDataPositionUpdateEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// UserDataBalanceUpdateEvent represents real-time balance changes
+type UserDataBalanceUpdateEvent struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Base               *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	AccountId          string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Exchange           string                 `protobuf:"bytes,3,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Asset              string                 `protobuf:"bytes,4,opt,name=asset,proto3" json:"asset,omitempty"`
+	WalletBalance      string                 `protobuf:"bytes,5,opt,name=wallet_balance,json=walletBalance,proto3" json:"wallet_balance,omitempty"`
+	CrossWalletBalance string                 `protobuf:"bytes,6,opt,name=cross_wallet_balance,json=crossWalletBalance,proto3" json:"cross_wallet_balance,omitempty"`
+	AvailableBalance   string                 `protobuf:"bytes,7,opt,name=available_balance,json=availableBalance,proto3" json:"available_balance,omitempty"`
+	ReasonType         string                 `protobuf:"bytes,8,opt,name=reason_type,json=reasonType,proto3" json:"reason_type,omitempty"` // DEPOSIT, WITHDRAW, ORDER, FUNDING_FEE, etc.
+	EventTime          *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *UserDataBalanceUpdateEvent) Reset() {
+	*x = UserDataBalanceUpdateEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDataBalanceUpdateEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDataBalanceUpdateEvent) ProtoMessage() {}
+
+func (x *UserDataBalanceUpdateEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDataBalanceUpdateEvent.ProtoReflect.Descriptor instead.
+func (*UserDataBalanceUpdateEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *UserDataBalanceUpdateEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *UserDataBalanceUpdateEvent) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetAsset() string {
+	if x != nil {
+		return x.Asset
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetWalletBalance() string {
+	if x != nil {
+		return x.WalletBalance
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetCrossWalletBalance() string {
+	if x != nil {
+		return x.CrossWalletBalance
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetAvailableBalance() string {
+	if x != nil {
+		return x.AvailableBalance
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetReasonType() string {
+	if x != nil {
+		return x.ReasonType
+	}
+	return ""
+}
+
+func (x *UserDataBalanceUpdateEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// PositionAtRisk describes a position that may be liquidated
+type PositionAtRisk struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Symbol            string                 `protobuf:"bytes,1,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Side              string                 `protobuf:"bytes,2,opt,name=side,proto3" json:"side,omitempty"`
+	Amount            string                 `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	MarginType        string                 `protobuf:"bytes,4,opt,name=margin_type,json=marginType,proto3" json:"margin_type,omitempty"`
+	UnrealizedPnl     string                 `protobuf:"bytes,5,opt,name=unrealized_pnl,json=unrealizedPnl,proto3" json:"unrealized_pnl,omitempty"`
+	MaintenanceMargin string                 `protobuf:"bytes,6,opt,name=maintenance_margin,json=maintenanceMargin,proto3" json:"maintenance_margin,omitempty"`
+	PositionSide      string                 `protobuf:"bytes,7,opt,name=position_side,json=positionSide,proto3" json:"position_side,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *PositionAtRisk) Reset() {
+	*x = PositionAtRisk{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PositionAtRisk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PositionAtRisk) ProtoMessage() {}
+
+func (x *PositionAtRisk) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PositionAtRisk.ProtoReflect.Descriptor instead.
+func (*PositionAtRisk) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *PositionAtRisk) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *PositionAtRisk) GetSide() string {
+	if x != nil {
+		return x.Side
+	}
+	return ""
+}
+
+func (x *PositionAtRisk) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *PositionAtRisk) GetMarginType() string {
+	if x != nil {
+		return x.MarginType
+	}
+	return ""
+}
+
+func (x *PositionAtRisk) GetUnrealizedPnl() string {
+	if x != nil {
+		return x.UnrealizedPnl
+	}
+	return ""
+}
+
+func (x *PositionAtRisk) GetMaintenanceMargin() string {
+	if x != nil {
+		return x.MaintenanceMargin
+	}
+	return ""
+}
+
+func (x *PositionAtRisk) GetPositionSide() string {
+	if x != nil {
+		return x.PositionSide
+	}
+	return ""
+}
+
+// UserDataMarginCallEvent represents liquidation risk warning (CRITICAL!)
+type UserDataMarginCallEvent struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Base               *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	AccountId          string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Exchange           string                 `protobuf:"bytes,3,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	CrossWalletBalance string                 `protobuf:"bytes,4,opt,name=cross_wallet_balance,json=crossWalletBalance,proto3" json:"cross_wallet_balance,omitempty"`
+	PositionsAtRisk    []*PositionAtRisk      `protobuf:"bytes,5,rep,name=positions_at_risk,json=positionsAtRisk,proto3" json:"positions_at_risk,omitempty"`
+	EventTime          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *UserDataMarginCallEvent) Reset() {
+	*x = UserDataMarginCallEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDataMarginCallEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDataMarginCallEvent) ProtoMessage() {}
+
+func (x *UserDataMarginCallEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDataMarginCallEvent.ProtoReflect.Descriptor instead.
+func (*UserDataMarginCallEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *UserDataMarginCallEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *UserDataMarginCallEvent) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UserDataMarginCallEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *UserDataMarginCallEvent) GetCrossWalletBalance() string {
+	if x != nil {
+		return x.CrossWalletBalance
+	}
+	return ""
+}
+
+func (x *UserDataMarginCallEvent) GetPositionsAtRisk() []*PositionAtRisk {
+	if x != nil {
+		return x.PositionsAtRisk
+	}
+	return nil
+}
+
+func (x *UserDataMarginCallEvent) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+// UserDataAccountConfigEvent represents leverage or margin mode changes
+type UserDataAccountConfigEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Base          *BaseEvent             `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Exchange      string                 `protobuf:"bytes,3,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	Symbol        string                 `protobuf:"bytes,4,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Leverage      int32                  `protobuf:"varint,5,opt,name=leverage,proto3" json:"leverage,omitempty"`
+	EventTime     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserDataAccountConfigEvent) Reset() {
+	*x = UserDataAccountConfigEvent{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDataAccountConfigEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDataAccountConfigEvent) ProtoMessage() {}
+
+func (x *UserDataAccountConfigEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDataAccountConfigEvent.ProtoReflect.Descriptor instead.
+func (*UserDataAccountConfigEvent) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *UserDataAccountConfigEvent) GetBase() *BaseEvent {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
+func (x *UserDataAccountConfigEvent) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UserDataAccountConfigEvent) GetExchange() string {
+	if x != nil {
+		return x.Exchange
+	}
+	return ""
+}
+
+func (x *UserDataAccountConfigEvent) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *UserDataAccountConfigEvent) GetLeverage() int32 {
+	if x != nil {
+		return x.Leverage
+	}
+	return 0
+}
+
+func (x *UserDataAccountConfigEvent) GetEventTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.EventTime
 	}
@@ -4821,54 +5555,58 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"spikeRatio\x12.\n" +
 	"\aurgency\x18\a \x01(\x0e2\x14.events.EventUrgencyR\aurgency\x12-\n" +
 	"\x12affected_positions\x18\b \x03(\tR\x11affectedPositions\x12\x1c\n" +
-	"\ttimeframe\x18\t \x01(\tR\ttimeframe\"\x82\x04\n" +
+	"\ttimeframe\x18\t \x01(\tR\ttimeframe\"\xa3\x04\n" +
 	"\x13WebSocketKlineEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
 	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
-	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x1a\n" +
-	"\binterval\x18\x04 \x01(\tR\binterval\x127\n" +
-	"\topen_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bopenTime\x129\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x1f\n" +
+	"\vmarket_type\x18\x04 \x01(\tR\n" +
+	"marketType\x12\x1a\n" +
+	"\binterval\x18\x05 \x01(\tR\binterval\x127\n" +
+	"\topen_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bopenTime\x129\n" +
 	"\n" +
-	"close_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcloseTime\x12\x12\n" +
-	"\x04open\x18\a \x01(\tR\x04open\x12\x12\n" +
-	"\x04high\x18\b \x01(\tR\x04high\x12\x10\n" +
-	"\x03low\x18\t \x01(\tR\x03low\x12\x14\n" +
-	"\x05close\x18\n" +
-	" \x01(\tR\x05close\x12\x16\n" +
-	"\x06volume\x18\v \x01(\tR\x06volume\x12!\n" +
-	"\fquote_volume\x18\f \x01(\tR\vquoteVolume\x12\x1f\n" +
-	"\vtrade_count\x18\r \x01(\x03R\n" +
+	"close_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcloseTime\x12\x12\n" +
+	"\x04open\x18\b \x01(\tR\x04open\x12\x12\n" +
+	"\x04high\x18\t \x01(\tR\x04high\x12\x10\n" +
+	"\x03low\x18\n" +
+	" \x01(\tR\x03low\x12\x14\n" +
+	"\x05close\x18\v \x01(\tR\x05close\x12\x16\n" +
+	"\x06volume\x18\f \x01(\tR\x06volume\x12!\n" +
+	"\fquote_volume\x18\r \x01(\tR\vquoteVolume\x12\x1f\n" +
+	"\vtrade_count\x18\x0e \x01(\x03R\n" +
 	"tradeCount\x12\x19\n" +
-	"\bis_final\x18\x0e \x01(\bR\aisFinal\x129\n" +
+	"\bis_final\x18\x0f \x01(\bR\aisFinal\x129\n" +
 	"\n" +
-	"event_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xde\x05\n" +
+	"event_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xff\x05\n" +
 	"\x14WebSocketTickerEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
 	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
-	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12!\n" +
-	"\fprice_change\x18\x04 \x01(\tR\vpriceChange\x120\n" +
-	"\x14price_change_percent\x18\x05 \x01(\tR\x12priceChangePercent\x12,\n" +
-	"\x12weighted_avg_price\x18\x06 \x01(\tR\x10weightedAvgPrice\x12\x1d\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x1f\n" +
+	"\vmarket_type\x18\x04 \x01(\tR\n" +
+	"marketType\x12!\n" +
+	"\fprice_change\x18\x05 \x01(\tR\vpriceChange\x120\n" +
+	"\x14price_change_percent\x18\x06 \x01(\tR\x12priceChangePercent\x12,\n" +
+	"\x12weighted_avg_price\x18\a \x01(\tR\x10weightedAvgPrice\x12\x1d\n" +
 	"\n" +
-	"last_price\x18\a \x01(\tR\tlastPrice\x12\x19\n" +
-	"\blast_qty\x18\b \x01(\tR\alastQty\x12\x1d\n" +
+	"last_price\x18\b \x01(\tR\tlastPrice\x12\x19\n" +
+	"\blast_qty\x18\t \x01(\tR\alastQty\x12\x1d\n" +
 	"\n" +
-	"open_price\x18\t \x01(\tR\topenPrice\x12\x1d\n" +
+	"open_price\x18\n" +
+	" \x01(\tR\topenPrice\x12\x1d\n" +
 	"\n" +
-	"high_price\x18\n" +
-	" \x01(\tR\thighPrice\x12\x1b\n" +
-	"\tlow_price\x18\v \x01(\tR\blowPrice\x12\x16\n" +
-	"\x06volume\x18\f \x01(\tR\x06volume\x12!\n" +
-	"\fquote_volume\x18\r \x01(\tR\vquoteVolume\x127\n" +
-	"\topen_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\bopenTime\x129\n" +
+	"high_price\x18\v \x01(\tR\thighPrice\x12\x1b\n" +
+	"\tlow_price\x18\f \x01(\tR\blowPrice\x12\x16\n" +
+	"\x06volume\x18\r \x01(\tR\x06volume\x12!\n" +
+	"\fquote_volume\x18\x0e \x01(\tR\vquoteVolume\x127\n" +
+	"\topen_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\bopenTime\x129\n" +
 	"\n" +
-	"close_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tcloseTime\x12$\n" +
-	"\x0efirst_trade_id\x18\x10 \x01(\x03R\ffirstTradeId\x12\"\n" +
-	"\rlast_trade_id\x18\x11 \x01(\x03R\vlastTradeId\x12\x1f\n" +
-	"\vtrade_count\x18\x12 \x01(\x03R\n" +
+	"close_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\tcloseTime\x12$\n" +
+	"\x0efirst_trade_id\x18\x11 \x01(\x03R\ffirstTradeId\x12\"\n" +
+	"\rlast_trade_id\x18\x12 \x01(\x03R\vlastTradeId\x12\x1f\n" +
+	"\vtrade_count\x18\x13 \x01(\x03R\n" +
 	"tradeCount\x129\n" +
 	"\n" +
-	"event_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\">\n" +
+	"event_time\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\">\n" +
 	"\n" +
 	"PriceLevel\x12\x14\n" +
 	"\x05price\x18\x01 \x01(\tR\x05price\x12\x1a\n" +
@@ -4881,22 +5619,24 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\x04asks\x18\x05 \x03(\v2\x12.events.PriceLevelR\x04asks\x12$\n" +
 	"\x0elast_update_id\x18\x06 \x01(\x03R\flastUpdateId\x129\n" +
 	"\n" +
-	"event_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xa7\x03\n" +
+	"event_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xc8\x03\n" +
 	"\x13WebSocketTradeEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
 	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
-	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x19\n" +
-	"\btrade_id\x18\x04 \x01(\x03R\atradeId\x12\x14\n" +
-	"\x05price\x18\x05 \x01(\tR\x05price\x12\x1a\n" +
-	"\bquantity\x18\x06 \x01(\tR\bquantity\x12$\n" +
-	"\x0ebuyer_order_id\x18\a \x01(\x03R\fbuyerOrderId\x12&\n" +
-	"\x0fseller_order_id\x18\b \x01(\x03R\rsellerOrderId\x129\n" +
+	"\x06symbol\x18\x03 \x01(\tR\x06symbol\x12\x1f\n" +
+	"\vmarket_type\x18\x04 \x01(\tR\n" +
+	"marketType\x12\x19\n" +
+	"\btrade_id\x18\x05 \x01(\x03R\atradeId\x12\x14\n" +
+	"\x05price\x18\x06 \x01(\tR\x05price\x12\x1a\n" +
+	"\bquantity\x18\a \x01(\tR\bquantity\x12$\n" +
+	"\x0ebuyer_order_id\x18\b \x01(\x03R\fbuyerOrderId\x12&\n" +
+	"\x0fseller_order_id\x18\t \x01(\x03R\rsellerOrderId\x129\n" +
 	"\n" +
-	"trade_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttradeTime\x12$\n" +
-	"\x0eis_buyer_maker\x18\n" +
-	" \x01(\bR\fisBuyerMaker\x129\n" +
+	"trade_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\ttradeTime\x12$\n" +
+	"\x0eis_buyer_maker\x18\v \x01(\bR\fisBuyerMaker\x129\n" +
 	"\n" +
-	"event_time\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xdb\x02\n" +
+	"event_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xdb\x02\n" +
 	"\x19WebSocketFundingRateEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1a\n" +
 	"\bexchange\x18\x02 \x01(\tR\bexchange\x12\x16\n" +
@@ -4918,7 +5658,95 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\ffunding_rate\x18\a \x01(\tR\vfundingRate\x12F\n" +
 	"\x11next_funding_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0fnextFundingTime\x129\n" +
 	"\n" +
-	"event_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\teventTime*;\n" +
+	"event_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xf6\x05\n" +
+	"\x18UserDataOrderUpdateEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1a\n" +
+	"\bexchange\x18\x03 \x01(\tR\bexchange\x12\x19\n" +
+	"\border_id\x18\x04 \x01(\tR\aorderId\x12&\n" +
+	"\x0fclient_order_id\x18\x05 \x01(\tR\rclientOrderId\x12\x16\n" +
+	"\x06symbol\x18\x06 \x01(\tR\x06symbol\x12\x12\n" +
+	"\x04side\x18\a \x01(\tR\x04side\x12#\n" +
+	"\rposition_side\x18\b \x01(\tR\fpositionSide\x12\x12\n" +
+	"\x04type\x18\t \x01(\tR\x04type\x12\x16\n" +
+	"\x06status\x18\n" +
+	" \x01(\tR\x06status\x12%\n" +
+	"\x0eexecution_type\x18\v \x01(\tR\rexecutionType\x12!\n" +
+	"\foriginal_qty\x18\f \x01(\tR\voriginalQty\x12\x1d\n" +
+	"\n" +
+	"filled_qty\x18\r \x01(\tR\tfilledQty\x12\x1b\n" +
+	"\tavg_price\x18\x0e \x01(\tR\bavgPrice\x12\x1d\n" +
+	"\n" +
+	"stop_price\x18\x0f \x01(\tR\tstopPrice\x12&\n" +
+	"\x0flast_filled_qty\x18\x10 \x01(\tR\rlastFilledQty\x12*\n" +
+	"\x11last_filled_price\x18\x11 \x01(\tR\x0flastFilledPrice\x12\x1e\n" +
+	"\n" +
+	"commission\x18\x12 \x01(\tR\n" +
+	"commission\x12)\n" +
+	"\x10commission_asset\x18\x13 \x01(\tR\x0fcommissionAsset\x129\n" +
+	"\n" +
+	"trade_time\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\ttradeTime\x129\n" +
+	"\n" +
+	"event_time\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xb9\x03\n" +
+	"\x1bUserDataPositionUpdateEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1a\n" +
+	"\bexchange\x18\x03 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x04 \x01(\tR\x06symbol\x12\x12\n" +
+	"\x04side\x18\x05 \x01(\tR\x04side\x12\x16\n" +
+	"\x06amount\x18\x06 \x01(\tR\x06amount\x12\x1f\n" +
+	"\ventry_price\x18\a \x01(\tR\n" +
+	"entryPrice\x12\x1d\n" +
+	"\n" +
+	"mark_price\x18\b \x01(\tR\tmarkPrice\x12%\n" +
+	"\x0eunrealized_pnl\x18\t \x01(\tR\runrealizedPnl\x12-\n" +
+	"\x12maintenance_margin\x18\n" +
+	" \x01(\tR\x11maintenanceMargin\x12#\n" +
+	"\rposition_side\x18\v \x01(\tR\fpositionSide\x129\n" +
+	"\n" +
+	"event_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xf6\x02\n" +
+	"\x1aUserDataBalanceUpdateEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1a\n" +
+	"\bexchange\x18\x03 \x01(\tR\bexchange\x12\x14\n" +
+	"\x05asset\x18\x04 \x01(\tR\x05asset\x12%\n" +
+	"\x0ewallet_balance\x18\x05 \x01(\tR\rwalletBalance\x120\n" +
+	"\x14cross_wallet_balance\x18\x06 \x01(\tR\x12crossWalletBalance\x12+\n" +
+	"\x11available_balance\x18\a \x01(\tR\x10availableBalance\x12\x1f\n" +
+	"\vreason_type\x18\b \x01(\tR\n" +
+	"reasonType\x129\n" +
+	"\n" +
+	"event_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xf0\x01\n" +
+	"\x0ePositionAtRisk\x12\x16\n" +
+	"\x06symbol\x18\x01 \x01(\tR\x06symbol\x12\x12\n" +
+	"\x04side\x18\x02 \x01(\tR\x04side\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\tR\x06amount\x12\x1f\n" +
+	"\vmargin_type\x18\x04 \x01(\tR\n" +
+	"marginType\x12%\n" +
+	"\x0eunrealized_pnl\x18\x05 \x01(\tR\runrealizedPnl\x12-\n" +
+	"\x12maintenance_margin\x18\x06 \x01(\tR\x11maintenanceMargin\x12#\n" +
+	"\rposition_side\x18\a \x01(\tR\fpositionSide\"\xac\x02\n" +
+	"\x17UserDataMarginCallEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1a\n" +
+	"\bexchange\x18\x03 \x01(\tR\bexchange\x120\n" +
+	"\x14cross_wallet_balance\x18\x04 \x01(\tR\x12crossWalletBalance\x12B\n" +
+	"\x11positions_at_risk\x18\x05 \x03(\v2\x16.events.PositionAtRiskR\x0fpositionsAtRisk\x129\n" +
+	"\n" +
+	"event_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xed\x01\n" +
+	"\x1aUserDataAccountConfigEvent\x12%\n" +
+	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1a\n" +
+	"\bexchange\x18\x03 \x01(\tR\bexchange\x12\x16\n" +
+	"\x06symbol\x18\x04 \x01(\tR\x06symbol\x12\x1a\n" +
+	"\bleverage\x18\x05 \x01(\x05R\bleverage\x129\n" +
+	"\n" +
+	"event_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime*;\n" +
 	"\fEventUrgency\x12\a\n" +
 	"\x03LOW\x10\x00\x12\n" +
 	"\n" +
@@ -4939,71 +5767,77 @@ func file_internal_events_proto_events_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_events_proto_events_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_internal_events_proto_events_proto_goTypes = []any{
-	(EventUrgency)(0),                  // 0: events.EventUrgency
-	(*BaseEvent)(nil),                  // 1: events.BaseEvent
-	(*AIUsageEvent)(nil),               // 2: events.AIUsageEvent
-	(*OpportunityFoundEvent)(nil),      // 3: events.OpportunityFoundEvent
-	(*RegimeChangedEvent)(nil),         // 4: events.RegimeChangedEvent
-	(*OrderPlacedEvent)(nil),           // 5: events.OrderPlacedEvent
-	(*OrderFilledEvent)(nil),           // 6: events.OrderFilledEvent
-	(*PositionOpenedEvent)(nil),        // 7: events.PositionOpenedEvent
-	(*PositionClosedEvent)(nil),        // 8: events.PositionClosedEvent
-	(*CircuitBreakerTrippedEvent)(nil), // 9: events.CircuitBreakerTrippedEvent
-	(*AgentExecutedEvent)(nil),         // 10: events.AgentExecutedEvent
-	(*DecisionMadeEvent)(nil),          // 11: events.DecisionMadeEvent
-	(*WorkerFailedEvent)(nil),          // 12: events.WorkerFailedEvent
-	(*DrawdownAlert)(nil),              // 13: events.DrawdownAlert
-	(*ConsecutiveLossesAlert)(nil),     // 14: events.ConsecutiveLossesAlert
-	(*PnLUpdatedEvent)(nil),            // 15: events.PnLUpdatedEvent
-	(*JournalEntryCreatedEvent)(nil),   // 16: events.JournalEntryCreatedEvent
-	(*DailyReportEvent)(nil),           // 17: events.DailyReportEvent
-	(*StrategyDisabledEvent)(nil),      // 18: events.StrategyDisabledEvent
-	(*OrderCancelledEvent)(nil),        // 19: events.OrderCancelledEvent
-	(*PositionPnLUpdatedEvent)(nil),    // 20: events.PositionPnLUpdatedEvent
-	(*FVGDetectedEvent)(nil),           // 21: events.FVGDetectedEvent
-	(*OrderBlockDetectedEvent)(nil),    // 22: events.OrderBlockDetectedEvent
-	(*MarketAnalysisRequestEvent)(nil), // 23: events.MarketAnalysisRequestEvent
-	(*MarketScanCompleteEvent)(nil),    // 24: events.MarketScanCompleteEvent
-	(*WhaleAlertEvent)(nil),            // 25: events.WhaleAlertEvent
-	(*LiquidationAlertEvent)(nil),      // 26: events.LiquidationAlertEvent
-	(*StrategyWarningEvent)(nil),       // 27: events.StrategyWarningEvent
-	(*StopApproachingEvent)(nil),       // 28: events.StopApproachingEvent
-	(*TargetApproachingEvent)(nil),     // 29: events.TargetApproachingEvent
-	(*ThesisInvalidationEvent)(nil),    // 30: events.ThesisInvalidationEvent
-	(*TimeDecayEvent)(nil),             // 31: events.TimeDecayEvent
-	(*ProfitMilestoneEvent)(nil),       // 32: events.ProfitMilestoneEvent
-	(*CorrelationSpikeEvent)(nil),      // 33: events.CorrelationSpikeEvent
-	(*VolatilitySpikeEvent)(nil),       // 34: events.VolatilitySpikeEvent
-	(*WebSocketKlineEvent)(nil),        // 35: events.WebSocketKlineEvent
-	(*WebSocketTickerEvent)(nil),       // 36: events.WebSocketTickerEvent
-	(*PriceLevel)(nil),                 // 37: events.PriceLevel
-	(*WebSocketDepthEvent)(nil),        // 38: events.WebSocketDepthEvent
-	(*WebSocketTradeEvent)(nil),        // 39: events.WebSocketTradeEvent
-	(*WebSocketFundingRateEvent)(nil),  // 40: events.WebSocketFundingRateEvent
-	(*WebSocketMarkPriceEvent)(nil),    // 41: events.WebSocketMarkPriceEvent
-	nil,                                // 42: events.OpportunityFoundEvent.IndicatorsEntry
-	nil,                                // 43: events.DecisionMadeEvent.ContextEntry
-	(*timestamppb.Timestamp)(nil),      // 44: google.protobuf.Timestamp
+	(EventUrgency)(0),                   // 0: events.EventUrgency
+	(*BaseEvent)(nil),                   // 1: events.BaseEvent
+	(*AIUsageEvent)(nil),                // 2: events.AIUsageEvent
+	(*OpportunityFoundEvent)(nil),       // 3: events.OpportunityFoundEvent
+	(*RegimeChangedEvent)(nil),          // 4: events.RegimeChangedEvent
+	(*OrderPlacedEvent)(nil),            // 5: events.OrderPlacedEvent
+	(*OrderFilledEvent)(nil),            // 6: events.OrderFilledEvent
+	(*PositionOpenedEvent)(nil),         // 7: events.PositionOpenedEvent
+	(*PositionClosedEvent)(nil),         // 8: events.PositionClosedEvent
+	(*CircuitBreakerTrippedEvent)(nil),  // 9: events.CircuitBreakerTrippedEvent
+	(*AgentExecutedEvent)(nil),          // 10: events.AgentExecutedEvent
+	(*DecisionMadeEvent)(nil),           // 11: events.DecisionMadeEvent
+	(*WorkerFailedEvent)(nil),           // 12: events.WorkerFailedEvent
+	(*DrawdownAlert)(nil),               // 13: events.DrawdownAlert
+	(*ConsecutiveLossesAlert)(nil),      // 14: events.ConsecutiveLossesAlert
+	(*PnLUpdatedEvent)(nil),             // 15: events.PnLUpdatedEvent
+	(*JournalEntryCreatedEvent)(nil),    // 16: events.JournalEntryCreatedEvent
+	(*DailyReportEvent)(nil),            // 17: events.DailyReportEvent
+	(*StrategyDisabledEvent)(nil),       // 18: events.StrategyDisabledEvent
+	(*OrderCancelledEvent)(nil),         // 19: events.OrderCancelledEvent
+	(*PositionPnLUpdatedEvent)(nil),     // 20: events.PositionPnLUpdatedEvent
+	(*FVGDetectedEvent)(nil),            // 21: events.FVGDetectedEvent
+	(*OrderBlockDetectedEvent)(nil),     // 22: events.OrderBlockDetectedEvent
+	(*MarketAnalysisRequestEvent)(nil),  // 23: events.MarketAnalysisRequestEvent
+	(*MarketScanCompleteEvent)(nil),     // 24: events.MarketScanCompleteEvent
+	(*WhaleAlertEvent)(nil),             // 25: events.WhaleAlertEvent
+	(*LiquidationAlertEvent)(nil),       // 26: events.LiquidationAlertEvent
+	(*StrategyWarningEvent)(nil),        // 27: events.StrategyWarningEvent
+	(*StopApproachingEvent)(nil),        // 28: events.StopApproachingEvent
+	(*TargetApproachingEvent)(nil),      // 29: events.TargetApproachingEvent
+	(*ThesisInvalidationEvent)(nil),     // 30: events.ThesisInvalidationEvent
+	(*TimeDecayEvent)(nil),              // 31: events.TimeDecayEvent
+	(*ProfitMilestoneEvent)(nil),        // 32: events.ProfitMilestoneEvent
+	(*CorrelationSpikeEvent)(nil),       // 33: events.CorrelationSpikeEvent
+	(*VolatilitySpikeEvent)(nil),        // 34: events.VolatilitySpikeEvent
+	(*WebSocketKlineEvent)(nil),         // 35: events.WebSocketKlineEvent
+	(*WebSocketTickerEvent)(nil),        // 36: events.WebSocketTickerEvent
+	(*PriceLevel)(nil),                  // 37: events.PriceLevel
+	(*WebSocketDepthEvent)(nil),         // 38: events.WebSocketDepthEvent
+	(*WebSocketTradeEvent)(nil),         // 39: events.WebSocketTradeEvent
+	(*WebSocketFundingRateEvent)(nil),   // 40: events.WebSocketFundingRateEvent
+	(*WebSocketMarkPriceEvent)(nil),     // 41: events.WebSocketMarkPriceEvent
+	(*UserDataOrderUpdateEvent)(nil),    // 42: events.UserDataOrderUpdateEvent
+	(*UserDataPositionUpdateEvent)(nil), // 43: events.UserDataPositionUpdateEvent
+	(*UserDataBalanceUpdateEvent)(nil),  // 44: events.UserDataBalanceUpdateEvent
+	(*PositionAtRisk)(nil),              // 45: events.PositionAtRisk
+	(*UserDataMarginCallEvent)(nil),     // 46: events.UserDataMarginCallEvent
+	(*UserDataAccountConfigEvent)(nil),  // 47: events.UserDataAccountConfigEvent
+	nil,                                 // 48: events.OpportunityFoundEvent.IndicatorsEntry
+	nil,                                 // 49: events.DecisionMadeEvent.ContextEntry
+	(*timestamppb.Timestamp)(nil),       // 50: google.protobuf.Timestamp
 }
 var file_internal_events_proto_events_proto_depIdxs = []int32{
-	44, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
+	50, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
 	1,  // 1: events.AIUsageEvent.base:type_name -> events.BaseEvent
 	1,  // 2: events.OpportunityFoundEvent.base:type_name -> events.BaseEvent
-	42, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
+	48, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
 	1,  // 4: events.RegimeChangedEvent.base:type_name -> events.BaseEvent
 	1,  // 5: events.OrderPlacedEvent.base:type_name -> events.BaseEvent
 	1,  // 6: events.OrderFilledEvent.base:type_name -> events.BaseEvent
 	1,  // 7: events.PositionOpenedEvent.base:type_name -> events.BaseEvent
 	1,  // 8: events.PositionClosedEvent.base:type_name -> events.BaseEvent
 	1,  // 9: events.CircuitBreakerTrippedEvent.base:type_name -> events.BaseEvent
-	44, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
+	50, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
 	1,  // 11: events.AgentExecutedEvent.base:type_name -> events.BaseEvent
 	1,  // 12: events.DecisionMadeEvent.base:type_name -> events.BaseEvent
-	43, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
+	49, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
 	1,  // 14: events.WorkerFailedEvent.base:type_name -> events.BaseEvent
-	44, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
+	50, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
 	1,  // 16: events.DrawdownAlert.base:type_name -> events.BaseEvent
 	1,  // 17: events.ConsecutiveLossesAlert.base:type_name -> events.BaseEvent
 	1,  // 18: events.PnLUpdatedEvent.base:type_name -> events.BaseEvent
@@ -5034,32 +5868,44 @@ var file_internal_events_proto_events_proto_depIdxs = []int32{
 	1,  // 43: events.VolatilitySpikeEvent.base:type_name -> events.BaseEvent
 	0,  // 44: events.VolatilitySpikeEvent.urgency:type_name -> events.EventUrgency
 	1,  // 45: events.WebSocketKlineEvent.base:type_name -> events.BaseEvent
-	44, // 46: events.WebSocketKlineEvent.open_time:type_name -> google.protobuf.Timestamp
-	44, // 47: events.WebSocketKlineEvent.close_time:type_name -> google.protobuf.Timestamp
-	44, // 48: events.WebSocketKlineEvent.event_time:type_name -> google.protobuf.Timestamp
+	50, // 46: events.WebSocketKlineEvent.open_time:type_name -> google.protobuf.Timestamp
+	50, // 47: events.WebSocketKlineEvent.close_time:type_name -> google.protobuf.Timestamp
+	50, // 48: events.WebSocketKlineEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 49: events.WebSocketTickerEvent.base:type_name -> events.BaseEvent
-	44, // 50: events.WebSocketTickerEvent.open_time:type_name -> google.protobuf.Timestamp
-	44, // 51: events.WebSocketTickerEvent.close_time:type_name -> google.protobuf.Timestamp
-	44, // 52: events.WebSocketTickerEvent.event_time:type_name -> google.protobuf.Timestamp
+	50, // 50: events.WebSocketTickerEvent.open_time:type_name -> google.protobuf.Timestamp
+	50, // 51: events.WebSocketTickerEvent.close_time:type_name -> google.protobuf.Timestamp
+	50, // 52: events.WebSocketTickerEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 53: events.WebSocketDepthEvent.base:type_name -> events.BaseEvent
 	37, // 54: events.WebSocketDepthEvent.bids:type_name -> events.PriceLevel
 	37, // 55: events.WebSocketDepthEvent.asks:type_name -> events.PriceLevel
-	44, // 56: events.WebSocketDepthEvent.event_time:type_name -> google.protobuf.Timestamp
+	50, // 56: events.WebSocketDepthEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 57: events.WebSocketTradeEvent.base:type_name -> events.BaseEvent
-	44, // 58: events.WebSocketTradeEvent.trade_time:type_name -> google.protobuf.Timestamp
-	44, // 59: events.WebSocketTradeEvent.event_time:type_name -> google.protobuf.Timestamp
+	50, // 58: events.WebSocketTradeEvent.trade_time:type_name -> google.protobuf.Timestamp
+	50, // 59: events.WebSocketTradeEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 60: events.WebSocketFundingRateEvent.base:type_name -> events.BaseEvent
-	44, // 61: events.WebSocketFundingRateEvent.funding_time:type_name -> google.protobuf.Timestamp
-	44, // 62: events.WebSocketFundingRateEvent.next_funding_time:type_name -> google.protobuf.Timestamp
-	44, // 63: events.WebSocketFundingRateEvent.event_time:type_name -> google.protobuf.Timestamp
+	50, // 61: events.WebSocketFundingRateEvent.funding_time:type_name -> google.protobuf.Timestamp
+	50, // 62: events.WebSocketFundingRateEvent.next_funding_time:type_name -> google.protobuf.Timestamp
+	50, // 63: events.WebSocketFundingRateEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 64: events.WebSocketMarkPriceEvent.base:type_name -> events.BaseEvent
-	44, // 65: events.WebSocketMarkPriceEvent.next_funding_time:type_name -> google.protobuf.Timestamp
-	44, // 66: events.WebSocketMarkPriceEvent.event_time:type_name -> google.protobuf.Timestamp
-	67, // [67:67] is the sub-list for method output_type
-	67, // [67:67] is the sub-list for method input_type
-	67, // [67:67] is the sub-list for extension type_name
-	67, // [67:67] is the sub-list for extension extendee
-	0,  // [0:67] is the sub-list for field type_name
+	50, // 65: events.WebSocketMarkPriceEvent.next_funding_time:type_name -> google.protobuf.Timestamp
+	50, // 66: events.WebSocketMarkPriceEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 67: events.UserDataOrderUpdateEvent.base:type_name -> events.BaseEvent
+	50, // 68: events.UserDataOrderUpdateEvent.trade_time:type_name -> google.protobuf.Timestamp
+	50, // 69: events.UserDataOrderUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 70: events.UserDataPositionUpdateEvent.base:type_name -> events.BaseEvent
+	50, // 71: events.UserDataPositionUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 72: events.UserDataBalanceUpdateEvent.base:type_name -> events.BaseEvent
+	50, // 73: events.UserDataBalanceUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 74: events.UserDataMarginCallEvent.base:type_name -> events.BaseEvent
+	45, // 75: events.UserDataMarginCallEvent.positions_at_risk:type_name -> events.PositionAtRisk
+	50, // 76: events.UserDataMarginCallEvent.event_time:type_name -> google.protobuf.Timestamp
+	1,  // 77: events.UserDataAccountConfigEvent.base:type_name -> events.BaseEvent
+	50, // 78: events.UserDataAccountConfigEvent.event_time:type_name -> google.protobuf.Timestamp
+	79, // [79:79] is the sub-list for method output_type
+	79, // [79:79] is the sub-list for method input_type
+	79, // [79:79] is the sub-list for extension type_name
+	79, // [79:79] is the sub-list for extension extendee
+	0,  // [0:79] is the sub-list for field type_name
 }
 
 func init() { file_internal_events_proto_events_proto_init() }
@@ -5073,7 +5919,7 @@ func file_internal_events_proto_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_events_proto_events_proto_rawDesc), len(file_internal_events_proto_events_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   43,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

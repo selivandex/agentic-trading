@@ -36,11 +36,20 @@ const (
 	Interval1M  Interval = "1M"
 )
 
+// MarketType defines the market type (spot or futures)
+type MarketType string
+
+const (
+	MarketTypeSpot    MarketType = "spot"
+	MarketTypeFutures MarketType = "futures"
+)
+
 // StreamConfig defines configuration for a single WebSocket stream
 type StreamConfig struct {
-	Type     StreamType
-	Symbol   string
-	Interval Interval // For kline streams (e.g., "1m", "5m", "1h")
+	Type       StreamType
+	Symbol     string
+	Interval   Interval   // For kline streams (e.g., "1m", "5m", "1h")
+	MarketType MarketType // spot or futures
 }
 
 // ConnectionConfig defines configuration for WebSocket connection
@@ -57,6 +66,7 @@ type ConnectionConfig struct {
 type KlineEvent struct {
 	Exchange    string
 	Symbol      string
+	MarketType  string // "spot" or "futures"
 	Interval    string
 	OpenTime    time.Time
 	CloseTime   time.Time
@@ -75,6 +85,7 @@ type KlineEvent struct {
 type TickerEvent struct {
 	Exchange           string
 	Symbol             string
+	MarketType         string // "spot" or "futures"
 	PriceChange        string
 	PriceChangePercent string
 	WeightedAvgPrice   string
@@ -113,6 +124,7 @@ type PriceLevel struct {
 type TradeEvent struct {
 	Exchange      string
 	Symbol        string
+	MarketType    string // "spot" or "futures"
 	TradeID       int64
 	Price         string
 	Quantity      string

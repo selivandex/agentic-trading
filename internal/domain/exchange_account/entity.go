@@ -21,6 +21,10 @@ type ExchangeAccount struct {
 	LastSyncAt      *time.Time   `db:"last_sync_at"`
 	CreatedAt       time.Time    `db:"created_at"`
 	UpdatedAt       time.Time    `db:"updated_at"`
+	
+	// User Data WebSocket fields (for real-time order/position updates)
+	ListenKeyEncrypted []byte     `db:"listen_key_encrypted"`
+	ListenKeyExpiresAt *time.Time `db:"listen_key_expires_at"`
 }
 
 // ExchangeType defines supported exchanges
@@ -140,4 +144,57 @@ func (ea *ExchangeAccount) GetPassphrase(encryptor Encryptor) (string, error) {
 	}
 
 	return plaintext, nil
+}
+
+// SetListenKey encrypts and sets the User Data WebSocket listenKey
+func (ea *ExchangeAccount) SetListenKey(plaintext string, expiresAt time.Time, encryptor Encryptor) error {
+	if encryptor == nil {
+		return nil
+	}
+
+	encrypted, err := encryptor.Encrypt(plaintext)
+	if err != nil {
+		return err
+	}
+
+	ea.ListenKeyEncrypted = encrypted
+	ea.ListenKeyExpiresAt = &expiresAt
+	return nil
+}
+
+// GetListenKey decrypts and returns the User Data WebSocket listenKey
+func (ea *ExchangeAccount) GetListenKey(encryptor Encryptor) (string, error) {
+	if encryptor == nil || len(ea.ListenKeyEncrypted) == 0 {
+		return "", nil
+	}
+
+	plaintext, err := encryptor.Decrypt(ea.ListenKeyEncrypted)
+	if err != nil {
+		return "", err
+	}
+
+	return plaintext, nil
+}
+
+// IsListenKeyExpired checks if the listenKey has expired
+func (ea *ExchangeAccount) IsListenKeyExpired() bool {
+	if ea.ListenKeyExpiresAt == nil {
+		return true // No key = expired
+	}
+	return time.Now().After(*ea.ListenKeyExpiresAt)
+}
+
+// ShouldRenewListenKey checks if the listenKey should be renewed soon
+// Returns true if key expires in less than 10 minutes
+func (ea *ExchangeAccount) ShouldRenewListenKey() bool {
+	if ea.ListenKeyExpiresAt == nil {
+		return true
+	}
+	return time.Until(*ea.ListenKeyExpiresAt) < 10*time.Minute
+}
+
+// ClearListenKey removes the listenKey from the account
+func (ea *ExchangeAccount) ClearListenKey() {
+	ea.ListenKeyEncrypted = nil
+	ea.ListenKeyExpiresAt = nil
 }

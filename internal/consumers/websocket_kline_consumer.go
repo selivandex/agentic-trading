@@ -386,11 +386,17 @@ func (c *WebSocketKlineConsumer) convertProtobufToOHLCV(event *eventspb.WebSocke
 		return f
 	}
 
+	// Use market_type from event, fallback to "futures" for backward compatibility
+	marketType := event.MarketType
+	if marketType == "" {
+		marketType = "futures"
+	}
+
 	return &market_data.OHLCV{
 		Exchange:            event.Exchange,
 		Symbol:              event.Symbol,
 		Timeframe:           event.Interval,
-		MarketType:          "futures", // Default for now, can be configured
+		MarketType:          marketType,
 		OpenTime:            event.OpenTime.AsTime(),
 		CloseTime:           event.CloseTime.AsTime(),
 		Open:                parseFloat(event.Open),

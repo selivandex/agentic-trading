@@ -99,6 +99,10 @@ func (c *WebSocketMarkPriceConsumer) Start(ctx context.Context) error {
 	go c.periodicFlush(ctx, flushTicker.C)
 	go c.periodicStatsLog(ctx, statsTicker.C)
 
+	c.log.Info("🔄 Starting to read messages from Kafka...",
+		"topic", "websocket.markprice",
+	)
+
 	// Consume messages from Kafka
 	for {
 		msg, err := c.consumer.ReadMessage(ctx)
@@ -113,6 +117,12 @@ func (c *WebSocketMarkPriceConsumer) Start(ctx context.Context) error {
 
 		c.incrementStat(&c.totalReceived)
 		c.incrementStat(&c.receivedSinceLastLog)
+
+		c.log.Debug("📩 Received message from Kafka",
+			"partition", msg.Partition,
+			"offset", msg.Offset,
+			"size_bytes", len(msg.Value),
+		)
 
 		// Process event with timeout
 		processCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -142,6 +152,13 @@ func (c *WebSocketMarkPriceConsumer) handleMarkPriceEvent(ctx context.Context, d
 
 	// Add to batch
 	c.addToBatch(markPrice)
+
+	c.log.Debug("Added mark price to batch",
+		"exchange", event.Exchange,
+		"symbol", event.Symbol,
+		"mark_price", event.MarkPrice,
+		"batch_size", len(c.batch),
+	)
 
 	// Flush if batch is full
 	if len(c.batch) >= markPriceBatchSize {
@@ -178,6 +195,12 @@ func (c *WebSocketMarkPriceConsumer) flushBatch(ctx context.Context) error {
 		c.statsMu.Lock()
 		c.totalDeduplicated += int64(deduplicatedCount)
 		c.statsMu.Unlock()
+
+		c.log.Debug("Deduplicated batch before write",
+			"original_size", originalSize,
+			"deduplicated_size", len(dedupedBatch),
+			"removed", deduplicatedCount,
+		)
 	}
 
 	// Write to ClickHouse
@@ -313,10 +336,11 @@ func (c *WebSocketMarkPriceConsumer) convertProtobufToMarkPrice(event *eventspb.
 		return f
 	}
 
+	// Mark price is always futures (it doesn't exist for spot)
 	return &market_data.MarkPrice{
 		Exchange:             event.Exchange,
 		Symbol:               event.Symbol,
-		MarketType:           "futures", // Default
+		MarketType:           "futures", // Mark price only exists for futures
 		Timestamp:            event.EventTime.AsTime(),
 		MarkPrice:            parseFloat(event.MarkPrice),
 		IndexPrice:           parseFloat(event.IndexPrice),
@@ -326,4 +350,3 @@ func (c *WebSocketMarkPriceConsumer) convertProtobufToMarkPrice(event *eventspb.
 		EventTime:            event.EventTime.AsTime(),
 	}
 }
-

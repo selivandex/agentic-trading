@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 
 	"prometheus/internal/adapters/websocket"
@@ -13,7 +14,7 @@ import (
 	"prometheus/pkg/logger"
 )
 
-// Client implements websocket.Client for Binance Futures
+// Client implements websocket.Client for Binance (Spot + Futures)
 type Client struct {
 	exchange   string
 	handler    websocket.EventHandler
@@ -75,58 +76,108 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 		"testnet", c.useTestnet,
 	)
 
-	// Group streams by type for efficient combined stream connections
-	klineStreams := make(map[string][]string) // symbol -> []interval
-	var markPriceSymbols []string
-	var tickerSymbols []string
-	var aggTradeSymbols []string
+	// Group streams by market type and stream type
+	spotKlineStreams := make(map[string][]string)    // symbol -> []interval
+	futuresKlineStreams := make(map[string][]string) // symbol -> []interval
+	var spotTickerSymbols []string
+	var futuresTickerSymbols []string
+	var spotTradeSymbols []string
+	var futuresTradeSymbols []string
+	var markPriceSymbols []string // Only futures have mark price
 	var otherStreams []websocket.StreamConfig
 
 	for _, stream := range config.Streams {
+		isSpot := stream.MarketType == websocket.MarketTypeSpot
+		isFutures := stream.MarketType == websocket.MarketTypeFutures
+
 		switch stream.Type {
 		case websocket.StreamTypeKline:
 			interval := string(stream.Interval)
-			if intervals, ok := klineStreams[stream.Symbol]; ok {
-				klineStreams[stream.Symbol] = append(intervals, interval)
-			} else {
-				klineStreams[stream.Symbol] = []string{interval}
+			if isSpot {
+				if intervals, ok := spotKlineStreams[stream.Symbol]; ok {
+					spotKlineStreams[stream.Symbol] = append(intervals, interval)
+				} else {
+					spotKlineStreams[stream.Symbol] = []string{interval}
+				}
+			} else if isFutures {
+				if intervals, ok := futuresKlineStreams[stream.Symbol]; ok {
+					futuresKlineStreams[stream.Symbol] = append(intervals, interval)
+				} else {
+					futuresKlineStreams[stream.Symbol] = []string{interval}
+				}
 			}
+
 		case websocket.StreamTypeMarkPrice:
-			markPriceSymbols = append(markPriceSymbols, stream.Symbol)
+			// Mark price only exists for futures
+			if isFutures {
+				markPriceSymbols = append(markPriceSymbols, stream.Symbol)
+			} else {
+				c.logger.Warn("Mark price stream requested for spot market (not supported)",
+					"symbol", stream.Symbol,
+				)
+			}
+
 		case websocket.StreamTypeTicker:
-			tickerSymbols = append(tickerSymbols, stream.Symbol)
+			if isSpot {
+				spotTickerSymbols = append(spotTickerSymbols, stream.Symbol)
+			} else if isFutures {
+				futuresTickerSymbols = append(futuresTickerSymbols, stream.Symbol)
+			}
+
 		case websocket.StreamTypeTrade:
-			aggTradeSymbols = append(aggTradeSymbols, stream.Symbol)
+			if isSpot {
+				spotTradeSymbols = append(spotTradeSymbols, stream.Symbol)
+			} else if isFutures {
+				futuresTradeSymbols = append(futuresTradeSymbols, stream.Symbol)
+			}
+
 		default:
 			otherStreams = append(otherStreams, stream)
 		}
 	}
 
-	// Connect kline streams using combined endpoint
-	if len(klineStreams) > 0 {
-		if err := c.connectKlineStreams(klineStreams); err != nil {
-			return errors.Wrap(err, "failed to connect kline streams")
+	// Connect SPOT streams
+	if len(spotKlineStreams) > 0 {
+		if err := c.connectSpotKlineStreams(spotKlineStreams); err != nil {
+			return errors.Wrap(err, "failed to connect spot kline streams")
 		}
 	}
 
-	// Connect mark price streams (funding rate + mark/index price)
+	if len(spotTickerSymbols) > 0 {
+		if err := c.connectSpotTickerStreams(spotTickerSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect spot ticker streams")
+		}
+	}
+
+	if len(spotTradeSymbols) > 0 {
+		if err := c.connectSpotTradeStreams(spotTradeSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect spot trade streams")
+		}
+	}
+
+	// Connect FUTURES streams
+	if len(futuresKlineStreams) > 0 {
+		if err := c.connectFuturesKlineStreams(futuresKlineStreams); err != nil {
+			return errors.Wrap(err, "failed to connect futures kline streams")
+		}
+	}
+
+	if len(futuresTickerSymbols) > 0 {
+		if err := c.connectFuturesTickerStreams(futuresTickerSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect futures ticker streams")
+		}
+	}
+
+	if len(futuresTradeSymbols) > 0 {
+		if err := c.connectFuturesTradeStreams(futuresTradeSymbols); err != nil {
+			return errors.Wrap(err, "failed to connect futures trade streams")
+		}
+	}
+
+	// Connect mark price streams (futures only)
 	if len(markPriceSymbols) > 0 {
 		if err := c.connectMarkPriceStreams(markPriceSymbols); err != nil {
 			return errors.Wrap(err, "failed to connect mark price streams")
-		}
-	}
-
-	// Connect ticker streams (24hr statistics)
-	if len(tickerSymbols) > 0 {
-		if err := c.connectTickerStreams(tickerSymbols); err != nil {
-			return errors.Wrap(err, "failed to connect ticker streams")
-		}
-	}
-
-	// Connect aggregated trade streams
-	if len(aggTradeSymbols) > 0 {
-		if err := c.connectAggTradeStreams(aggTradeSymbols); err != nil {
-			return errors.Wrap(err, "failed to connect agg trade streams")
 		}
 	}
 
@@ -157,8 +208,8 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	return nil
 }
 
-// connectKlineStreams connects to multiple kline streams efficiently
-func (c *Client) connectKlineStreams(symbolIntervals map[string][]string) error {
+// connectFuturesKlineStreams connects to multiple futures kline streams efficiently
+func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
 		c.statsMu.Lock()
@@ -215,19 +266,108 @@ func (c *Client) connectKlineStreams(symbolIntervals map[string][]string) error 
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to kline streams",
+	c.logger.Info("Connected to futures kline streams",
 		"exchange", c.exchange,
+		"market_type", "futures",
 		"symbols", len(symbolIntervals),
 	)
 
 	return nil
 }
 
-// convertKlineEvent converts Binance kline event to generic format
+// connectSpotKlineStreams connects to multiple spot kline streams
+func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) error {
+	errHandler := func(err error) {
+		c.errorCount.Add(1)
+		c.statsMu.Lock()
+		c.stats.LastError = err
+		c.statsMu.Unlock()
+
+		c.logger.Error("Spot kline WebSocket error",
+			"exchange", c.exchange,
+			"error", err.Error(),
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
+	klineHandler := func(event *binance.WsKlineEvent) {
+		c.messagesReceived.Add(1)
+
+		if c.stopping.Load() {
+			c.logger.Debug("Ignoring spot kline event during shutdown",
+				"symbol", event.Symbol,
+			)
+			return
+		}
+
+		if c.handler == nil {
+			return
+		}
+
+		// Convert to generic format
+		genericEvent := c.convertSpotKlineEvent(event)
+		if err := c.handler.OnKline(genericEvent); err != nil {
+			c.logger.Error("Failed to handle spot kline event",
+				"exchange", c.exchange,
+				"symbol", event.Symbol,
+				"error", err.Error(),
+			)
+			c.errorCount.Add(1)
+		}
+	}
+
+	// Use combined multi-interval stream for efficiency
+	doneC, stopC, err := binance.WsCombinedKlineServeMultiInterval(
+		symbolIntervals,
+		klineHandler,
+		errHandler,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start spot kline WebSocket")
+	}
+
+	c.stopChannels = append(c.stopChannels, stopC)
+	c.doneChannels = append(c.doneChannels, doneC)
+
+	c.logger.Info("Connected to spot kline streams",
+		"exchange", c.exchange,
+		"market_type", "spot",
+		"symbols", len(symbolIntervals),
+	)
+
+	return nil
+}
+
+// convertKlineEvent converts Binance futures kline event to generic format
 func (c *Client) convertKlineEvent(event *futures.WsKlineEvent) *websocket.KlineEvent {
 	return &websocket.KlineEvent{
 		Exchange:    c.exchange,
 		Symbol:      event.Symbol,
+		MarketType:  "futures",
+		Interval:    event.Kline.Interval,
+		OpenTime:    time.UnixMilli(event.Kline.StartTime),
+		CloseTime:   time.UnixMilli(event.Kline.EndTime),
+		Open:        event.Kline.Open,
+		High:        event.Kline.High,
+		Low:         event.Kline.Low,
+		Close:       event.Kline.Close,
+		Volume:      event.Kline.Volume,
+		QuoteVolume: event.Kline.QuoteVolume,
+		TradeCount:  event.Kline.TradeNum,
+		IsFinal:     event.Kline.IsFinal,
+		EventTime:   time.UnixMilli(event.Time),
+	}
+}
+
+// convertSpotKlineEvent converts Binance spot kline event to generic format
+func (c *Client) convertSpotKlineEvent(event *binance.WsKlineEvent) *websocket.KlineEvent {
+	return &websocket.KlineEvent{
+		Exchange:    c.exchange,
+		Symbol:      event.Symbol,
+		MarketType:  "spot",
 		Interval:    event.Kline.Interval,
 		OpenTime:    time.UnixMilli(event.Kline.StartTime),
 		CloseTime:   time.UnixMilli(event.Kline.EndTime),
@@ -319,8 +459,8 @@ func (c *Client) convertMarkPriceEvent(event *futures.WsMarkPriceEvent) *websock
 	}
 }
 
-// connectTickerStreams connects to 24hr ticker streams
-func (c *Client) connectTickerStreams(symbols []string) error {
+// connectFuturesTickerStreams connects to futures 24hr ticker streams
+func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
 		c.statsMu.Lock()
@@ -377,19 +517,85 @@ func (c *Client) connectTickerStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to ticker streams",
+	c.logger.Info("Connected to futures ticker streams",
 		"exchange", c.exchange,
+		"market_type", "futures",
 		"symbols", len(symbols),
 	)
 
 	return nil
 }
 
-// convertTickerEvent converts Binance ticker event to generic format
+// connectSpotTickerStreams connects to spot 24hr ticker streams
+func (c *Client) connectSpotTickerStreams(symbols []string) error {
+	errHandler := func(err error) {
+		c.errorCount.Add(1)
+		c.statsMu.Lock()
+		c.stats.LastError = err
+		c.statsMu.Unlock()
+
+		c.logger.Error("Spot ticker WebSocket error",
+			"exchange", c.exchange,
+			"error", err.Error(),
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
+	tickerHandler := func(event *binance.WsAllMarketsStatEvent) {
+		c.messagesReceived.Add(int64(len(*event)))
+
+		if c.stopping.Load() {
+			return
+		}
+
+		if c.handler == nil {
+			return
+		}
+
+		// Process each ticker event in the array
+		for _, ticker := range *event {
+			genericEvent := c.convertSpotTickerEvent(&ticker)
+			if err := c.handler.OnTicker(genericEvent); err != nil {
+				c.logger.Error("Failed to handle spot ticker event",
+					"exchange", c.exchange,
+					"symbol", ticker.Symbol,
+					"error", err.Error(),
+				)
+				c.errorCount.Add(1)
+			}
+		}
+	}
+
+	// Use all market tickers stream for efficiency
+	doneC, stopC, err := binance.WsAllMarketsStatServe(
+		tickerHandler,
+		errHandler,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start spot ticker WebSocket")
+	}
+
+	c.stopChannels = append(c.stopChannels, stopC)
+	c.doneChannels = append(c.doneChannels, doneC)
+
+	c.logger.Info("Connected to spot ticker streams",
+		"exchange", c.exchange,
+		"market_type", "spot",
+		"symbols", len(symbols),
+	)
+
+	return nil
+}
+
+// convertTickerEvent converts Binance futures ticker event to generic format
 func (c *Client) convertTickerEvent(event *futures.WsMarketTickerEvent) *websocket.TickerEvent {
 	return &websocket.TickerEvent{
 		Exchange:           c.exchange,
 		Symbol:             event.Symbol,
+		MarketType:         "futures",
 		PriceChange:        event.PriceChange,
 		PriceChangePercent: event.PriceChangePercent,
 		WeightedAvgPrice:   event.WeightedAvgPrice,
@@ -409,8 +615,33 @@ func (c *Client) convertTickerEvent(event *futures.WsMarketTickerEvent) *websock
 	}
 }
 
-// connectAggTradeStreams connects to aggregated trade streams
-func (c *Client) connectAggTradeStreams(symbols []string) error {
+// convertSpotTickerEvent converts Binance spot ticker event to generic format
+func (c *Client) convertSpotTickerEvent(event *binance.WsMarketStatEvent) *websocket.TickerEvent {
+	return &websocket.TickerEvent{
+		Exchange:           c.exchange,
+		Symbol:             event.Symbol,
+		MarketType:         "spot",
+		PriceChange:        event.PriceChange,
+		PriceChangePercent: event.PriceChangePercent,
+		WeightedAvgPrice:   event.WeightedAvgPrice,
+		LastPrice:          event.LastPrice,
+		LastQty:            event.LastQuantity,
+		OpenPrice:          event.OpenPrice,
+		HighPrice:          event.HighPrice,
+		LowPrice:           event.LowPrice,
+		Volume:             event.BaseVolume,
+		QuoteVolume:        event.QuoteVolume,
+		OpenTime:           time.UnixMilli(event.OpenTime),
+		CloseTime:          time.UnixMilli(event.CloseTime),
+		FirstTradeID:       event.FirstID,
+		LastTradeID:        event.LastID,
+		TradeCount:         event.Count,
+		EventTime:          time.UnixMilli(event.EventTime),
+	}
+}
+
+// connectFuturesTradeStreams connects to futures aggregated trade streams
+func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
 		c.statsMu.Lock()
@@ -463,19 +694,84 @@ func (c *Client) connectAggTradeStreams(symbols []string) error {
 	c.stopChannels = append(c.stopChannels, stopC)
 	c.doneChannels = append(c.doneChannels, doneC)
 
-	c.logger.Info("Connected to agg trade streams",
+	c.logger.Info("Connected to futures trade streams",
 		"exchange", c.exchange,
+		"market_type", "futures",
 		"symbols", len(symbols),
 	)
 
 	return nil
 }
 
-// convertAggTradeEvent converts Binance agg trade event to generic format
+// connectSpotTradeStreams connects to spot aggregated trade streams
+func (c *Client) connectSpotTradeStreams(symbols []string) error {
+	errHandler := func(err error) {
+		c.errorCount.Add(1)
+		c.statsMu.Lock()
+		c.stats.LastError = err
+		c.statsMu.Unlock()
+
+		c.logger.Error("Spot trade WebSocket error",
+			"exchange", c.exchange,
+			"error", err.Error(),
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
+	tradeHandler := func(event *binance.WsAggTradeEvent) {
+		c.messagesReceived.Add(1)
+
+		if c.stopping.Load() {
+			return
+		}
+
+		if c.handler == nil {
+			return
+		}
+
+		// Convert to generic format
+		genericEvent := c.convertSpotTradeEvent(event)
+		if err := c.handler.OnTrade(genericEvent); err != nil {
+			c.logger.Error("Failed to handle spot trade event",
+				"exchange", c.exchange,
+				"symbol", event.Symbol,
+				"error", err.Error(),
+			)
+			c.errorCount.Add(1)
+		}
+	}
+
+	// Use combined stream for multiple symbols
+	doneC, stopC, err := binance.WsCombinedAggTradeServe(
+		symbols,
+		tradeHandler,
+		errHandler,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to start spot trade WebSocket")
+	}
+
+	c.stopChannels = append(c.stopChannels, stopC)
+	c.doneChannels = append(c.doneChannels, doneC)
+
+	c.logger.Info("Connected to spot trade streams",
+		"exchange", c.exchange,
+		"market_type", "spot",
+		"symbols", len(symbols),
+	)
+
+	return nil
+}
+
+// convertAggTradeEvent converts Binance futures agg trade event to generic format
 func (c *Client) convertAggTradeEvent(event *futures.WsAggTradeEvent) *websocket.TradeEvent {
 	return &websocket.TradeEvent{
 		Exchange:      c.exchange,
 		Symbol:        event.Symbol,
+		MarketType:    "futures",
 		TradeID:       event.AggregateTradeID,
 		Price:         event.Price,
 		Quantity:      event.Quantity,
@@ -484,6 +780,23 @@ func (c *Client) convertAggTradeEvent(event *futures.WsAggTradeEvent) *websocket
 		TradeTime:     time.UnixMilli(event.TradeTime),
 		IsBuyerMaker:  event.Maker,
 		EventTime:     time.UnixMilli(event.Time),
+	}
+}
+
+// convertSpotTradeEvent converts Binance spot agg trade event to generic format
+func (c *Client) convertSpotTradeEvent(event *binance.WsAggTradeEvent) *websocket.TradeEvent {
+	return &websocket.TradeEvent{
+		Exchange:      c.exchange,
+		Symbol:        event.Symbol,
+		MarketType:    "spot",
+		TradeID:       event.AggTradeID,
+		Price:         event.Price,
+		Quantity:      event.Quantity,
+		BuyerOrderID:  event.BuyerOrderID,
+		SellerOrderID: event.SellerOrderID,
+		TradeTime:     time.UnixMilli(event.TradeTime),
+		IsBuyerMaker:  event.IsBuyerMaker,
+		EventTime:     time.UnixMilli(event.EventTime),
 	}
 }
 

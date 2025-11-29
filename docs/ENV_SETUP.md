@@ -304,6 +304,8 @@ WEBSOCKET_ENABLED=true                                  # Enable/disable WebSock
 WEBSOCKET_USE_TESTNET=false                            # Use testnet endpoints for testing
 WEBSOCKET_SYMBOLS=BTCUSDT,ETHUSDT,SOLUSDT              # Symbols to stream (comma-separated)
 WEBSOCKET_INTERVALS=1m,5m,15m,1h,4h                    # Timeframes to collect (comma-separated)
+WEBSOCKET_STREAM_TYPES=kline,ticker,trade,markPrice    # Stream types (comma-separated)
+WEBSOCKET_MARKET_TYPES=spot,futures                    # Market types to collect (comma-separated)
 WEBSOCKET_EXCHANGES=binance                             # Exchanges to connect (comma-separated)
 WEBSOCKET_RECONNECT_BACKOFF=5s                         # Backoff between reconnection attempts
 WEBSOCKET_MAX_RECONNECTS=10                            # Maximum reconnection attempts before giving up
@@ -314,9 +316,18 @@ WEBSOCKET_WRITE_BUFFER_SIZE=4096                       # Write buffer size in by
 
 **Supported Timeframes**: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M`
 
+**Supported Stream Types**: `kline`, `ticker`, `trade`, `markPrice`, `depth`
+
+**Supported Market Types**: 
+- `spot` - Spot markets (no leverage, direct asset ownership)
+- `futures` - Futures/perpetual markets (leverage, funding rates)
+
 **Notes**:
-- **Public streams** (klines, ticker, depth) don't require API keys
+- **Public streams** (klines, ticker, depth, trades) don't require API keys
 - **Private streams** (orders, positions) require `BINANCE_MARKET_DATA_API_KEY` and `BINANCE_MARKET_DATA_SECRET`
+- **markPrice stream** is only available for `futures` market type (includes mark price, index price, funding rate)
+- Spot and futures use different WebSocket endpoints and have different data structures
 - Events are published to Kafka and consumed by batch writer to ClickHouse
+- Data is automatically tagged with `market_type` field for proper differentiation in ClickHouse
 - Deduplication happens at batch level to avoid redundant writes
 - See `docs/WEBSOCKET_AUTH.md` for authentication details
