@@ -10,6 +10,7 @@ import (
 
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/metrics"
+	exchangeservice "prometheus/internal/services/exchange"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -35,20 +36,18 @@ type UserDataFactory interface {
 // - Persists listenKeys to DB for crash recovery
 // ExchangeService defines interface for exchange account management
 type ExchangeService interface {
-	DeactivateAccount(ctx context.Context, input struct {
-		AccountID uuid.UUID
-		Reason    string
-		ErrorMsg  string
-	}) error
+	DeactivateAccount(ctx context.Context, input exchangeservice.DeactivateAccountInput) error
+	SaveListenKey(ctx context.Context, accountID uuid.UUID, listenKey string, expiresAt time.Time) error
+	UpdateListenKeyExpiration(ctx context.Context, accountID uuid.UUID, expiresAt time.Time) error
 }
 
 type UserDataManager struct {
-	accountRepo    exchange_account.Repository
+	accountRepo     exchange_account.Repository
 	exchangeService ExchangeService
-	factory        UserDataFactory
-	handler        UserDataEventHandler
-	encryptor      *crypto.Encryptor
-	logger         *logger.Logger
+	factory         UserDataFactory
+	handler         UserDataEventHandler
+	encryptor       *crypto.Encryptor
+	logger          *logger.Logger
 
 	// Connection pool: accountID -> client
 	clients   map[uuid.UUID]UserDataStreamer
@@ -412,22 +411,13 @@ func (m *UserDataManager) ensureListenKey(
 		"expires_at", expiresAt,
 	)
 
-	// Encrypt and store listenKey in account
-	if err := account.SetListenKey(listenKey, expiresAt, m.encryptor); err != nil {
-		m.logger.Errorw("Failed to encrypt listenKey",
-			"account_id", account.ID,
-			"error", err,
-		)
-		return "", time.Time{}, errors.Wrap(err, "failed to encrypt listenKey")
-	}
-
-	m.logger.Debugw("ListenKey encrypted, persisting to database",
+	// Persist listenKey via exchange service (Clean Architecture)
+	m.logger.Debugw("Persisting listenKey via exchange service",
 		"account_id", account.ID,
 	)
 
-	// Persist to DB
-	if err := m.accountRepo.Update(ctx, account); err != nil {
-		m.logger.Errorw("Failed to persist listenKey to database",
+	if err := m.exchangeService.SaveListenKey(ctx, account.ID, listenKey, expiresAt); err != nil {
+		m.logger.Errorw("Failed to persist listenKey via service",
 			"account_id", account.ID,
 			"error", err,
 		)
@@ -738,56 +728,103 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 		default:
 		}
 
-		// Load account from DB
-		account, err := m.accountRepo.GetByID(ctx, accountID)
-		if err != nil {
-			m.logger.Errorw("Failed to load account for listenKey renewal",
+		if err := m.renewListenKeyForAccount(ctx, accountID); err != nil {
+			m.logger.Errorw("Failed to renew listenKey for account",
 				"account_id", accountID,
 				"error", err,
 			)
 			continue
 		}
+	}
+}
 
-		// Check if renewal is needed
-		if !account.ShouldRenewListenKey() {
-			continue
-		}
+// renewListenKeyForAccount renews listenKey for a specific account
+// Business logic (check rules, handle errors) delegated to exchange service
+func (m *UserDataManager) renewListenKeyForAccount(ctx context.Context, accountID uuid.UUID) error {
+	// Load account from DB (via service to apply business rules)
+	account, err := m.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load account")
+	}
 
-		m.logger.Infow("Renewing listenKey",
+	// Business rule: check if renewal needed (domain logic)
+	if !account.ShouldRenewListenKey() {
+		return nil // Skip renewal
+	}
+
+	// Get client
+	m.clientsMu.RLock()
+	client, exists := m.clients[accountID]
+	m.clientsMu.RUnlock()
+
+	if !exists {
+		return errors.New("client not found")
+	}
+
+	// Decrypt credentials
+	apiKey, err := account.GetAPIKey(m.encryptor)
+	if err != nil {
+		return errors.Wrap(err, "failed to decrypt API key")
+	}
+
+	secret, err := account.GetSecret(m.encryptor)
+	if err != nil {
+		return errors.Wrap(err, "failed to decrypt secret")
+	}
+
+	listenKey, err := account.GetListenKey(m.encryptor)
+	if err != nil {
+		return errors.Wrap(err, "failed to decrypt listenKey")
+	}
+
+	// Infrastructure call: actual API renewal
+	if err := client.RenewListenKey(ctx, apiKey, secret, listenKey); err != nil {
+		m.logger.Errorw("Failed to renew listenKey via API",
 			"account_id", accountID,
-			"current_expires_at", account.ListenKeyExpiresAt,
+			"error", err,
 		)
 
-		// Get client
-		m.clientsMu.RLock()
-		client, exists := m.clients[accountID]
-		m.clientsMu.RUnlock()
-
-		if !exists {
-			continue
-		}
-
-		// Decrypt credentials
-		apiKey, _ := account.GetAPIKey(m.encryptor)
-		secret, _ := account.GetSecret(m.encryptor)
-		listenKey, _ := account.GetListenKey(m.encryptor)
-
-		// Renew
-		if err := client.RenewListenKey(ctx, apiKey, secret, listenKey); err != nil {
-			m.logger.Errorw("Failed to renew listenKey",
+		// Delegate error handling to exchange service (business logic)
+		if m.isCredentialsError(err) {
+			m.logger.Warnw("Credentials error during renewal, deactivating via service",
 				"account_id", accountID,
-				"error", err,
 			)
-			metrics.UserDataListenKeyRenewals.WithLabelValues(string(account.Exchange), "error").Inc()
-			continue
+			deactivateErr := m.exchangeService.DeactivateAccount(ctx, exchangeservice.DeactivateAccountInput{
+				AccountID: accountID,
+				Reason:    "listenkey_renewal_failed",
+				ErrorMsg:  err.Error(),
+			})
+			if deactivateErr != nil {
+				m.logger.Errorw("Failed to deactivate account after renewal error",
+					"account_id", accountID,
+					"error", deactivateErr,
+				)
+			}
 		}
 
-		// Update metrics
-		metrics.UserDataListenKeyRenewals.WithLabelValues(string(account.Exchange), "success").Inc()
-
-		// Update expiration in DB (client already updated it internally)
-		// We don't need to persist it again since client handles it
+		metrics.UserDataListenKeyRenewals.WithLabelValues(string(account.Exchange), "error").Inc()
+		return errors.Wrap(err, "listenKey renewal failed")
 	}
+
+	// Update expiration in DB via exchange service
+	expiresAt := time.Now().Add(60 * time.Minute)
+	if err := m.exchangeService.UpdateListenKeyExpiration(ctx, accountID, expiresAt); err != nil {
+		m.logger.Errorw("Failed to update listenKey expiration in DB",
+			"account_id", accountID,
+			"error", err,
+		)
+		// Don't fail renewal if DB update fails - renewal succeeded on Binance
+	}
+
+	// Update metrics
+	metrics.UserDataListenKeyRenewals.WithLabelValues(string(account.Exchange), "success").Inc()
+
+	m.logger.Debugw("✅ ListenKey renewed successfully",
+		"account_id", accountID,
+		"new_expires_at", expiresAt,
+	)
+
+	return nil
 }
 
 // reconnectAccount attempts to reconnect a disconnected account
@@ -952,11 +989,7 @@ func (m *UserDataManager) handleCredentialsError(ctx context.Context, account *e
 	)
 
 	// Use exchange service to deactivate account and publish notification
-	deactivateErr := m.exchangeService.DeactivateAccount(ctx, struct {
-		AccountID uuid.UUID
-		Reason    string
-		ErrorMsg  string
-	}{
+	deactivateErr := m.exchangeService.DeactivateAccount(ctx, exchangeservice.DeactivateAccountInput{
 		AccountID: account.ID,
 		Reason:    "invalid_credentials",
 		ErrorMsg:  err.Error(),

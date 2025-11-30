@@ -125,87 +125,21 @@ func (c *Container) MustInitWebSocketClients() {
 		c.Adapters.WebSocketClients = clients
 	}
 
-	// Create WebSocket consumers for all stream types
-	streamTypes := c.Config.WebSocket.GetStreamTypes()
-
-	for _, streamType := range streamTypes {
-		switch streamType {
-		case "kline":
-			c.Log.Infow("Creating WebSocket kline consumer",
-				"topic", events.TopicWebSocketKline,
-				"group_id", c.Config.Kafka.GroupID,
-			)
-			c.Background.WebSocketKlineSvc = consumers.NewWebSocketKlineConsumer(
-				c.Adapters.WebSocketKlineConsumer,
-				c.Repos.MarketData,
-				c.Log,
-			)
-
-		case "markPrice":
-			c.Log.Infow("Creating WebSocket mark price consumer",
-				"topic", events.TopicWebSocketMarkPrice,
-				"group_id", c.Config.Kafka.GroupID,
-			)
-			c.Background.WebSocketMarkPriceSvc = consumers.NewWebSocketMarkPriceConsumer(
-				c.Adapters.WebSocketMarkPriceConsumer,
-				c.Repos.MarketData,
-				c.Log,
-			)
-
-		case "ticker":
-			c.Log.Infow("Creating WebSocket ticker consumer",
-				"topic", events.TopicWebSocketTicker,
-				"group_id", c.Config.Kafka.GroupID,
-			)
-			c.Background.WebSocketTickerSvc = consumers.NewWebSocketTickerConsumer(
-				c.Adapters.WebSocketTickerConsumer,
-				c.Repos.MarketData,
-				c.Log,
-			)
-
-		case "trade":
-			c.Log.Infow("Creating WebSocket trade consumer",
-				"topic", events.TopicWebSocketTrade,
-				"group_id", c.Config.Kafka.GroupID,
-			)
-			c.Background.WebSocketTradeSvc = consumers.NewWebSocketTradeConsumer(
-				c.Adapters.WebSocketTradeConsumer,
-				c.Repos.MarketData,
-				c.Log,
-			)
-
-		case "depth":
-			c.Log.Infow("Creating WebSocket depth consumer",
-				"topic", events.TopicWebSocketDepth,
-				"group_id", c.Config.Kafka.GroupID,
-			)
-			c.Background.WebSocketDepthSvc = consumers.NewWebSocketDepthConsumer(
-				c.Adapters.WebSocketDepthConsumer,
-				c.Repos.MarketData,
-				c.Log,
-			)
-
-		case "liquidation":
-			c.Log.Infow("Creating WebSocket liquidation consumer",
-				"topic", events.TopicWebSocketLiquidation,
-				"group_id", c.Config.Kafka.GroupID,
-			)
-			c.Background.WebSocketLiquidationSvc = consumers.NewWebSocketLiquidationConsumer(
-				c.Adapters.WebSocketLiquidationConsumer,
-				c.Repos.MarketData,
-				c.Log,
-			)
-		}
-	}
+	// Create unified WebSocket consumer (handles all stream types)
+	c.Log.Infow("Creating unified WebSocket consumer",
+		"topic", events.TopicWebSocketEvents,
+		"event_types", []string{"kline", "ticker", "depth", "trade", "mark_price", "liquidation"},
+		"group_id", c.Config.Kafka.GroupID,
+	)
+	c.Background.WebSocketSvc = consumers.NewWebSocketConsumer(
+		c.Adapters.WebSocketConsumer,
+		c.Repos.MarketData,
+		c.Log,
+	)
 
 	c.Log.Infow("✓ WebSocket infrastructure initialized",
-		"stream_types", streamTypes,
-		"kline_consumer", c.Background.WebSocketKlineSvc != nil,
-		"markprice_consumer", c.Background.WebSocketMarkPriceSvc != nil,
-		"ticker_consumer", c.Background.WebSocketTickerSvc != nil,
-		"trade_consumer", c.Background.WebSocketTradeSvc != nil,
-		"depth_consumer", c.Background.WebSocketDepthSvc != nil,
-		"liquidation_consumer", c.Background.WebSocketLiquidationSvc != nil,
+		"consumer", "unified",
+		"handles_all_types", true,
 	)
 }
 

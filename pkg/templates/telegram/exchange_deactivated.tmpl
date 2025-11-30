@@ -3,12 +3,12 @@
 Your exchange account has been automatically deactivated due to connection issues:
 
 *Exchange:* {{.Exchange}}
-*Label:* {{.Label}}
+*Label:* {{safeText .Label}}
 {{if .IsTestnet}}*Mode:* Testnet{{else}}*Mode:* Production{{end}}
 
-*Reason:* {{.Reason}}
+*Reason:* {{safeText .Reason}}
 {{if .ErrorMessage}}
-*Error Details:* {{.ErrorMessage}}
+*Error Details:* {{safeText .ErrorMessage}}
 {{end}}
 
 *Possible causes:*

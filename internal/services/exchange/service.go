@@ -305,6 +305,64 @@ func (s *Service) SetAccountActive(ctx context.Context, accountID uuid.UUID, act
 	return nil
 }
 
+// SaveListenKey saves a new listenKey (encrypted) to the database
+// Called by infrastructure layer after creating listenKey via API
+func (s *Service) SaveListenKey(ctx context.Context, accountID uuid.UUID, listenKey string, expiresAt time.Time) error {
+	account, err := s.repo.GetByID(ctx, accountID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load account")
+	}
+
+	// Encrypt and set listenKey
+	if err := account.SetListenKey(listenKey, expiresAt, s.encryptor); err != nil {
+		return errors.Wrap(err, "failed to encrypt listenKey")
+	}
+
+	// Persist
+	if err := s.repo.Update(ctx, account); err != nil {
+		return errors.Wrap(err, "failed to persist listenKey")
+	}
+
+	s.log.Debugw("Saved listenKey to database",
+		"account_id", accountID,
+		"expires_at", expiresAt,
+	)
+
+	return nil
+}
+
+// UpdateListenKeyExpiration updates listenKey expiration after successful renewal
+// Called by infrastructure layer after actual API renewal (listenKey stays same, only expiration changes)
+func (s *Service) UpdateListenKeyExpiration(ctx context.Context, accountID uuid.UUID, expiresAt time.Time) error {
+	account, err := s.repo.GetByID(ctx, accountID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load account")
+	}
+
+	// Get current listenKey
+	listenKey, err := account.GetListenKey(s.encryptor)
+	if err != nil {
+		return errors.Wrap(err, "failed to decrypt listenKey")
+	}
+
+	// Update expiration (re-encrypt with new expiration)
+	if err := account.SetListenKey(listenKey, expiresAt, s.encryptor); err != nil {
+		return errors.Wrap(err, "failed to encrypt listenKey")
+	}
+
+	// Persist
+	if err := s.repo.Update(ctx, account); err != nil {
+		return errors.Wrap(err, "failed to persist listenKey expiration")
+	}
+
+	s.log.Debugw("Updated listenKey expiration",
+		"account_id", accountID,
+		"expires_at", expiresAt,
+	)
+
+	return nil
+}
+
 // DeactivateAccountInput contains data for deactivating an account
 type DeactivateAccountInput struct {
 	AccountID uuid.UUID

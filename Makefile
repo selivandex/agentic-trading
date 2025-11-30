@@ -2,6 +2,7 @@
 .PHONY: db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create
 .PHONY: db-pg-create db-pg-drop migrate-pg-up migrate-pg-down migrate-pg-status
 .PHONY: db-ch-create db-ch-drop migrate-ch-up migrate-ch-down migrate-ch-status
+.PHONY: kafka-topics-create kafka-topics-list kafka-topics-delete
 .PHONY: test-db-create test-db-drop test-db-reset test-migrate-up
 .PHONY: gen-encryption-key lint fmt test test-short test-integration test-coverage test-repo
 .PHONY: build build-linux build-prod run run-dev setup
@@ -56,6 +57,11 @@ help:
 	@echo "  make migrate-ch-up      - Apply ClickHouse migrations"
 	@echo "  make migrate-ch-down    - Rollback ClickHouse migrations"
 	@echo "  make migrate-ch-status  - Show ClickHouse migration status"
+	@echo ""
+	@echo "📨 Kafka:"
+	@echo "  make kafka-topics-create - Create all required Kafka topics"
+	@echo "  make kafka-topics-list   - List all Kafka topics"
+	@echo "  make kafka-topics-delete - Delete all application topics"
 	@echo ""
 	@echo "🧪 Test Databases:"
 	@echo "  make test-db-create     - Create test databases (PostgreSQL + ClickHouse, uses .env.test)"
@@ -144,6 +150,24 @@ migrate-ch-down:
 migrate-ch-status:
 	@echo "ClickHouse migration status for $(DB_CH_NAME):"
 	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse version
+
+# ============================================================================
+# Kafka Commands
+# ============================================================================
+
+KAFKA_CONTAINER ?= flowly-kafka
+KAFKA_PARTITIONS ?= 3
+KAFKA_REPLICATION ?= 1
+
+kafka-topics-create:
+	@KAFKA_CONTAINER=$(KAFKA_CONTAINER) KAFKA_PARTITIONS=$(KAFKA_PARTITIONS) KAFKA_REPLICATION=$(KAFKA_REPLICATION) \
+		./scripts/kafka-topics.sh create
+
+kafka-topics-list:
+	@KAFKA_CONTAINER=$(KAFKA_CONTAINER) ./scripts/kafka-topics.sh list
+
+kafka-topics-delete:
+	@KAFKA_CONTAINER=$(KAFKA_CONTAINER) ./scripts/kafka-topics.sh delete
 
 # ============================================================================
 # Combined Database Commands (PostgreSQL + ClickHouse)
@@ -362,8 +386,12 @@ clean:
 	go clean -cache
 
 # Development setup
-setup: deps docker-up db-create migrate-up
+setup: deps docker-up db-create migrate-up kafka-topics-create
 	@echo "✓ Development environment ready!"
+	@echo "  - PostgreSQL + ClickHouse databases created"
+	@echo "  - Migrations applied"
+	@echo "  - Kafka topics created (10 domain-level topics)"
+	@echo ""
 	@echo "Run 'make run' to start the application"
 
 # Production build

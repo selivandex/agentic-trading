@@ -18,16 +18,27 @@ import (
 // ControlCommandHandler handles control commands (stop, settings)
 type ControlCommandHandler struct {
 	positionRepo position.Repository
-	userRepo     user.Repository
+	userService  userServiceInterface
 	templates    *templates.Registry
 	bot          *Bot
 	log          *logger.Logger
 }
 
+// userServiceInterface defines interface for user operations in control handler
+type userServiceInterface interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*user.User, error)
+	SetActive(ctx context.Context, userID uuid.UUID, active bool) error
+	UpdateSettings(ctx context.Context, userID uuid.UUID, settings user.Settings) error
+	ToggleCircuitBreaker(ctx context.Context, userID uuid.UUID) error
+	ToggleNotifications(ctx context.Context, userID uuid.UUID) error
+	UpdateRiskLevel(ctx context.Context, userID uuid.UUID, riskLevel string) error
+	UpdateMaxPositions(ctx context.Context, userID uuid.UUID, maxPositions int) error
+}
+
 // NewControlCommandHandler creates a new control command handler
 func NewControlCommandHandler(
 	positionRepo position.Repository,
-	userRepo user.Repository,
+	userService userServiceInterface,
 	tmpl *templates.Registry,
 	bot *Bot,
 	log *logger.Logger,
@@ -38,7 +49,7 @@ func NewControlCommandHandler(
 
 	return &ControlCommandHandler{
 		positionRepo: positionRepo,
-		userRepo:     userRepo,
+		userService:  userService,
 		templates:    tmpl,
 		bot:          bot,
 		log:          log.With("component", "telegram_control_handler"),
@@ -48,7 +59,7 @@ func NewControlCommandHandler(
 // HandleStop handles /stop command - pauses all trading
 func (ch *ControlCommandHandler) HandleStop(ctx context.Context, chatID int64, userID uuid.UUID) error {
 	// Get user
-	usr, err := ch.userRepo.GetByID(ctx, userID)
+	usr, err := ch.userService.GetByID(ctx, userID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user")
 	}
@@ -62,10 +73,9 @@ func (ch *ControlCommandHandler) HandleStop(ctx context.Context, chatID int64, u
 		return ch.bot.SendMessage(chatID, msg)
 	}
 
-	// Pause user trading
-	usr.IsActive = false
-	if err := ch.userRepo.Update(ctx, usr); err != nil {
-		return errors.Wrap(err, "failed to update user")
+	// Pause user trading (via service - business logic)
+	if err := ch.userService.SetActive(ctx, userID, false); err != nil {
+		return errors.Wrap(err, "failed to deactivate user")
 	}
 
 	ch.log.Infow("User trading paused", "user_id", userID)
@@ -88,8 +98,8 @@ func (ch *ControlCommandHandler) HandleStop(ctx context.Context, chatID int64, u
 
 // HandleSettings handles /settings command - manages user preferences
 func (ch *ControlCommandHandler) HandleSettings(ctx context.Context, chatID int64, userID uuid.UUID) error {
-	// Get user
-	usr, err := ch.userRepo.GetByID(ctx, userID)
+	// Get user (via service)
+	usr, err := ch.userService.GetByID(ctx, userID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user")
 	}
@@ -148,7 +158,7 @@ func (ch *ControlCommandHandler) formatToggle(label string, enabled bool) string
 
 // HandleSettingsCallback handles callback queries from settings keyboard
 func (ch *ControlCommandHandler) HandleSettingsCallback(ctx context.Context, chatID int64, userID uuid.UUID, action string) error {
-	usr, err := ch.userRepo.GetByID(ctx, userID)
+	usr, err := ch.userService.GetByID(ctx, userID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user")
 	}
@@ -161,15 +171,13 @@ func (ch *ControlCommandHandler) HandleSettingsCallback(ctx context.Context, cha
 		return ch.handleMaxPositionsChange(ctx, chatID, usr)
 
 	case "toggle_circuit_breaker":
-		usr.Settings.CircuitBreakerOn = !usr.Settings.CircuitBreakerOn
-		if err := ch.userRepo.Update(ctx, usr); err != nil {
+		if err := ch.userService.ToggleCircuitBreaker(ctx, userID); err != nil {
 			return err
 		}
 		return ch.HandleSettings(ctx, chatID, userID)
 
 	case "toggle_notifications":
-		usr.Settings.NotificationsOn = !usr.Settings.NotificationsOn
-		if err := ch.userRepo.Update(ctx, usr); err != nil {
+		if err := ch.userService.ToggleNotifications(ctx, userID); err != nil {
 			return err
 		}
 		return ch.HandleSettings(ctx, chatID, userID)
@@ -240,25 +248,20 @@ func (ch *ControlCommandHandler) handleMaxPositionsChange(ctx context.Context, c
 
 // HandleSettingsValueUpdate handles updating specific setting values
 func (ch *ControlCommandHandler) HandleSettingsValueUpdate(ctx context.Context, chatID int64, userID uuid.UUID, setting, value string) error {
-	usr, err := ch.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return errors.Wrap(err, "failed to get user")
-	}
-
 	switch setting {
 	case "risk":
 		if value == "conservative" || value == "moderate" || value == "aggressive" {
-			usr.Settings.RiskLevel = value
+			if err := ch.userService.UpdateRiskLevel(ctx, userID, value); err != nil {
+				return errors.Wrap(err, "failed to update risk level")
+			}
 		}
 
 	case "max_pos":
 		if maxPos, err := strconv.Atoi(value); err == nil && maxPos >= 1 && maxPos <= 10 {
-			usr.Settings.MaxPositions = maxPos
+			if err := ch.userService.UpdateMaxPositions(ctx, userID, maxPos); err != nil {
+				return errors.Wrap(err, "failed to update max positions")
+			}
 		}
-	}
-
-	if err := ch.userRepo.Update(ctx, usr); err != nil {
-		return errors.Wrap(err, "failed to update user settings")
 	}
 
 	return ch.HandleSettings(ctx, chatID, userID)

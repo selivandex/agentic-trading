@@ -45,21 +45,12 @@ func (nc *NotificationConsumer) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Subscribe to all notification-worthy topics
-	topics := []string{
-		events.TopicOrderPlaced,
-		events.TopicOrderFilled,
-		events.TopicPositionOpened,
-		events.TopicPositionClosed,
-		events.TopicStopLossTriggered,
-		events.TopicTakeProfitHit,
-		events.TopicCircuitBreakerTripped,
-		events.TopicDrawdownAlert,
-	}
-
-	for _, topic := range topics {
-		nc.log.Infow("Subscribed to topic", "topic", topic)
-	}
+	// Subscribe to domain-level topics for notification-worthy events
+	// Events come from Trading and Risk domains
+	nc.log.Infow("Subscribed to notification domains",
+		"trading_events", events.TopicTradingEvents,
+		"risk_events", events.TopicRiskEvents,
+	)
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
@@ -95,25 +86,44 @@ func (nc *NotificationConsumer) Start(ctx context.Context) error {
 }
 
 // handleMessage processes a single event message
+// With domain-level topics, all events come through domain topics and are filtered by event.Base.Type
 func (nc *NotificationConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
+	// First, unmarshal to get BaseEvent and determine type
+	var baseEvent eventspb.BaseEvent
+	if err := proto.Unmarshal(msg.Value, &baseEvent); err != nil {
+		return errors.Wrap(err, "unmarshal base event")
+	}
+
 	nc.log.Debug("Processing notification event",
 		"topic", msg.Topic,
+		"event_type", baseEvent.Type,
 		"size", len(msg.Value),
 	)
 
-	switch msg.Topic {
-	case events.TopicOrderPlaced:
+	// Route by event type
+	switch baseEvent.Type {
+	case "trading.order_placed":
 		return nc.handleOrderPlaced(ctx, msg.Value)
-	case events.TopicOrderFilled:
+	case "trading.order_filled":
 		return nc.handleOrderFilled(ctx, msg.Value)
-	case events.TopicPositionOpened:
+	case "trading.position_opened":
 		return nc.handlePositionOpened(ctx, msg.Value)
-	case events.TopicPositionClosed:
+	case "trading.position_closed":
 		return nc.handlePositionClosed(ctx, msg.Value)
-	case events.TopicCircuitBreakerTripped:
+	case "trading.stop_loss_triggered":
+		// Handle as position closed
+		return nc.handlePositionClosed(ctx, msg.Value)
+	case "trading.take_profit_hit":
+		// Handle as position closed
+		return nc.handlePositionClosed(ctx, msg.Value)
+	case "risk.circuit_breaker_tripped":
 		return nc.handleCircuitBreakerTripped(ctx, msg.Value)
+	case "risk.drawdown_alert":
+		// TODO: implement drawdown alert notification
+		nc.log.Info("Drawdown alert received (notification not implemented yet)")
+		return nil
 	default:
-		nc.log.Warn("Unknown topic", "topic", msg.Topic)
+		nc.log.Debug("Unhandled notification event type", "type", baseEvent.Type)
 		return nil
 	}
 }

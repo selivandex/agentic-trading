@@ -541,7 +541,7 @@ func TestMarketDataRepository_OrderBook(t *testing.T) {
 		oldSnapshot := testsupport.NewOrderBookSnapshotFixture().
 			WithExchange("test_exchange").
 			WithSymbol("ETH/USDT").
-			WithTimestamp(baseTime.Add(-5 * time.Second)).
+			WithTimestamp(baseTime.Add(-5*time.Second)).
 			WithBids(`[[2990.0, 10.0]]`).
 			WithDepth(10.0, 8.0).
 			Build()

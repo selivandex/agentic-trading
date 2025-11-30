@@ -51,7 +51,8 @@ type ExchangeSetupSession struct {
 	APIKey            string             `json:"api_key"`
 	Secret            string             `json:"secret"`
 	Label             string             `json:"label"`
-	IsUpdate          bool               `json:"is_update"` // True if updating existing account
+	IsTestnet         bool               `json:"is_testnet"` // Use testnet mode
+	IsUpdate          bool               `json:"is_update"`  // True if updating existing account
 	StartedAt         time.Time          `json:"started_at"`
 	LastInteractionAt time.Time          `json:"last_interaction_at"`
 }
@@ -59,12 +60,15 @@ type ExchangeSetupSession struct {
 // ExchangeSetupService manages the exchange connection UI flow (Telegram-specific)
 // All business logic is delegated to services/exchange.Service
 type ExchangeSetupService struct {
-	redis       *redis.Client
-	bot         *Bot
-	exchService *exchange.Service // Business logic service
-	exchFactory exchanges.Factory // For testing credentials
-	templates   *templates.Registry
-	log         *logger.Logger
+	redis          *redis.Client
+	bot            *Bot
+	exchService    *exchange.Service // Business logic service
+	exchFactory    exchanges.Factory // For testing credentials
+	templates      *templates.Registry
+	binanceTestnet bool // Use Binance testnet for user accounts
+	bybitTestnet   bool // Use Bybit testnet for user accounts
+	okxTestnet     bool // Use OKX testnet for user accounts
+	log            *logger.Logger
 }
 
 // NewExchangeSetupService creates a new exchange setup service
@@ -74,6 +78,9 @@ func NewExchangeSetupService(
 	exchService *exchange.Service, // Business logic service
 	exchFactory exchanges.Factory,
 	tmpl *templates.Registry,
+	binanceTestnet bool, // Use Binance testnet
+	bybitTestnet bool, // Use Bybit testnet
+	okxTestnet bool, // Use OKX testnet
 	log *logger.Logger,
 ) *ExchangeSetupService {
 	if tmpl == nil {
@@ -81,25 +88,29 @@ func NewExchangeSetupService(
 	}
 
 	return &ExchangeSetupService{
-		redis:       redis,
-		bot:         bot,
-		exchService: exchService,
-		exchFactory: exchFactory,
-		templates:   tmpl,
-		log:         log.With("component", "exchange_setup"),
+		redis:          redis,
+		bot:            bot,
+		exchService:    exchService,
+		exchFactory:    exchFactory,
+		templates:      tmpl,
+		binanceTestnet: binanceTestnet,
+		bybitTestnet:   bybitTestnet,
+		okxTestnet:     okxTestnet,
+		log:            log.With("component", "exchange_setup"),
 	}
 }
 
 // HandleAddExchange starts the exchange connection flow
-func (es *ExchangeSetupService) HandleAddExchange(ctx context.Context, chatID int64, userID uuid.UUID) error {
+func (es *ExchangeSetupService) HandleAddExchange(ctx context.Context, chatID int64, telegramID int64, userID uuid.UUID) error {
 	es.log.Debugw("Starting exchange setup flow",
 		"chat_id", chatID,
+		"telegram_id", telegramID,
 		"user_id", userID,
 	)
 
 	// Create new session
 	session := &ExchangeSetupSession{
-		TelegramID:        chatID,
+		TelegramID:        telegramID,
 		UserID:            userID,
 		State:             ExchangeStateSelectExchange,
 		StartedAt:         time.Now(),
@@ -231,6 +242,18 @@ func (es *ExchangeSetupService) handleExchangeSelection(ctx context.Context, ses
 	session.SelectedExchange = string(exchangeType)
 	session.State = ExchangeStateAwaitingAPIKey
 	session.LastInteractionAt = time.Now()
+
+	// Set testnet flag based on exchange and config
+	switch exchangeType {
+	case exchange_account.ExchangeBinance:
+		session.IsTestnet = es.binanceTestnet
+	case exchange_account.ExchangeBybit:
+		session.IsTestnet = es.bybitTestnet
+	case exchange_account.ExchangeOKX:
+		session.IsTestnet = es.okxTestnet
+	default:
+		session.IsTestnet = false
+	}
 
 	if err := es.saveSession(ctx, session); err != nil {
 		es.log.Errorw("Failed to save exchange setup session",
@@ -519,7 +542,7 @@ func (es *ExchangeSetupService) testAndSaveExchange(ctx context.Context, session
 		APIKey:    session.APIKey,
 		Secret:    session.Secret,
 		Label:     session.Label,
-		IsTestnet: false,
+		IsTestnet: session.IsTestnet, // Use testnet flag from session (set from config)
 	}
 
 	account, err := es.exchService.CreateAccount(ctx, input)
@@ -691,9 +714,10 @@ func (es *ExchangeSetupService) deleteSession(ctx context.Context, telegramID in
 // ========================================================================
 
 // HandleUpdateExchange starts the exchange update/management flow
-func (es *ExchangeSetupService) HandleUpdateExchange(ctx context.Context, chatID int64, userID uuid.UUID) error {
+func (es *ExchangeSetupService) HandleUpdateExchange(ctx context.Context, chatID int64, telegramID int64, userID uuid.UUID) error {
 	es.log.Infow("Starting exchange management flow",
 		"chat_id", chatID,
+		"telegram_id", telegramID,
 		"user_id", userID,
 	)
 
@@ -713,7 +737,7 @@ func (es *ExchangeSetupService) HandleUpdateExchange(ctx context.Context, chatID
 
 	// Create new session for management
 	session := &ExchangeSetupSession{
-		TelegramID:        chatID,
+		TelegramID:        telegramID,
 		UserID:            userID,
 		State:             ExchangeStateSelectAccount,
 		IsUpdate:          true,
@@ -821,6 +845,7 @@ func (es *ExchangeSetupService) handleAccountSelected(ctx context.Context, sessi
 	session.SelectedAccountID = accountID
 	session.SelectedExchange = string(account.Exchange)
 	session.Label = account.Label
+	session.IsTestnet = account.IsTestnet // Preserve testnet flag from existing account
 	session.State = ExchangeStateSelectAction
 	session.LastInteractionAt = time.Now()
 
@@ -904,7 +929,7 @@ func (es *ExchangeSetupService) handleActionSelected(ctx context.Context, sessio
 
 	case "back":
 		es.deleteSession(ctx, session.TelegramID)
-		return es.HandleUpdateExchange(ctx, session.TelegramID, session.UserID)
+		return es.HandleUpdateExchange(ctx, session.TelegramID, session.TelegramID, session.UserID)
 
 	case "cancel":
 		es.deleteSession(ctx, session.TelegramID)

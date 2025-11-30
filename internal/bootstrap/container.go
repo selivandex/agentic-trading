@@ -37,6 +37,7 @@ import (
 	"prometheus/internal/events"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
+	exchangeservice "prometheus/internal/services/exchange"
 	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
 	"prometheus/internal/workers"
@@ -109,6 +110,7 @@ type Repositories struct {
 type Services struct {
 	User            *user.Service
 	ExchangeAccount *exchange_account.Service
+	Exchange        *exchangeservice.Service // Exchange account management service
 	TradingPair     *trading_pair.Service
 	Order           *order.Service
 	Position        *position.Service
@@ -130,13 +132,8 @@ type Adapters struct {
 	PositionGuardianConsumer     *kafka.Consumer
 	TelegramNotificationConsumer *kafka.Consumer
 
-	// WebSocket consumers (one per stream type)
-	WebSocketKlineConsumer       *kafka.Consumer
-	WebSocketMarkPriceConsumer   *kafka.Consumer
-	WebSocketTickerConsumer      *kafka.Consumer
-	WebSocketTradeConsumer       *kafka.Consumer
-	WebSocketDepthConsumer       *kafka.Consumer
-	WebSocketLiquidationConsumer *kafka.Consumer
+	// WebSocket consumer (unified for all stream types)
+	WebSocketConsumer *kafka.Consumer
 
 	// User Data WebSocket consumers
 	UserDataOrderConsumer         *kafka.Consumer
@@ -194,13 +191,8 @@ type Background struct {
 	AIUsageSvc          *consumers.AIUsageConsumer
 	PositionGuardianSvc *consumers.PositionGuardianConsumer
 
-	// WebSocket consumer services
-	WebSocketKlineSvc       *consumers.WebSocketKlineConsumer
-	WebSocketMarkPriceSvc   *consumers.WebSocketMarkPriceConsumer
-	WebSocketTickerSvc      *consumers.WebSocketTickerConsumer
-	WebSocketTradeSvc       *consumers.WebSocketTradeConsumer
-	WebSocketDepthSvc       *consumers.WebSocketDepthConsumer
-	WebSocketLiquidationSvc *consumers.WebSocketLiquidationConsumer
+	// WebSocket consumer service (unified)
+	WebSocketSvc *consumers.WebSocketConsumer
 
 	// User Data WebSocket consumer service
 	UserDataSvc *consumers.UserDataConsumer
@@ -305,61 +297,15 @@ func (c *Container) startConsumers() error {
 		{"telegram_notifications", c.Application.TelegramNotificationSvc},
 	}
 
-	// Add WebSocket consumers based on enabled stream types
-	streamTypes := c.Config.WebSocket.GetStreamTypes()
+	// Add unified WebSocket consumer (handles all stream types)
 	consumerNames := []string{"notification", "risk", "analytics", "opportunity", "ai_usage", "position_guardian", "telegram_bot", "telegram_notifications"}
 
-	for _, streamType := range streamTypes {
-		switch streamType {
-		case "kline":
-			if c.Background.WebSocketKlineSvc != nil {
-				consumers = append(consumers, struct {
-					name string
-					svc  interface{ Start(context.Context) error }
-				}{"websocket_kline", c.Background.WebSocketKlineSvc})
-				consumerNames = append(consumerNames, "websocket_kline")
-			}
-		case "markPrice":
-			if c.Background.WebSocketMarkPriceSvc != nil {
-				consumers = append(consumers, struct {
-					name string
-					svc  interface{ Start(context.Context) error }
-				}{"websocket_markprice", c.Background.WebSocketMarkPriceSvc})
-				consumerNames = append(consumerNames, "websocket_markprice")
-			}
-		case "ticker":
-			if c.Background.WebSocketTickerSvc != nil {
-				consumers = append(consumers, struct {
-					name string
-					svc  interface{ Start(context.Context) error }
-				}{"websocket_ticker", c.Background.WebSocketTickerSvc})
-				consumerNames = append(consumerNames, "websocket_ticker")
-			}
-		case "trade":
-			if c.Background.WebSocketTradeSvc != nil {
-				consumers = append(consumers, struct {
-					name string
-					svc  interface{ Start(context.Context) error }
-				}{"websocket_trade", c.Background.WebSocketTradeSvc})
-				consumerNames = append(consumerNames, "websocket_trade")
-			}
-		case "depth":
-			if c.Background.WebSocketDepthSvc != nil {
-				consumers = append(consumers, struct {
-					name string
-					svc  interface{ Start(context.Context) error }
-				}{"websocket_depth", c.Background.WebSocketDepthSvc})
-				consumerNames = append(consumerNames, "websocket_depth")
-			}
-		case "liquidation":
-			if c.Background.WebSocketLiquidationSvc != nil {
-				consumers = append(consumers, struct {
-					name string
-					svc  interface{ Start(context.Context) error }
-				}{"websocket_liquidation", c.Background.WebSocketLiquidationSvc})
-				consumerNames = append(consumerNames, "websocket_liquidation")
-			}
-		}
+	if c.Background.WebSocketSvc != nil {
+		consumers = append(consumers, struct {
+			name string
+			svc  interface{ Start(context.Context) error }
+		}{"websocket", c.Background.WebSocketSvc})
+		consumerNames = append(consumerNames, "websocket")
 	}
 
 	// Add User Data consumer if enabled
@@ -430,12 +376,7 @@ func (c *Container) Shutdown() {
 		c.Adapters.AIUsageConsumer,
 		c.Adapters.PositionGuardianConsumer,
 		c.Adapters.TelegramNotificationConsumer,
-		c.Adapters.WebSocketKlineConsumer,
-		c.Adapters.WebSocketMarkPriceConsumer,
-		c.Adapters.WebSocketTickerConsumer,
-		c.Adapters.WebSocketTradeConsumer,
-		c.Adapters.WebSocketDepthConsumer,
-		c.Adapters.WebSocketLiquidationConsumer,
+		c.Adapters.WebSocketConsumer,
 		c.PG,
 		c.CH,
 		c.Redis,

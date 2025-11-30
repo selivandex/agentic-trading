@@ -46,18 +46,13 @@ func (ac *AnalyticsConsumer) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Subscribe to analytics-worthy topics
-	topics := []string{
-		events.TopicOpportunityFound,
-		events.TopicRegimeChanged,
-		events.TopicAgentExecuted,
-		events.TopicDecisionMade,
-		events.TopicWorkerFailed,
-	}
-
-	for _, topic := range topics {
-		ac.log.Infow("Subscribed to analytics topic", "topic", topic)
-	}
+	// Subscribe to domain-level topics for analytics
+	// Events come from multiple domains: Market, Agent, System
+	ac.log.Infow("Subscribed to analytics domains",
+		"market_events", events.TopicMarketEvents,
+		"agent_events", events.TopicAgentEvents,
+		"system_events", events.TopicSystemEvents,
+	)
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
@@ -93,25 +88,34 @@ func (ac *AnalyticsConsumer) Start(ctx context.Context) error {
 }
 
 // handleMessage processes a single analytics event
+// With domain-level topics, events come through domain topics and are filtered by event.Base.Type
 func (ac *AnalyticsConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
+	// First, unmarshal to get BaseEvent and determine type
+	var baseEvent eventspb.BaseEvent
+	if err := proto.Unmarshal(msg.Value, &baseEvent); err != nil {
+		return errors.Wrap(err, "unmarshal base event")
+	}
+
 	ac.log.Debug("Processing analytics event",
 		"topic", msg.Topic,
+		"event_type", baseEvent.Type,
 		"size", len(msg.Value),
 	)
 
-	switch msg.Topic {
-	case events.TopicOpportunityFound:
+	// Route by event type
+	switch baseEvent.Type {
+	case "market.opportunity_found":
 		return ac.handleOpportunityFound(ctx, msg.Value)
-	case events.TopicRegimeChanged:
+	case "market.regime_changed":
 		return ac.handleRegimeChanged(ctx, msg.Value)
-	case events.TopicAgentExecuted:
+	case "agent.executed":
 		return ac.handleAgentExecuted(ctx, msg.Value)
-	case events.TopicDecisionMade:
+	case "agent.decision_made":
 		return ac.handleDecisionMade(ctx, msg.Value)
-	case events.TopicWorkerFailed:
+	case "system.worker_failed":
 		return ac.handleWorkerFailed(ctx, msg.Value)
 	default:
-		ac.log.Warn("Unknown analytics topic", "topic", msg.Topic)
+		ac.log.Debug("Unhandled analytics event type", "type", baseEvent.Type)
 		return nil
 	}
 }

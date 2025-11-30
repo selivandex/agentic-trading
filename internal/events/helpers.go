@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	eventspb "prometheus/internal/events/proto"
@@ -10,82 +11,48 @@ import (
 )
 
 // All Kafka topic names MUST be defined here
+// Architecture: Domain-level topics with event type discrimination in message payload
+//
+// Event Type Pattern:
+// - Publishers use domain-level topics (e.g., TopicMarketEvents)
+// - Event type is stored in BaseEvent.Type field (e.g., "market.opportunity_found")
+// - Consumers subscribe to domain topic and filter by event type if needed
+//
+// Benefits:
+// - Reduced operational overhead (~10 topics instead of ~40)
+// - Easier scaling (fewer partitions to manage)
+// - Simpler consumer setup (subscribe to one domain, filter by type)
+// - Better resource utilization (no empty low-volume topics)
 const (
-	// AI/ML events
-	TopicAIUsage = "ai.usage" // AI model usage tracking (tokens, costs, latency)
+	// AI events - AI/ML usage tracking, model inference, costs
+	TopicAIEvents = "ai.events"
 
-	// Market events
-	TopicOpportunityFound = "market.opportunity_found"
-	TopicRegimeChanged    = "market.regime_changed"
-	TopicSignalGenerated  = "market.signal_generated"
-	TopicAnomalyDetected  = "market.anomaly_detected"
+	// Market events - opportunities, regime changes, signals, anomalies, SMC patterns
+	TopicMarketEvents = "market.events"
 
-	// Trading events
-	TopicOrderPlaced       = "trading.order_placed"
-	TopicOrderFilled       = "trading.order_filled"
-	TopicOrderCancelled    = "trading.order_cancelled"
-	TopicPositionOpened    = "trading.position_opened"
-	TopicPositionClosed    = "trading.position_closed"
-	TopicStopLossTriggered = "trading.stop_loss_triggered"
-	TopicTakeProfitHit     = "trading.take_profit_hit"
+	// Trading events - orders, positions, executions (high volume)
+	TopicTradingEvents = "trading.events"
 
-	// Risk events
-	TopicCircuitBreakerTripped = "risk.circuit_breaker_tripped"
-	TopicDrawdownAlert         = "risk.drawdown_alert"
-	TopicMarginCall            = "risk.margin_call"
-	TopicRiskLimitExceeded     = "risk.limit_exceeded"
-	TopicRiskEvents            = "risk_events" // General risk events stream
+	// Risk events - circuit breakers, drawdowns, margin calls, limit violations
+	TopicRiskEvents = "risk.events"
 
-	// Agent events
-	TopicAgentExecuted = "agent.executed"
-	TopicAgentError    = "agent.error"
-	TopicDecisionMade  = "agent.decision_made"
+	// Position events - position monitoring, PnL updates, guardian alerts
+	TopicPositionEvents = "position.events"
 
-	// System events
-	TopicHealthCheckFailed = "system.health_check_failed"
-	TopicWorkerFailed      = "system.worker_failed"
+	// Agent events - agent execution, decisions, errors
+	TopicAgentEvents = "agent.events"
 
-	// Notification events
-	TopicNotifications         = "notifications"          // General notification stream
-	TopicTelegramNotifications = "telegram_notifications" // Telegram-specific notifications
-	TopicAnalytics             = "analytics"              // Analytics events stream
+	// System events - health checks, worker failures, infrastructure issues
+	TopicSystemEvents = "system.events"
 
-	// Worker-specific events
-	TopicPnLUpdated          = "user.pnl_updated"
-	TopicJournalEntryCreated = "journal.entry_created"
-	TopicDailyReport         = "report.daily"
-	TopicStrategyDisabled    = "strategy.disabled"
-	TopicStrategyWarning     = "strategy.warning"
-	TopicPositionPnLUpdated  = "position.pnl_updated"
+	// Notification events - user-facing notifications (Telegram, email)
+	TopicNotifications = "notifications"
 
-	// Position Guardian events (event-driven monitoring)
-	TopicStopApproaching    = "position.stop_approaching"
-	TopicTargetApproaching  = "position.target_approaching"
-	TopicThesisInvalidation = "position.thesis_invalidation"
-	TopicTimeDecay          = "position.time_decay"
-	TopicProfitMilestone    = "position.profit_milestone"
-	TopicCorrelationSpike   = "position.correlation_spike"
-	TopicVolatilitySpike    = "position.volatility_spike"
-	TopicPositionGuardian   = "position_guardian" // General position guardian stream
+	// WebSocket events - real-time market data (kline, ticker, depth, trades, liquidations)
+	TopicWebSocketEvents = "websocket.events"
 
-	// SMC (Smart Money Concepts) events
-	TopicFVGDetected        = "smc.fvg_detected"
-	TopicOrderBlockDetected = "smc.order_block_detected"
-
-	// Internal worker events
-	TopicAnalysisRequested = "market.analysis_requested"
-	TopicScanComplete      = "market.scan_complete"
-	TopicWhaleAlert        = "market.whale_alerts"
-	TopicLiquidationAlert  = "market.liquidations"
-
-	// WebSocket stream events (real-time market data)
-	TopicWebSocketKline       = "websocket.kline"
-	TopicWebSocketTicker      = "websocket.ticker"
-	TopicWebSocketDepth       = "websocket.depth"
-	TopicWebSocketTrade       = "websocket.trade"
-	TopicWebSocketFundingRate = "websocket.funding_rate"
-	TopicWebSocketMarkPrice   = "websocket.mark_price"
-	TopicWebSocketLiquidation = "websocket.liquidation"
+	// Analytics events - metrics, statistics, performance, reports
+	TopicAnalytics = "analytics"
 )
 
 // NewBaseEvent creates a new base event with defaults
@@ -105,4 +72,13 @@ func generateEventID() string {
 	// Format: timestamp_nanoseconds
 	now := time.Now()
 	return fmt.Sprintf("%d_%d", now.Unix(), now.Nanosecond())
+}
+
+// SanitizeUTF8 removes invalid UTF-8 sequences from string
+// This prevents protobuf unmarshaling errors: "string field contains invalid UTF-8"
+// Use this for any user-generated content or external API responses before publishing to Kafka
+func SanitizeUTF8(s string) string {
+	// Replace invalid UTF-8 sequences with empty string
+	// This is more robust than string([]rune(s)) and safer than using replacement character
+	return strings.ToValidUTF8(s, "")
 }

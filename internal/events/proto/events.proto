@@ -562,6 +562,20 @@ message WebSocketLiquidationEvent {
   google.protobuf.Timestamp event_time = 10;
 }
 
+// WebSocketEventWrapper wraps all WebSocket event types for efficient type detection
+// This allows consumer to determine event type without trial-and-error unmarshaling
+message WebSocketEventWrapper {
+  oneof event {
+    WebSocketKlineEvent kline = 1;
+    WebSocketTickerEvent ticker = 2;
+    WebSocketDepthEvent depth = 3;
+    WebSocketTradeEvent trade = 4;
+    WebSocketMarkPriceEvent mark_price = 5;
+    WebSocketLiquidationEvent liquidation = 6;
+    WebSocketFundingRateEvent funding_rate = 7;
+  }
+}
+
 // ==========================================
 // User Data WebSocket Events
 // Real-time order, position, balance, and margin updates

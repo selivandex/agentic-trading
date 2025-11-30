@@ -190,6 +190,13 @@ func (r *Registry) loadTemplate(path string) error {
 				return 0
 			}
 		},
+		// Telegram Markdown helpers
+		"escape":     EscapeMarkdown,       // Escape special Markdown characters
+		"escapeV2":   EscapeMarkdownV2,     // Escape special MarkdownV2 characters
+		"escapeCode": EscapeMarkdownV2Code, // Escape for code blocks
+		"escapeLink": EscapeMarkdownV2Link, // Escape for link URLs
+		"safeText":   SafeText,             // Sanitize UTF-8 + escape Markdown (use for user input)
+		"safeTextV2": SafeTextV2,           // Sanitize UTF-8 + escape MarkdownV2
 	}).Parse(string(content))
 	if err != nil {
 		return errors.Wrapf(err, "parse template %s", id)

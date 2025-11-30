@@ -18,11 +18,11 @@ type MarketDataManager struct {
 	logger *logger.Logger
 
 	// Health monitoring
-	mu                  sync.RWMutex
-	connected           bool
-	lastHealthCheck     time.Time
-	consecutiveFailures int
-	healthCheckInterval time.Duration
+	mu                     sync.RWMutex
+	connected              bool
+	lastHealthCheck        time.Time
+	consecutiveFailures    int
+	healthCheckInterval    time.Duration
 	maxConsecutiveFailures int
 
 	// Control channels
@@ -36,8 +36,8 @@ type MarketDataManager struct {
 
 // MarketDataManagerConfig configures the MarketDataManager
 type MarketDataManagerConfig struct {
-	HealthCheckInterval time.Duration // How often to check connection health
-	MaxConsecutiveFailures int        // Max failures before logging warning
+	HealthCheckInterval    time.Duration // How often to check connection health
+	MaxConsecutiveFailures int           // Max failures before logging warning
 }
 
 // NewMarketDataManager creates a new Market Data WebSocket manager
@@ -278,4 +278,3 @@ func (m *MarketDataManager) getTotalReconnects() int {
 	defer m.statsMu.RUnlock()
 	return m.totalReconnects
 }
-

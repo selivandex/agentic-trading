@@ -101,3 +101,168 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+// GetOrCreateByTelegramID gets existing user or creates a new one
+// Used by Telegram adapter to handle first-time users
+func (s *Service) GetOrCreateByTelegramID(ctx context.Context, telegramID int64, firstName, lastName, username, languageCode string) (*User, error) {
+	if telegramID == 0 {
+		return nil, errors.ErrInvalidInput
+	}
+
+	// Try to get existing user
+	user, err := s.repo.GetByTelegramID(ctx, telegramID)
+	if err == nil {
+		s.log.Debugw("User found",
+			"user_id", user.ID,
+			"telegram_id", telegramID,
+		)
+		return user, nil
+	}
+
+	// User doesn't exist, create new one
+	s.log.Infow("Creating new user from Telegram",
+		"telegram_id", telegramID,
+		"username", username,
+	)
+
+	newUser := &User{
+		ID:               uuid.New(),
+		TelegramID:       telegramID,
+		TelegramUsername: username,
+		FirstName:        firstName,
+		LastName:         lastName,
+		LanguageCode:     languageCode,
+		IsActive:         true,
+		IsPremium:        false,
+		Settings:         DefaultSettings(),
+	}
+
+	if err := s.repo.Create(ctx, newUser); err != nil {
+		return nil, errors.Wrap(err, "failed to create user")
+	}
+
+	s.log.Infow("✅ Created new user",
+		"user_id", newUser.ID,
+		"telegram_id", newUser.TelegramID,
+		"username", newUser.TelegramUsername,
+	)
+
+	return newUser, nil
+}
+
+// SetActive activates or deactivates a user (for /stop command)
+func (s *Service) SetActive(ctx context.Context, userID uuid.UUID, active bool) error {
+	if userID == uuid.Nil {
+		return errors.ErrInvalidInput
+	}
+
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "get user")
+	}
+
+	user.IsActive = active
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "update user active status")
+	}
+
+	s.log.Infow("User active status updated",
+		"user_id", userID,
+		"active", active,
+	)
+
+	return nil
+}
+
+// UpdateSettings updates user settings
+func (s *Service) UpdateSettings(ctx context.Context, userID uuid.UUID, settings Settings) error {
+	if userID == uuid.Nil {
+		return errors.ErrInvalidInput
+	}
+
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "get user")
+	}
+
+	user.Settings = settings
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "update user settings")
+	}
+
+	s.log.Debugw("User settings updated",
+		"user_id", userID,
+	)
+
+	return nil
+}
+
+// ToggleCircuitBreaker toggles circuit breaker setting
+func (s *Service) ToggleCircuitBreaker(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "get user")
+	}
+
+	user.Settings.CircuitBreakerOn = !user.Settings.CircuitBreakerOn
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "update circuit breaker setting")
+	}
+
+	return nil
+}
+
+// ToggleNotifications toggles notifications setting
+func (s *Service) ToggleNotifications(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "get user")
+	}
+
+	user.Settings.NotificationsOn = !user.Settings.NotificationsOn
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "update notifications setting")
+	}
+
+	return nil
+}
+
+// UpdateRiskLevel updates user risk level
+func (s *Service) UpdateRiskLevel(ctx context.Context, userID uuid.UUID, riskLevel string) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "get user")
+	}
+
+	user.Settings.RiskLevel = riskLevel
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "update risk level")
+	}
+
+	return nil
+}
+
+// UpdateMaxPositions updates max positions setting
+func (s *Service) UpdateMaxPositions(ctx context.Context, userID uuid.UUID, maxPositions int) error {
+	if maxPositions < 1 || maxPositions > 10 {
+		return errors.Wrapf(errors.ErrInvalidInput, "maxPositions must be between 1 and 10, got %d", maxPositions)
+	}
+
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "get user")
+	}
+
+	user.Settings.MaxPositions = maxPositions
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "update max positions")
+	}
+
+	return nil
+}

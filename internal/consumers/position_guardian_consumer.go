@@ -53,22 +53,16 @@ func (pgc *PositionGuardianConsumer) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Subscribe to all position guardian topics
-	topics := []string{
-		events.TopicStopApproaching,
-		events.TopicTargetApproaching,
-		events.TopicThesisInvalidation,
-		events.TopicTimeDecay,
-		events.TopicProfitMilestone,
-		events.TopicCorrelationSpike,
-		events.TopicVolatilitySpike,
-		// Also handle critical events (stop/target hit) for immediate action
-		events.TopicStopLossTriggered,
-		events.TopicTakeProfitHit,
-		events.TopicCircuitBreakerTripped,
-	}
-
-	pgc.log.Infow("Subscribed to position guardian topics", "topics", topics)
+	// Subscribe to domain-level topics
+	// Position guardian monitors events from multiple domains:
+	// - TopicPositionEvents: stop_approaching, target_approaching, etc
+	// - TopicTradingEvents: stop_loss_triggered, take_profit_hit
+	// - TopicRiskEvents: circuit_breaker_tripped
+	pgc.log.Infow("Subscribed to position guardian domains",
+		"position_events", events.TopicPositionEvents,
+		"trading_events", events.TopicTradingEvents,
+		"risk_events", events.TopicRiskEvents,
+	)
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
@@ -104,41 +98,50 @@ func (pgc *PositionGuardianConsumer) Start(ctx context.Context) error {
 }
 
 // handleMessage processes a single position guardian event
+// With domain-level topics, events come from multiple domains and are filtered by event.Base.Type
 func (pgc *PositionGuardianConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
+	// First, unmarshal to get BaseEvent and determine type
+	var baseEvent eventspb.BaseEvent
+	if err := proto.Unmarshal(msg.Value, &baseEvent); err != nil {
+		return errors.Wrap(err, "unmarshal base event")
+	}
+
 	pgc.log.Debugw("Processing position guardian event",
 		"topic", msg.Topic,
+		"event_type", baseEvent.Type,
 		"size", len(msg.Value),
 	)
 
-	switch msg.Topic {
+	// Route by event type
+	switch baseEvent.Type {
 	// CRITICAL events - immediate algorithmic action
-	case events.TopicStopLossTriggered:
+	case "trading.stop_loss_triggered":
 		return pgc.handleStopLossTriggered(ctx, msg.Value)
-	case events.TopicTakeProfitHit:
+	case "trading.take_profit_hit":
 		return pgc.handleTakeProfitHit(ctx, msg.Value)
-	case events.TopicCircuitBreakerTripped:
+	case "risk.circuit_breaker_tripped":
 		return pgc.handleCircuitBreakerTripped(ctx, msg.Value)
 
 	// HIGH/MEDIUM events - LLM-based decision
-	case events.TopicStopApproaching:
+	case "position.stop_approaching":
 		return pgc.handleStopApproaching(ctx, msg.Value)
-	case events.TopicTargetApproaching:
+	case "position.target_approaching":
 		return pgc.handleTargetApproaching(ctx, msg.Value)
-	case events.TopicProfitMilestone:
+	case "position.profit_milestone":
 		return pgc.handleProfitMilestone(ctx, msg.Value)
-	case events.TopicThesisInvalidation:
+	case "position.thesis_invalidation":
 		return pgc.handleThesisInvalidation(ctx, msg.Value)
-	case events.TopicTimeDecay:
+	case "position.time_decay":
 		return pgc.handleTimeDecay(ctx, msg.Value)
 
 	// LOW priority events - log for now (can implement batch processing later)
-	case events.TopicCorrelationSpike:
+	case "position.correlation_spike":
 		return pgc.handleCorrelationSpike(ctx, msg.Value)
-	case events.TopicVolatilitySpike:
+	case "position.volatility_spike":
 		return pgc.handleVolatilitySpike(ctx, msg.Value)
 
 	default:
-		pgc.log.Warn("Unknown position guardian topic", "topic", msg.Topic)
+		pgc.log.Debug("Unhandled position guardian event type", "type", baseEvent.Type)
 		return nil
 	}
 }

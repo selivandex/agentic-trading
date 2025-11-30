@@ -27,6 +27,13 @@ func (np *NotificationPublisher) PublishExchangeDeactivated(
 	accountID, userID, exchange, label, reason, errorMsg string,
 	isTestnet bool,
 ) error {
+	// Sanitize ALL string fields to ensure valid UTF-8
+	// This prevents protobuf unmarshaling errors: "string field contains invalid UTF-8"
+	// External API responses (especially error messages) may contain invalid UTF-8
+	label = SanitizeUTF8(label)
+	reason = SanitizeUTF8(reason)
+	errorMsg = SanitizeUTF8(errorMsg)
+
 	event := &eventspb.ExchangeDeactivatedEvent{
 		Base:         NewBaseEvent("exchange.deactivated", "exchange_service", userID),
 		AccountId:    accountID,
@@ -47,7 +54,7 @@ func (np *NotificationPublisher) publishNotification(ctx context.Context, key st
 		return errors.Wrap(err, "marshal protobuf")
 	}
 
-	if err := np.kafka.PublishBinary(ctx, TopicTelegramNotifications, []byte(key), data); err != nil {
+	if err := np.kafka.PublishBinary(ctx, TopicNotifications, []byte(key), data); err != nil {
 		return errors.Wrap(err, "publish to kafka")
 	}
 

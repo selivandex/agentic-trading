@@ -17,7 +17,7 @@ import (
 // Handler manages command routing and execution
 type Handler struct {
 	bot              *Bot
-	userRepo         user.Repository
+	userService      UserService
 	onboardingMgr    OnboardingManager
 	statusHandler    StatusHandler
 	portfolioHandler PortfolioHandler
@@ -27,10 +27,16 @@ type Handler struct {
 	log              *logger.Logger
 }
 
+// UserService defines interface for user operations
+type UserService interface {
+	GetOrCreateByTelegramID(ctx context.Context, telegramID int64, firstName, lastName, username, languageCode string) (*user.User, error)
+	GetByTelegramID(ctx context.Context, telegramID int64) (*user.User, error)
+}
+
 // Dependencies for Handler
 type HandlerDeps struct {
 	Bot              *Bot
-	UserRepo         user.Repository
+	UserService      UserService
 	OnboardingMgr    OnboardingManager
 	StatusHandler    StatusHandler
 	PortfolioHandler PortfolioHandler
@@ -48,7 +54,7 @@ func NewHandler(deps HandlerDeps) *Handler {
 
 	return &Handler{
 		bot:              deps.Bot,
-		userRepo:         deps.UserRepo,
+		userService:      deps.UserService,
 		onboardingMgr:    deps.OnboardingMgr,
 		statusHandler:    deps.StatusHandler,
 		portfolioHandler: deps.PortfolioHandler,
@@ -83,8 +89,8 @@ type ControlHandler interface {
 
 // ExchangeHandler handles all exchange operations (add, update, delete)
 type ExchangeHandler interface {
-	HandleAddExchange(ctx context.Context, chatID int64, userID uuid.UUID) error
-	HandleUpdateExchange(ctx context.Context, chatID int64, userID uuid.UUID) error
+	HandleAddExchange(ctx context.Context, chatID int64, telegramID int64, userID uuid.UUID) error
+	HandleUpdateExchange(ctx context.Context, chatID int64, telegramID int64, userID uuid.UUID) error
 	HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) error
 	HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, data string) error
 	IsInSetup(ctx context.Context, telegramID int64) (bool, error)
@@ -181,7 +187,7 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) erro
 			"command", command,
 			"has_args", args != "",
 		)
-		return h.handleCommand(ctx, chatID, usr, command, args)
+		return h.handleCommand(ctx, chatID, telegramID, usr, command, args)
 	}
 
 	// Non-command message
@@ -195,9 +201,10 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) erro
 }
 
 // handleCommand routes commands to appropriate handlers
-func (h *Handler) handleCommand(ctx context.Context, chatID int64, usr *user.User, command, args string) error {
+func (h *Handler) handleCommand(ctx context.Context, chatID int64, telegramID int64, usr *user.User, command, args string) error {
 	h.log.Infow("Handling command",
 		"user_id", usr.ID,
+		"telegram_id", telegramID,
 		"command", command,
 		"args", args,
 	)
@@ -268,20 +275,20 @@ func (h *Handler) handleCommand(ctx context.Context, chatID int64, usr *user.Use
 	case "add_exchange", "addexchange":
 		h.log.Debugw("Handling /add_exchange command",
 			"user_id", usr.ID,
-			"telegram_id", chatID,
+			"telegram_id", telegramID,
 		)
 		if h.exchangeHandler != nil {
-			return h.exchangeHandler.HandleAddExchange(ctx, chatID, usr.ID)
+			return h.exchangeHandler.HandleAddExchange(ctx, chatID, telegramID, usr.ID)
 		}
 		return h.bot.SendMessage(chatID, "Add exchange command not yet implemented")
 
 	case "update_exchange", "updateexchange", "manage_exchange":
 		h.log.Debugw("Handling /update_exchange command",
 			"user_id", usr.ID,
-			"telegram_id", chatID,
+			"telegram_id", telegramID,
 		)
 		if h.exchangeHandler != nil {
-			return h.exchangeHandler.HandleUpdateExchange(ctx, chatID, usr.ID)
+			return h.exchangeHandler.HandleUpdateExchange(ctx, chatID, telegramID, usr.ID)
 		}
 		return h.bot.SendMessage(chatID, "Update exchange command not yet implemented")
 
@@ -401,7 +408,7 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 				"telegram_id", telegramID,
 				"callback_data", data,
 			)
-			return h.exchangeHandler.HandleCallback(ctx, usr.ID, chatID, data)
+			return h.exchangeHandler.HandleCallback(ctx, usr.ID, telegramID, data)
 		}
 		h.log.Warnw("Exchange handler not available",
 			"telegram_id", telegramID,
@@ -415,7 +422,7 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 				"telegram_id", telegramID,
 				"exchange_type", exchangeType,
 			)
-			return h.exchangeHandler.HandleMessage(ctx, usr.ID, chatID, exchangeType)
+			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, exchangeType)
 		}
 		h.log.Warnw("Exchange handler not available or invalid callback data",
 			"telegram_id", telegramID,
@@ -460,60 +467,22 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 }
 
 // getOrCreateUser gets existing user or creates a new one
+// Delegates to user service (business logic layer)
 func (h *Handler) getOrCreateUser(ctx context.Context, from *tgbotapi.User) (*user.User, error) {
-	h.log.Debugw("Getting or creating user",
-		"telegram_id", from.ID,
-		"username", from.UserName,
+	return h.userService.GetOrCreateByTelegramID(
+		ctx,
+		from.ID,
+		from.FirstName,
+		from.LastName,
+		from.UserName,
+		from.LanguageCode,
 	)
-
-	// Try to get existing user
-	usr, err := h.userRepo.GetByTelegramID(ctx, from.ID)
-	if err == nil {
-		h.log.Debugw("User found in database",
-			"user_id", usr.ID,
-			"telegram_id", usr.TelegramID,
-		)
-		return usr, nil
-	}
-
-	h.log.Debugw("User not found, creating new user",
-		"telegram_id", from.ID,
-		"username", from.UserName,
-	)
-
-	// User doesn't exist, create new one
-	newUser := &user.User{
-		ID:               uuid.New(),
-		TelegramID:       from.ID,
-		TelegramUsername: from.UserName,
-		FirstName:        from.FirstName,
-		LastName:         from.LastName,
-		LanguageCode:     from.LanguageCode,
-		IsActive:         true,
-		IsPremium:        false, // Premium status can be checked separately
-		Settings:         user.DefaultSettings(),
-	}
-
-	if err := h.userRepo.Create(ctx, newUser); err != nil {
-		h.log.Errorw("Failed to create new user",
-			"telegram_id", from.ID,
-			"error", err,
-		)
-		return nil, errors.Wrap(err, "failed to create user")
-	}
-
-	h.log.Infow("Created new user",
-		"user_id", newUser.ID,
-		"telegram_id", newUser.TelegramID,
-		"username", newUser.TelegramUsername,
-	)
-
-	return newUser, nil
 }
 
 // getUserByTelegramID gets user by Telegram ID
+// Delegates to user service (business logic layer)
 func (h *Handler) getUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {
-	usr, err := h.userRepo.GetByTelegramID(ctx, telegramID)
+	usr, err := h.userService.GetByTelegramID(ctx, telegramID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user")
 	}

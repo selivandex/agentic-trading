@@ -54,12 +54,7 @@ func (l *Lifecycle) Shutdown(
 	aiUsageKafkaConsumer *kafka.Consumer,
 	positionGuardianConsumer *kafka.Consumer,
 	telegramNotificationConsumer *kafka.Consumer,
-	websocketKlineConsumer *kafka.Consumer,
-	websocketMarkPriceConsumer *kafka.Consumer,
-	websocketTickerConsumer *kafka.Consumer,
-	websocketTradeConsumer *kafka.Consumer,
-	websocketDepthConsumer *kafka.Consumer,
-	websocketLiquidationConsumer *kafka.Consumer,
+	websocketConsumer *kafka.Consumer, // Unified WebSocket consumer
 	pgClient *pgclient.Client,
 	chClient *chclient.Client,
 	redisClient *redisclient.Client,
@@ -88,7 +83,7 @@ func (l *Lifecycle) Shutdown(
 	// ========================================
 	log.Info("[2/10] Stopping background workers...")
 	if err := workerScheduler.Stop(); err != nil {
-		log.Error("Workers shutdown failed", "error", err)
+		log.Errorw("Workers shutdown failed", "error", err)
 	} else {
 		log.Info("✓ Workers stopped")
 	}
@@ -100,7 +95,7 @@ func (l *Lifecycle) Shutdown(
 	if marketDataManager != nil && marketDataManager.Manager != nil {
 		wsCtx, wsCancel := context.WithTimeout(shutdownCtx, 10*time.Second)
 		if err := marketDataManager.Manager.Stop(wsCtx); err != nil {
-			log.Error("Market Data Manager shutdown failed", "error", err)
+			log.Errorw("Market Data Manager shutdown failed", "error", err)
 		} else {
 			log.Info("✓ Market Data Manager stopped")
 		}
@@ -114,7 +109,7 @@ func (l *Lifecycle) Shutdown(
 	if userDataManager != nil && userDataManager.Manager != nil {
 		wsCtx, wsCancel := context.WithTimeout(shutdownCtx, 30*time.Second)
 		if err := userDataManager.Manager.Stop(wsCtx); err != nil {
-			log.Error("User Data Manager shutdown failed", "error", err)
+			log.Errorw("User Data Manager shutdown failed", "error", err)
 		} else {
 			log.Info("✓ User Data Manager stopped")
 		}
@@ -135,12 +130,7 @@ func (l *Lifecycle) Shutdown(
 		"ai_usage":               aiUsageKafkaConsumer,
 		"position_guardian":      positionGuardianConsumer,
 		"telegram_notifications": telegramNotificationConsumer,
-		"websocket_kline":        websocketKlineConsumer,
-		"websocket_markprice":    websocketMarkPriceConsumer,
-		"websocket_ticker":       websocketTickerConsumer,
-		"websocket_trade":        websocketTradeConsumer,
-		"websocket_depth":        websocketDepthConsumer,
-		"websocket_liquidation":  websocketLiquidationConsumer,
+		"websocket":              websocketConsumer, // Unified consumer for all WebSocket events
 	}, log)
 	log.Info("✓ Kafka consumers closed")
 
@@ -156,7 +146,7 @@ func (l *Lifecycle) Shutdown(
 	log.Info("[7/11] Closing Kafka producer...")
 	if kafkaProducer != nil {
 		if err := kafkaProducer.Close(); err != nil {
-			log.Error("Kafka producer close failed", "error", err)
+			log.Errorw("Kafka producer close failed", "error", err)
 		} else {
 			log.Info("✓ Kafka producer closed")
 		}
@@ -193,7 +183,7 @@ func (l *Lifecycle) closeKafkaConsumers(consumers map[string]*kafka.Consumer, lo
 	for name, consumer := range consumers {
 		if consumer != nil {
 			if err := consumer.Close(); err != nil {
-				log.Error("Kafka consumer close failed", "consumer", name, "error", err)
+				log.Errorw("Kafka consumer close failed", "consumer", name, "error", err)
 			}
 		}
 	}
@@ -225,7 +215,7 @@ func (l *Lifecycle) flushErrorTracker(tracker errors.Tracker, ctx context.Contex
 	defer flushCancel()
 
 	if err := tracker.Flush(flushCtx); err != nil {
-		log.Error("Error tracker flush failed", "error", err)
+		log.Errorw("Error tracker flush failed", "error", err)
 	} else {
 		log.Info("✓ Error tracker flushed")
 	}
@@ -259,7 +249,7 @@ func (l *Lifecycle) closeDatabases(
 	}
 
 	if len(dbErrors) > 0 {
-		log.Error("Database close errors", "errors", dbErrors)
+		log.Errorw("Database close errors", "errors", dbErrors)
 	} else {
 		log.Info("✓ Database connections closed")
 	}
@@ -277,7 +267,7 @@ func (l *Lifecycle) stopWebSocketClients(ctx context.Context, clients *WebSocket
 	if clients.Binance != nil {
 		if err := clients.Binance.Stop(ctx); err != nil {
 			wsErrors = append(wsErrors, errors.Wrap(err, "binance"))
-			log.Error("Binance WebSocket stop failed", "error", err)
+			log.Errorw("Binance WebSocket stop failed", "error", err)
 		} else {
 			log.Info("✓ Binance WebSocket stopped")
 		}
@@ -287,7 +277,7 @@ func (l *Lifecycle) stopWebSocketClients(ctx context.Context, clients *WebSocket
 	if clients.Bybit != nil {
 		if err := clients.Bybit.Stop(ctx); err != nil {
 			wsErrors = append(wsErrors, errors.Wrap(err, "bybit"))
-			log.Error("Bybit WebSocket stop failed", "error", err)
+			log.Errorw("Bybit WebSocket stop failed", "error", err)
 		} else {
 			log.Info("✓ Bybit WebSocket stopped")
 		}
@@ -297,7 +287,7 @@ func (l *Lifecycle) stopWebSocketClients(ctx context.Context, clients *WebSocket
 	if clients.OKX != nil {
 		if err := clients.OKX.Stop(ctx); err != nil {
 			wsErrors = append(wsErrors, errors.Wrap(err, "okx"))
-			log.Error("OKX WebSocket stop failed", "error", err)
+			log.Errorw("OKX WebSocket stop failed", "error", err)
 		} else {
 			log.Info("✓ OKX WebSocket stopped")
 		}

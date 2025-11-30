@@ -18,16 +18,21 @@ import (
 // QueryCommandHandler handles query commands (status, portfolio)
 type QueryCommandHandler struct {
 	positionRepo position.Repository
-	userRepo     user.Repository
+	userService  queryUserService
 	templates    *templates.Registry
 	bot          *Bot
 	log          *logger.Logger
 }
 
+// queryUserService defines interface for user operations in query handler
+type queryUserService interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*user.User, error)
+}
+
 // NewQueryCommandHandler creates a new query command handler
 func NewQueryCommandHandler(
 	positionRepo position.Repository,
-	userRepo user.Repository,
+	userService queryUserService,
 	tmpl *templates.Registry,
 	bot *Bot,
 	log *logger.Logger,
@@ -38,7 +43,7 @@ func NewQueryCommandHandler(
 
 	return &QueryCommandHandler{
 		positionRepo: positionRepo,
-		userRepo:     userRepo,
+		userService:  userService,
 		templates:    tmpl,
 		bot:          bot,
 		log:          log.With("component", "telegram_query_handler"),
@@ -47,8 +52,8 @@ func NewQueryCommandHandler(
 
 // HandleStatus handles /status command
 func (qh *QueryCommandHandler) HandleStatus(ctx context.Context, chatID int64, userID uuid.UUID) error {
-	// Get user
-	usr, err := qh.userRepo.GetByID(ctx, userID)
+	// Get user (via service)
+	usr, err := qh.userService.GetByID(ctx, userID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user")
 	}

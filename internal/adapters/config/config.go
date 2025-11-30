@@ -125,21 +125,24 @@ type CryptoConfig struct {
 
 // BinanceConfig contains Binance-specific market data credentials
 type BinanceConfig struct {
-	APIKey string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
-	Secret string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
+	APIKey     string `envconfig:"BINANCE_MARKET_DATA_API_KEY"`
+	Secret     string `envconfig:"BINANCE_MARKET_DATA_SECRET"`
+	UseTestnet bool   `envconfig:"BINANCE_USE_TESTNET" default:"false"` // Use Binance testnet for user accounts
 }
 
-// BybitMarketDataConfig contains Bybit-specific market data credentials
+// BybitConfig contains Bybit-specific market data credentials
 type BybitConfig struct {
-	APIKey string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
-	Secret string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
+	APIKey     string `envconfig:"BYBIT_MARKET_DATA_API_KEY"`
+	Secret     string `envconfig:"BYBIT_MARKET_DATA_SECRET"`
+	UseTestnet bool   `envconfig:"BYBIT_USE_TESTNET" default:"false"` // Use Bybit testnet for user accounts
 }
 
-// OKXMarketDataConfig contains OKX-specific market data credentials
+// OKXConfig contains OKX-specific market data credentials
 type OKXConfig struct {
 	APIKey     string `envconfig:"OKX_MARKET_DATA_API_KEY"`
 	Secret     string `envconfig:"OKX_MARKET_DATA_SECRET"`
 	Passphrase string `envconfig:"OKX_MARKET_DATA_PASSPHRASE"`
+	UseTestnet bool   `envconfig:"OKX_USE_TESTNET" default:"false"` // Use OKX testnet for user accounts
 }
 
 // MarketDataConfig contains centralized market data collection credentials
@@ -344,7 +347,7 @@ func (wc WorkerConfig) GetMacroEventTypesAsStrings() []string {
 // WebSocketConfig contains configuration for WebSocket connections to exchanges
 type WebSocketConfig struct {
 	Enabled          bool          `envconfig:"WEBSOCKET_ENABLED" default:"true"`
-	UseTestnet       bool          `envconfig:"WEBSOCKET_USE_TESTNET" default:"false"`
+	UseTestnet       bool          `envconfig:"WEBSOCKET_USE_TESTNET" default:"false"`                                     // Use testnet for public market data streams
 	Symbols          string        `envconfig:"WEBSOCKET_SYMBOLS" default:"BTCUSDT,ETHUSDT,SOLUSDT"`                       // Comma-separated symbols
 	Intervals        string        `envconfig:"WEBSOCKET_INTERVALS" default:"1m,5m,15m,1h,4h"`                             // Comma-separated intervals
 	StreamTypes      string        `envconfig:"WEBSOCKET_STREAM_TYPES" default:"kline,markPrice,ticker,depth,liquidation"` // Comma-separated stream types: kline,markPrice,ticker,trade,depth,liquidation

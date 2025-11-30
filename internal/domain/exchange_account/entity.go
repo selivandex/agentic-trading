@@ -21,7 +21,7 @@ type ExchangeAccount struct {
 	LastSyncAt      *time.Time   `db:"last_sync_at"`
 	CreatedAt       time.Time    `db:"created_at"`
 	UpdatedAt       time.Time    `db:"updated_at"`
-	
+
 	// User Data WebSocket fields (for real-time order/position updates)
 	ListenKeyEncrypted []byte     `db:"listen_key_encrypted"`
 	ListenKeyExpiresAt *time.Time `db:"listen_key_expires_at"`

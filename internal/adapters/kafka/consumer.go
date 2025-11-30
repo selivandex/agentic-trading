@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"strings"
 
 	"github.com/segmentio/kafka-go"
 
@@ -71,6 +72,13 @@ func (c *Consumer) Consume(ctx context.Context, handler MessageHandler) error {
 				c.log.Info("Consumer stopped")
 				return ctx.Err()
 			}
+
+			// Check if this is a rebalance error (transient, not critical)
+			if isRebalanceError(err) {
+				c.log.Debug("Consumer rebalancing (normal during startup/scaling)")
+				continue
+			}
+
 			c.log.Errorf("Failed to read message: %v", err)
 			continue
 		}
@@ -135,4 +143,16 @@ func (c *Consumer) ReadMessageWithShutdownCheck(ctx context.Context) (kafka.Mess
 // Close closes the consumer
 func (c *Consumer) Close() error {
 	return c.reader.Close()
+}
+
+// isRebalanceError checks if the error is related to Kafka consumer group rebalancing.
+// Rebalancing is a normal part of consumer group coordination and should not be logged as errors.
+func isRebalanceError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "rebalance in progress") ||
+		strings.Contains(errMsg, "rebalance") ||
+		strings.Contains(errMsg, "[27]") // Kafka error code 27 = GROUP_COORDINATOR_NOT_AVAILABLE
 }

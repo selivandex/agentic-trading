@@ -27,89 +27,89 @@ func NewPublisher(producer *kafka.Producer, log *logger.Logger) *Publisher {
 
 // PublishOpportunity publishes an opportunity found event
 func (p *Publisher) PublishOpportunity(ctx context.Context, event *eventspb.OpportunityFoundEvent) error {
-	return p.publish(ctx, TopicOpportunityFound, event)
+	return p.publish(ctx, TopicMarketEvents, event)
 }
 
 // PublishRegimeChange publishes a regime changed event
 func (p *Publisher) PublishRegimeChange(ctx context.Context, event *eventspb.RegimeChangedEvent) error {
-	return p.publish(ctx, TopicRegimeChanged, event)
+	return p.publish(ctx, TopicMarketEvents, event)
 }
 
 // PublishOrderPlaced publishes an order placed event
 func (p *Publisher) PublishOrderPlaced(ctx context.Context, event *eventspb.OrderPlacedEvent) error {
-	return p.publish(ctx, TopicOrderPlaced, event)
+	return p.publish(ctx, TopicTradingEvents, event)
 }
 
 // PublishOrderFilled publishes an order filled event
 func (p *Publisher) PublishOrderFilled(ctx context.Context, event *eventspb.OrderFilledEvent) error {
-	return p.publish(ctx, TopicOrderFilled, event)
+	return p.publish(ctx, TopicTradingEvents, event)
 }
 
 // PublishPositionOpened publishes a position opened event
 func (p *Publisher) PublishPositionOpened(ctx context.Context, event *eventspb.PositionOpenedEvent) error {
-	return p.publish(ctx, TopicPositionOpened, event)
+	return p.publish(ctx, TopicTradingEvents, event)
 }
 
 // PublishPositionClosed publishes a position closed event
 func (p *Publisher) PublishPositionClosed(ctx context.Context, event *eventspb.PositionClosedEvent) error {
-	return p.publish(ctx, TopicPositionClosed, event)
+	return p.publish(ctx, TopicTradingEvents, event)
 }
 
 // PublishCircuitBreakerTripped publishes a circuit breaker event
 func (p *Publisher) PublishCircuitBreakerTripped(ctx context.Context, event *eventspb.CircuitBreakerTrippedEvent) error {
-	return p.publish(ctx, TopicCircuitBreakerTripped, event)
+	return p.publish(ctx, TopicRiskEvents, event)
 }
 
 // PublishAgentExecuted publishes an agent execution event
 func (p *Publisher) PublishAgentExecuted(ctx context.Context, event *eventspb.AgentExecutedEvent) error {
-	return p.publish(ctx, TopicAgentExecuted, event)
+	return p.publish(ctx, TopicAgentEvents, event)
 }
 
 // PublishDecisionMade publishes an agent decision event
 func (p *Publisher) PublishDecisionMade(ctx context.Context, event *eventspb.DecisionMadeEvent) error {
-	return p.publish(ctx, TopicDecisionMade, event)
+	return p.publish(ctx, TopicAgentEvents, event)
 }
 
 // PublishWorkerFailed publishes a worker failure event
 func (p *Publisher) PublishWorkerFailed(ctx context.Context, event *eventspb.WorkerFailedEvent) error {
-	return p.publish(ctx, TopicWorkerFailed, event)
+	return p.publish(ctx, TopicSystemEvents, event)
 }
 
 // Position Guardian event publishers
 
 // PublishStopApproaching publishes a stop approaching event
 func (p *Publisher) PublishStopApproaching(ctx context.Context, event *eventspb.StopApproachingEvent) error {
-	return p.publish(ctx, TopicStopApproaching, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // PublishTargetApproaching publishes a target approaching event
 func (p *Publisher) PublishTargetApproaching(ctx context.Context, event *eventspb.TargetApproachingEvent) error {
-	return p.publish(ctx, TopicTargetApproaching, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // PublishThesisInvalidation publishes a thesis invalidation event
 func (p *Publisher) PublishThesisInvalidation(ctx context.Context, event *eventspb.ThesisInvalidationEvent) error {
-	return p.publish(ctx, TopicThesisInvalidation, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // PublishTimeDecay publishes a time decay event
 func (p *Publisher) PublishTimeDecay(ctx context.Context, event *eventspb.TimeDecayEvent) error {
-	return p.publish(ctx, TopicTimeDecay, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // PublishProfitMilestone publishes a profit milestone event
 func (p *Publisher) PublishProfitMilestone(ctx context.Context, event *eventspb.ProfitMilestoneEvent) error {
-	return p.publish(ctx, TopicProfitMilestone, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // PublishCorrelationSpike publishes a correlation spike event
 func (p *Publisher) PublishCorrelationSpike(ctx context.Context, event *eventspb.CorrelationSpikeEvent) error {
-	return p.publish(ctx, TopicCorrelationSpike, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // PublishVolatilitySpike publishes a volatility spike event
 func (p *Publisher) PublishVolatilitySpike(ctx context.Context, event *eventspb.VolatilitySpikeEvent) error {
-	return p.publish(ctx, TopicVolatilitySpike, event)
+	return p.publish(ctx, TopicPositionEvents, event)
 }
 
 // Publish publishes raw bytes to a topic (for non-protobuf events like WebSocket data)

@@ -49,17 +49,8 @@ func (rc *RiskConsumer) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Subscribe to risk-related topics
-	topics := []string{
-		events.TopicCircuitBreakerTripped,
-		events.TopicDrawdownAlert,
-		events.TopicMarginCall,
-		events.TopicRiskLimitExceeded,
-	}
-
-	for _, topic := range topics {
-		rc.log.Infow("Subscribed to risk topic", "topic", topic)
-	}
+	// Subscribe to domain-level risk topic (events filtered by type in handleMessage)
+	rc.log.Infow("Subscribed to risk events", "topic", events.TopicRiskEvents)
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
@@ -95,19 +86,37 @@ func (rc *RiskConsumer) Start(ctx context.Context) error {
 }
 
 // handleMessage processes a single risk event
+// With domain-level topics, all risk events come through TopicRiskEvents
+// and are filtered by event.Base.Type
 func (rc *RiskConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
+	// First, unmarshal to get BaseEvent and determine type
+	var baseEvent eventspb.BaseEvent
+	if err := proto.Unmarshal(msg.Value, &baseEvent); err != nil {
+		return errors.Wrap(err, "unmarshal base event")
+	}
+
 	rc.log.Debug("Processing risk event",
 		"topic", msg.Topic,
+		"event_type", baseEvent.Type,
 		"size", len(msg.Value),
 	)
 
-	switch msg.Topic {
-	case events.TopicCircuitBreakerTripped:
+	// Route by event type
+	switch baseEvent.Type {
+	case "risk.circuit_breaker_tripped":
 		return rc.handleCircuitBreakerTripped(ctx, msg.Value)
-	case events.TopicDrawdownAlert:
+	case "risk.drawdown_alert":
 		return rc.handleDrawdownAlert(ctx, msg.Value)
+	case "risk.margin_call":
+		// TODO: implement margin call handler
+		rc.log.Warn("Margin call handler not implemented yet")
+		return nil
+	case "risk.limit_exceeded":
+		// TODO: implement risk limit handler
+		rc.log.Warn("Risk limit handler not implemented yet")
+		return nil
 	default:
-		rc.log.Warn("Unknown risk topic", "topic", msg.Topic)
+		rc.log.Debug("Unhandled risk event type", "type", baseEvent.Type)
 		return nil
 	}
 }

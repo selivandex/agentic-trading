@@ -63,41 +63,41 @@ type OrderUpdateEvent struct {
 
 // PositionUpdateEvent represents a position change
 type PositionUpdateEvent struct {
-	UserID           uuid.UUID
-	AccountID        uuid.UUID
-	Exchange         string
-	Symbol           string
-	Side             string // LONG, SHORT
-	Amount           string
-	EntryPrice       string
-	MarkPrice        string
-	UnrealizedPnL    string
+	UserID            uuid.UUID
+	AccountID         uuid.UUID
+	Exchange          string
+	Symbol            string
+	Side              string // LONG, SHORT
+	Amount            string
+	EntryPrice        string
+	MarkPrice         string
+	UnrealizedPnL     string
 	MaintenanceMargin string
-	PositionSide     string // LONG, SHORT, BOTH (for hedge mode)
-	EventTime        time.Time
+	PositionSide      string // LONG, SHORT, BOTH (for hedge mode)
+	EventTime         time.Time
 }
 
 // BalanceUpdateEvent represents a balance change
 type BalanceUpdateEvent struct {
-	UserID            uuid.UUID
-	AccountID         uuid.UUID
-	Exchange          string
-	Asset             string
-	WalletBalance     string
+	UserID             uuid.UUID
+	AccountID          uuid.UUID
+	Exchange           string
+	Asset              string
+	WalletBalance      string
 	CrossWalletBalance string
-	AvailableBalance  string
-	EventTime         time.Time
-	ReasonType        string // DEPOSIT, WITHDRAW, ORDER, FUNDING_FEE, etc.
+	AvailableBalance   string
+	EventTime          time.Time
+	ReasonType         string // DEPOSIT, WITHDRAW, ORDER, FUNDING_FEE, etc.
 }
 
 // MarginCallEvent represents a liquidation risk warning (CRITICAL!)
 type MarginCallEvent struct {
-	UserID              uuid.UUID
-	AccountID           uuid.UUID
-	Exchange            string
-	CrossWalletBalance  string
-	PositionsAtRisk     []PositionAtRisk
-	EventTime           time.Time
+	UserID             uuid.UUID
+	AccountID          uuid.UUID
+	Exchange           string
+	CrossWalletBalance string
+	PositionsAtRisk    []PositionAtRisk
+	EventTime          time.Time
 }
 
 // PositionAtRisk describes a position that may be liquidated
@@ -136,4 +136,3 @@ type UserDataStats struct {
 	LastError          error
 	ListenKeyExpiresAt time.Time
 }
-

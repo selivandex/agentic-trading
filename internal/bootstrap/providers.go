@@ -149,18 +149,15 @@ func (c *Container) MustInitAdapters() {
 	c.Adapters.NotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
 	c.Adapters.RiskConsumer = provideKafkaConsumer(c.Config, events.TopicRiskEvents, c.Log)
 	c.Adapters.AnalyticsConsumer = provideKafkaConsumer(c.Config, events.TopicAnalytics, c.Log)
-	c.Adapters.OpportunityConsumer = provideKafkaConsumer(c.Config, events.TopicOpportunityFound, c.Log)
-	c.Adapters.AIUsageConsumer = provideKafkaConsumer(c.Config, events.TopicAIUsage, c.Log)
-	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionGuardian, c.Log)
-	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicTelegramNotifications, c.Log)
+	c.Adapters.OpportunityConsumer = provideKafkaConsumer(c.Config, events.TopicMarketEvents, c.Log)
+	c.Adapters.AIUsageConsumer = provideKafkaConsumer(c.Config, events.TopicAIEvents, c.Log)
+	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionEvents, c.Log)
+	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
 
-	// WebSocket consumers (one per stream type)
-	c.Adapters.WebSocketKlineConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketKline, c.Log)
-	c.Adapters.WebSocketMarkPriceConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketMarkPrice, c.Log)
-	c.Adapters.WebSocketTickerConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketTicker, c.Log)
-	c.Adapters.WebSocketTradeConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketTrade, c.Log)
-	c.Adapters.WebSocketDepthConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketDepth, c.Log)
-	c.Adapters.WebSocketLiquidationConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketLiquidation, c.Log)
+	// WebSocket consumer (unified consumer for all websocket.events)
+	// Single consumer handles all WebSocket event types (kline, ticker, depth, trade, etc)
+	// Routes by event.Base.Type and batches inserts by type
+	c.Adapters.WebSocketConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketEvents, c.Log)
 
 	// Crypto
 	c.Adapters.Encryptor, err = crypto.NewEncryptor(c.Config.Crypto.EncryptionKey)
@@ -204,6 +201,15 @@ func (c *Container) MustInitServices() {
 	c.Services.Journal = journal.NewService(c.Repos.Journal)
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)
+
+	// Exchange service with notification publisher for Telegram
+	notificationPublisher := events.NewNotificationPublisher(c.Adapters.KafkaProducer)
+	c.Services.Exchange = exchange.NewService(
+		c.Repos.ExchangeAccount,
+		c.Adapters.Encryptor,
+		notificationPublisher,
+		c.Log,
+	)
 
 	c.Log.Info("✓ Services initialized")
 }
@@ -303,7 +309,8 @@ func (c *Container) MustInitApplication() {
 		telegramHandler,
 		c.Application.TelegramNotificationSvc = provideTelegramBot(
 		c.Config,
-		c.Repos.User,
+		c.Services.User, // User service (Clean Architecture)
+		c.Repos.User,    // Still needed for some components (onboarding)
 		c.Repos.Position,
 		c.Repos.ExchangeAccount,
 		c.Business.WorkflowFactory,
@@ -311,7 +318,9 @@ func (c *Container) MustInitApplication() {
 		c.Redis,
 		c.Adapters.Encryptor,
 		c.Adapters.ExchangeFactory,
+		c.Adapters.KafkaProducer,
 		c.Adapters.TelegramNotificationConsumer,
+		c.Services.Exchange, // Exchange service (Clean Architecture)
 		c.Log,
 	)
 
@@ -659,6 +668,7 @@ func provideHTTPServer(
 
 func provideTelegramBot(
 	cfg *config.Config,
+	userService *user.Service,
 	userRepo user.Repository,
 	positionRepo position.Repository,
 	exchAcctRepo exchange_account.Repository,
@@ -667,7 +677,9 @@ func provideTelegramBot(
 	redisClient *redisclient.Client,
 	encryptor *crypto.Encryptor,
 	exchFactory exchanges.Factory,
+	kafkaProducer *kafka.Producer,
 	notificationConsumer *kafka.Consumer,
+	exchangeService *exchange.Service,
 	log *logger.Logger,
 ) (*telegram.Bot, *telegram.Handler, *consumers.TelegramNotificationConsumer) {
 	log.Info("Initializing Telegram bot...")
@@ -705,30 +717,22 @@ func provideTelegramBot(
 		log,
 	)
 
-	// Create notification publisher for Telegram notifications
-	notificationPublisher := events.NewNotificationPublisher(kafkaProducer)
-
-	// Create exchange business service (reusable for web/API/telegram)
-	exchangeService := exchange.NewService(
-		exchAcctRepo,
-		encryptor,
-		notificationPublisher,
-		log,
-	)
-
 	// Create Telegram UI adapter (wraps business service)
 	exchangeSetupService := telegram.NewExchangeSetupService(
 		redisClient.Client(),
 		bot,
-		exchangeService, // Inject business service
+		exchangeService, // Injected from container
 		exchFactory,
 		templates.Get(),
+		cfg.MarketData.Binance.UseTestnet, // Binance testnet flag
+		cfg.MarketData.Bybit.UseTestnet,   // Bybit testnet flag
+		cfg.MarketData.OKX.UseTestnet,     // OKX testnet flag
 		log,
 	)
 
 	queryHandler := telegram.NewQueryCommandHandler(
 		positionRepo,
-		userRepo,
+		userService, // Use service instead of repository (Clean Architecture)
 		templates.Get(),
 		bot,
 		log,
@@ -736,7 +740,7 @@ func provideTelegramBot(
 
 	controlHandler := telegram.NewControlCommandHandler(
 		positionRepo,
-		userRepo,
+		userService, // Use service instead of repository (Clean Architecture)
 		templates.Get(),
 		bot,
 		log,
@@ -744,7 +748,7 @@ func provideTelegramBot(
 
 	handler := telegram.NewHandler(telegram.HandlerDeps{
 		Bot:              bot,
-		UserRepo:         userRepo,
+		UserService:      userService,
 		OnboardingMgr:    onboardingService,
 		StatusHandler:    queryHandler,
 		PortfolioHandler: queryHandler,

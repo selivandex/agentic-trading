@@ -34,7 +34,7 @@ func (wp *WebSocketPublisher) PublishKline(
 	isFinal bool,
 ) error {
 	event := &eventspb.WebSocketKlineEvent{
-		Base:        NewBaseEvent(TopicWebSocketKline, "websocket_"+exchange, ""),
+		Base:        NewBaseEvent("websocket.kline", "websocket_"+exchange, ""),
 		Exchange:    exchange,
 		Symbol:      symbol,
 		MarketType:  marketType,
@@ -52,7 +52,14 @@ func (wp *WebSocketPublisher) PublishKline(
 		EventTime:   timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketKline, symbol, event)
+	// Wrap in envelope for efficient type detection by consumer
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_Kline{
+			Kline: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // PublishTicker publishes a 24hr ticker statistics event from WebSocket
@@ -66,7 +73,7 @@ func (wp *WebSocketPublisher) PublishTicker(
 	firstTradeID, lastTradeID, tradeCount int64,
 ) error {
 	event := &eventspb.WebSocketTickerEvent{
-		Base:               NewBaseEvent(TopicWebSocketTicker, "websocket_"+exchange, ""),
+		Base:               NewBaseEvent("websocket.ticker", "websocket_"+exchange, ""),
 		Exchange:           exchange,
 		Symbol:             symbol,
 		MarketType:         marketType,
@@ -88,7 +95,13 @@ func (wp *WebSocketPublisher) PublishTicker(
 		EventTime:          timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketTicker, symbol, event)
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_Ticker{
+			Ticker: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // PublishDepth publishes an order book depth event from WebSocket
@@ -117,7 +130,7 @@ func (wp *WebSocketPublisher) PublishDepth(
 	}
 
 	event := &eventspb.WebSocketDepthEvent{
-		Base:         NewBaseEvent(TopicWebSocketDepth, "websocket_"+exchange, ""),
+		Base:         NewBaseEvent("websocket.depth", "websocket_"+exchange, ""),
 		Exchange:     exchange,
 		Symbol:       symbol,
 		MarketType:   marketType,
@@ -127,7 +140,13 @@ func (wp *WebSocketPublisher) PublishDepth(
 		EventTime:    timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketDepth, symbol, event)
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_Depth{
+			Depth: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // PriceLevel represents a price level for order book
@@ -147,7 +166,7 @@ func (wp *WebSocketPublisher) PublishTrade(
 	isBuyerMaker bool,
 ) error {
 	event := &eventspb.WebSocketTradeEvent{
-		Base:          NewBaseEvent(TopicWebSocketTrade, "websocket_"+exchange, ""),
+		Base:          NewBaseEvent("websocket.trade", "websocket_"+exchange, ""),
 		Exchange:      exchange,
 		Symbol:        symbol,
 		MarketType:    marketType,
@@ -161,7 +180,13 @@ func (wp *WebSocketPublisher) PublishTrade(
 		EventTime:     timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketTrade, symbol, event)
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_Trade{
+			Trade: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // PublishFundingRate publishes a funding rate event from WebSocket
@@ -172,7 +197,7 @@ func (wp *WebSocketPublisher) PublishFundingRate(
 	fundingTime, nextFundingTime, eventTime time.Time,
 ) error {
 	event := &eventspb.WebSocketFundingRateEvent{
-		Base:            NewBaseEvent(TopicWebSocketFundingRate, "websocket_"+exchange, ""),
+		Base:            NewBaseEvent("websocket.funding_rate", "websocket_"+exchange, ""),
 		Exchange:        exchange,
 		Symbol:          symbol,
 		FundingRate:     fundingRate,
@@ -181,7 +206,13 @@ func (wp *WebSocketPublisher) PublishFundingRate(
 		EventTime:       timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketFundingRate, symbol, event)
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_FundingRate{
+			FundingRate: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // PublishMarkPrice publishes a mark price event from WebSocket
@@ -192,7 +223,7 @@ func (wp *WebSocketPublisher) PublishMarkPrice(
 	nextFundingTime, eventTime time.Time,
 ) error {
 	event := &eventspb.WebSocketMarkPriceEvent{
-		Base:                 NewBaseEvent(TopicWebSocketMarkPrice, "websocket_"+exchange, ""),
+		Base:                 NewBaseEvent("websocket.mark_price", "websocket_"+exchange, ""),
 		Exchange:             exchange,
 		Symbol:               symbol,
 		MarkPrice:            markPrice,
@@ -203,7 +234,13 @@ func (wp *WebSocketPublisher) PublishMarkPrice(
 		EventTime:            timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketMarkPrice, symbol, event)
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_MarkPrice{
+			MarkPrice: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // PublishLiquidation publishes a liquidation event from WebSocket (futures only)
@@ -214,7 +251,7 @@ func (wp *WebSocketPublisher) PublishLiquidation(
 	eventTime time.Time,
 ) error {
 	event := &eventspb.WebSocketLiquidationEvent{
-		Base:       NewBaseEvent(TopicWebSocketLiquidation, "websocket_"+exchange, ""),
+		Base:       NewBaseEvent("websocket.liquidation", "websocket_"+exchange, ""),
 		Exchange:   exchange,
 		Symbol:     symbol,
 		MarketType: marketType,
@@ -226,7 +263,13 @@ func (wp *WebSocketPublisher) PublishLiquidation(
 		EventTime:  timestamppb.New(eventTime),
 	}
 
-	return wp.publishProto(ctx, TopicWebSocketLiquidation, symbol, event)
+	wrapper := &eventspb.WebSocketEventWrapper{
+		Event: &eventspb.WebSocketEventWrapper_Liquidation{
+			Liquidation: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
 // Shutdown sets the stopping flag to prevent new publications
