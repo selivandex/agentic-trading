@@ -11,12 +11,12 @@ import (
 // KafkaUserDataHandler implements UserDataEventHandler and publishes events to Kafka
 // This is the bridge between WebSocket events and Kafka event pipeline
 type KafkaUserDataHandler struct {
-	publisher *events.UserDataPublisher
+	publisher *events.WebSocketPublisher
 	logger    *logger.Logger
 }
 
 // NewKafkaUserDataHandler creates a new Kafka event handler for User Data WebSocket
-func NewKafkaUserDataHandler(publisher *events.UserDataPublisher, log *logger.Logger) *KafkaUserDataHandler {
+func NewKafkaUserDataHandler(publisher *events.WebSocketPublisher, log *logger.Logger) *KafkaUserDataHandler {
 	return &KafkaUserDataHandler{
 		publisher: publisher,
 		logger:    log,
@@ -31,8 +31,8 @@ func (h *KafkaUserDataHandler) OnOrderUpdate(ctx context.Context, event *OrderUp
 
 	err := h.publisher.PublishOrderUpdate(
 		ctx,
-		event.UserID,
-		event.AccountID,
+		event.UserID.String(),
+		event.AccountID.String(),
 		event.Exchange,
 		event.OrderID,
 		event.ClientOrderID,
@@ -74,8 +74,8 @@ func (h *KafkaUserDataHandler) OnPositionUpdate(ctx context.Context, event *Posi
 
 	err := h.publisher.PublishPositionUpdate(
 		ctx,
-		event.UserID,
-		event.AccountID,
+		event.UserID.String(),
+		event.AccountID.String(),
 		event.Exchange,
 		event.Symbol,
 		event.Side,
@@ -108,8 +108,8 @@ func (h *KafkaUserDataHandler) OnBalanceUpdate(ctx context.Context, event *Balan
 
 	err := h.publisher.PublishBalanceUpdate(
 		ctx,
-		event.UserID,
-		event.AccountID,
+		event.UserID.String(),
+		event.AccountID.String(),
 		event.Exchange,
 		event.Asset,
 		event.WalletBalance,
@@ -153,8 +153,8 @@ func (h *KafkaUserDataHandler) OnMarginCall(ctx context.Context, event *MarginCa
 
 	err := h.publisher.PublishMarginCall(
 		ctx,
-		event.UserID,
-		event.AccountID,
+		event.UserID.String(),
+		event.AccountID.String(),
 		event.Exchange,
 		event.CrossWalletBalance,
 		positionsAtRisk,
@@ -188,8 +188,8 @@ func (h *KafkaUserDataHandler) OnAccountConfigUpdate(ctx context.Context, event 
 
 	err := h.publisher.PublishAccountConfigUpdate(
 		ctx,
-		event.UserID,
-		event.AccountID,
+		event.UserID.String(),
+		event.AccountID.String(),
 		event.Exchange,
 		event.Symbol,
 		event.Leverage,

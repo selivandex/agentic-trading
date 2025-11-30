@@ -28,8 +28,8 @@ import (
 // runs personalized trading decisions for each interested user
 type OpportunityConsumer struct {
 	consumer        *kafkaadapter.Consumer
-	userRepo        user.Repository
 	tradingPairRepo trading_pair.Repository
+	userService     *user.Service
 	workflowFactory *workflows.Factory
 	sessionService  session.Service
 	maxConcurrency  int
@@ -39,8 +39,8 @@ type OpportunityConsumer struct {
 // NewOpportunityConsumer creates a new opportunity event consumer
 func NewOpportunityConsumer(
 	consumer *kafkaadapter.Consumer,
-	userRepo user.Repository,
 	tradingPairRepo trading_pair.Repository,
+	userService *user.Service,
 	workflowFactory *workflows.Factory,
 	sessionService session.Service,
 	maxConcurrency int,
@@ -52,8 +52,8 @@ func NewOpportunityConsumer(
 
 	return &OpportunityConsumer{
 		consumer:        consumer,
-		userRepo:        userRepo,
 		tradingPairRepo: tradingPairRepo,
+		userService:     userService,
 		workflowFactory: workflowFactory,
 		sessionService:  sessionService,
 		maxConcurrency:  maxConcurrency,
@@ -130,20 +130,21 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		"entry", event.Entry,
 	)
 
-	// Find all users monitoring this symbol
+	// Get trading pairs monitoring this symbol via repository
+	// Note: Using repository here as domain service doesn't provide GetActiveBySymbol
 	pairs, err := oc.tradingPairRepo.GetActiveBySymbol(ctx, event.Symbol)
 	if err != nil {
 		return errors.Wrap(err, "get trading pairs for symbol")
 	}
 
 	if len(pairs) == 0 {
-		oc.log.Debug("No users monitoring this symbol", "symbol", event.Symbol)
+		oc.log.Debugw("No trading pairs monitoring this symbol", "symbol", event.Symbol)
 		return nil
 	}
 
-	oc.log.Infow("Found users interested in opportunity",
+	oc.log.Infow("Found trading pairs interested in opportunity",
 		"symbol", event.Symbol,
-		"users_count", len(pairs),
+		"pairs_count", len(pairs),
 	)
 
 	// Run personal trading workflow for each interested user (concurrent with limit)
@@ -169,7 +170,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		// Check if shutdown was requested before starting new workflow
 		select {
 		case <-shutdownCh:
-			oc.log.Warn("Shutdown requested, skipping remaining workflows",
+			oc.log.Warnw("Shutdown requested, skipping remaining workflows",
 				"symbol", event.Symbol,
 				"remaining_users", len(pairs),
 			)
@@ -178,15 +179,20 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		default:
 		}
 
-		// Get user
-		usr, err := oc.userRepo.GetByID(ctx, pair.UserID)
+		// Get user using UserService (Clean Architecture)
+		usr, err := oc.userService.GetByID(ctx, pair.UserID)
 		if err != nil {
-			oc.log.Error("Failed to get user", "user_id", pair.UserID, "error", err)
+			oc.log.Errorw("Failed to get user", "user_id", pair.UserID, "error", err)
 			continue
 		}
 
 		// Skip inactive users or users with circuit breaker off
 		if !usr.IsActive || !usr.Settings.CircuitBreakerOn {
+			oc.log.Debugw("Skipping user (inactive or circuit breaker off)",
+				"user_id", usr.ID,
+				"is_active", usr.IsActive,
+				"circuit_breaker_on", usr.Settings.CircuitBreakerOn,
+			)
 			continue
 		}
 
@@ -199,7 +205,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 			case semaphore <- struct{}{}:
 				defer func() { <-semaphore }()
 			case <-workflowCtx.Done():
-				oc.log.Warn("Workflow cancelled before starting (context done)",
+				oc.log.Warnw("Workflow cancelled before starting (context done)",
 					"user_id", u.ID,
 					"symbol", p.Symbol,
 				)
@@ -207,7 +213,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 			}
 
 			if err := oc.runPersonalTradingWorkflow(workflowCtx, u, p, &event); err != nil {
-				oc.log.Error("Personal trading workflow failed",
+				oc.log.Errorw("Personal trading workflow failed",
 					"user_id", u.ID,
 					"symbol", p.Symbol,
 					"error", err,

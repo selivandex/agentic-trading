@@ -22,6 +22,7 @@ import (
 	"prometheus/internal/domain/derivatives"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/journal"
+	"prometheus/internal/domain/limit_profile"
 	"prometheus/internal/domain/macro"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
@@ -37,7 +38,10 @@ import (
 	"prometheus/internal/events"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
+	aiusagesvc "prometheus/internal/services/ai_usage"
 	exchangeservice "prometheus/internal/services/exchange"
+	limitsservice "prometheus/internal/services/limits"
+	marketdatasvc "prometheus/internal/services/market_data"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
@@ -98,6 +102,7 @@ type Repositories struct {
 	Risk            domainRisk.Repository
 	Session         domainsession.Repository
 	Reasoning       *pgrepo.ReasoningRepository
+	LimitProfile    limit_profile.Repository // User tier/subscription limits
 	MarketData      market_data.Repository
 	Regime          regime.Repository
 	Sentiment       sentiment.Repository
@@ -109,17 +114,21 @@ type Repositories struct {
 
 // Services groups all domain services
 type Services struct {
-	User               *user.Service
-	ExchangeAccount    *exchange_account.Service
-	Exchange           *exchangeservice.Service // Exchange account management service
-	TradingPair        *trading_pair.Service
-	Order              *order.Service
-	Position           *position.Service
-	PositionManagement *positionservice.Service // Position management service for WebSocket updates
-	Memory             *memory.Service
-	Journal            *journal.Service
-	Session            *domainsession.Service
-	ADKSession         session.Service // ADK interface
+	// Domain services (Clean Architecture: Service Layer)
+	User               *user.Service             // User business logic
+	ExchangeAccount    *exchange_account.Service // Exchange account domain service
+	Exchange           *exchangeservice.Service  // Exchange account management service
+	TradingPair        *trading_pair.Service     // Trading pair business logic
+	Order              *order.Service            // Order domain service
+	Position           *position.Service         // Position domain service
+	PositionManagement *positionservice.Service  // Position management service for WebSocket updates
+	Memory             *memory.Service           // Memory domain service
+	Journal            *journal.Service          // Journal domain service
+	Session            *domainsession.Service    // Session domain service
+	ADKSession         session.Service           // ADK interface
+	Limits             *limitsservice.Service    // Limit validation service (tiers, quotas)
+	MarketData         *marketdatasvc.Service    // Market data service (abstraction over ClickHouse)
+	AIUsage            *aiusagesvc.Service       // AI usage tracking service (abstraction over batch writer)
 }
 
 // Adapters groups all external adapters
@@ -134,11 +143,8 @@ type Adapters struct {
 	PositionGuardianConsumer     *kafka.Consumer
 	TelegramNotificationConsumer *kafka.Consumer
 
-	// WebSocket consumer (unified for all stream types)
+	// WebSocket consumer (unified for ALL WebSocket events: market data + user data)
 	WebSocketConsumer *kafka.Consumer
-
-	// User Data WebSocket consumer (unified for all user data events)
-	UserDataEventsConsumer *kafka.Consumer
 
 	// Crypto & Exchanges
 	Encryptor         *crypto.Encryptor
@@ -282,7 +288,8 @@ func (c *Container) startConsumers() error {
 		name string
 		svc  interface{ Start(context.Context) error }
 	}{
-		{"notification", c.Background.NotificationSvc},
+		// NOTE: Old "notification" consumer removed - replaced with "telegram_notifications"
+		// to avoid two consumers competing for same messages on notifications topic
 		{"risk", c.Background.RiskSvc},
 		{"analytics", c.Background.AnalyticsSvc},
 		{"opportunity", c.Background.OpportunitySvc},
@@ -293,7 +300,7 @@ func (c *Container) startConsumers() error {
 	}
 
 	// Add unified WebSocket consumer (handles all stream types)
-	consumerNames := []string{"notification", "risk", "analytics", "opportunity", "ai_usage", "position_guardian", "telegram_bot", "telegram_notifications"}
+	consumerNames := []string{"risk", "analytics", "opportunity", "ai_usage", "position_guardian", "telegram_bot", "telegram_notifications"}
 
 	if c.Background.WebSocketSvc != nil {
 		consumers = append(consumers, struct {

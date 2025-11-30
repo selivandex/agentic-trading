@@ -35,14 +35,14 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 	query := `
 		INSERT INTO users (
 			id, telegram_id, telegram_username, first_name, last_name,
-			language_code, is_active, is_premium, settings, created_at, updated_at
+			language_code, is_active, is_premium, limit_profile_id, settings, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 		)`
 
 	_, err = r.db.ExecContext(ctx, query,
 		u.ID, u.TelegramID, u.TelegramUsername, u.FirstName, u.LastName,
-		u.LanguageCode, u.IsActive, u.IsPremium, settingsJSON, u.CreatedAt, u.UpdatedAt,
+		u.LanguageCode, u.IsActive, u.IsPremium, u.LimitProfileID, settingsJSON, u.CreatedAt, u.UpdatedAt,
 	)
 
 	return err
@@ -53,12 +53,16 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User,
 	var u user.User
 	var settingsJSON []byte
 
-	query := `SELECT * FROM users WHERE id = $1`
+	query := `
+		SELECT id, telegram_id, telegram_username, first_name, last_name,
+			   language_code, is_active, is_premium, limit_profile_id, settings, created_at, updated_at
+		FROM users 
+		WHERE id = $1`
 
 	row := r.db.QueryRowContext(ctx, query, id)
 	err := row.Scan(
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.FirstName, &u.LastName,
-		&u.LanguageCode, &u.IsActive, &u.IsPremium, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
+		&u.LanguageCode, &u.IsActive, &u.IsPremium, &u.LimitProfileID, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -81,12 +85,16 @@ func (r *UserRepository) GetByTelegramID(ctx context.Context, telegramID int64) 
 	var u user.User
 	var settingsJSON []byte
 
-	query := `SELECT * FROM users WHERE telegram_id = $1`
+	query := `
+		SELECT id, telegram_id, telegram_username, first_name, last_name,
+			   language_code, is_active, is_premium, limit_profile_id, settings, created_at, updated_at
+		FROM users 
+		WHERE telegram_id = $1`
 
 	row := r.db.QueryRowContext(ctx, query, telegramID)
 	err := row.Scan(
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.FirstName, &u.LastName,
-		&u.LanguageCode, &u.IsActive, &u.IsPremium, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
+		&u.LanguageCode, &u.IsActive, &u.IsPremium, &u.LimitProfileID, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -120,13 +128,14 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 			language_code = $5,
 			is_active = $6,
 			is_premium = $7,
-			settings = $8,
+			limit_profile_id = $8,
+			settings = $9,
 			updated_at = NOW()
 		WHERE id = $1`
 
 	_, err = r.db.ExecContext(ctx, query,
 		u.ID, u.TelegramUsername, u.FirstName, u.LastName,
-		u.LanguageCode, u.IsActive, u.IsPremium, settingsJSON,
+		u.LanguageCode, u.IsActive, u.IsPremium, u.LimitProfileID, settingsJSON,
 	)
 
 	return err
@@ -145,7 +154,7 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.U
 
 	query := `
 		SELECT id, telegram_id, telegram_username, first_name, last_name,
-			   language_code, is_active, is_premium, settings, created_at, updated_at
+			   language_code, is_active, is_premium, limit_profile_id, settings, created_at, updated_at
 		FROM users 
 		ORDER BY created_at DESC 
 		LIMIT $1 OFFSET $2`
@@ -162,7 +171,7 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.U
 
 		err := rows.Scan(
 			&u.ID, &u.TelegramID, &u.TelegramUsername, &u.FirstName, &u.LastName,
-			&u.LanguageCode, &u.IsActive, &u.IsPremium, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
+			&u.LanguageCode, &u.IsActive, &u.IsPremium, &u.LimitProfileID, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err

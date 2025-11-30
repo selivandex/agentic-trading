@@ -10,7 +10,7 @@ import (
 	kafkaadapter "prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/ai_usage"
 	eventspb "prometheus/internal/events/proto"
-	chrepo "prometheus/internal/repository/clickhouse"
+	aiusagesvc "prometheus/internal/services/ai_usage"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
@@ -18,21 +18,21 @@ import (
 // AIUsageConsumer reads AI usage events from Kafka and writes to ClickHouse in batches
 // This decouples the main app from ClickHouse and provides reliable delivery
 type AIUsageConsumer struct {
-	consumer    *kafkaadapter.Consumer
-	aiUsageRepo *chrepo.AIUsageRepository
-	log         *logger.Logger
+	consumer       *kafkaadapter.Consumer
+	aiUsageService *aiusagesvc.Service
+	log            *logger.Logger
 }
 
 // NewAIUsageConsumer creates a new AI usage consumer
 func NewAIUsageConsumer(
 	consumer *kafkaadapter.Consumer,
-	aiUsageRepo *chrepo.AIUsageRepository,
+	aiUsageService *aiusagesvc.Service,
 	log *logger.Logger,
 ) *AIUsageConsumer {
 	return &AIUsageConsumer{
-		consumer:    consumer,
-		aiUsageRepo: aiUsageRepo,
-		log:         log,
+		consumer:       consumer,
+		aiUsageService: aiUsageService,
+		log:            log,
 	}
 }
 
@@ -40,14 +40,14 @@ func NewAIUsageConsumer(
 func (c *AIUsageConsumer) Start(ctx context.Context) error {
 	c.log.Info("Starting AI usage consumer (writes to ClickHouse in batches)...")
 
-	// Start batch writer background loop
-	c.aiUsageRepo.Start(ctx)
+	// Start batch writer background loop via service
+	c.aiUsageService.Start(ctx)
 
 	// Ensure consumer is closed on exit
 	defer func() {
 		c.log.Info("Closing AI usage consumer...")
 		if err := c.consumer.Close(); err != nil {
-			c.log.Error("Failed to close AI usage consumer", "error", err)
+			c.log.Errorw("Failed to close AI usage consumer", "error", err)
 		} else {
 			c.log.Info("✓ AI usage consumer closed")
 		}
@@ -58,8 +58,8 @@ func (c *AIUsageConsumer) Start(ctx context.Context) error {
 		c.log.Info("Stopping AI usage batch writer...")
 		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := c.aiUsageRepo.Stop(stopCtx); err != nil {
-			c.log.Error("Failed to stop AI usage batch writer", "error", err)
+		if err := c.aiUsageService.Stop(stopCtx); err != nil {
+			c.log.Errorw("Failed to stop AI usage batch writer", "error", err)
 		} else {
 			c.log.Info("✓ AI usage batch writer stopped")
 		}
@@ -75,7 +75,7 @@ func (c *AIUsageConsumer) Start(ctx context.Context) error {
 				return nil
 			}
 			// Reader might be closed during shutdown
-			c.log.Debug("Failed to read AI usage event", "error", err)
+			c.log.Debugw("Failed to read AI usage event", "error", err)
 			continue
 		}
 
@@ -137,8 +137,8 @@ func (c *AIUsageConsumer) handleUsageEvent(ctx context.Context, msg kafka.Messag
 		CreatedAt:        time.Now(),
 	}
 
-	// Add to batch writer (buffered, will flush when batch is full or timeout)
-	if err := c.aiUsageRepo.Store(ctx, usageLog); err != nil {
+	// Store via service (Clean Architecture: Consumer → Service → Repository)
+	if err := c.aiUsageService.Store(ctx, usageLog); err != nil {
 		return errors.Wrap(err, "failed to store AI usage log")
 	}
 

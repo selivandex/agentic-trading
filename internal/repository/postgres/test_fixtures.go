@@ -369,3 +369,66 @@ func WithMemoryType(memType string) func(*MemoryFixture) {
 		f.Type = memType
 	}
 }
+
+// CreateLimitProfile creates a test limit profile in the database
+func (f *TestFixtures) CreateLimitProfile(opts ...func(*LimitProfileFixture)) uuid.UUID {
+	f.t.Helper()
+
+	fixture := &LimitProfileFixture{
+		Name:        fmt.Sprintf("test_profile_%d", rand.Intn(999999)),
+		Description: "Test limit profile",
+		IsActive:    true,
+		Limits: `{
+			"exchanges_count": 2,
+			"active_positions": 5,
+			"daily_trades_count": 10,
+			"monthly_trades_count": 100
+		}`,
+	}
+
+	for _, opt := range opts {
+		opt(fixture)
+	}
+
+	id := uuid.New()
+	query := `INSERT INTO limit_profiles (
+		id, name, description, limits, is_active, created_at, updated_at
+	) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`
+
+	_, err := f.db.Exec(query, id, fixture.Name, fixture.Description, fixture.Limits, fixture.IsActive)
+	require.NoError(f.t, err, "Failed to create test limit profile")
+
+	return id
+}
+
+// LimitProfileFixture holds limit profile configuration
+type LimitProfileFixture struct {
+	Name        string
+	Description string
+	Limits      string // JSON string
+	IsActive    bool
+}
+
+func WithLimitProfileName(name string) func(*LimitProfileFixture) {
+	return func(f *LimitProfileFixture) {
+		f.Name = name
+	}
+}
+
+func WithLimitProfileDescription(desc string) func(*LimitProfileFixture) {
+	return func(f *LimitProfileFixture) {
+		f.Description = desc
+	}
+}
+
+func WithLimitProfileLimits(limits string) func(*LimitProfileFixture) {
+	return func(f *LimitProfileFixture) {
+		f.Limits = limits
+	}
+}
+
+func WithLimitProfileActive(active bool) func(*LimitProfileFixture) {
+	return func(f *LimitProfileFixture) {
+		f.IsActive = active
+	}
+}

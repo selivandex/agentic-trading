@@ -91,8 +91,8 @@ type ControlHandler interface {
 type ExchangeHandler interface {
 	HandleAddExchange(ctx context.Context, chatID int64, telegramID int64, userID uuid.UUID) error
 	HandleUpdateExchange(ctx context.Context, chatID int64, telegramID int64, userID uuid.UUID) error
-	HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) error
-	HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, data string) error
+	HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, text string) error
+	HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, data string) error
 	IsInSetup(ctx context.Context, telegramID int64) (bool, error)
 }
 
@@ -162,7 +162,7 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) erro
 			h.log.Errorw("Failed to check exchange setup status", "error", err)
 		} else if inSetup {
 			// Route to exchange handler (handles both setup and management)
-			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, text)
+			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, msg.MessageID, text)
 		}
 	}
 
@@ -407,8 +407,9 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 			h.log.Debugw("Routing to exchange handler (management callback)",
 				"telegram_id", telegramID,
 				"callback_data", data,
+				"message_id", callback.Message.MessageID,
 			)
-			return h.exchangeHandler.HandleCallback(ctx, usr.ID, telegramID, data)
+			return h.exchangeHandler.HandleCallback(ctx, usr.ID, telegramID, callback.Message.MessageID, data)
 		}
 		h.log.Warnw("Exchange handler not available",
 			"telegram_id", telegramID,
@@ -422,7 +423,8 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 				"telegram_id", telegramID,
 				"exchange_type", exchangeType,
 			)
-			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, exchangeType)
+			// For callback queries, messageID is 0 (no user message to delete)
+			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, 0, exchangeType)
 		}
 		h.log.Warnw("Exchange handler not available or invalid callback data",
 			"telegram_id", telegramID,

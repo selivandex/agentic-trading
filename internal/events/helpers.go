@@ -48,11 +48,10 @@ const (
 	// Notification events - user-facing notifications (Telegram, email)
 	TopicNotifications = "notifications"
 
-	// WebSocket events - real-time market data (kline, ticker, depth, trades, liquidations)
+	// WebSocket events - ALL real-time WebSocket events (market data + user data)
+	// Market data: kline, ticker, depth, trades, liquidations, mark price, funding rate
+	// User data: orders, positions, balance, margin calls, account config
 	TopicWebSocketEvents = "websocket.events"
-
-	// User Data events - real-time order, position, balance, margin updates from exchange WebSocket
-	TopicUserDataEvents = "user-data.events"
 
 	// Analytics events - metrics, statistics, performance, reports
 	TopicAnalytics = "analytics"

@@ -51,8 +51,9 @@ type ExchangeSetupSession struct {
 	APIKey            string             `json:"api_key"`
 	Secret            string             `json:"secret"`
 	Label             string             `json:"label"`
-	IsTestnet         bool               `json:"is_testnet"` // Use testnet mode
-	IsUpdate          bool               `json:"is_update"`  // True if updating existing account
+	IsTestnet         bool               `json:"is_testnet"`  // Use testnet mode
+	IsUpdate          bool               `json:"is_update"`   // True if updating existing account
+	LastMessageID     int                `json:"last_msg_id"` // Last bot message ID (for cleanup)
 	StartedAt         time.Time          `json:"started_at"`
 	LastInteractionAt time.Time          `json:"last_interaction_at"`
 }
@@ -69,6 +70,31 @@ type ExchangeSetupService struct {
 	bybitTestnet   bool // Use Bybit testnet for user accounts
 	okxTestnet     bool // Use OKX testnet for user accounts
 	log            *logger.Logger
+}
+
+// escapeMarkdown escapes special Markdown characters to prevent parsing errors
+func escapeMarkdown(text string) string {
+	replacer := strings.NewReplacer(
+		"_", "\\_",
+		"*", "\\*",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"~", "\\~",
+		"`", "\\`",
+		">", "\\>",
+		"#", "\\#",
+		"+", "\\+",
+		"-", "\\-",
+		"=", "\\=",
+		"|", "\\|",
+		"{", "\\{",
+		"}", "\\}",
+		".", "\\.",
+		"!", "\\!",
+	)
+	return replacer.Replace(text)
 }
 
 // NewExchangeSetupService creates a new exchange setup service
@@ -135,10 +161,11 @@ func (es *ExchangeSetupService) HandleAddExchange(ctx context.Context, chatID in
 }
 
 // HandleMessage processes a message during exchange setup flow
-func (es *ExchangeSetupService) HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) error {
+func (es *ExchangeSetupService) HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, text string) error {
 	es.log.Debugw("Processing exchange setup message",
 		"telegram_id", telegramID,
 		"user_id", userID,
+		"message_id", messageID,
 		"text_length", len(text),
 	)
 
@@ -164,10 +191,10 @@ func (es *ExchangeSetupService) HandleMessage(ctx context.Context, userID uuid.U
 		return es.handleExchangeSelection(ctx, session, text)
 
 	case ExchangeStateAwaitingAPIKey, ExchangeStateUpdateAPIKey:
-		return es.handleAPIKeyInput(ctx, session, text, telegramID)
+		return es.handleAPIKeyInput(ctx, session, text, messageID)
 
 	case ExchangeStateAwaitingSecret, ExchangeStateUpdateSecret:
-		return es.handleSecretInput(ctx, session, text, telegramID)
+		return es.handleSecretInput(ctx, session, text, messageID)
 
 	case ExchangeStateAwaitingLabel:
 		return es.handleLabelInput(ctx, session, text)
@@ -279,11 +306,11 @@ func (es *ExchangeSetupService) handleExchangeSelection(ctx context.Context, ses
 		return errors.Wrap(err, "failed to render exchange_api_key_prompt template")
 	}
 
-	return es.bot.SendMessage(session.TelegramID, msg)
+	return es.sendMessageAndCleanup(ctx, session, msg)
 }
 
 // handleAPIKeyInput processes API key input (for both create and update flows)
-func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *ExchangeSetupSession, text string, messageID int64) error {
+func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *ExchangeSetupSession, text string, messageID int) error {
 	isUpdate := session.State == ExchangeStateUpdateAPIKey
 
 	es.log.Debugw("Processing API key input",
@@ -291,10 +318,14 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 		"user_id", session.UserID,
 		"exchange", session.SelectedExchange,
 		"key_length", len(text),
+		"message_id", messageID,
 		"is_update_flow", isUpdate,
 	)
 
 	apiKey := strings.TrimSpace(text)
+
+	// Delete user's message with API key immediately for security
+	es.bot.DeleteMessageAsync(session.TelegramID, messageID, "sensitive: API key")
 
 	if len(apiKey) < 16 {
 		es.log.Debugw("API key validation failed: too short",
@@ -305,7 +336,7 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 		if err != nil {
 			return errors.Wrap(err, "failed to render exchange_api_key_invalid template")
 		}
-		return es.bot.SendMessage(session.TelegramID, msg)
+		return es.sendMessageAndCleanup(ctx, session, msg)
 	}
 
 	es.log.Debugw("API key validated successfully",
@@ -342,11 +373,11 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 		return errors.Wrap(err, "failed to render exchange_secret_prompt template")
 	}
 
-	return es.bot.SendMessage(session.TelegramID, msg)
+	return es.sendMessageAndCleanup(ctx, session, msg)
 }
 
 // handleSecretInput processes API secret input (for both create and update flows)
-func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *ExchangeSetupSession, text string, messageID int64) error {
+func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *ExchangeSetupSession, text string, messageID int) error {
 	isUpdate := session.State == ExchangeStateUpdateSecret
 
 	es.log.Debugw("Processing API secret input",
@@ -354,10 +385,14 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 		"user_id", session.UserID,
 		"exchange", session.SelectedExchange,
 		"secret_length", len(text),
+		"message_id", messageID,
 		"is_update_flow", isUpdate,
 	)
 
 	secret := strings.TrimSpace(text)
+
+	// Delete user's message with API secret immediately for security
+	es.bot.DeleteMessageAsync(session.TelegramID, messageID, "sensitive: API secret")
 
 	if len(secret) < 16 {
 		es.log.Debugw("API secret validation failed: too short",
@@ -368,7 +403,7 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 		if err != nil {
 			return errors.Wrap(err, "failed to render exchange_secret_invalid template")
 		}
-		return es.bot.SendMessage(session.TelegramID, msg)
+		return es.sendMessageAndCleanup(ctx, session, msg)
 	}
 
 	es.log.Debugw("API secret validated successfully",
@@ -405,7 +440,7 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 		return errors.Wrap(err, "failed to render exchange_label_prompt template")
 	}
 
-	return es.bot.SendMessage(session.TelegramID, msg)
+	return es.sendMessageAndCleanup(ctx, session, msg)
 }
 
 // updateAccountCredentials updates API credentials via service
@@ -602,6 +637,49 @@ func (es *ExchangeSetupService) promptExchangeSelection(telegramID int64) error 
 	return nil
 }
 
+// sendMessageAndCleanup sends a new message and deletes the previous one from session
+func (es *ExchangeSetupService) sendMessageAndCleanup(ctx context.Context, session *ExchangeSetupSession, text string) error {
+	// Delete previous message if exists
+	if session.LastMessageID > 0 {
+		es.bot.DeleteMessageAsync(session.TelegramID, session.LastMessageID, "UI cleanup")
+	}
+
+	// Send new message
+	msg := tgbotapi.NewMessage(session.TelegramID, text)
+	msg.ParseMode = "Markdown"
+
+	sentMsg, err := es.bot.GetAPI().Send(msg)
+	if err != nil {
+		return errors.Wrap(err, "failed to send message")
+	}
+
+	// Save new message ID
+	session.LastMessageID = sentMsg.MessageID
+	return es.saveSession(ctx, session)
+}
+
+// sendMessageWithKeyboardAndCleanup sends a message with keyboard and deletes the previous one
+func (es *ExchangeSetupService) sendMessageWithKeyboardAndCleanup(ctx context.Context, session *ExchangeSetupSession, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	// Delete previous message if exists
+	if session.LastMessageID > 0 {
+		es.bot.DeleteMessageAsync(session.TelegramID, session.LastMessageID, "UI cleanup")
+	}
+
+	// Send new message with keyboard
+	msg := tgbotapi.NewMessage(session.TelegramID, text)
+	msg.ParseMode = "Markdown"
+	msg.ReplyMarkup = keyboard
+
+	sentMsg, err := es.bot.GetAPI().Send(msg)
+	if err != nil {
+		return errors.Wrap(err, "failed to send message with keyboard")
+	}
+
+	// Save new message ID
+	session.LastMessageID = sentMsg.MessageID
+	return es.saveSession(ctx, session)
+}
+
 // Redis session management
 
 func (es *ExchangeSetupService) getSessionKey(telegramID int64) string {
@@ -694,6 +772,13 @@ func (es *ExchangeSetupService) deleteSession(ctx context.Context, telegramID in
 		"redis_key", key,
 	)
 
+	// Get session to clean up last message
+	session, err := es.getSession(ctx, telegramID)
+	if err == nil && session.LastMessageID > 0 {
+		// Delete last UI message
+		es.bot.DeleteMessageAsync(telegramID, session.LastMessageID, "session cleanup")
+	}
+
 	if err := es.redis.Del(ctx, key).Err(); err != nil {
 		es.log.Errorw("Failed to delete exchange setup session from Redis",
 			"telegram_id", telegramID,
@@ -750,20 +835,24 @@ func (es *ExchangeSetupService) HandleUpdateExchange(ctx context.Context, chatID
 	}
 
 	// Show exchange selection keyboard
-	return es.showAccountList(chatID, accounts)
+	return es.showAccountList(ctx, session, accounts)
 }
 
 // HandleCallback processes callback queries from inline keyboards (for management flow)
-func (es *ExchangeSetupService) HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, data string) error {
+func (es *ExchangeSetupService) HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, data string) error {
 	es.log.Debugw("Processing exchange callback",
 		"telegram_id", telegramID,
 		"callback_data", data,
+		"message_id", messageID,
 	)
 
 	session, err := es.getSession(ctx, telegramID)
 	if err != nil {
 		return errors.Wrap(err, "no active exchange session")
 	}
+
+	// Update last message ID to the callback message (will be deleted when showing next screen)
+	session.LastMessageID = messageID
 
 	parts := strings.Split(data, ":")
 	if len(parts) < 2 {
@@ -797,8 +886,35 @@ func (es *ExchangeSetupService) HandleCallback(ctx context.Context, userID uuid.
 }
 
 // showAccountList displays list of user's exchange accounts with inline keyboard
-func (es *ExchangeSetupService) showAccountList(chatID int64, accounts []*exchange_account.ExchangeAccount) error {
-	msg := "📊 *Manage Exchange Accounts*\n\nSelect an exchange to update:"
+func (es *ExchangeSetupService) showAccountList(ctx context.Context, session *ExchangeSetupSession, accounts []*exchange_account.ExchangeAccount) error {
+	// Prepare data for template
+	type AccountInfo struct {
+		StatusEmoji string
+		Exchange    string
+		Label       string
+	}
+
+	accountsData := make([]AccountInfo, len(accounts))
+	for i, account := range accounts {
+		statusEmoji := "✅"
+		if !account.IsActive {
+			statusEmoji = "❌"
+		}
+		accountsData[i] = AccountInfo{
+			StatusEmoji: statusEmoji,
+			Exchange:    strings.Title(string(account.Exchange)),
+			Label:       account.Label,
+		}
+	}
+
+	data := map[string]interface{}{
+		"Accounts": accountsData,
+	}
+
+	msg, err := es.templates.Render("telegram/exchange_manage_list", data)
+	if err != nil {
+		return errors.Wrap(err, "failed to render exchange_manage_list template")
+	}
 
 	// Create keyboard with exchange accounts
 	var rows [][]tgbotapi.InlineKeyboardButton
@@ -808,6 +924,7 @@ func (es *ExchangeSetupService) showAccountList(chatID int64, accounts []*exchan
 			statusEmoji = "❌"
 		}
 
+		// Don't need to escape in button text - Telegram handles it
 		buttonText := fmt.Sprintf("%s %s - %s", statusEmoji, strings.Title(string(account.Exchange)), account.Label)
 		row := tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(buttonText, fmt.Sprintf("exch:%s", account.ID.String())),
@@ -821,7 +938,7 @@ func (es *ExchangeSetupService) showAccountList(chatID int64, accounts []*exchan
 	))
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	return es.bot.SendMessageWithKeyboard(chatID, msg, keyboard)
+	return es.sendMessageWithKeyboardAndCleanup(ctx, session, msg, keyboard)
 }
 
 // handleAccountSelected processes exchange account selection
@@ -854,27 +971,29 @@ func (es *ExchangeSetupService) handleAccountSelected(ctx context.Context, sessi
 	}
 
 	// Show action menu
-	return es.showActionMenu(session.TelegramID, account)
+	return es.showActionMenu(ctx, session, account)
 }
 
 // showActionMenu displays available actions for selected exchange
-func (es *ExchangeSetupService) showActionMenu(chatID int64, account *exchange_account.ExchangeAccount) error {
-	statusEmoji := "✅ Active"
+func (es *ExchangeSetupService) showActionMenu(ctx context.Context, session *ExchangeSetupSession, account *exchange_account.ExchangeAccount) error {
+	statusText := "✅ Active"
 	toggleAction := "deactivate"
 	if !account.IsActive {
-		statusEmoji = "❌ Inactive"
+		statusText = "❌ Inactive"
 		toggleAction = "activate"
 	}
 
-	msg := fmt.Sprintf("📊 *%s - %s*\n\n"+
-		"Status: %s\n"+
-		"Testnet: %v\n\n"+
-		"What would you like to do?",
-		strings.Title(string(account.Exchange)),
-		account.Label,
-		statusEmoji,
-		account.IsTestnet,
-	)
+	data := map[string]interface{}{
+		"Exchange":   strings.Title(string(account.Exchange)),
+		"Label":      account.Label,
+		"StatusText": statusText,
+		"IsTestnet":  account.IsTestnet,
+	}
+
+	msg, err := es.templates.Render("telegram/exchange_manage_actions", data)
+	if err != nil {
+		return errors.Wrap(err, "failed to render exchange_manage_actions template")
+	}
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -894,7 +1013,7 @@ func (es *ExchangeSetupService) showActionMenu(chatID int64, account *exchange_a
 		),
 	)
 
-	return es.bot.SendMessageWithKeyboard(chatID, msg, keyboard)
+	return es.sendMessageWithKeyboardAndCleanup(ctx, session, msg, keyboard)
 }
 
 // handleActionSelected processes selected action
@@ -909,14 +1028,12 @@ func (es *ExchangeSetupService) handleActionSelected(ctx context.Context, sessio
 	case "update_label":
 		session.State = ExchangeStateUpdateLabel
 		session.LastInteractionAt = time.Now()
-		es.saveSession(ctx, session)
-		return es.bot.SendMessage(session.TelegramID, "✏️ Please enter a new label:")
+		return es.sendMessageAndCleanup(ctx, session, "✏️ Please enter a new label:")
 
 	case "update_creds":
 		session.State = ExchangeStateUpdateAPIKey
 		session.LastInteractionAt = time.Now()
-		es.saveSession(ctx, session)
-		return es.bot.SendMessage(session.TelegramID, "🔑 Please enter your new API Key:")
+		return es.sendMessageAndCleanup(ctx, session, "🔑 Please enter your new API Key:")
 
 	case "activate", "deactivate":
 		return es.toggleAccountActive(ctx, session, action == "activate")
@@ -925,7 +1042,7 @@ func (es *ExchangeSetupService) handleActionSelected(ctx context.Context, sessio
 		session.State = ExchangeStateConfirmDelete
 		session.LastInteractionAt = time.Now()
 		es.saveSession(ctx, session)
-		return es.showDeleteConfirmation(session.TelegramID)
+		return es.showDeleteConfirmation(ctx, session)
 
 	case "back":
 		es.deleteSession(ctx, session.TelegramID)
@@ -962,9 +1079,11 @@ func (es *ExchangeSetupService) toggleAccountActive(ctx context.Context, session
 }
 
 // showDeleteConfirmation shows delete confirmation dialog
-func (es *ExchangeSetupService) showDeleteConfirmation(chatID int64) error {
-	msg := "⚠️ *Delete Exchange Account*\n\n" +
-		"Are you sure? This cannot be undone!"
+func (es *ExchangeSetupService) showDeleteConfirmation(ctx context.Context, session *ExchangeSetupSession) error {
+	msg, err := es.templates.Render("telegram/exchange_manage_delete_confirm", nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to render exchange_manage_delete_confirm template")
+	}
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -973,7 +1092,7 @@ func (es *ExchangeSetupService) showDeleteConfirmation(chatID int64) error {
 		),
 	)
 
-	return es.bot.SendMessageWithKeyboard(chatID, msg, keyboard)
+	return es.sendMessageWithKeyboardAndCleanup(ctx, session, msg, keyboard)
 }
 
 // handleDeleteConfirmation processes delete confirmation
@@ -1004,7 +1123,7 @@ func (es *ExchangeSetupService) handleDeleteConfirmation(ctx context.Context, se
 func (es *ExchangeSetupService) handleLabelUpdate(ctx context.Context, session *ExchangeSetupSession, text string) error {
 	newLabel := strings.TrimSpace(text)
 	if newLabel == "" {
-		return es.bot.SendMessage(session.TelegramID, "❌ Label cannot be empty. Please try again:")
+		return es.sendMessageAndCleanup(ctx, session, "❌ Label cannot be empty. Please try again:")
 	}
 
 	es.log.Debugw("Updating account label",

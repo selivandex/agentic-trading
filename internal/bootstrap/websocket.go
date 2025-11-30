@@ -127,21 +127,22 @@ func (c *Container) MustInitWebSocketClients() {
 
 	// Create unified WebSocket consumer (handles market data + user data events)
 	c.Log.Infow("Creating unified WebSocket consumer",
-		"topics", []string{events.TopicWebSocketEvents, events.TopicUserDataEvents},
+		"topic", events.TopicWebSocketEvents,
 		"market_data_types", []string{"kline", "ticker", "depth", "trade", "mark_price", "liquidation"},
-		"user_data_types", []string{"order", "position", "balance", "margin_call"},
+		"user_data_types", []string{"order", "position", "balance", "margin_call", "account_config"},
 		"group_id", c.Config.Kafka.GroupID,
 	)
 	c.Background.WebSocketSvc = consumers.NewWebSocketConsumer(
 		c.Adapters.WebSocketConsumer,
-		c.Repos.MarketData,
+		c.Services.MarketData,
 		c.Services.PositionManagement,
 		c.Log,
 	)
 
 	c.Log.Infow("✓ WebSocket infrastructure initialized",
 		"consumer", "unified",
-		"handles_all_types", true,
+		"single_topic", events.TopicWebSocketEvents,
+		"handles_market_and_user_data", true,
 	)
 }
 

@@ -8,17 +8,18 @@ import (
 
 // User represents a system user (Telegram user)
 type User struct {
-	ID               uuid.UUID `db:"id"`
-	TelegramID       int64     `db:"telegram_id"`
-	TelegramUsername string    `db:"telegram_username"`
-	FirstName        string    `db:"first_name"`
-	LastName         string    `db:"last_name"`
-	LanguageCode     string    `db:"language_code"`
-	IsActive         bool      `db:"is_active"`
-	IsPremium        bool      `db:"is_premium"`
-	Settings         Settings  `db:"settings"` // sqlx handles JSONB automatically
-	CreatedAt        time.Time `db:"created_at"`
-	UpdatedAt        time.Time `db:"updated_at"`
+	ID               uuid.UUID  `db:"id"`
+	TelegramID       int64      `db:"telegram_id"`
+	TelegramUsername string     `db:"telegram_username"`
+	FirstName        string     `db:"first_name"`
+	LastName         string     `db:"last_name"`
+	LanguageCode     string     `db:"language_code"`
+	IsActive         bool       `db:"is_active"`
+	IsPremium        bool       `db:"is_premium"`
+	LimitProfileID   *uuid.UUID `db:"limit_profile_id"` // Reference to limit profile (tier)
+	Settings         Settings   `db:"settings"`         // sqlx handles JSONB automatically
+	CreatedAt        time.Time  `db:"created_at"`
+	UpdatedAt        time.Time  `db:"updated_at"`
 }
 
 // Settings contains user preferences and risk parameters

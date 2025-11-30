@@ -272,6 +272,191 @@ func (wp *WebSocketPublisher) PublishLiquidation(
 	return wp.publishProto(ctx, TopicWebSocketEvents, symbol, wrapper)
 }
 
+// ========================================
+// User Data Events (Orders, Positions, Balance, Margin Calls)
+// ========================================
+
+// PublishOrderUpdate publishes a UserDataOrderUpdateEvent to Kafka using wrapper
+func (wp *WebSocketPublisher) PublishOrderUpdate(
+	ctx context.Context,
+	userID, accountID string,
+	exchange, orderID, clientOrderID, symbol, side, positionSide, orderType, status, executionType string,
+	originalQty, filledQty, avgPrice, stopPrice, lastFilledQty, lastFilledPrice, commission, commissionAsset string,
+	tradeTime, eventTime time.Time,
+) error {
+	event := &eventspb.UserDataOrderUpdateEvent{
+		Base:            NewBaseEvent("user_data.order_update", "user_data_websocket", userID),
+		AccountId:       accountID,
+		Exchange:        exchange,
+		OrderId:         orderID,
+		ClientOrderId:   clientOrderID,
+		Symbol:          symbol,
+		Side:            side,
+		PositionSide:    positionSide,
+		Type:            orderType,
+		Status:          status,
+		ExecutionType:   executionType,
+		OriginalQty:     originalQty,
+		FilledQty:       filledQty,
+		AvgPrice:        avgPrice,
+		StopPrice:       stopPrice,
+		LastFilledQty:   lastFilledQty,
+		LastFilledPrice: lastFilledPrice,
+		Commission:      commission,
+		CommissionAsset: commissionAsset,
+		TradeTime:       timestamppb.New(tradeTime),
+		EventTime:       timestamppb.New(eventTime),
+	}
+
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_OrderUpdate{
+			OrderUpdate: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, userID, wrapper)
+}
+
+// PublishPositionUpdate publishes a UserDataPositionUpdateEvent to Kafka using wrapper
+func (wp *WebSocketPublisher) PublishPositionUpdate(
+	ctx context.Context,
+	userID, accountID string,
+	exchange, symbol, side, amount, entryPrice, markPrice, unrealizedPnL, maintenanceMargin, positionSide string,
+	eventTime time.Time,
+) error {
+	event := &eventspb.UserDataPositionUpdateEvent{
+		Base:              NewBaseEvent("user_data.position_update", "user_data_websocket", userID),
+		AccountId:         accountID,
+		Exchange:          exchange,
+		Symbol:            symbol,
+		Side:              side,
+		Amount:            amount,
+		EntryPrice:        entryPrice,
+		MarkPrice:         markPrice,
+		UnrealizedPnl:     unrealizedPnL,
+		MaintenanceMargin: maintenanceMargin,
+		PositionSide:      positionSide,
+		EventTime:         timestamppb.New(eventTime),
+	}
+
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_PositionUpdate{
+			PositionUpdate: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, userID, wrapper)
+}
+
+// PublishBalanceUpdate publishes a UserDataBalanceUpdateEvent to Kafka using wrapper
+func (wp *WebSocketPublisher) PublishBalanceUpdate(
+	ctx context.Context,
+	userID, accountID string,
+	exchange, asset, walletBalance, crossWalletBalance, availableBalance, reasonType string,
+	eventTime time.Time,
+) error {
+	event := &eventspb.UserDataBalanceUpdateEvent{
+		Base:               NewBaseEvent("user_data.balance_update", "user_data_websocket", userID),
+		AccountId:          accountID,
+		Exchange:           exchange,
+		Asset:              asset,
+		WalletBalance:      walletBalance,
+		CrossWalletBalance: crossWalletBalance,
+		AvailableBalance:   availableBalance,
+		ReasonType:         reasonType,
+		EventTime:          timestamppb.New(eventTime),
+	}
+
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_BalanceUpdate{
+			BalanceUpdate: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, userID, wrapper)
+}
+
+// PositionAtRiskData represents a position that may be liquidated
+type PositionAtRiskData struct {
+	Symbol            string
+	Side              string
+	Amount            string
+	MarginType        string
+	UnrealizedPnL     string
+	MaintenanceMargin string
+	PositionSide      string
+}
+
+// PublishMarginCall publishes a UserDataMarginCallEvent to Kafka using wrapper (CRITICAL!)
+func (wp *WebSocketPublisher) PublishMarginCall(
+	ctx context.Context,
+	userID, accountID string,
+	exchange, crossWalletBalance string,
+	positionsAtRisk []PositionAtRiskData,
+	eventTime time.Time,
+) error {
+	// Convert positions at risk
+	protoPositions := make([]*eventspb.PositionAtRisk, 0, len(positionsAtRisk))
+	for _, pos := range positionsAtRisk {
+		protoPositions = append(protoPositions, &eventspb.PositionAtRisk{
+			Symbol:            pos.Symbol,
+			Side:              pos.Side,
+			Amount:            pos.Amount,
+			MarginType:        pos.MarginType,
+			UnrealizedPnl:     pos.UnrealizedPnL,
+			MaintenanceMargin: pos.MaintenanceMargin,
+			PositionSide:      pos.PositionSide,
+		})
+	}
+
+	event := &eventspb.UserDataMarginCallEvent{
+		Base:               NewBaseEvent("user_data.margin_call", "user_data_websocket", userID),
+		AccountId:          accountID,
+		Exchange:           exchange,
+		CrossWalletBalance: crossWalletBalance,
+		PositionsAtRisk:    protoPositions,
+		EventTime:          timestamppb.New(eventTime),
+	}
+
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_MarginCall{
+			MarginCall: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, userID, wrapper)
+}
+
+// PublishAccountConfigUpdate publishes a UserDataAccountConfigEvent to Kafka using wrapper
+func (wp *WebSocketPublisher) PublishAccountConfigUpdate(
+	ctx context.Context,
+	userID, accountID string,
+	exchange, symbol string,
+	leverage int,
+	eventTime time.Time,
+) error {
+	event := &eventspb.UserDataAccountConfigEvent{
+		Base:      NewBaseEvent("user_data.account_config_update", "user_data_websocket", userID),
+		AccountId: accountID,
+		Exchange:  exchange,
+		Symbol:    symbol,
+		Leverage:  int32(leverage),
+		EventTime: timestamppb.New(eventTime),
+	}
+
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_AccountConfig{
+			AccountConfig: event,
+		},
+	}
+
+	return wp.publishProto(ctx, TopicWebSocketEvents, userID, wrapper)
+}
+
+// ========================================
+// Internal helpers
+// ========================================
+
 // Shutdown sets the stopping flag to prevent new publications
 func (wp *WebSocketPublisher) Shutdown() {
 	wp.stopping.Store(true)

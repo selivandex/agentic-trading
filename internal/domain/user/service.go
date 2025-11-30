@@ -9,15 +9,31 @@ import (
 	"prometheus/pkg/logger"
 )
 
+// LimitProfileRepository defines interface for getting limit profiles
+// Used to assign default limit profile to new users
+type LimitProfileRepository interface {
+	GetByName(ctx context.Context, name string) (LimitProfileInfo, error)
+}
+
+// LimitProfileInfo contains minimal info about a limit profile
+type LimitProfileInfo struct {
+	ID uuid.UUID
+}
+
 // Service provides business logic for user operations.
 type Service struct {
-	repo Repository
-	log  *logger.Logger
+	repo             Repository
+	limitProfileRepo LimitProfileRepository
+	log              *logger.Logger
 }
 
 // NewService constructs a user service instance.
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo, log: logger.Get()}
+func NewService(repo Repository, limitProfileRepo LimitProfileRepository) *Service {
+	return &Service{
+		repo:             repo,
+		limitProfileRepo: limitProfileRepo,
+		log:              logger.Get(),
+	}
 }
 
 // Create registers a new user with default settings when not provided.
@@ -137,7 +153,38 @@ func (s *Service) GetOrCreateByTelegramID(ctx context.Context, telegramID int64,
 		Settings:         DefaultSettings(),
 	}
 
+	// Assign default free tier limit profile to new user
+	if s.limitProfileRepo != nil {
+		freeProfile, err := s.limitProfileRepo.GetByName(ctx, "free")
+		if err != nil {
+			s.log.Warnw("Failed to get free limit profile, user will have no limits assigned",
+				"error", err,
+			)
+		} else {
+			newUser.LimitProfileID = &freeProfile.ID
+			s.log.Debugw("Assigned free tier to new user",
+				"limit_profile_id", freeProfile.ID,
+			)
+		}
+	}
+
 	if err := s.repo.Create(ctx, newUser); err != nil {
+		// Check if this is a duplicate key error (race condition)
+		// Another request might have created the user between our check and insert
+		if isDuplicateKeyError(err) {
+			s.log.Debugw("User was created by another request, fetching existing user",
+				"telegram_id", telegramID,
+			)
+			// Try to get the user again
+			existingUser, getErr := s.repo.GetByTelegramID(ctx, telegramID)
+			if getErr == nil {
+				return existingUser, nil
+			}
+			s.log.Errorw("Failed to get user after duplicate key error",
+				"telegram_id", telegramID,
+				"get_error", getErr,
+			)
+		}
 		return nil, errors.Wrap(err, "failed to create user")
 	}
 
@@ -148,6 +195,40 @@ func (s *Service) GetOrCreateByTelegramID(ctx context.Context, telegramID int64,
 	)
 
 	return newUser, nil
+}
+
+// isDuplicateKeyError checks if error is a PostgreSQL unique constraint violation
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for PostgreSQL error code 23505 (unique_violation)
+	// This works with both pq and pgx drivers
+	errMsg := err.Error()
+	return contains(errMsg, "duplicate key") ||
+		contains(errMsg, "unique constraint") ||
+		contains(errMsg, "23505")
+}
+
+// contains is a simple string contains check
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) &&
+		(s == substr || len(substr) == 0 ||
+			indexSubstring(s, substr) >= 0)
+}
+
+// indexSubstring finds substring in string
+func indexSubstring(s, substr string) int {
+	n := len(substr)
+	if n == 0 {
+		return 0
+	}
+	for i := 0; i+n <= len(s); i++ {
+		if s[i:i+n] == substr {
+			return i
+		}
+	}
+	return -1
 }
 
 // SetActive activates or deactivates a user (for /stop command)

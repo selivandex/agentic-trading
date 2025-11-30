@@ -37,7 +37,10 @@ import (
 	"prometheus/internal/metrics"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
+	aiusagesvc "prometheus/internal/services/ai_usage"
 	"prometheus/internal/services/exchange"
+	limitsservice "prometheus/internal/services/limits"
+	marketdatasvc "prometheus/internal/services/market_data"
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
@@ -48,6 +51,7 @@ import (
 	"prometheus/pkg/logger"
 	"prometheus/pkg/templates"
 
+	"github.com/google/uuid"
 	"google.golang.org/adk/session"
 )
 
@@ -125,6 +129,7 @@ func (c *Container) MustInitRepositories() {
 	c.Repos.Risk = pgrepo.NewRiskRepository(c.PG.DB())
 	c.Repos.Session = pgrepo.NewSessionRepository(c.PG.DB())
 	c.Repos.Reasoning = pgrepo.NewReasoningRepository(c.PG.DB())
+	c.Repos.LimitProfile = pgrepo.NewLimitProfileRepository(c.PG.DB())
 	c.Repos.MarketData = chrepo.NewMarketDataRepository(c.CH.Conn())
 	c.Repos.Regime = chrepo.NewRegimeRepository(c.CH.Conn())
 	c.Repos.Sentiment = chrepo.NewSentimentRepository(c.CH.Conn())
@@ -146,7 +151,9 @@ func (c *Container) MustInitAdapters() {
 
 	// Kafka
 	c.Adapters.KafkaProducer = provideKafkaProducer(c.Config, c.Log)
-	c.Adapters.NotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
+	// NOTE: Old NotificationConsumer removed - replaced with TelegramNotificationConsumer
+	// to avoid two consumers competing for same messages on notifications topic
+	c.Adapters.NotificationConsumer = nil // Not used anymore, kept for backwards compatibility
 	c.Adapters.RiskConsumer = provideKafkaConsumer(c.Config, events.TopicRiskEvents, c.Log)
 	c.Adapters.AnalyticsConsumer = provideKafkaConsumer(c.Config, events.TopicAnalytics, c.Log)
 	c.Adapters.OpportunityConsumer = provideKafkaConsumer(c.Config, events.TopicMarketEvents, c.Log)
@@ -154,13 +161,12 @@ func (c *Container) MustInitAdapters() {
 	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionEvents, c.Log)
 	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
 
-	// WebSocket consumer (unified consumer for all websocket.events)
-	// Single consumer handles all WebSocket event types (kline, ticker, depth, trade, etc)
-	// Routes by event.Base.Type and batches inserts by type
+	// WebSocket consumer (unified consumer for ALL websocket.events)
+	// Single consumer handles all WebSocket event types:
+	// - Market data: kline, ticker, depth, trade, mark_price, liquidation, funding_rate
+	// - User data: orders, positions, balance, margin_call, account_config
+	// Routes by wrapper type (WebSocketEventWrapper vs UserDataEventWrapper) and batches inserts
 	c.Adapters.WebSocketConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketEvents, c.Log)
-
-	// User Data consumer (for user-specific WebSocket events: orders, positions, balances)
-	c.Adapters.UserDataEventsConsumer = provideKafkaConsumer(c.Config, events.TopicUserDataEvents, c.Log)
 
 	// Crypto
 	c.Adapters.Encryptor, err = crypto.NewEncryptor(c.Config.Crypto.EncryptionKey)
@@ -195,7 +201,17 @@ func (c *Container) MustInitAdapters() {
 
 // MustInitServices initializes domain services
 func (c *Container) MustInitServices() {
-	c.Services.User = user.NewService(c.Repos.User)
+	// Create limit profile adapter to avoid circular dependency
+	limitProfileAdapter := user.NewLimitProfileAdapter(func(ctx context.Context, name string) (uuid.UUID, error) {
+		profile, err := c.Repos.LimitProfile.GetByName(ctx, name)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		return profile.ID, nil
+	})
+
+	// Core domain services
+	c.Services.User = user.NewService(c.Repos.User, limitProfileAdapter)
 	c.Services.ExchangeAccount = exchange_account.NewService(c.Repos.ExchangeAccount)
 	c.Services.TradingPair = trading_pair.NewService(c.Repos.TradingPair)
 	c.Services.Order = order.NewService(c.Repos.Order)
@@ -208,14 +224,26 @@ func (c *Container) MustInitServices() {
 	// Position management service for WebSocket updates
 	c.Services.PositionManagement = positionservice.NewService(c.Repos.Position, c.Log)
 
+	// Limits service for tier/subscription management
+	c.Services.Limits = limitsservice.NewService(
+		c.Repos.LimitProfile,
+		c.Repos.ExchangeAccount,
+		c.Repos.User,
+	)
+
 	// Exchange service with notification publisher for Telegram
 	notificationPublisher := events.NewNotificationPublisher(c.Adapters.KafkaProducer)
 	c.Services.Exchange = exchange.NewService(
 		c.Repos.ExchangeAccount,
 		c.Adapters.Encryptor,
+		c.Services.Limits, // Inject limits service for validation
 		notificationPublisher,
 		c.Log,
 	)
+
+	// Consumer-facing services (Clean Architecture: abstraction over repositories)
+	c.Services.MarketData = marketdatasvc.NewService(c.Repos.MarketData, c.Log)
+	c.Services.AIUsage = aiusagesvc.NewService(c.Repos.AIUsage, c.Log)
 
 	c.Log.Info("✓ Services initialized")
 }
@@ -383,10 +411,9 @@ func (c *Container) MustInitBackground() {
 	)
 
 	// Event consumers
-	c.Background.NotificationSvc = consumers.NewNotificationConsumer(
-		c.Adapters.NotificationConsumer,
-		c.Log,
-	)
+	// NOTE: Old NotificationConsumer disabled - replaced with TelegramNotificationConsumer
+	// to avoid two consumers competing for same messages on notifications topic
+	c.Background.NotificationSvc = nil // Not used anymore
 
 	c.Background.RiskSvc = consumers.NewRiskConsumer(
 		c.Adapters.RiskConsumer,
@@ -399,16 +426,18 @@ func (c *Container) MustInitBackground() {
 		c.Log,
 	)
 
+	// AI Usage Consumer - uses AIUsageService (Clean Architecture)
 	c.Background.AIUsageSvc = consumers.NewAIUsageConsumer(
 		c.Adapters.AIUsageConsumer,
-		c.Repos.AIUsage,
+		c.Services.AIUsage,
 		c.Log,
 	)
 
+	// Opportunity Consumer - uses TradingPairRepo (for GetActiveBySymbol) and UserService
 	c.Background.OpportunitySvc = consumers.NewOpportunityConsumer(
 		c.Adapters.OpportunityConsumer,
-		c.Repos.User,
 		c.Repos.TradingPair,
+		c.Services.User,
 		c.Business.WorkflowFactory,
 		c.Services.ADKSession,
 		c.Config.Workers.MarketScannerMaxConcurrency,
@@ -780,11 +809,12 @@ func provideTelegramBot(
 		}
 	}
 
+	// Telegram Notification Consumer - uses UserService (Clean Architecture)
 	telegramNotificationSvc := consumers.NewTelegramNotificationConsumer(
 		notificationConsumer,
 		bot,
 		notificationService,
-		userRepo,
+		userService,
 		log,
 	)
 

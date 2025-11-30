@@ -123,7 +123,7 @@ func (l *Lifecycle) Shutdown(
 	// ========================================
 	log.Info("[5/11] Closing Kafka consumers...")
 	l.closeKafkaConsumers(map[string]*kafka.Consumer{
-		"notification":           notificationConsumer,
+		// NOTE: "notification" consumer removed - replaced with "telegram_notifications"
 		"risk":                   riskConsumer,
 		"analytics":              analyticsConsumer,
 		"opportunity":            opportunityKafkaConsumer,

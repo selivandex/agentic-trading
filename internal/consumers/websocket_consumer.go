@@ -12,6 +12,7 @@ import (
 	kafkaadapter "prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/market_data"
 	eventspb "prometheus/internal/events/proto"
+	market_datasvc "prometheus/internal/services/market_data"
 	positionsvc "prometheus/internal/services/position"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -27,10 +28,10 @@ const (
 // WebSocketConsumer is a unified consumer for all WebSocket events
 // Handles market data from TopicWebSocketEvents and user data from TopicUserDataEvents
 type WebSocketConsumer struct {
-	consumer        *kafkaadapter.Consumer
-	repository      market_data.Repository
-	positionService positionService
-	log             *logger.Logger
+	consumer          *kafkaadapter.Consumer
+	marketDataService *market_datasvc.Service
+	positionService   positionService
+	log               *logger.Logger
 
 	// Batching (single batch for all event types)
 	mu    sync.Mutex
@@ -66,20 +67,20 @@ type eventTypeStats struct {
 // NewWebSocketConsumer creates a new unified WebSocket consumer
 func NewWebSocketConsumer(
 	consumer *kafkaadapter.Consumer,
-	repository market_data.Repository,
+	marketDataService *market_datasvc.Service,
 	posService positionService,
 	log *logger.Logger,
 ) *WebSocketConsumer {
 	now := time.Now()
 	return &WebSocketConsumer{
-		consumer:         consumer,
-		repository:       repository,
-		positionService:  posService,
-		log:              log,
-		batch:            make([]interface{}, 0, wsBatchSize),
-		lastFlushTime:    now,
-		lastStatsLogTime: now,
-		typeStats:        make(map[string]*eventTypeStats),
+		consumer:          consumer,
+		marketDataService: marketDataService,
+		positionService:   posService,
+		log:               log,
+		batch:             make([]interface{}, 0, wsBatchSize),
+		lastFlushTime:     now,
+		lastStatsLogTime:  now,
+		typeStats:         make(map[string]*eventTypeStats),
 	}
 }
 
@@ -524,10 +525,9 @@ func (c *WebSocketConsumer) FlushBatch(ctx context.Context) error {
 			"final", len(dedupedBatch),
 		)
 	}
-
-	// Group items by type and insert
-	if err := c.insertMixedBatch(ctx, dedupedBatch); err != nil {
-		c.log.Error("Failed to flush batch", "error", err)
+	// Use MarketDataService to store batch (Clean Architecture: Consumer → Service → Repository)
+	if err := c.marketDataService.StoreMixedBatch(ctx, dedupedBatch); err != nil {
+		c.log.Errorw("Failed to flush batch", "error", err)
 		return err
 	}
 
@@ -536,81 +536,6 @@ func (c *WebSocketConsumer) FlushBatch(ctx context.Context) error {
 		"size", len(dedupedBatch),
 		"duration_ms", duration.Milliseconds(),
 	)
-
-	return nil
-}
-
-// insertMixedBatch groups items by type and inserts them
-func (c *WebSocketConsumer) insertMixedBatch(ctx context.Context, batch []interface{}) error {
-	var (
-		klines       []market_data.OHLCV
-		tickers      []market_data.Ticker
-		depths       []market_data.OrderBookSnapshot
-		trades       []market_data.Trade
-		markPrices   []market_data.MarkPrice
-		liquidations []market_data.Liquidation
-	)
-
-	// Group by type
-	for _, item := range batch {
-		switch v := item.(type) {
-		case market_data.OHLCV:
-			klines = append(klines, v)
-		case market_data.Ticker:
-			tickers = append(tickers, v)
-		case market_data.OrderBookSnapshot:
-			depths = append(depths, v)
-		case market_data.Trade:
-			trades = append(trades, v)
-		case market_data.MarkPrice:
-			markPrices = append(markPrices, v)
-		case market_data.Liquidation:
-			liquidations = append(liquidations, v)
-		}
-	}
-
-	// Insert each type
-	if len(klines) > 0 {
-		if err := c.repository.InsertOHLCV(ctx, klines); err != nil {
-			return errors.Wrap(err, "insert klines")
-		}
-		c.log.Infow("  → Inserted klines", "count", len(klines))
-	}
-
-	if len(tickers) > 0 {
-		if err := c.repository.InsertTicker(ctx, tickers); err != nil {
-			return errors.Wrap(err, "insert tickers")
-		}
-		c.log.Infow("  → Inserted tickers", "count", len(tickers))
-	}
-
-	if len(depths) > 0 {
-		if err := c.repository.InsertOrderBook(ctx, depths); err != nil {
-			return errors.Wrap(err, "insert depths")
-		}
-		c.log.Infow("  → Inserted order book snapshots", "count", len(depths))
-	}
-
-	if len(trades) > 0 {
-		if err := c.repository.InsertTrades(ctx, trades); err != nil {
-			return errors.Wrap(err, "insert trades")
-		}
-		c.log.Infow("  → Inserted trades", "count", len(trades))
-	}
-
-	if len(markPrices) > 0 {
-		if err := c.repository.InsertMarkPrice(ctx, markPrices); err != nil {
-			return errors.Wrap(err, "insert mark prices")
-		}
-		c.log.Infow("  → Inserted mark prices", "count", len(markPrices))
-	}
-
-	if len(liquidations) > 0 {
-		if err := c.repository.InsertLiquidations(ctx, liquidations); err != nil {
-			return errors.Wrap(err, "insert liquidations")
-		}
-		c.log.Infow("  → Inserted liquidations", "count", len(liquidations))
-	}
 
 	return nil
 }

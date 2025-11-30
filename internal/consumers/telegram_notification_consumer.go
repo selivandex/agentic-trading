@@ -21,7 +21,7 @@ type TelegramNotificationConsumer struct {
 	consumer     *kafka.Consumer
 	bot          *telegram.Bot
 	notifService *telegram.NotificationService
-	userRepo     user.Repository
+	userService  *user.Service
 	log          *logger.Logger
 }
 
@@ -30,14 +30,14 @@ func NewTelegramNotificationConsumer(
 	consumer *kafka.Consumer,
 	bot *telegram.Bot,
 	notifService *telegram.NotificationService,
-	userRepo user.Repository,
+	userService *user.Service,
 	log *logger.Logger,
 ) *TelegramNotificationConsumer {
 	return &TelegramNotificationConsumer{
 		consumer:     consumer,
 		bot:          bot,
 		notifService: notifService,
-		userRepo:     userRepo,
+		userService:  userService,
 		log:          log,
 	}
 }
@@ -286,7 +286,7 @@ func (tnc *TelegramNotificationConsumer) handleOpportunityFound(ctx context.Cont
 	return nil
 }
 
-// getChatID gets Telegram chat ID for a user
+// getChatID gets Telegram chat ID for a user using UserService (Clean Architecture)
 func (tnc *TelegramNotificationConsumer) getChatID(ctx context.Context, userIDStr string) (int64, error) {
 	// Parse user ID
 	userID, err := parseUserID(userIDStr)
@@ -294,8 +294,8 @@ func (tnc *TelegramNotificationConsumer) getChatID(ctx context.Context, userIDSt
 		return 0, errors.Wrap(err, "invalid user_id")
 	}
 
-	// Get user from repository
-	usr, err := tnc.userRepo.GetByID(ctx, userID)
+	// Get user from service
+	usr, err := tnc.userService.GetByID(ctx, userID)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get user")
 	}

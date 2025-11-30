@@ -27,11 +27,11 @@ func (c *Container) MustInitUserDataManager() {
 
 	c.Log.Info("Initializing User Data WebSocket Manager...")
 
-	// Create User Data publisher
-	userDataPublisher := events.NewUserDataPublisher(c.Adapters.KafkaProducer, c.Log)
+	// Create unified WebSocket publisher (handles both market data + user data)
+	wsPublisher := events.NewWebSocketPublisher(c.Adapters.KafkaProducer)
 
 	// Create Kafka handler for User Data events (WebSocket → Kafka)
-	kafkaHandler := websocket.NewKafkaUserDataHandler(userDataPublisher, c.Log)
+	kafkaHandler := websocket.NewKafkaUserDataHandler(wsPublisher, c.Log)
 
 	// Create inline factory (to avoid import cycle)
 	factory := &inlineUserDataFactory{log: c.Log}

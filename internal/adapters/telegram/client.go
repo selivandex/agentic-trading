@@ -247,6 +247,31 @@ func (b *Bot) DeleteMessage(chatID int64, messageID int) error {
 	return nil
 }
 
+// DeleteMessageAsync deletes a message asynchronously with logging
+// Use this for security-sensitive messages (API keys, secrets, etc.)
+func (b *Bot) DeleteMessageAsync(chatID int64, messageID int, reason string) {
+	if messageID <= 0 {
+		return
+	}
+
+	go func(cid int64, mid int, r string) {
+		if err := b.DeleteMessage(cid, mid); err != nil {
+			b.log.Warnw("Failed to delete message",
+				"chat_id", cid,
+				"message_id", mid,
+				"reason", r,
+				"error", err,
+			)
+		} else {
+			b.log.Debugw("✓ Message deleted",
+				"chat_id", cid,
+				"message_id", mid,
+				"reason", r,
+			)
+		}
+	}(chatID, messageID, reason)
+}
+
 // AnswerCallbackQuery answers a callback query from inline keyboard
 func (b *Bot) AnswerCallbackQuery(callbackQueryID string, text string) error {
 	b.log.Debugw("Answering callback query",
@@ -413,4 +438,57 @@ func (b *Bot) GetWebhookInfo() (*tgbotapi.WebhookInfo, error) {
 	)
 
 	return &info, nil
+}
+
+// SendSelfDestructingMessage sends a message and immediately deletes the user's message containing sensitive data
+// Optionally deletes the response message after a specified duration
+func (b *Bot) SendSelfDestructingMessage(chatID int64, userMessageID int, text string, deleteResponseAfter time.Duration) error {
+	b.log.Debugw("Sending self-destructing message",
+		"chat_id", chatID,
+		"user_message_id", userMessageID,
+		"delete_response_after", deleteResponseAfter,
+	)
+
+	// Delete user's message immediately (contains sensitive data like API keys)
+	b.DeleteMessageAsync(chatID, userMessageID, "sensitive: user input")
+
+	// Send response message
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "Markdown"
+
+	sentMsg, err := b.api.Send(msg)
+	if err != nil {
+		b.log.Errorw("Failed to send self-destructing message",
+			"chat_id", chatID,
+			"error", err,
+		)
+		return errors.Wrap(err, "failed to send message")
+	}
+
+	b.log.Debugw("Self-destructing message sent",
+		"chat_id", chatID,
+		"sent_message_id", sentMsg.MessageID,
+	)
+
+	// If delete duration specified, schedule deletion of response message
+	if deleteResponseAfter > 0 {
+		go func(cid int64, mid int, duration time.Duration) {
+			time.Sleep(duration)
+			if err := b.DeleteMessage(cid, mid); err != nil {
+				b.log.Warnw("Failed to delete response message",
+					"chat_id", cid,
+					"message_id", mid,
+					"error", err,
+				)
+			} else {
+				b.log.Debugw("Response message deleted after timeout",
+					"chat_id", cid,
+					"message_id", mid,
+					"after", duration,
+				)
+			}
+		}(chatID, sentMsg.MessageID, deleteResponseAfter)
+	}
+
+	return nil
 }

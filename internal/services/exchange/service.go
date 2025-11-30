@@ -18,6 +18,7 @@ import (
 type Service struct {
 	repo                  exchange_account.Repository
 	encryptor             *crypto.Encryptor
+	limitsChecker         LimitsChecker // For checking user limits
 	notificationPublisher NotificationPublisher
 	log                   *logger.Logger
 }
@@ -27,16 +28,23 @@ type NotificationPublisher interface {
 	PublishExchangeDeactivated(ctx context.Context, accountID, userID, exchange, label, reason, errorMsg string, isTestnet bool) error
 }
 
+// LimitsChecker defines interface for checking user limits
+type LimitsChecker interface {
+	CheckExchangeAccountLimit(ctx context.Context, userID uuid.UUID) error
+}
+
 // NewService creates a new exchange service
 func NewService(
 	repo exchange_account.Repository,
 	encryptor *crypto.Encryptor,
+	limitsChecker LimitsChecker, // Can be nil for backward compatibility
 	notificationPublisher NotificationPublisher,
 	log *logger.Logger,
 ) *Service {
 	return &Service{
 		repo:                  repo,
 		encryptor:             encryptor,
+		limitsChecker:         limitsChecker,
 		notificationPublisher: notificationPublisher,
 		log:                   log.With("component", "exchange_service"),
 	}
@@ -77,6 +85,18 @@ func (s *Service) CreateAccount(ctx context.Context, input CreateAccountInput) (
 
 	if !input.Exchange.Valid() {
 		return nil, errors.Wrapf(errors.ErrInvalidInput, "invalid exchange: %s", input.Exchange)
+	}
+
+	// Check if user can create more exchange accounts (limit validation)
+	if s.limitsChecker != nil {
+		if err := s.limitsChecker.CheckExchangeAccountLimit(ctx, input.UserID); err != nil {
+			s.log.Warnw("Exchange account limit exceeded",
+				"user_id", input.UserID,
+				"exchange", input.Exchange,
+				"error", err,
+			)
+			return nil, errors.Wrap(err, "exchange account limit exceeded")
+		}
 	}
 
 	// Create account entity
