@@ -43,7 +43,7 @@ func NewConsumer(cfg ConsumerConfig) *Consumer {
 		StartOffset: kafka.FirstOffset, // Start from beginning if no offset committed
 	})
 
-	log.Info("Kafka consumer created",
+	log.Infow("Kafka consumer created",
 		"brokers", cfg.Brokers,
 		"group_id", cfg.GroupID,
 		"topic", cfg.Topic,

@@ -58,7 +58,7 @@ func (h *CriticalEventHandler) HandleStopLossHit(ctx context.Context, event *eve
 
 	// If position already closed, skip
 	if pos.Status == position.PositionClosed {
-		h.log.Info("Position already closed", "position_id", event.PositionId)
+		h.log.Infow("Position already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -70,14 +70,14 @@ func (h *CriticalEventHandler) HandleStopLossHit(ctx context.Context, event *eve
 	}
 
 	if err := h.posRepo.Close(ctx, positionID, exitPrice, pnl); err != nil {
-		h.log.Error("Failed to close position at stop loss",
+		h.log.Errorw("Failed to close position at stop loss",
 			"position_id", event.PositionId,
 			"error", err,
 		)
 		return errors.Wrap(err, "failed to close position")
 	}
 
-	h.log.Info("Position closed at stop loss",
+	h.log.Infow("Position closed at stop loss",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"exit_price", event.ExitPrice,
@@ -91,7 +91,7 @@ func (h *CriticalEventHandler) HandleStopLossHit(ctx context.Context, event *eve
 
 // HandleTakeProfitHit handles take profit hit - closes position immediately
 func (h *CriticalEventHandler) HandleTakeProfitHit(ctx context.Context, event *eventspb.PositionClosedEvent) error {
-	h.log.Info("CRITICAL: Take profit hit - closing position immediately",
+	h.log.Infow("CRITICAL: Take profit hit - closing position immediately",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"user_id", event.Base.UserId,
@@ -111,13 +111,13 @@ func (h *CriticalEventHandler) HandleTakeProfitHit(ctx context.Context, event *e
 	}
 
 	if pos == nil {
-		h.log.Warn("Position not found (already closed?)", "position_id", event.PositionId)
+		h.log.Warnw("Position not found (already closed?)", "position_id", event.PositionId)
 		return nil
 	}
 
 	// If position already closed, skip
 	if pos.Status == position.PositionClosed {
-		h.log.Info("Position already closed", "position_id", event.PositionId)
+		h.log.Infow("Position already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -129,14 +129,14 @@ func (h *CriticalEventHandler) HandleTakeProfitHit(ctx context.Context, event *e
 	}
 
 	if err := h.posRepo.Close(ctx, positionID, exitPrice, pnl); err != nil {
-		h.log.Error("Failed to close position at take profit",
+		h.log.Errorw("Failed to close position at take profit",
 			"position_id", event.PositionId,
 			"error", err,
 		)
 		return errors.Wrap(err, "failed to close position")
 	}
 
-	h.log.Info("Position closed at take profit",
+	h.log.Infow("Position closed at take profit",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"exit_price", event.ExitPrice,
@@ -150,7 +150,7 @@ func (h *CriticalEventHandler) HandleTakeProfitHit(ctx context.Context, event *e
 
 // HandleCircuitBreakerTripped handles circuit breaker event - closes ALL user positions
 func (h *CriticalEventHandler) HandleCircuitBreakerTripped(ctx context.Context, event *eventspb.CircuitBreakerTrippedEvent) error {
-	h.log.Error("CRITICAL: Circuit breaker tripped - closing ALL positions",
+	h.log.Errorw("CRITICAL: Circuit breaker tripped - closing ALL positions",
 		"user_id", event.Base.UserId,
 		"reason", event.Reason,
 		"drawdown", event.Drawdown,
@@ -169,11 +169,11 @@ func (h *CriticalEventHandler) HandleCircuitBreakerTripped(ctx context.Context, 
 	}
 
 	if len(positions) == 0 {
-		h.log.Info("No open positions to close", "user_id", event.Base.UserId)
+		h.log.Infow("No open positions to close", "user_id", event.Base.UserId)
 		return nil
 	}
 
-	h.log.Warn("Closing positions due to circuit breaker",
+	h.log.Warnw("Closing positions due to circuit breaker",
 		"user_id", event.Base.UserId,
 		"positions_count", len(positions),
 	)
@@ -184,7 +184,7 @@ func (h *CriticalEventHandler) HandleCircuitBreakerTripped(ctx context.Context, 
 	for _, pos := range positions {
 		// Close at current price with current PnL
 		if err := h.posRepo.Close(ctx, pos.ID, pos.CurrentPrice, pos.UnrealizedPnL); err != nil {
-			h.log.Error("Failed to close position during circuit breaker",
+			h.log.Errorw("Failed to close position during circuit breaker",
 				"position_id", pos.ID,
 				"symbol", pos.Symbol,
 				"error", err,
@@ -195,7 +195,7 @@ func (h *CriticalEventHandler) HandleCircuitBreakerTripped(ctx context.Context, 
 		}
 	}
 
-	h.log.Warn("Circuit breaker positions closed",
+	h.log.Warnw("Circuit breaker positions closed",
 		"user_id", event.Base.UserId,
 		"success", successCount,
 		"failed", failCount,

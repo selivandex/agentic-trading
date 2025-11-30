@@ -66,7 +66,7 @@ func (f *Factory) CreateMarketResearchWorkflowWithPathSelector(config PathSelect
 
 	pathSelector := NewPathSelector(config)
 
-	f.log.Info("Market research workflow with path selector created successfully",
+	f.log.Infow("Market research workflow with path selector created successfully",
 		"high_stakes_threshold", config.HighStakesThreshold,
 		"volatility_threshold", config.VolatilityThreshold,
 		"target_committee_usage_pct", config.CommitteeUsagePercent,

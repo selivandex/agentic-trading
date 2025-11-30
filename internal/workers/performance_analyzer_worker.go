@@ -31,11 +31,11 @@ func NewPerformanceAnalyzerWorker(
 // Run starts the performance analysis loop.
 // Runs weekly to analyze trade outcomes and extract patterns.
 func (w *PerformanceAnalyzerWorker) Run(ctx context.Context) error {
-	w.log.Info("Performance analyzer worker started", "schedule", w.schedule)
+	w.log.Infow("Performance analyzer worker started", "schedule", w.schedule)
 
 	// Run immediately on startup
 	if err := w.analyzePerformance(ctx); err != nil {
-		w.log.Error("Initial performance analysis failed", "error", err)
+		w.log.Errorw("Initial performance analysis failed", "error", err)
 	}
 
 	// Run weekly (every Sunday at 00:00 UTC)
@@ -46,7 +46,7 @@ func (w *PerformanceAnalyzerWorker) Run(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			if err := w.analyzePerformance(ctx); err != nil {
-				w.log.Error("Performance analysis failed", "error", err)
+				w.log.Errorw("Performance analysis failed", "error", err)
 				// Continue running despite errors
 			}
 

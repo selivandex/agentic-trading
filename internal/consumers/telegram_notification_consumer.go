@@ -11,7 +11,6 @@ import (
 	"prometheus/internal/adapters/kafka"
 	telegram "prometheus/internal/adapters/telegram"
 	"prometheus/internal/domain/user"
-	"prometheus/internal/events"
 	eventspb "prometheus/internal/events/proto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -65,14 +64,14 @@ func (tnc *TelegramNotificationConsumer) Start(ctx context.Context) error {
 				tnc.log.Info("Telegram notification consumer stopping (context cancelled)")
 				return nil
 			}
-			tnc.log.Debug("Failed to read notification event", "error", err)
+			tnc.log.Debugw("Failed to read notification event", "error", err)
 			continue
 		}
 
 		// Process message with timeout
 		processCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		if err := tnc.handleMessage(processCtx, msg); err != nil {
-			tnc.log.Error("Failed to handle notification",
+			tnc.log.Errorw("Failed to handle notification",
 				"topic", msg.Topic,
 				"error", err,
 			)
@@ -87,34 +86,49 @@ func (tnc *TelegramNotificationConsumer) Start(ctx context.Context) error {
 	}
 }
 
-// handleMessage routes message to appropriate handler based on topic
+// handleMessage routes message to appropriate handler based on event type
 func (tnc *TelegramNotificationConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
-	tnc.log.Debug("Processing notification event", "topic", msg.Topic)
+	tnc.log.Debugw("Processing notification event", "topic", msg.Topic)
 
-	switch msg.Topic {
-	case events.TopicPositionOpened:
+	// For telegram_notifications topic, we need to peek at BaseEvent.Type to route
+	// First, try to unmarshal as BaseEvent to get the type
+	var baseEvent eventspb.BaseEvent
+	if err := proto.Unmarshal(msg.Value, &baseEvent); err != nil {
+		tnc.log.Errorw("Failed to unmarshal base event", "error", err)
+		return errors.Wrap(err, "unmarshal base event")
+	}
+
+	eventType := baseEvent.Type
+	tnc.log.Debugw("Routing notification by event type", "event_type", eventType)
+
+	// Route based on event type (not topic)
+	switch eventType {
+	case "trading.position_opened":
 		return tnc.handlePositionOpened(ctx, msg.Value)
 
-	case events.TopicPositionClosed:
+	case "trading.position_closed":
 		return tnc.handlePositionClosed(ctx, msg.Value)
 
-	case events.TopicStopLossTriggered:
+	case "trading.stop_loss_triggered":
 		return tnc.handleStopLossTriggered(ctx, msg.Value)
 
-	case events.TopicTakeProfitHit:
+	case "trading.take_profit_hit":
 		return tnc.handleTakeProfitHit(ctx, msg.Value)
 
-	case events.TopicCircuitBreakerTripped:
+	case "risk.circuit_breaker_tripped":
 		return tnc.handleCircuitBreakerTripped(ctx, msg.Value)
 
-	case events.TopicDailyReport:
+	case "report.daily":
 		return tnc.handleDailyReport(ctx, msg.Value)
 
-	case events.TopicOpportunityFound:
+	case "market.opportunity_found":
 		return tnc.handleOpportunityFound(ctx, msg.Value)
 
+	case "exchange.deactivated":
+		return tnc.handleExchangeDeactivated(ctx, msg.Value)
+
 	default:
-		tnc.log.Debug("Ignoring unknown topic", "topic", msg.Topic)
+		tnc.log.Debugw("Ignoring unknown event type", "event_type", eventType)
 		return nil
 	}
 }
@@ -264,7 +278,7 @@ func (tnc *TelegramNotificationConsumer) handleOpportunityFound(ctx context.Cont
 
 	// This is a global event - we could notify all users monitoring this symbol
 	// For now, skip to avoid spam (users will get notified when their personal workflow executes)
-	tnc.log.Debug("Opportunity found event received",
+	tnc.log.Debugw("Opportunity found event received",
 		"symbol", event.Symbol,
 		"confidence", event.Confidence,
 	)
@@ -288,7 +302,7 @@ func (tnc *TelegramNotificationConsumer) getChatID(ctx context.Context, userIDSt
 
 	// Check if notifications are enabled
 	if !usr.Settings.NotificationsOn {
-		tnc.log.Debug("Notifications disabled for user", "user_id", userID)
+		tnc.log.Debugw("Notifications disabled for user", "user_id", userID)
 		return 0, errors.New("notifications disabled")
 	}
 
@@ -302,4 +316,27 @@ func parseUserID(userIDStr string) (uuid.UUID, error) {
 		return uuid.Nil, errors.Wrap(err, "invalid user_id format")
 	}
 	return userID, nil
+}
+
+// handleExchangeDeactivated handles exchange deactivated events
+func (tnc *TelegramNotificationConsumer) handleExchangeDeactivated(ctx context.Context, data []byte) error {
+	var event eventspb.ExchangeDeactivatedEvent
+	if err := proto.Unmarshal(data, &event); err != nil {
+		return errors.Wrap(err, "unmarshal exchange_deactivated")
+	}
+
+	chatID, err := tnc.getChatID(ctx, event.Base.UserId)
+	if err != nil {
+		return err
+	}
+
+	notifData := telegram.ExchangeDeactivatedData{
+		Exchange:     event.Exchange,
+		Label:        event.Label,
+		Reason:       event.Reason,
+		ErrorMessage: event.ErrorMessage,
+		IsTestnet:    event.IsTestnet,
+	}
+
+	return tnc.notifService.NotifyExchangeDeactivated(chatID, notifData)
 }

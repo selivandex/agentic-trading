@@ -44,6 +44,7 @@ func (l *Lifecycle) Shutdown(
 	workerScheduler *workers.Scheduler,
 	marketDataFactory exchanges.CentralFactory,
 	websocketClients *WebSocketClients,
+	marketDataManager *MarketDataManager,
 	userDataManager *UserDataManager,
 	kafkaProducer *kafka.Producer,
 	notificationConsumer *kafka.Consumer,
@@ -93,12 +94,16 @@ func (l *Lifecycle) Shutdown(
 	}
 
 	// ========================================
-	// Step 3: Stop Market Data WebSocket Clients (Binance, Bybit, OKX)
+	// Step 3: Stop Market Data WebSocket Manager
 	// ========================================
-	log.Info("[3/11] Stopping Market Data WebSocket clients...")
-	if websocketClients != nil {
+	log.Info("[3/11] Stopping Market Data WebSocket Manager...")
+	if marketDataManager != nil && marketDataManager.Manager != nil {
 		wsCtx, wsCancel := context.WithTimeout(shutdownCtx, 10*time.Second)
-		l.stopWebSocketClients(wsCtx, websocketClients, log)
+		if err := marketDataManager.Manager.Stop(wsCtx); err != nil {
+			log.Error("Market Data Manager shutdown failed", "error", err)
+		} else {
+			log.Info("✓ Market Data Manager stopped")
+		}
 		wsCancel()
 	}
 

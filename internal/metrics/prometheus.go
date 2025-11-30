@@ -221,6 +221,15 @@ var (
 		},
 		[]string{"exchange", "status"}, // status: success|error
 	)
+
+	// Market Data WebSocket metrics (centralized market data streams)
+	MarketDataReconnects = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_marketdata_reconnects_total",
+			Help: "Total number of Market Data WebSocket reconnect attempts",
+		},
+		[]string{"status"}, // status: success|failed
+	)
 )
 
 // Init registers all metrics with Prometheus
@@ -265,6 +274,9 @@ func Init() {
 	prometheus.MustRegister(UserDataReconciliations)
 	prometheus.MustRegister(UserDataHotReload)
 	prometheus.MustRegister(UserDataListenKeyRenewals)
+
+	// Market Data WebSocket metrics
+	prometheus.MustRegister(MarketDataReconnects)
 }
 
 // Handler returns Prometheus HTTP handler

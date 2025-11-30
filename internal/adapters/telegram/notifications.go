@@ -111,6 +111,15 @@ type DailyReportData struct {
 	PortfolioValue  float64
 }
 
+// ExchangeDeactivatedData represents data for exchange deactivation notification
+type ExchangeDeactivatedData struct {
+	Exchange     string
+	Label        string
+	Reason       string
+	ErrorMessage string
+	IsTestnet    bool
+}
+
 // NotifyPositionOpened sends position opened notification
 func (ns *NotificationService) NotifyPositionOpened(chatID int64, data PositionOpenedData) error {
 	text, err := ns.templates.Render("notifications/position_opened", data)
@@ -176,6 +185,16 @@ func (ns *NotificationService) NotifyDailyReport(chatID int64, data DailyReportD
 	text, err := ns.templates.Render("notifications/daily_report", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render daily_report template")
+	}
+
+	return ns.bot.SendNotificationWithRetry(chatID, text, 3)
+}
+
+// NotifyExchangeDeactivated sends exchange deactivated notification
+func (ns *NotificationService) NotifyExchangeDeactivated(chatID int64, data ExchangeDeactivatedData) error {
+	text, err := ns.templates.Render("telegram/exchange_deactivated", data)
+	if err != nil {
+		return errors.Wrap(err, "failed to render exchange_deactivated template")
 	}
 
 	return ns.bot.SendNotificationWithRetry(chatID, text, 3)

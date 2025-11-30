@@ -652,3 +652,14 @@ message UserDataAccountConfigEvent {
   google.protobuf.Timestamp event_time = 6;
 }
 
+// ExchangeDeactivatedEvent is published when exchange account is deactivated due to errors
+message ExchangeDeactivatedEvent {
+  BaseEvent base = 1;
+  string account_id = 2;
+  string exchange = 3;
+  string label = 4;
+  string reason = 5;  // "invalid_credentials", "permission_error", "connection_error"
+  string error_message = 6;
+  bool is_testnet = 7;
+}
+

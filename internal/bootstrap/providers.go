@@ -37,6 +37,7 @@ import (
 	"prometheus/internal/metrics"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
+	"prometheus/internal/services/exchange"
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
@@ -467,7 +468,7 @@ func provideKafkaProducer(cfg *config.Config, log *logger.Logger) *kafka.Produce
 }
 
 func provideKafkaConsumer(cfg *config.Config, topic string, log *logger.Logger) *kafka.Consumer {
-	log.Info("Initializing Kafka consumer", "topic", topic)
+	log.Infow("Initializing Kafka consumer", "topic", topic)
 	if len(cfg.Kafka.Brokers) == 0 {
 		cfg.Kafka.Brokers = []string{"localhost:9092"}
 	}
@@ -477,7 +478,7 @@ func provideKafkaConsumer(cfg *config.Config, topic string, log *logger.Logger) 
 		GroupID: cfg.Kafka.GroupID,
 		Topic:   topic,
 	})
-	log.Info("✓ Kafka consumer initialized", "topic", topic)
+	log.Infow("✓ Kafka consumer initialized", "topic", topic)
 	return consumer
 }
 
@@ -643,7 +644,7 @@ func provideHTTPServer(
 	var webhookHandler *telegramapi.WebhookHandler
 	if cfg.Telegram.WebhookURL != "" {
 		webhookHandler = telegramapi.NewWebhookHandler(telegramBot, telegramHandler, log)
-		log.Info("✓ Telegram webhook mode enabled", "url", cfg.Telegram.WebhookURL)
+		log.Infow("✓ Telegram webhook mode enabled", "url", cfg.Telegram.WebhookURL)
 	} else {
 		log.Info("✓ Telegram polling mode enabled")
 	}
@@ -704,12 +705,23 @@ func provideTelegramBot(
 		log,
 	)
 
+	// Create notification publisher for Telegram notifications
+	notificationPublisher := events.NewNotificationPublisher(kafkaProducer)
+
+	// Create exchange business service (reusable for web/API/telegram)
+	exchangeService := exchange.NewService(
+		exchAcctRepo,
+		encryptor,
+		notificationPublisher,
+		log,
+	)
+
+	// Create Telegram UI adapter (wraps business service)
 	exchangeSetupService := telegram.NewExchangeSetupService(
 		redisClient.Client(),
 		bot,
-		exchAcctRepo,
+		exchangeService, // Inject business service
 		exchFactory,
-		encryptor,
 		templates.Get(),
 		log,
 	)
@@ -745,13 +757,13 @@ func provideTelegramBot(
 	handler.RegisterHandlers()
 
 	if cfg.Telegram.WebhookURL != "" {
-		log.Info("Configuring Telegram webhook...", "url", cfg.Telegram.WebhookURL)
+		log.Infow("Configuring Telegram webhook...", "url", cfg.Telegram.WebhookURL)
 		if err := bot.SetWebhook(cfg.Telegram.WebhookURL); err != nil {
 			log.Fatalf("Failed to set Telegram webhook: %v", err)
 		}
 
 		if webhookInfo, err := bot.GetWebhookInfo(); err == nil {
-			log.Info("✓ Telegram webhook configured",
+			log.Infow("✓ Telegram webhook configured",
 				"url", webhookInfo.URL,
 				"pending_updates", webhookInfo.PendingUpdateCount,
 			)

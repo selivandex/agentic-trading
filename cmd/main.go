@@ -32,7 +32,7 @@ func main() {
 	}()
 
 	log := container.Log
-	log.Info("✓ System initialization complete", "metrics", container.GetMetrics())
+	log.Infow("✓ System initialization complete", "metrics", container.GetMetrics())
 
 	// Start all background components (consumers, HTTP server)
 	if err := container.Start(); err != nil {

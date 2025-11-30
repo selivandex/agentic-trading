@@ -68,7 +68,7 @@ func (ch *ControlCommandHandler) HandleStop(ctx context.Context, chatID int64, u
 		return errors.Wrap(err, "failed to update user")
 	}
 
-	ch.log.Info("User trading paused", "user_id", userID)
+	ch.log.Infow("User trading paused", "user_id", userID)
 
 	// Render confirmation with current positions info
 	openPositions, _ := ch.positionRepo.GetOpenByUser(ctx, userID)

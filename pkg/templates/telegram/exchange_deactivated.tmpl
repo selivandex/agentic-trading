@@ -1,0 +1,29 @@
+🚨 *Exchange Account Deactivated*
+
+Your exchange account has been automatically deactivated due to connection issues:
+
+*Exchange:* {{.Exchange}}
+*Label:* {{.Label}}
+{{if .IsTestnet}}*Mode:* Testnet{{else}}*Mode:* Production{{end}}
+
+*Reason:* {{.Reason}}
+{{if .ErrorMessage}}
+*Error Details:* {{.ErrorMessage}}
+{{end}}
+
+*Possible causes:*
+• Invalid API credentials (key or secret changed)
+• Insufficient API permissions
+• IP whitelist restrictions
+• API key revoked or expired
+
+*What to do:*
+1. Check your API key settings on the exchange
+2. Verify permissions: "Enable Reading" + "Enable Futures/Spot Trading"
+3. Review IP whitelist settings (or disable them temporarily)
+4. Reconnect your account: /add_exchange
+
+⚠️ *Your account will remain disabled until you fix the issue and reconnect.*
+
+Need help? Use /help for support options.
+

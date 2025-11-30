@@ -56,7 +56,7 @@ func (ac *AnalyticsConsumer) Start(ctx context.Context) error {
 	}
 
 	for _, topic := range topics {
-		ac.log.Info("Subscribed to analytics topic", "topic", topic)
+		ac.log.Infow("Subscribed to analytics topic", "topic", topic)
 	}
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
@@ -122,7 +122,7 @@ func (ac *AnalyticsConsumer) handleOpportunityFound(ctx context.Context, data []
 		return errors.Wrap(err, "unmarshal opportunity_found")
 	}
 
-	ac.log.Info("Opportunity detected",
+	ac.log.Infow("Opportunity detected",
 		"symbol", event.Symbol,
 		"direction", event.Direction,
 		"confidence", event.Confidence,
@@ -143,7 +143,7 @@ func (ac *AnalyticsConsumer) handleRegimeChanged(ctx context.Context, data []byt
 		return errors.Wrap(err, "unmarshal regime_changed")
 	}
 
-	ac.log.Info("Market regime changed",
+	ac.log.Infow("Market regime changed",
 		"symbol", event.Symbol,
 		"old_regime", event.OldRegime,
 		"new_regime", event.NewRegime,
@@ -195,7 +195,7 @@ func (ac *AnalyticsConsumer) handleDecisionMade(ctx context.Context, data []byte
 		return errors.Wrap(err, "unmarshal decision_made")
 	}
 
-	ac.log.Info("Agent decision",
+	ac.log.Infow("Agent decision",
 		"agent", event.AgentType,
 		"action", event.Action,
 		"symbol", event.Symbol,

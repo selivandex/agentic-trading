@@ -76,7 +76,7 @@ func NewExecutionService(orderService *order.Service) *ExecutionService {
 
 // Execute places an order with optimal execution strategy.
 func (s *ExecutionService) Execute(ctx context.Context, plan TradingPlan) (*ExecutionResult, error) {
-	s.log.Info("Executing trading plan",
+	s.log.Infow("Executing trading plan",
 		"user_id", plan.UserID,
 		"symbol", plan.Symbol,
 		"side", plan.Side,
@@ -113,7 +113,7 @@ func (s *ExecutionService) Execute(ctx context.Context, plan TradingPlan) (*Exec
 		}, errors.Wrap(err, "failed to place order")
 	}
 
-	s.log.Info("Order placed successfully",
+	s.log.Infow("Order placed successfully",
 		"order_id", createdOrder.ID,
 		"status", createdOrder.Status,
 	)

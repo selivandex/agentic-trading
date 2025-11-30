@@ -48,7 +48,7 @@ func (wh *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Route update to handler
 	if err := wh.handler.Route(r.Context(), *update); err != nil {
-		wh.log.Error("Failed to route update", "error", err)
+		wh.log.Errorw("Failed to route update", "error", err)
 		// Don't return error to Telegram - we processed it even if there was an error
 		// This prevents Telegram from retrying the same update
 	}

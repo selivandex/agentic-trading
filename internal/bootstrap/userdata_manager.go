@@ -46,6 +46,7 @@ func (c *Container) MustInitUserDataManager() {
 
 	manager := websocket.NewUserDataManager(
 		c.Repos.ExchangeAccount,
+		c.Services.Exchange, // Exchange service for deactivation + notifications
 		factory,
 		kafkaHandler,
 		c.Adapters.Encryptor,

@@ -79,7 +79,7 @@ func provideWorkers(
 	if err != nil {
 		log.Fatal("Failed to create PathSelector", "error", err)
 	}
-	log.Info("PathSelector created successfully",
+	log.Infow("PathSelector created successfully",
 		"high_stakes_threshold", pathSelector.GetMetrics()["high_stakes_threshold"],
 		"volatility_threshold", pathSelector.GetMetrics()["volatility_threshold"],
 		"target_committee_pct", pathSelector.GetMetrics()["target_committee_pct"],
@@ -281,7 +281,7 @@ func provideWorkers(
 		true, // Always enabled
 	))
 
-	log.Info("Worker intervals configured",
+	log.Infow("Worker intervals configured",
 		"position_monitor", cfg.Workers.PositionMonitorInterval,
 		"risk_monitor", cfg.Workers.RiskMonitorInterval,
 		"pnl_calculator", cfg.Workers.PnLCalculatorInterval,

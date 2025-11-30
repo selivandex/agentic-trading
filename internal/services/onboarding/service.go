@@ -55,7 +55,7 @@ func NewService(
 
 // StartOnboarding executes the PortfolioArchitect workflow to initialize user's portfolio
 func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegram.OnboardingSession) error {
-	s.log.Info("Starting portfolio initialization workflow",
+	s.log.Infow("Starting portfolio initialization workflow",
 		"user_id", onboardingSession.UserID,
 		"capital", onboardingSession.Capital,
 		"risk_profile", onboardingSession.RiskProfile,
@@ -122,7 +122,7 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 			for _, part := range event.LLMResponse.Content.Parts {
 				if part.FunctionCall != nil && (part.FunctionCall.Name == "execute_trade" || part.FunctionCall.Name == "place_order") {
 					tradesExecuted++
-					s.log.Info("Portfolio allocation: trade executed",
+					s.log.Infow("Portfolio allocation: trade executed",
 						"user_id", onboardingSession.UserID,
 						"session_id", sessionID,
 						"trades_executed", tradesExecuted,
@@ -134,7 +134,7 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 		// Check if workflow is complete
 		if event.TurnComplete && event.IsFinalResponse() {
 			duration := time.Since(startTime)
-			s.log.Info("Portfolio initialization complete",
+			s.log.Infow("Portfolio initialization complete",
 				"user_id", onboardingSession.UserID,
 				"session_id", sessionID,
 				"trades_executed", tradesExecuted,
@@ -145,7 +145,7 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 	}
 
 	if tradesExecuted == 0 {
-		s.log.Warn("Portfolio initialization completed but no trades were executed",
+		s.log.Warnw("Portfolio initialization completed but no trades were executed",
 			"user_id", onboardingSession.UserID,
 			"session_id", sessionID,
 		)
@@ -169,7 +169,7 @@ func (s *Service) buildArchitectPrompt(onboardingSession *telegram.OnboardingSes
 	promptText, err := s.templates.Render("prompts/workflows/portfolio_initialization_input", data)
 	if err != nil {
 		// Fallback to simple prompt if template not found
-		s.log.Warn("Template not found, using fallback prompt", "error", err)
+		s.log.Warnw("Template not found, using fallback prompt", "error", err)
 		promptText = fmt.Sprintf(`Design initial portfolio allocation for a new client.
 
 Client Profile:

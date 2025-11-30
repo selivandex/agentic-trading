@@ -2,7 +2,6 @@ package consumers
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"prometheus/internal/adapters/kafka"
@@ -59,7 +58,7 @@ func (nc *NotificationConsumer) Start(ctx context.Context) error {
 	}
 
 	for _, topic := range topics {
-		nc.log.Info("Subscribed to topic", "topic", topic)
+		nc.log.Infow("Subscribed to topic", "topic", topic)
 	}
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
@@ -72,7 +71,7 @@ func (nc *NotificationConsumer) Start(ctx context.Context) error {
 				return nil
 			}
 			// Reader might be closed during shutdown, log at debug level
-			nc.log.Debug("Failed to read message", "error", err)
+			nc.log.Debugw("Failed to read message", "error", err)
 			continue
 		}
 
@@ -126,7 +125,7 @@ func (nc *NotificationConsumer) handleOrderPlaced(ctx context.Context, data []by
 	}
 
 	// TODO: Send Telegram notification when bot is implemented
-	nc.log.Info("Order placed notification",
+	nc.log.Infow("Order placed notification",
 		"user_id", event.Base.UserId,
 		"symbol", event.Symbol,
 		"side", event.Side,
@@ -142,7 +141,7 @@ func (nc *NotificationConsumer) handleOrderFilled(ctx context.Context, data []by
 		return errors.Wrap(err, "unmarshal order_filled event")
 	}
 
-	nc.log.Info("Order filled notification",
+	nc.log.Infow("Order filled notification",
 		"user_id", event.Base.UserId,
 		"symbol", event.Symbol,
 		"filled_price", event.FilledPrice,
@@ -158,7 +157,7 @@ func (nc *NotificationConsumer) handlePositionOpened(ctx context.Context, data [
 		return errors.Wrap(err, "unmarshal position_opened event")
 	}
 
-	nc.log.Info("Position opened notification",
+	nc.log.Infow("Position opened notification",
 		"user_id", event.Base.UserId,
 		"symbol", event.Symbol,
 		"side", event.Side,
@@ -180,7 +179,7 @@ func (nc *NotificationConsumer) handlePositionClosed(ctx context.Context, data [
 		pnlSign = "📉"
 	}
 
-	nc.log.Info(fmt.Sprintf("%s Position closed notification", pnlSign),
+	nc.log.Infow(pnlSign, "Position closed notification",
 		"user_id", event.Base.UserId,
 		"symbol", event.Symbol,
 		"pnl", event.Pnl,

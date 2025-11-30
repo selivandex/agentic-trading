@@ -110,7 +110,7 @@ func (k *KillSwitch) Activate(ctx context.Context, userID uuid.UUID, reason stri
 				)
 			} else {
 				result.PositionsClosed++
-				k.log.Info("Kill switch: position closed",
+				k.log.Infow("Kill switch: position closed",
 					"position_id", pos.ID,
 					"symbol", pos.Symbol,
 					"realized_pnl", realizedPnL,
@@ -137,7 +137,7 @@ func (k *KillSwitch) Activate(ctx context.Context, userID uuid.UUID, reason stri
 				)
 			} else {
 				result.OrdersCancelled++
-				k.log.Info("Kill switch: order cancelled",
+				k.log.Infow("Kill switch: order cancelled",
 					"order_id", ord.ID,
 					"symbol", ord.Symbol,
 				)
@@ -197,7 +197,7 @@ func (k *KillSwitch) Activate(ctx context.Context, userID uuid.UUID, reason stri
 		k.log.Error("Kill switch: failed to store state in Redis", "error", err)
 	}
 
-	k.log.Info("Kill switch activation complete",
+	k.log.Infow("Kill switch activation complete",
 		"user_id", userID,
 		"positions_closed", result.PositionsClosed,
 		"orders_cancelled", result.OrdersCancelled,
@@ -219,7 +219,7 @@ func (k *KillSwitch) IsActive(ctx context.Context, userID uuid.UUID) (bool, erro
 
 // Deactivate manually deactivates the kill switch and resets circuit breaker
 func (k *KillSwitch) Deactivate(ctx context.Context, userID uuid.UUID) error {
-	k.log.Info("Deactivating kill switch", "user_id", userID)
+	k.log.Infow("Deactivating kill switch", "user_id", userID)
 
 	// Reset circuit breaker
 	state, err := k.riskRepo.GetState(ctx, userID)
@@ -243,7 +243,7 @@ func (k *KillSwitch) Deactivate(ctx context.Context, userID uuid.UUID) error {
 		k.log.Error("Failed to delete kill switch state from Redis", "error", err)
 	}
 
-	k.log.Info("Kill switch deactivated", "user_id", userID)
+	k.log.Infow("Kill switch deactivated", "user_id", userID)
 	return nil
 }
 

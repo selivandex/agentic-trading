@@ -43,7 +43,7 @@ func (rc *RiskConsumer) Start(ctx context.Context) error {
 	defer func() {
 		rc.log.Info("Closing risk consumer...")
 		if err := rc.consumer.Close(); err != nil {
-			rc.log.Error("Failed to close risk consumer", "error", err)
+			rc.log.Errorw("Failed to close risk consumer", "error", err)
 		} else {
 			rc.log.Info("✓ Risk consumer closed")
 		}
@@ -58,7 +58,7 @@ func (rc *RiskConsumer) Start(ctx context.Context) error {
 	}
 
 	for _, topic := range topics {
-		rc.log.Info("Subscribed to risk topic", "topic", topic)
+		rc.log.Infow("Subscribed to risk topic", "topic", topic)
 	}
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)

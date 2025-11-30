@@ -95,7 +95,7 @@ func NewWebSocketBaseConsumer[T proto.Message, D any](
 
 // Start begins consuming events
 func (c *WebSocketBaseConsumer[T, D]) Start(ctx context.Context) error {
-	c.log.Info("Starting websocket consumer...",
+	c.log.Infow("Starting websocket consumer...",
 		"consumer", c.config.ConsumerName,
 		"batch_size", c.config.BatchSize,
 		"flush_interval", c.config.FlushInterval,
@@ -119,7 +119,7 @@ func (c *WebSocketBaseConsumer[T, D]) Start(ctx context.Context) error {
 	// Start background workers (periodic flush and stats)
 	lifecycle.StartBackgroundWorkers(ctx)
 
-	c.log.Info("🔄 Starting to read messages from Kafka...",
+	c.log.Infow("🔄 Starting to read messages from Kafka...",
 		"consumer", c.config.ConsumerName,
 	)
 
@@ -313,7 +313,7 @@ func (c *WebSocketBaseConsumer[T, D]) LogStats(isFinal bool) {
 	message := prefix + " " + c.config.ConsumerName + " stats"
 
 	// Base log fields as variadic args
-	c.log.Info(message,
+	c.log.Infow(message,
 		"total_received", c.totalReceived,
 		"total_processed", c.totalProcessed,
 		"total_deduplicated", c.totalDeduplicated,

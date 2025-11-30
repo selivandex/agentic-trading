@@ -53,7 +53,7 @@ func NewAgentEventHandler(
 
 // HandleStopApproaching handles stop approaching event - asks agent if should exit early
 func (h *AgentEventHandler) HandleStopApproaching(ctx context.Context, event *eventspb.StopApproachingEvent) error {
-	h.log.Info("Agent evaluating stop approaching event",
+	h.log.Infow("Agent evaluating stop approaching event",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"distance_pct", event.DistancePercent,
@@ -72,7 +72,7 @@ func (h *AgentEventHandler) HandleStopApproaching(ctx context.Context, event *ev
 	}
 
 	if pos == nil || pos.Status == position.PositionClosed {
-		h.log.Info("Position not found or already closed", "position_id", event.PositionId)
+		h.log.Infow("Position not found or already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -96,7 +96,7 @@ func (h *AgentEventHandler) HandleStopApproaching(ctx context.Context, event *ev
 
 // HandleTargetApproaching handles target approaching event - asks agent if should take profit or let run
 func (h *AgentEventHandler) HandleTargetApproaching(ctx context.Context, event *eventspb.TargetApproachingEvent) error {
-	h.log.Info("Agent evaluating target approaching event",
+	h.log.Infow("Agent evaluating target approaching event",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"distance_pct", event.DistancePercent,
@@ -116,7 +116,7 @@ func (h *AgentEventHandler) HandleTargetApproaching(ctx context.Context, event *
 	}
 
 	if pos == nil || pos.Status == position.PositionClosed {
-		h.log.Info("Position not found or already closed", "position_id", event.PositionId)
+		h.log.Infow("Position not found or already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -140,7 +140,7 @@ func (h *AgentEventHandler) HandleTargetApproaching(ctx context.Context, event *
 
 // HandleProfitMilestone handles profit milestone event - asks agent if should trail stop
 func (h *AgentEventHandler) HandleProfitMilestone(ctx context.Context, event *eventspb.ProfitMilestoneEvent) error {
-	h.log.Info("Agent evaluating profit milestone event",
+	h.log.Infow("Agent evaluating profit milestone event",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"milestone", event.Milestone,
@@ -160,7 +160,7 @@ func (h *AgentEventHandler) HandleProfitMilestone(ctx context.Context, event *ev
 	}
 
 	if pos == nil || pos.Status == position.PositionClosed {
-		h.log.Info("Position not found or already closed", "position_id", event.PositionId)
+		h.log.Infow("Position not found or already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -204,7 +204,7 @@ func (h *AgentEventHandler) HandleThesisInvalidation(ctx context.Context, event 
 	}
 
 	if pos == nil || pos.Status == position.PositionClosed {
-		h.log.Info("Position not found or already closed", "position_id", event.PositionId)
+		h.log.Infow("Position not found or already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -214,12 +214,12 @@ func (h *AgentEventHandler) HandleThesisInvalidation(ctx context.Context, event 
 	// Run agent with timeout
 	decision, err := h.runAgent(ctx, pos.UserID.String(), prompt)
 	if err != nil {
-		h.log.Error("Agent evaluation failed for thesis invalidation",
+		h.log.Errorw("Agent evaluation failed for thesis invalidation",
 			"position_id", event.PositionId,
 			"error", err,
 		)
 		// Fallback: close position (thesis invalidated = serious)
-		h.log.Warn("Fallback: closing position due to thesis invalidation", "position_id", event.PositionId)
+		h.log.Warnw("Fallback: closing position due to thesis invalidation", "position_id", event.PositionId)
 		posID, _ := uuid.Parse(event.PositionId)
 		// Close with current price and PnL from position
 		closeErr := h.posRepo.Close(ctx, posID, pos.CurrentPrice, pos.UnrealizedPnL)
@@ -235,7 +235,7 @@ func (h *AgentEventHandler) HandleThesisInvalidation(ctx context.Context, event 
 
 // HandleTimeDecay handles time decay event - asks agent if should close stale position
 func (h *AgentEventHandler) HandleTimeDecay(ctx context.Context, event *eventspb.TimeDecayEvent) error {
-	h.log.Info("Agent evaluating time decay event",
+	h.log.Infow("Agent evaluating time decay event",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"duration_hours", event.DurationHours,
@@ -255,7 +255,7 @@ func (h *AgentEventHandler) HandleTimeDecay(ctx context.Context, event *eventspb
 	}
 
 	if pos == nil || pos.Status == position.PositionClosed {
-		h.log.Info("Position not found or already closed", "position_id", event.PositionId)
+		h.log.Infow("Position not found or already closed", "position_id", event.PositionId)
 		return nil
 	}
 
@@ -265,7 +265,7 @@ func (h *AgentEventHandler) HandleTimeDecay(ctx context.Context, event *eventspb
 	// Run agent with timeout
 	decision, err := h.runAgent(ctx, pos.UserID.String(), prompt)
 	if err != nil {
-		h.log.Error("Agent evaluation failed for time decay",
+		h.log.Errorw("Agent evaluation failed for time decay",
 			"position_id", event.PositionId,
 			"error", err,
 		)
@@ -341,7 +341,7 @@ func (h *AgentEventHandler) runAgent(ctx context.Context, userID string, prompt 
 
 // executeDecision executes the agent's decision
 func (h *AgentEventHandler) executeDecision(ctx context.Context, pos *position.Position, decision string, eventType string) error {
-	h.log.Info("Executing agent decision",
+	h.log.Infow("Executing agent decision",
 		"position_id", pos.ID,
 		"symbol", pos.Symbol,
 		"decision", decision,
@@ -354,27 +354,27 @@ func (h *AgentEventHandler) executeDecision(ctx context.Context, pos *position.P
 
 	switch {
 	case containsAction(decision, "EXIT"):
-		h.log.Info("Agent decided to EXIT position", "position_id", pos.ID)
+		h.log.Infow("Agent decided to EXIT position", "position_id", pos.ID)
 		// Close position with current price and PnL
 		err := h.posRepo.Close(ctx, pos.ID, pos.CurrentPrice, pos.UnrealizedPnL)
 		return err
 
 	case containsAction(decision, "HOLD"):
-		h.log.Info("Agent decided to HOLD position", "position_id", pos.ID)
+		h.log.Infow("Agent decided to HOLD position", "position_id", pos.ID)
 		return nil
 
 	case containsAction(decision, "TRAIL_STOP"):
-		h.log.Info("Agent decided to TRAIL_STOP (not implemented yet)", "position_id", pos.ID)
+		h.log.Infow("Agent decided to TRAIL_STOP (not implemented yet)", "position_id", pos.ID)
 		// TODO: Implement stop loss trailing
 		return nil
 
 	case containsAction(decision, "TRIM"):
-		h.log.Info("Agent decided to TRIM position (not implemented yet)", "position_id", pos.ID)
+		h.log.Infow("Agent decided to TRIM position (not implemented yet)", "position_id", pos.ID)
 		// TODO: Implement partial position closing
 		return nil
 
 	default:
-		h.log.Warn("Unknown agent decision, defaulting to HOLD",
+		h.log.Warnw("Unknown agent decision, defaulting to HOLD",
 			"position_id", pos.ID,
 			"decision", decision,
 		)

@@ -81,10 +81,12 @@ type ControlHandler interface {
 	HandleSettings(ctx context.Context, chatID int64, userID uuid.UUID) error
 }
 
-// ExchangeHandler handles exchange connection
+// ExchangeHandler handles all exchange operations (add, update, delete)
 type ExchangeHandler interface {
 	HandleAddExchange(ctx context.Context, chatID int64, userID uuid.UUID) error
+	HandleUpdateExchange(ctx context.Context, chatID int64, userID uuid.UUID) error
 	HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) error
+	HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, data string) error
 	IsInSetup(ctx context.Context, telegramID int64) (bool, error)
 }
 
@@ -147,13 +149,13 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) erro
 		return errors.Wrap(err, "failed to get or create user")
 	}
 
-	// Check if user is in exchange setup flow
+	// Check if user is in exchange setup/management flow
 	if h.exchangeHandler != nil {
 		inSetup, err := h.exchangeHandler.IsInSetup(ctx, telegramID)
 		if err != nil {
 			h.log.Errorw("Failed to check exchange setup status", "error", err)
 		} else if inSetup {
-			// Route to exchange setup handler
+			// Route to exchange handler (handles both setup and management)
 			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, text)
 		}
 	}
@@ -273,6 +275,16 @@ func (h *Handler) handleCommand(ctx context.Context, chatID int64, usr *user.Use
 		}
 		return h.bot.SendMessage(chatID, "Add exchange command not yet implemented")
 
+	case "update_exchange", "updateexchange", "manage_exchange":
+		h.log.Debugw("Handling /update_exchange command",
+			"user_id", usr.ID,
+			"telegram_id", chatID,
+		)
+		if h.exchangeHandler != nil {
+			return h.exchangeHandler.HandleUpdateExchange(ctx, chatID, usr.ID)
+		}
+		return h.bot.SendMessage(chatID, "Update exchange command not yet implemented")
+
 	default:
 		h.log.Warnw("Unknown command received",
 			"user_id", usr.ID,
@@ -382,6 +394,19 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 	)
 
 	switch action {
+	case "exch":
+		// Handle exchange management callbacks (update, delete, etc.)
+		if h.exchangeHandler != nil {
+			h.log.Debugw("Routing to exchange handler (management callback)",
+				"telegram_id", telegramID,
+				"callback_data", data,
+			)
+			return h.exchangeHandler.HandleCallback(ctx, usr.ID, chatID, data)
+		}
+		h.log.Warnw("Exchange handler not available",
+			"telegram_id", telegramID,
+		)
+
 	case "exchange":
 		// Handle exchange selection callbacks
 		if h.exchangeHandler != nil && len(parts) > 1 {

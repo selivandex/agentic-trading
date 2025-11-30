@@ -3,12 +3,12 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"prometheus/internal/adapters/websocket"
 	binancews "prometheus/internal/adapters/websocket/binance"
 	"prometheus/internal/consumers"
 	"prometheus/internal/events"
-	"prometheus/pkg/errors"
 )
 
 // WebSocketClients groups WebSocket clients for different exchanges
@@ -18,6 +18,11 @@ type WebSocketClients struct {
 	OKX     websocket.Client
 }
 
+// MarketDataManager wraps the market data websocket manager
+type MarketDataManager struct {
+	Manager *websocket.MarketDataManager
+}
+
 // MustInitWebSocketClients initializes WebSocket clients for all configured exchanges
 func (c *Container) MustInitWebSocketClients() {
 	if !c.Config.WebSocket.Enabled {
@@ -25,7 +30,7 @@ func (c *Container) MustInitWebSocketClients() {
 		return
 	}
 
-	c.Log.Info("Initializing WebSocket clients",
+	c.Log.Infow("Initializing WebSocket clients",
 		"exchanges", c.Config.WebSocket.GetExchanges(),
 		"symbols", c.Config.WebSocket.GetSymbols(),
 		"intervals", c.Config.WebSocket.GetIntervals(),
@@ -62,7 +67,7 @@ func (c *Container) MustInitWebSocketClients() {
 				c.Log,
 			)
 			clients.Binance = client
-			c.Log.Info("✓ Binance WebSocket client created",
+			c.Log.Infow("✓ Binance WebSocket client created",
 				"has_credentials", apiKey != "",
 			)
 
@@ -126,7 +131,7 @@ func (c *Container) MustInitWebSocketClients() {
 	for _, streamType := range streamTypes {
 		switch streamType {
 		case "kline":
-			c.Log.Info("Creating WebSocket kline consumer",
+			c.Log.Infow("Creating WebSocket kline consumer",
 				"topic", events.TopicWebSocketKline,
 				"group_id", c.Config.Kafka.GroupID,
 			)
@@ -137,7 +142,7 @@ func (c *Container) MustInitWebSocketClients() {
 			)
 
 		case "markPrice":
-			c.Log.Info("Creating WebSocket mark price consumer",
+			c.Log.Infow("Creating WebSocket mark price consumer",
 				"topic", events.TopicWebSocketMarkPrice,
 				"group_id", c.Config.Kafka.GroupID,
 			)
@@ -148,7 +153,7 @@ func (c *Container) MustInitWebSocketClients() {
 			)
 
 		case "ticker":
-			c.Log.Info("Creating WebSocket ticker consumer",
+			c.Log.Infow("Creating WebSocket ticker consumer",
 				"topic", events.TopicWebSocketTicker,
 				"group_id", c.Config.Kafka.GroupID,
 			)
@@ -159,7 +164,7 @@ func (c *Container) MustInitWebSocketClients() {
 			)
 
 		case "trade":
-			c.Log.Info("Creating WebSocket trade consumer",
+			c.Log.Infow("Creating WebSocket trade consumer",
 				"topic", events.TopicWebSocketTrade,
 				"group_id", c.Config.Kafka.GroupID,
 			)
@@ -170,7 +175,7 @@ func (c *Container) MustInitWebSocketClients() {
 			)
 
 		case "depth":
-			c.Log.Info("Creating WebSocket depth consumer",
+			c.Log.Infow("Creating WebSocket depth consumer",
 				"topic", events.TopicWebSocketDepth,
 				"group_id", c.Config.Kafka.GroupID,
 			)
@@ -181,7 +186,7 @@ func (c *Container) MustInitWebSocketClients() {
 			)
 
 		case "liquidation":
-			c.Log.Info("Creating WebSocket liquidation consumer",
+			c.Log.Infow("Creating WebSocket liquidation consumer",
 				"topic", events.TopicWebSocketLiquidation,
 				"group_id", c.Config.Kafka.GroupID,
 			)
@@ -193,7 +198,7 @@ func (c *Container) MustInitWebSocketClients() {
 		}
 	}
 
-	c.Log.Info("✓ WebSocket infrastructure initialized",
+	c.Log.Infow("✓ WebSocket infrastructure initialized",
 		"stream_types", streamTypes,
 		"kline_consumer", c.Background.WebSocketKlineSvc != nil,
 		"markprice_consumer", c.Background.WebSocketMarkPriceSvc != nil,
@@ -204,56 +209,49 @@ func (c *Container) MustInitWebSocketClients() {
 	)
 }
 
-// connectWebSocketClients establishes connections for all WebSocket clients
-func (c *Container) connectWebSocketClients(ctx context.Context) error {
-	if !c.Config.WebSocket.Enabled || c.Adapters.WebSocketClients == nil {
-		return nil
+// MustInitMarketDataManager initializes Market Data WebSocket manager with health monitoring
+func (c *Container) MustInitMarketDataManager() {
+	if !c.Config.WebSocket.Enabled {
+		c.Log.Info("Market Data WebSocket manager disabled (WebSocket connections disabled)")
+		return
 	}
 
-	c.Log.Info("Connecting WebSocket clients...")
+	if c.Adapters.WebSocketClients == nil || c.Adapters.WebSocketClients.Binance == nil {
+		c.Log.Warn("Market Data WebSocket manager disabled (no clients initialized)")
+		return
+	}
+
+	c.Log.Info("Initializing Market Data WebSocket Manager...")
 
 	// Build stream configuration
 	streamConfig := c.buildStreamConfig()
 
-	// Connect Binance client
-	if c.Adapters.WebSocketClients.Binance != nil {
-		if err := c.Adapters.WebSocketClients.Binance.Connect(ctx, streamConfig); err != nil {
-			return errors.Wrap(err, "connect binance websocket")
-		}
-
-		if err := c.Adapters.WebSocketClients.Binance.Start(ctx); err != nil {
-			return errors.Wrap(err, "start binance websocket")
-		}
-
-		c.Log.Info("✓ Binance WebSocket connected")
+	// Create Market Data Manager for Binance client
+	managerConfig := websocket.MarketDataManagerConfig{
+		HealthCheckInterval:    60 * time.Second, // Check connection health every 60 seconds
+		MaxConsecutiveFailures: 3,                // Log warning after 3 consecutive failures
 	}
 
-	// // Connect Bybit client
-	// if c.Adapters.WebSocketClients.Bybit != nil {
-	// 	if err := c.Adapters.WebSocketClients.Bybit.Connect(ctx, streamConfig); err != nil {
-	// 		return errors.Wrap(err, "connect bybit websocket")
-	// 	}
+	manager := websocket.NewMarketDataManager(
+		c.Adapters.WebSocketClients.Binance,
+		streamConfig,
+		managerConfig,
+		c.Log,
+	)
 
-	// 	if err := c.Adapters.WebSocketClients.Bybit.Start(ctx); err != nil {
-	// 		return errors.Wrap(err, "start bybit websocket")
-	// 	}
+	c.Adapters.MarketDataManager = &MarketDataManager{
+		Manager: manager,
+	}
 
-	// 	c.Log.Info("✓ Bybit WebSocket connected")
-	// }
+	c.Log.Info("✓ Market Data WebSocket Manager initialized")
+}
 
-	// // Connect OKX client
-	// if c.Adapters.WebSocketClients.OKX != nil {
-	// 	if err := c.Adapters.WebSocketClients.OKX.Connect(ctx, streamConfig); err != nil {
-	// 		return errors.Wrap(err, "connect okx websocket")
-	// 	}
-
-	// 	if err := c.Adapters.WebSocketClients.OKX.Start(ctx); err != nil {
-	// 		return errors.Wrap(err, "start okx websocket")
-	// 	}
-
-	// 	c.Log.Info("✓ OKX WebSocket connected")
-	// }
-
+// connectWebSocketClients is deprecated - Market Data connections are now managed by MarketDataManager
+// This function is kept for backward compatibility but does nothing
+func (c *Container) connectWebSocketClients(ctx context.Context) error {
+	// NOTE: WebSocket connections are now managed by MarketDataManager with auto-reconnect
+	// See MustInitMarketDataManager() and Start() in container.go
+	c.Log.Debug("WebSocket connections now managed by MarketDataManager")
 	return nil
 }
 
@@ -353,7 +351,7 @@ func (c *Container) buildStreamConfig() websocket.ConnectionConfig {
 		}
 	}
 
-	c.Log.Info("Built stream configuration",
+	c.Log.Infow("Built stream configuration",
 		"total_streams", len(streams),
 		"stream_types", streamTypes,
 		"market_types", marketTypes,

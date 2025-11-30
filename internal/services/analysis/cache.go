@@ -199,7 +199,7 @@ func (ac *AnalysisCache) InvalidateSymbol(ctx context.Context, exchange, symbol 
 	// Note: This requires SCAN command which is safe for production
 	// Implementation would use redis SCAN to avoid blocking
 	// For now, we'll log and let entries expire naturally
-	ac.log.Info("Symbol invalidation requested (entries will expire naturally)",
+	ac.log.Infow("Symbol invalidation requested (entries will expire naturally)",
 		"exchange", exchange,
 		"symbol", symbol,
 		"pattern", pattern,
@@ -249,7 +249,7 @@ func (ac *AnalysisCache) isEntryValid(cached *CachedAnalysis, currentPrice, curr
 	if cached.Price > 0 && currentPrice > 0 {
 		priceChange := math.Abs(currentPrice-cached.Price) / cached.Price
 		if priceChange > ac.config.InvalidationPriceMovePct {
-			ac.log.Debug("Cache entry invalidated by price move",
+			ac.log.Debugw("Cache entry invalidated by price move",
 				"symbol", cached.Symbol,
 				"cached_price", cached.Price,
 				"current_price", currentPrice,
@@ -264,7 +264,7 @@ func (ac *AnalysisCache) isEntryValid(cached *CachedAnalysis, currentPrice, curr
 		volumeChange := math.Abs(currentVolume-cached.Volume) / cached.Volume
 		if volumeChange > ac.config.VolumeTolerancePct*2 {
 			// Only invalidate on very large volume changes (2x tolerance)
-			ac.log.Debug("Cache entry invalidated by volume spike",
+			ac.log.Debugw("Cache entry invalidated by volume spike",
 				"symbol", cached.Symbol,
 				"cached_volume", cached.Volume,
 				"current_volume", currentVolume,

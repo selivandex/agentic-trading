@@ -111,7 +111,7 @@ func (oc *OpportunityConsumer) Start(ctx context.Context) error {
 
 // handleOpportunity processes a single opportunity event
 func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.Message) error {
-	oc.log.Debug("Processing opportunity event",
+	oc.log.Debugw("Processing opportunity event",
 		"topic", msg.Topic,
 		"size", len(msg.Value),
 	)
@@ -122,7 +122,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		return errors.Wrap(err, "unmarshal opportunity_found event")
 	}
 
-	oc.log.Info("Opportunity detected",
+	oc.log.Infow("Opportunity detected",
 		"symbol", event.Symbol,
 		"direction", event.Direction,
 		"confidence", event.Confidence,
@@ -141,7 +141,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		return nil
 	}
 
-	oc.log.Info("Found users interested in opportunity",
+	oc.log.Infow("Found users interested in opportunity",
 		"symbol", event.Symbol,
 		"users_count", len(pairs),
 	)
@@ -234,7 +234,7 @@ waitForCompletion:
 
 	select {
 	case <-done:
-		oc.log.Info("Opportunity processing complete",
+		oc.log.Infow("Opportunity processing complete",
 			"symbol", event.Symbol,
 			"users_processed", len(pairs),
 		)
@@ -268,7 +268,7 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 	pair *trading_pair.TradingPair,
 	opportunity *eventspb.OpportunityFoundEvent,
 ) error {
-	oc.log.Info("Running personal trading workflow",
+	oc.log.Infow("Running personal trading workflow",
 		"user_id", usr.ID,
 		"symbol", pair.Symbol,
 		"opportunity_confidence", opportunity.Confidence,
@@ -325,7 +325,7 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 			for _, part := range event.LLMResponse.Content.Parts {
 				if part.FunctionCall != nil && part.FunctionCall.Name == "place_order" {
 					orderPlaced = true
-					oc.log.Info("Order placed by executor",
+					oc.log.Infow("Order placed by executor",
 						"user_id", usr.ID,
 						"symbol", pair.Symbol,
 					)
@@ -336,7 +336,7 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 		// Check if workflow is complete
 		if event.TurnComplete && event.IsFinalResponse() {
 			duration := time.Since(startTime)
-			oc.log.Info("Personal trading workflow complete",
+			oc.log.Infow("Personal trading workflow complete",
 				"user_id", usr.ID,
 				"symbol", pair.Symbol,
 				"session_id", sessionID,

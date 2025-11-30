@@ -100,7 +100,7 @@ func (c *AIUsageConsumer) Start(ctx context.Context) error {
 
 // handleUsageEvent processes a single AI usage event
 func (c *AIUsageConsumer) handleUsageEvent(ctx context.Context, msg kafka.Message) error {
-	c.log.Debug("Processing AI usage event",
+	c.log.Debugw("Processing AI usage event",
 		"topic", msg.Topic,
 		"size", len(msg.Value),
 	)
@@ -142,7 +142,7 @@ func (c *AIUsageConsumer) handleUsageEvent(ctx context.Context, msg kafka.Messag
 		return errors.Wrap(err, "failed to store AI usage log")
 	}
 
-	c.log.Debug("AI usage event buffered for batch insert",
+	c.log.Debugw("AI usage event buffered for batch insert",
 		"agent", event.AgentName,
 		"provider", event.Provider,
 		"model", event.ModelId,

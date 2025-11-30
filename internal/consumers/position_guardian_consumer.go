@@ -68,7 +68,7 @@ func (pgc *PositionGuardianConsumer) Start(ctx context.Context) error {
 		events.TopicCircuitBreakerTripped,
 	}
 
-	pgc.log.Info("Subscribed to position guardian topics", "topics", topics)
+	pgc.log.Infow("Subscribed to position guardian topics", "topics", topics)
 
 	// Consume messages (ReadMessage blocks until message or ctx cancelled)
 	for {
@@ -80,7 +80,7 @@ func (pgc *PositionGuardianConsumer) Start(ctx context.Context) error {
 				return nil
 			}
 			// Reader might be closed during shutdown, log at debug level
-			pgc.log.Debug("Failed to read position guardian event", "error", err)
+			pgc.log.Debugw("Failed to read position guardian event", "error", err)
 			continue
 		}
 
@@ -88,7 +88,7 @@ func (pgc *PositionGuardianConsumer) Start(ctx context.Context) error {
 		// Allow up to 45s to complete current message processing (30s agent timeout + 15s buffer)
 		processCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		if err := pgc.handleMessage(processCtx, msg); err != nil {
-			pgc.log.Error("Failed to handle position guardian event",
+			pgc.log.Errorw("Failed to handle position guardian event",
 				"topic", msg.Topic,
 				"error", err,
 			)
@@ -105,7 +105,7 @@ func (pgc *PositionGuardianConsumer) Start(ctx context.Context) error {
 
 // handleMessage processes a single position guardian event
 func (pgc *PositionGuardianConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
-	pgc.log.Debug("Processing position guardian event",
+	pgc.log.Debugw("Processing position guardian event",
 		"topic", msg.Topic,
 		"size", len(msg.Value),
 	)
@@ -151,7 +151,7 @@ func (pgc *PositionGuardianConsumer) handleStopLossTriggered(ctx context.Context
 		return errors.Wrap(err, "unmarshal stop_loss_triggered")
 	}
 
-	pgc.log.Warn("Stop loss triggered - delegating to critical handler",
+	pgc.log.Warnw("Stop loss triggered - delegating to critical handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 	)
@@ -165,7 +165,7 @@ func (pgc *PositionGuardianConsumer) handleTakeProfitHit(ctx context.Context, da
 		return errors.Wrap(err, "unmarshal take_profit_hit")
 	}
 
-	pgc.log.Info("Take profit hit - delegating to critical handler",
+	pgc.log.Infow("Take profit hit - delegating to critical handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 	)
@@ -179,7 +179,7 @@ func (pgc *PositionGuardianConsumer) handleCircuitBreakerTripped(ctx context.Con
 		return errors.Wrap(err, "unmarshal circuit_breaker_tripped")
 	}
 
-	pgc.log.Error("Circuit breaker tripped - delegating to critical handler",
+	pgc.log.Errorw("Circuit breaker tripped - delegating to critical handler",
 		"user_id", event.Base.UserId,
 		"reason", event.Reason,
 	)
@@ -195,7 +195,7 @@ func (pgc *PositionGuardianConsumer) handleStopApproaching(ctx context.Context, 
 		return errors.Wrap(err, "unmarshal stop_approaching")
 	}
 
-	pgc.log.Info("Stop approaching - delegating to agent handler",
+	pgc.log.Infow("Stop approaching - delegating to agent handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"distance_pct", event.DistancePercent,
@@ -210,7 +210,7 @@ func (pgc *PositionGuardianConsumer) handleTargetApproaching(ctx context.Context
 		return errors.Wrap(err, "unmarshal target_approaching")
 	}
 
-	pgc.log.Info("Target approaching - delegating to agent handler",
+	pgc.log.Infow("Target approaching - delegating to agent handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"distance_pct", event.DistancePercent,
@@ -225,7 +225,7 @@ func (pgc *PositionGuardianConsumer) handleProfitMilestone(ctx context.Context, 
 		return errors.Wrap(err, "unmarshal profit_milestone")
 	}
 
-	pgc.log.Info("Profit milestone reached - delegating to agent handler",
+	pgc.log.Infow("Profit milestone reached - delegating to agent handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"milestone", event.Milestone,
@@ -240,7 +240,7 @@ func (pgc *PositionGuardianConsumer) handleThesisInvalidation(ctx context.Contex
 		return errors.Wrap(err, "unmarshal thesis_invalidation")
 	}
 
-	pgc.log.Warn("Thesis invalidation detected - delegating to agent handler",
+	pgc.log.Warnw("Thesis invalidation detected - delegating to agent handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"reason", event.InvalidationReason,
@@ -255,7 +255,7 @@ func (pgc *PositionGuardianConsumer) handleTimeDecay(ctx context.Context, data [
 		return errors.Wrap(err, "unmarshal time_decay")
 	}
 
-	pgc.log.Info("Time decay detected - delegating to agent handler",
+	pgc.log.Infow("Time decay detected - delegating to agent handler",
 		"position_id", event.PositionId,
 		"symbol", event.Symbol,
 		"duration_hours", event.DurationHours,
@@ -272,7 +272,7 @@ func (pgc *PositionGuardianConsumer) handleCorrelationSpike(ctx context.Context,
 		return errors.Wrap(err, "unmarshal correlation_spike")
 	}
 
-	pgc.log.Warn("Correlation spike detected",
+	pgc.log.Warnw("Correlation spike detected",
 		"user_id", event.Base.UserId,
 		"symbols", event.Symbols,
 		"correlation", event.Correlation,
@@ -290,7 +290,7 @@ func (pgc *PositionGuardianConsumer) handleVolatilitySpike(ctx context.Context, 
 		return errors.Wrap(err, "unmarshal volatility_spike")
 	}
 
-	pgc.log.Warn("Volatility spike detected",
+	pgc.log.Warnw("Volatility spike detected",
 		"symbol", event.Symbol,
 		"current_volatility", event.CurrentVolatility,
 		"spike_ratio", event.SpikeRatio,

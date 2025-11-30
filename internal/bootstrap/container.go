@@ -157,6 +157,7 @@ type Adapters struct {
 	WebSocketClients   *WebSocketClients
 	WebSocketPublisher *events.WebSocketPublisher
 	UserDataManager    *UserDataManager
+	MarketDataManager  *MarketDataManager
 }
 
 // Business groups business logic components
@@ -235,6 +236,7 @@ func (c *Container) MustInit() {
 	c.MustInitApplication()
 	c.MustInitBackground()
 	c.MustInitWebSocketClients()
+	c.MustInitMarketDataManager()
 	c.MustInitUserDataManager()
 	c.MustInitUserDataConsumer()
 }
@@ -243,9 +245,14 @@ func (c *Container) MustInit() {
 func (c *Container) Start() error {
 	c.Log.Info("Starting all systems...")
 
-	// Start WebSocket connections
-	if err := c.connectWebSocketClients(c.Context); err != nil {
-		return errors.Wrap(err, "failed to connect WebSocket clients")
+	// Start Market Data WebSocket Manager (with auto-reconnect)
+	if c.Adapters.MarketDataManager != nil && c.Adapters.MarketDataManager.Manager != nil {
+		if err := c.Adapters.MarketDataManager.Manager.Start(c.Context); err != nil {
+			return errors.Wrap(err, "failed to start Market Data Manager")
+		}
+		c.Log.Infow("✓ Market Data Manager started",
+			"connected", c.Adapters.MarketDataManager.Manager.IsConnected(),
+		)
 	}
 
 	// Start User Data WebSocket Manager
@@ -253,7 +260,7 @@ func (c *Container) Start() error {
 		if err := c.Adapters.UserDataManager.Manager.Start(c.Context); err != nil {
 			return errors.Wrap(err, "failed to start User Data Manager")
 		}
-		c.Log.Info("✓ User Data Manager started",
+		c.Log.Infow("✓ User Data Manager started",
 			"active_connections", c.Adapters.UserDataManager.Manager.GetActiveConnectionCount(),
 		)
 	}
@@ -378,7 +385,7 @@ func (c *Container) startConsumers() error {
 		}()
 	}
 
-	c.Log.Info("✓ Event consumers started", "consumers", consumerNames)
+	c.Log.Infow("✓ Event consumers started", "consumers", consumerNames)
 	return nil
 }
 
@@ -413,6 +420,7 @@ func (c *Container) Shutdown() {
 		c.Background.WorkerScheduler,
 		c.Adapters.MarketDataFactory,
 		c.Adapters.WebSocketClients,
+		c.Adapters.MarketDataManager,
 		c.Adapters.UserDataManager,
 		c.Adapters.KafkaProducer,
 		c.Adapters.NotificationConsumer,

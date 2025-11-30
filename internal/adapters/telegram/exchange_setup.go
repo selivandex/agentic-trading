@@ -13,16 +13,17 @@ import (
 
 	"prometheus/internal/adapters/exchanges"
 	"prometheus/internal/domain/exchange_account"
-	"prometheus/pkg/crypto"
+	"prometheus/internal/services/exchange"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 	"prometheus/pkg/templates"
 )
 
-// ExchangeSetupState represents the current stage of exchange setup
+// ExchangeSetupState represents the current stage of exchange setup/management
 type ExchangeSetupState string
 
 const (
+	// Add exchange flow
 	ExchangeStateSelectExchange ExchangeSetupState = "select_exchange"
 	ExchangeStateAwaitingAPIKey ExchangeSetupState = "awaiting_api_key"
 	ExchangeStateAwaitingSecret ExchangeSetupState = "awaiting_secret"
@@ -30,39 +31,48 @@ const (
 	ExchangeStateTesting        ExchangeSetupState = "testing"
 	ExchangeStateComplete       ExchangeSetupState = "complete"
 	ExchangeStateError          ExchangeSetupState = "error"
+
+	// Update/manage exchange flow
+	ExchangeStateSelectAccount ExchangeSetupState = "select_account"
+	ExchangeStateSelectAction  ExchangeSetupState = "select_action"
+	ExchangeStateUpdateLabel   ExchangeSetupState = "update_label"
+	ExchangeStateUpdateAPIKey  ExchangeSetupState = "update_api_key"
+	ExchangeStateUpdateSecret  ExchangeSetupState = "update_secret"
+	ExchangeStateConfirmDelete ExchangeSetupState = "confirm_delete"
 )
 
-// ExchangeSetupSession stores the state of ongoing exchange setup
+// ExchangeSetupSession stores the state of ongoing exchange setup/management
 type ExchangeSetupSession struct {
 	TelegramID        int64              `json:"telegram_id"`
 	UserID            uuid.UUID          `json:"user_id"`
 	State             ExchangeSetupState `json:"state"`
 	SelectedExchange  string             `json:"selected_exchange"`
+	SelectedAccountID uuid.UUID          `json:"selected_account_id,omitempty"` // For update flow
 	APIKey            string             `json:"api_key"`
 	Secret            string             `json:"secret"`
 	Label             string             `json:"label"`
+	IsUpdate          bool               `json:"is_update"` // True if updating existing account
 	StartedAt         time.Time          `json:"started_at"`
 	LastInteractionAt time.Time          `json:"last_interaction_at"`
 }
 
-// ExchangeSetupService manages the exchange connection flow
+// ExchangeSetupService manages the exchange connection UI flow (Telegram-specific)
+// All business logic is delegated to services/exchange.Service
 type ExchangeSetupService struct {
-	redis        *redis.Client
-	bot          *Bot
-	exchAcctRepo exchange_account.Repository
-	exchFactory  exchanges.Factory
-	encryptor    *crypto.Encryptor
-	templates    *templates.Registry
-	log          *logger.Logger
+	redis       *redis.Client
+	bot         *Bot
+	exchService *exchange.Service // Business logic service
+	exchFactory exchanges.Factory // For testing credentials
+	templates   *templates.Registry
+	log         *logger.Logger
 }
 
 // NewExchangeSetupService creates a new exchange setup service
 func NewExchangeSetupService(
 	redis *redis.Client,
 	bot *Bot,
-	exchAcctRepo exchange_account.Repository,
+	exchService *exchange.Service, // Business logic service
 	exchFactory exchanges.Factory,
-	encryptor *crypto.Encryptor,
 	tmpl *templates.Registry,
 	log *logger.Logger,
 ) *ExchangeSetupService {
@@ -71,13 +81,12 @@ func NewExchangeSetupService(
 	}
 
 	return &ExchangeSetupService{
-		redis:        redis,
-		bot:          bot,
-		exchAcctRepo: exchAcctRepo,
-		exchFactory:  exchFactory,
-		encryptor:    encryptor,
-		templates:    tmpl,
-		log:          log.With("component", "exchange_setup"),
+		redis:       redis,
+		bot:         bot,
+		exchService: exchService,
+		exchFactory: exchFactory,
+		templates:   tmpl,
+		log:         log.With("component", "exchange_setup"),
 	}
 }
 
@@ -143,14 +152,17 @@ func (es *ExchangeSetupService) HandleMessage(ctx context.Context, userID uuid.U
 	case ExchangeStateSelectExchange:
 		return es.handleExchangeSelection(ctx, session, text)
 
-	case ExchangeStateAwaitingAPIKey:
+	case ExchangeStateAwaitingAPIKey, ExchangeStateUpdateAPIKey:
 		return es.handleAPIKeyInput(ctx, session, text, telegramID)
 
-	case ExchangeStateAwaitingSecret:
+	case ExchangeStateAwaitingSecret, ExchangeStateUpdateSecret:
 		return es.handleSecretInput(ctx, session, text, telegramID)
 
 	case ExchangeStateAwaitingLabel:
 		return es.handleLabelInput(ctx, session, text)
+
+	case ExchangeStateUpdateLabel:
+		return es.handleLabelUpdate(ctx, session, text)
 
 	case ExchangeStateTesting:
 		es.bot.SendMessage(telegramID, "⏳ Testing connection... Please wait.")
@@ -247,13 +259,16 @@ func (es *ExchangeSetupService) handleExchangeSelection(ctx context.Context, ses
 	return es.bot.SendMessage(session.TelegramID, msg)
 }
 
-// handleAPIKeyInput processes API key input
+// handleAPIKeyInput processes API key input (for both create and update flows)
 func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *ExchangeSetupSession, text string, messageID int64) error {
+	isUpdate := session.State == ExchangeStateUpdateAPIKey
+
 	es.log.Debugw("Processing API key input",
 		"telegram_id", session.TelegramID,
 		"user_id", session.UserID,
 		"exchange", session.SelectedExchange,
 		"key_length", len(text),
+		"is_update_flow", isUpdate,
 	)
 
 	apiKey := strings.TrimSpace(text)
@@ -275,7 +290,14 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 	)
 
 	session.APIKey = apiKey
-	session.State = ExchangeStateAwaitingSecret
+
+	// Different next states for create vs update
+	if isUpdate {
+		session.State = ExchangeStateUpdateSecret
+	} else {
+		session.State = ExchangeStateAwaitingSecret
+	}
+
 	session.LastInteractionAt = time.Now()
 
 	if err := es.saveSession(ctx, session); err != nil {
@@ -288,7 +310,7 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 
 	es.log.Debugw("Session updated, requesting secret",
 		"telegram_id", session.TelegramID,
-		"new_state", ExchangeStateAwaitingSecret,
+		"new_state", session.State,
 	)
 
 	// Ask for secret using template
@@ -300,13 +322,16 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 	return es.bot.SendMessage(session.TelegramID, msg)
 }
 
-// handleSecretInput processes API secret input
+// handleSecretInput processes API secret input (for both create and update flows)
 func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *ExchangeSetupSession, text string, messageID int64) error {
+	isUpdate := session.State == ExchangeStateUpdateSecret
+
 	es.log.Debugw("Processing API secret input",
 		"telegram_id", session.TelegramID,
 		"user_id", session.UserID,
 		"exchange", session.SelectedExchange,
 		"secret_length", len(text),
+		"is_update_flow", isUpdate,
 	)
 
 	secret := strings.TrimSpace(text)
@@ -328,6 +353,13 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 	)
 
 	session.Secret = secret
+
+	// For update flow - save credentials immediately
+	if isUpdate {
+		return es.updateAccountCredentials(ctx, session)
+	}
+
+	// For create flow - continue to label input
 	session.State = ExchangeStateAwaitingLabel
 	session.LastInteractionAt = time.Now()
 
@@ -351,6 +383,34 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 	}
 
 	return es.bot.SendMessage(session.TelegramID, msg)
+}
+
+// updateAccountCredentials updates API credentials via service
+func (es *ExchangeSetupService) updateAccountCredentials(ctx context.Context, session *ExchangeSetupSession) error {
+	es.log.Debugw("Updating account credentials",
+		"account_id", session.SelectedAccountID,
+		"telegram_id", session.TelegramID,
+	)
+
+	// Update via service
+	apiKey := session.APIKey
+	secret := session.Secret
+	input := exchange.UpdateAccountInput{
+		AccountID: session.SelectedAccountID,
+		APIKey:    &apiKey,
+		Secret:    &secret,
+	}
+
+	if _, err := es.exchService.UpdateAccount(ctx, input); err != nil {
+		es.log.Errorw("Failed to update credentials via service",
+			"account_id", session.SelectedAccountID,
+			"error", err,
+		)
+		return es.bot.SendMessage(session.TelegramID, "❌ Failed to update credentials")
+	}
+
+	es.deleteSession(ctx, session.TelegramID)
+	return es.bot.SendMessage(session.TelegramID, "✅ Credentials updated successfully!\n\nThe system will reconnect automatically.")
 }
 
 // handleLabelInput processes label input and completes setup
@@ -443,95 +503,37 @@ func (es *ExchangeSetupService) handleLabelInput(ctx context.Context, session *E
 	return es.deleteSession(ctx, session.TelegramID)
 }
 
-// testAndSaveExchange tests connection and saves encrypted credentials
-// Business logic: validates credentials, creates account entity with encryption
+// testAndSaveExchange delegates account creation to business service
 func (es *ExchangeSetupService) testAndSaveExchange(ctx context.Context, session *ExchangeSetupSession) error {
-	es.log.Debugw("Testing and saving exchange credentials",
+	es.log.Debugw("Creating exchange account via service",
 		"user_id", session.UserID,
 		"exchange", session.SelectedExchange,
 	)
 
-	// TODO: Actually test connection by calling exchange API
-	// For now, just validate format and save
+	// TODO: Actually test connection by calling exchange API before saving
 
-	accountID := uuid.New()
-	es.log.Debugw("Creating exchange account entity",
-		"account_id", accountID,
-		"user_id", session.UserID,
-		"exchange", session.SelectedExchange,
-	)
-
-	// Create exchange account entity
-	account := &exchange_account.ExchangeAccount{
-		ID:          accountID,
-		UserID:      session.UserID,
-		Exchange:    exchange_account.ExchangeType(session.SelectedExchange),
-		Label:       session.Label,
-		IsTestnet:   false,
-		Permissions: []string{"read", "trade"},
-		IsActive:    true,
-		LastSyncAt:  nil,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+	// Delegate to business service
+	input := exchange.CreateAccountInput{
+		UserID:    session.UserID,
+		Exchange:  exchange_account.ExchangeType(session.SelectedExchange),
+		APIKey:    session.APIKey,
+		Secret:    session.Secret,
+		Label:     session.Label,
+		IsTestnet: false,
 	}
 
-	// Use domain entity setters for encryption (encapsulation)
-	// Log safely (length and preview only)
-	apiKeyPreview := "empty"
-	if len(session.APIKey) > 0 {
-		if len(session.APIKey) >= 8 {
-			apiKeyPreview = session.APIKey[:4] + "..." + session.APIKey[len(session.APIKey)-4:]
-		} else {
-			apiKeyPreview = session.APIKey[:1] + "..." + session.APIKey[len(session.APIKey)-1:]
-		}
-	}
-
-	es.log.Debugw("Encrypting API credentials",
-		"account_id", accountID,
-		"api_key_length", len(session.APIKey),
-		"api_key_preview", apiKeyPreview,
-		"secret_length", len(session.Secret),
-		"has_whitespace_start", len(session.APIKey) > 0 && (session.APIKey[0] == ' ' || session.APIKey[0] == '\t'),
-		"has_whitespace_end", len(session.APIKey) > 0 && (session.APIKey[len(session.APIKey)-1] == ' ' || session.APIKey[len(session.APIKey)-1] == '\t'),
-	)
-
-	if err := account.SetAPIKey(session.APIKey, es.encryptor); err != nil {
-		es.log.Errorw("Failed to encrypt API key",
-			"account_id", accountID,
-			"api_key_length", len(session.APIKey),
-			"error", err,
-		)
-		return errors.Wrap(err, "failed to encrypt API key")
-	}
-
-	if err := account.SetSecret(session.Secret, es.encryptor); err != nil {
-		es.log.Errorw("Failed to encrypt secret",
-			"account_id", accountID,
-			"secret_length", len(session.Secret),
-			"error", err,
-		)
-		return errors.Wrap(err, "failed to encrypt secret")
-	}
-
-	es.log.Debugw("Credentials encrypted successfully, saving to repository",
-		"account_id", accountID,
-		"encrypted_api_key_bytes", len(account.APIKeyEncrypted),
-		"encrypted_secret_bytes", len(account.SecretEncrypted),
-	)
-
-	// Save to repository
-	if err := es.exchAcctRepo.Create(ctx, account); err != nil {
-		es.log.Errorw("Failed to save exchange account to repository",
-			"account_id", accountID,
+	account, err := es.exchService.CreateAccount(ctx, input)
+	if err != nil {
+		es.log.Errorw("Failed to create exchange account via service",
 			"user_id", session.UserID,
 			"exchange", session.SelectedExchange,
 			"error", err,
 		)
-		return errors.Wrap(err, "failed to save exchange account")
+		return err
 	}
 
-	es.log.Infow("Exchange account created successfully",
-		"account_id", accountID,
+	es.log.Infow("✅ Exchange account created successfully",
+		"account_id", account.ID,
 		"user_id", session.UserID,
 		"exchange", session.SelectedExchange,
 		"label", session.Label,
@@ -682,4 +684,331 @@ func (es *ExchangeSetupService) deleteSession(ctx context.Context, telegramID in
 	)
 
 	return nil
+}
+
+// ========================================================================
+// Exchange Account Management (Update/Delete existing accounts)
+// ========================================================================
+
+// HandleUpdateExchange starts the exchange update/management flow
+func (es *ExchangeSetupService) HandleUpdateExchange(ctx context.Context, chatID int64, userID uuid.UUID) error {
+	es.log.Infow("Starting exchange management flow",
+		"chat_id", chatID,
+		"user_id", userID,
+	)
+
+	// Get user's exchange accounts via service
+	accounts, err := es.exchService.GetUserAccounts(ctx, userID)
+	if err != nil {
+		es.log.Errorw("Failed to get user exchange accounts",
+			"user_id", userID,
+			"error", err,
+		)
+		return es.bot.SendMessage(chatID, "❌ Failed to load your exchange accounts")
+	}
+
+	if len(accounts) == 0 {
+		return es.bot.SendMessage(chatID, "You don't have any connected exchanges.\n\nUse /add_exchange to connect one.")
+	}
+
+	// Create new session for management
+	session := &ExchangeSetupSession{
+		TelegramID:        chatID,
+		UserID:            userID,
+		State:             ExchangeStateSelectAccount,
+		IsUpdate:          true,
+		StartedAt:         time.Now(),
+		LastInteractionAt: time.Now(),
+	}
+
+	if err := es.saveSession(ctx, session); err != nil {
+		return err
+	}
+
+	// Show exchange selection keyboard
+	return es.showAccountList(chatID, accounts)
+}
+
+// HandleCallback processes callback queries from inline keyboards (for management flow)
+func (es *ExchangeSetupService) HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, data string) error {
+	es.log.Debugw("Processing exchange callback",
+		"telegram_id", telegramID,
+		"callback_data", data,
+	)
+
+	session, err := es.getSession(ctx, telegramID)
+	if err != nil {
+		return errors.Wrap(err, "no active exchange session")
+	}
+
+	parts := strings.Split(data, ":")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid callback data format")
+	}
+
+	action := parts[1] // parts[0] is "exch"
+
+	switch session.State {
+	case ExchangeStateSelectAccount:
+		// User selected an exchange account to manage
+		if action == "cancel" {
+			es.deleteSession(ctx, telegramID)
+			return es.bot.SendMessage(telegramID, "❌ Cancelled")
+		}
+		accountID, err := uuid.Parse(action)
+		if err != nil {
+			return errors.Wrap(err, "invalid account ID")
+		}
+		return es.handleAccountSelected(ctx, session, accountID)
+
+	case ExchangeStateSelectAction:
+		return es.handleActionSelected(ctx, session, action)
+
+	case ExchangeStateConfirmDelete:
+		return es.handleDeleteConfirmation(ctx, session, action)
+
+	default:
+		return fmt.Errorf("unexpected state for callback: %s", session.State)
+	}
+}
+
+// showAccountList displays list of user's exchange accounts with inline keyboard
+func (es *ExchangeSetupService) showAccountList(chatID int64, accounts []*exchange_account.ExchangeAccount) error {
+	msg := "📊 *Manage Exchange Accounts*\n\nSelect an exchange to update:"
+
+	// Create keyboard with exchange accounts
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, account := range accounts {
+		statusEmoji := "✅"
+		if !account.IsActive {
+			statusEmoji = "❌"
+		}
+
+		buttonText := fmt.Sprintf("%s %s - %s", statusEmoji, strings.Title(string(account.Exchange)), account.Label)
+		row := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(buttonText, fmt.Sprintf("exch:%s", account.ID.String())),
+		)
+		rows = append(rows, row)
+	}
+
+	// Add cancel button
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "exch:cancel"),
+	))
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	return es.bot.SendMessageWithKeyboard(chatID, msg, keyboard)
+}
+
+// handleAccountSelected processes exchange account selection
+func (es *ExchangeSetupService) handleAccountSelected(ctx context.Context, session *ExchangeSetupSession, accountID uuid.UUID) error {
+	es.log.Infow("Exchange account selected for management",
+		"telegram_id", session.TelegramID,
+		"account_id", accountID,
+	)
+
+	// Load account details via service
+	account, err := es.exchService.GetAccount(ctx, accountID)
+	if err != nil {
+		es.log.Errorw("Failed to load exchange account",
+			"account_id", accountID,
+			"error", err,
+		)
+		return es.bot.SendMessage(session.TelegramID, "❌ Failed to load exchange account")
+	}
+
+	// Update session
+	session.SelectedAccountID = accountID
+	session.SelectedExchange = string(account.Exchange)
+	session.Label = account.Label
+	session.State = ExchangeStateSelectAction
+	session.LastInteractionAt = time.Now()
+
+	if err := es.saveSession(ctx, session); err != nil {
+		return err
+	}
+
+	// Show action menu
+	return es.showActionMenu(session.TelegramID, account)
+}
+
+// showActionMenu displays available actions for selected exchange
+func (es *ExchangeSetupService) showActionMenu(chatID int64, account *exchange_account.ExchangeAccount) error {
+	statusEmoji := "✅ Active"
+	toggleAction := "deactivate"
+	if !account.IsActive {
+		statusEmoji = "❌ Inactive"
+		toggleAction = "activate"
+	}
+
+	msg := fmt.Sprintf("📊 *%s - %s*\n\n"+
+		"Status: %s\n"+
+		"Testnet: %v\n\n"+
+		"What would you like to do?",
+		strings.Title(string(account.Exchange)),
+		account.Label,
+		statusEmoji,
+		account.IsTestnet,
+	)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✏️ Update Label", "exch:update_label"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔑 Update Credentials", "exch:update_creds"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("⚙️ %s", strings.Title(toggleAction)), fmt.Sprintf("exch:%s", toggleAction)),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🗑️ Delete", "exch:delete"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Back", "exch:back"),
+		),
+	)
+
+	return es.bot.SendMessageWithKeyboard(chatID, msg, keyboard)
+}
+
+// handleActionSelected processes selected action
+func (es *ExchangeSetupService) handleActionSelected(ctx context.Context, session *ExchangeSetupSession, action string) error {
+	es.log.Infow("Management action selected",
+		"telegram_id", session.TelegramID,
+		"account_id", session.SelectedAccountID,
+		"action", action,
+	)
+
+	switch action {
+	case "update_label":
+		session.State = ExchangeStateUpdateLabel
+		session.LastInteractionAt = time.Now()
+		es.saveSession(ctx, session)
+		return es.bot.SendMessage(session.TelegramID, "✏️ Please enter a new label:")
+
+	case "update_creds":
+		session.State = ExchangeStateUpdateAPIKey
+		session.LastInteractionAt = time.Now()
+		es.saveSession(ctx, session)
+		return es.bot.SendMessage(session.TelegramID, "🔑 Please enter your new API Key:")
+
+	case "activate", "deactivate":
+		return es.toggleAccountActive(ctx, session, action == "activate")
+
+	case "delete":
+		session.State = ExchangeStateConfirmDelete
+		session.LastInteractionAt = time.Now()
+		es.saveSession(ctx, session)
+		return es.showDeleteConfirmation(session.TelegramID)
+
+	case "back":
+		es.deleteSession(ctx, session.TelegramID)
+		return es.HandleUpdateExchange(ctx, session.TelegramID, session.UserID)
+
+	case "cancel":
+		es.deleteSession(ctx, session.TelegramID)
+		return es.bot.SendMessage(session.TelegramID, "❌ Cancelled")
+
+	default:
+		return fmt.Errorf("unknown action: %s", action)
+	}
+}
+
+// toggleAccountActive activates or deactivates exchange account via service
+func (es *ExchangeSetupService) toggleAccountActive(ctx context.Context, session *ExchangeSetupSession, activate bool) error {
+	// Delegate to service
+	if err := es.exchService.SetAccountActive(ctx, session.SelectedAccountID, activate); err != nil {
+		es.log.Errorw("Failed to toggle account status via service",
+			"account_id", session.SelectedAccountID,
+			"activate", activate,
+			"error", err,
+		)
+		return es.bot.SendMessage(session.TelegramID, "❌ Failed to update status")
+	}
+
+	status := "deactivated"
+	if activate {
+		status = "activated"
+	}
+
+	es.deleteSession(ctx, session.TelegramID)
+	return es.bot.SendMessage(session.TelegramID, fmt.Sprintf("✅ Account %s!", status))
+}
+
+// showDeleteConfirmation shows delete confirmation dialog
+func (es *ExchangeSetupService) showDeleteConfirmation(chatID int64) error {
+	msg := "⚠️ *Delete Exchange Account*\n\n" +
+		"Are you sure? This cannot be undone!"
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Yes", "exch:confirm_delete"),
+			tgbotapi.NewInlineKeyboardButtonData("❌ No", "exch:cancel_delete"),
+		),
+	)
+
+	return es.bot.SendMessageWithKeyboard(chatID, msg, keyboard)
+}
+
+// handleDeleteConfirmation processes delete confirmation
+func (es *ExchangeSetupService) handleDeleteConfirmation(ctx context.Context, session *ExchangeSetupSession, action string) error {
+	if action == "cancel_delete" {
+		es.deleteSession(ctx, session.TelegramID)
+		return es.bot.SendMessage(session.TelegramID, "❌ Deletion cancelled")
+	}
+
+	if action != "confirm_delete" {
+		return fmt.Errorf("unexpected delete action: %s", action)
+	}
+
+	// Delete account via service
+	if err := es.exchService.DeleteAccount(ctx, session.SelectedAccountID); err != nil {
+		es.log.Errorw("Failed to delete exchange account via service",
+			"account_id", session.SelectedAccountID,
+			"error", err,
+		)
+		return es.bot.SendMessage(session.TelegramID, "❌ Failed to delete account")
+	}
+
+	es.deleteSession(ctx, session.TelegramID)
+	return es.bot.SendMessage(session.TelegramID, "✅ Account deleted!")
+}
+
+// handleLabelUpdate updates exchange account label
+func (es *ExchangeSetupService) handleLabelUpdate(ctx context.Context, session *ExchangeSetupSession, text string) error {
+	newLabel := strings.TrimSpace(text)
+	if newLabel == "" {
+		return es.bot.SendMessage(session.TelegramID, "❌ Label cannot be empty. Please try again:")
+	}
+
+	es.log.Debugw("Updating account label",
+		"account_id", session.SelectedAccountID,
+		"new_label", newLabel,
+	)
+
+	// Load current account to show old label
+	account, err := es.exchService.GetAccount(ctx, session.SelectedAccountID)
+	if err != nil {
+		return err
+	}
+	oldLabel := account.Label
+
+	// Update via service
+	label := newLabel
+	input := exchange.UpdateAccountInput{
+		AccountID: session.SelectedAccountID,
+		Label:     &label,
+	}
+
+	if _, err := es.exchService.UpdateAccount(ctx, input); err != nil {
+		es.log.Errorw("Failed to update account label via service",
+			"account_id", session.SelectedAccountID,
+			"error", err,
+		)
+		return es.bot.SendMessage(session.TelegramID, "❌ Failed to update label")
+	}
+
+	es.deleteSession(ctx, session.TelegramID)
+	return es.bot.SendMessage(session.TelegramID, fmt.Sprintf("✅ Label updated: *%s* → *%s*", oldLabel, newLabel))
 }

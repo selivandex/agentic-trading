@@ -166,7 +166,7 @@ func (ps *PathSelector) SelectPath(ctx context.Context, req AnalysisRequest) age
 	// Route decision
 	if useCommittee {
 		ps.committeeRequests++
-		ps.log.Info("Routing to ResearchCommittee",
+		ps.log.Infow("Routing to ResearchCommittee",
 			"symbol", req.Symbol,
 			"exchange", req.Exchange,
 			"reason", reason,
@@ -178,7 +178,7 @@ func (ps *PathSelector) SelectPath(ctx context.Context, req AnalysisRequest) age
 		return ps.committePath
 	}
 
-	ps.log.Debug("Routing to fast-path OpportunitySynthesizer",
+	ps.log.Debugw("Routing to fast-path OpportunitySynthesizer",
 		"symbol", req.Symbol,
 		"exchange", req.Exchange,
 		"priority", req.Priority,

@@ -90,7 +90,7 @@ func (s *MarketSnapshotService) GetSnapshot(
 		snapshot.MarketAnalysis = marketResult
 	}
 
-	s.log.Info("Market snapshot fetched",
+	s.log.Infow("Market snapshot fetched",
 		"symbol", symbol,
 		"technical_ok", snapshot.TechnicalAnalysis != nil,
 		"smc_ok", snapshot.SMCAnalysis != nil,

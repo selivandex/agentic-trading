@@ -209,7 +209,7 @@ func (e *RiskEngine) RecordTrade(ctx context.Context, userID uuid.UUID, pnl deci
 	cacheKey := riskStateCacheKeyPrefix + userID.String()
 	e.redis.Delete(ctx, cacheKey)
 
-	e.log.Info("Trade recorded in risk engine",
+	e.log.Infow("Trade recorded in risk engine",
 		"user_id", userID,
 		"pnl", pnl,
 		"daily_pnl", state.DailyPnL,
@@ -287,7 +287,7 @@ func (e *RiskEngine) ResetCircuitBreaker(ctx context.Context, userID uuid.UUID) 
 	cacheKey := riskStateCacheKeyPrefix + userID.String()
 	e.redis.Delete(ctx, cacheKey)
 
-	e.log.Info("Circuit breaker reset manually", "user_id", userID)
+	e.log.Infow("Circuit breaker reset manually", "user_id", userID)
 
 	return nil
 }

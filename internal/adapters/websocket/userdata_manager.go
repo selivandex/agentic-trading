@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,12 +33,22 @@ type UserDataFactory interface {
 // - Maintains WebSocket connections per account
 // - Handles reconnections and health monitoring
 // - Persists listenKeys to DB for crash recovery
+// ExchangeService defines interface for exchange account management
+type ExchangeService interface {
+	DeactivateAccount(ctx context.Context, input struct {
+		AccountID uuid.UUID
+		Reason    string
+		ErrorMsg  string
+	}) error
+}
+
 type UserDataManager struct {
-	accountRepo exchange_account.Repository
-	factory     UserDataFactory
-	handler     UserDataEventHandler
-	encryptor   *crypto.Encryptor
-	logger      *logger.Logger
+	accountRepo    exchange_account.Repository
+	exchangeService ExchangeService
+	factory        UserDataFactory
+	handler        UserDataEventHandler
+	encryptor      *crypto.Encryptor
+	logger         *logger.Logger
 
 	// Connection pool: accountID -> client
 	clients   map[uuid.UUID]UserDataStreamer
@@ -70,6 +81,7 @@ type UserDataManagerConfig struct {
 // NewUserDataManager creates a new User Data WebSocket manager
 func NewUserDataManager(
 	accountRepo exchange_account.Repository,
+	exchangeService ExchangeService,
 	factory UserDataFactory,
 	handler UserDataEventHandler,
 	encryptor *crypto.Encryptor,
@@ -83,11 +95,12 @@ func NewUserDataManager(
 		config.ListenKeyRenewal = 30 * time.Minute
 	}
 	if config.ReconciliationInterval == 0 {
-		config.ReconciliationInterval = 20 * time.Second // Default: check DB every 5 minutes
+		config.ReconciliationInterval = 20 * time.Second // Default: check DB every 20 seconds
 	}
 
 	return &UserDataManager{
 		accountRepo:            accountRepo,
+		exchangeService:        exchangeService,
 		factory:                factory,
 		handler:                handler,
 		encryptor:              encryptor,
@@ -220,6 +233,13 @@ func (m *UserDataManager) connectAccount(ctx context.Context, account *exchange_
 		}
 	}
 
+	// Get char codes for debugging
+	var firstCharCode, lastCharCode int
+	if len(apiKey) > 0 {
+		firstCharCode = int(apiKey[0])
+		lastCharCode = int(apiKey[len(apiKey)-1])
+	}
+
 	m.logger.Debugw("Credentials decrypted successfully",
 		"account_id", account.ID,
 		"api_key_length", len(apiKey),
@@ -227,6 +247,8 @@ func (m *UserDataManager) connectAccount(ctx context.Context, account *exchange_
 		"secret_length", len(secret),
 		"has_whitespace_start", len(apiKey) > 0 && (apiKey[0] == ' ' || apiKey[0] == '\t' || apiKey[0] == '\n'),
 		"has_whitespace_end", len(apiKey) > 0 && (apiKey[len(apiKey)-1] == ' ' || apiKey[len(apiKey)-1] == '\t' || apiKey[len(apiKey)-1] == '\n'),
+		"api_key_first_char_code", firstCharCode,
+		"api_key_last_char_code", lastCharCode,
 	)
 
 	// Create client
@@ -266,6 +288,17 @@ func (m *UserDataManager) connectAccount(ctx context.Context, account *exchange_
 			"account_id", account.ID,
 			"error", err,
 		)
+
+		// Check if it's a credentials error
+		if m.isCredentialsError(err) {
+			m.logger.Warnw("Detected credentials error, deactivating account and notifying user",
+				"account_id", account.ID,
+				"user_id", account.UserID,
+				"exchange", account.Exchange,
+			)
+			m.handleCredentialsError(ctx, account, err)
+		}
+
 		return errors.Wrap(err, "failed to ensure listenKey")
 	}
 
@@ -876,5 +909,69 @@ func (m *UserDataManager) GetStats() map[string]interface{} {
 		"total_reconnects":    totalReconnects,
 		"total_reconciled":    totalReconciled,
 		"last_reconciliation": lastReconciliation,
+	}
+}
+
+// isCredentialsError checks if error is related to invalid credentials
+func (m *UserDataManager) isCredentialsError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	// Binance API error codes and messages
+	credentialsErrors := []string{
+		"code=-2015", // Invalid API-key, IP, or permissions for action
+		"invalid api-key",
+		"invalid signature",
+		"api-key not found",
+		"unauthorized",
+		"permission denied",
+		"insufficient permissions",
+		"ip not whitelisted",
+	}
+
+	for _, errPattern := range credentialsErrors {
+		if strings.Contains(errStr, errPattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// handleCredentialsError handles credentials-related errors:
+// - Deactivates the exchange account
+// - Publishes event for notification service to alert user
+func (m *UserDataManager) handleCredentialsError(ctx context.Context, account *exchange_account.ExchangeAccount, err error) {
+	m.logger.Infow("Handling credentials error via exchange service",
+		"account_id", account.ID,
+		"user_id", account.UserID,
+		"exchange", account.Exchange,
+	)
+
+	// Use exchange service to deactivate account and publish notification
+	deactivateErr := m.exchangeService.DeactivateAccount(ctx, struct {
+		AccountID uuid.UUID
+		Reason    string
+		ErrorMsg  string
+	}{
+		AccountID: account.ID,
+		Reason:    "invalid_credentials",
+		ErrorMsg:  err.Error(),
+	})
+
+	if deactivateErr != nil {
+		m.logger.Errorw("Failed to deactivate account via exchange service",
+			"account_id", account.ID,
+			"error", deactivateErr,
+		)
+	} else {
+		m.logger.Infow("✅ Account deactivated and notification sent",
+			"account_id", account.ID,
+			"user_id", account.UserID,
+			"exchange", account.Exchange,
+		)
 	}
 }
