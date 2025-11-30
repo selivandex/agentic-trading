@@ -72,7 +72,7 @@ func (ac *AnalyticsConsumer) Start(ctx context.Context) error {
 		// Allow up to 5s to complete current message processing
 		processCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if err := ac.handleMessage(processCtx, msg); err != nil {
-			ac.log.Error("Failed to handle analytics event",
+			ac.log.Errorw("Failed to handle analytics event",
 				"topic", msg.Topic,
 				"error", err,
 			)

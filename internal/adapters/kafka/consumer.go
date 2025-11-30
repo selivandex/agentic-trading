@@ -79,14 +79,14 @@ func (c *Consumer) Consume(ctx context.Context, handler MessageHandler) error {
 				continue
 			}
 
-			c.log.Errorf("Failed to read message: %v", err)
+			c.log.Errorw("Failed to read message", "error", err)
 			continue
 		}
 
-		c.log.Debugf("Received message: key=%s", string(msg.Key))
+		c.log.Debugw("Received message", "key", string(msg.Key))
 
 		if err := handler(ctx, msg); err != nil {
-			c.log.Errorf("Failed to handle message: %v", err)
+			c.log.Errorw("Failed to handle message", "error", err)
 			// Continue processing other messages even if one fails
 		}
 	}

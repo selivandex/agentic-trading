@@ -51,6 +51,9 @@ const (
 	// WebSocket events - real-time market data (kline, ticker, depth, trades, liquidations)
 	TopicWebSocketEvents = "websocket.events"
 
+	// User Data events - real-time order, position, balance, margin updates from exchange WebSocket
+	TopicUserDataEvents = "user-data.events"
+
 	// Analytics events - metrics, statistics, performance, reports
 	TopicAnalytics = "analytics"
 )

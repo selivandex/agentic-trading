@@ -324,7 +324,7 @@ func (c *UserDataClient) handleOrderUpdate(ctx context.Context, event *futures.W
 	}
 
 	if err := c.handler.OnOrderUpdate(ctx, orderEvent); err != nil {
-		c.logger.Error("Failed to handle order update",
+		c.logger.Errorw("Failed to handle order update",
 			"account_id", c.accountID,
 			"order_id", orderEvent.OrderID,
 			"error", err,
@@ -355,7 +355,7 @@ func (c *UserDataClient) handleAccountUpdate(ctx context.Context, event *futures
 		}
 
 		if err := c.handler.OnPositionUpdate(ctx, posEvent); err != nil {
-			c.logger.Error("Failed to handle position update",
+			c.logger.Errorw("Failed to handle position update",
 				"account_id", c.accountID,
 				"symbol", pos.Symbol,
 				"error", err,
@@ -381,7 +381,7 @@ func (c *UserDataClient) handleAccountUpdate(ctx context.Context, event *futures
 		}
 
 		if err := c.handler.OnBalanceUpdate(ctx, balEvent); err != nil {
-			c.logger.Error("Failed to handle balance update",
+			c.logger.Errorw("Failed to handle balance update",
 				"account_id", c.accountID,
 				"asset", bal.Asset,
 				"error", err,
@@ -414,7 +414,7 @@ func (c *UserDataClient) handleMarginCall(ctx context.Context, event *futures.Ws
 	}
 
 	if err := c.handler.OnMarginCall(ctx, marginEvent); err != nil {
-		c.logger.Error("Failed to handle margin call",
+		c.logger.Errorw("Failed to handle margin call",
 			"account_id", c.accountID,
 			"error", err,
 		)
@@ -434,7 +434,7 @@ func (c *UserDataClient) handleAccountConfigUpdate(ctx context.Context, event *f
 	}
 
 	if err := c.handler.OnAccountConfigUpdate(ctx, configEvent); err != nil {
-		c.logger.Error("Failed to handle account config update",
+		c.logger.Errorw("Failed to handle account config update",
 			"account_id", c.accountID,
 			"error", err,
 		)

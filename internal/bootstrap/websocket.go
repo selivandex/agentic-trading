@@ -125,15 +125,17 @@ func (c *Container) MustInitWebSocketClients() {
 		c.Adapters.WebSocketClients = clients
 	}
 
-	// Create unified WebSocket consumer (handles all stream types)
+	// Create unified WebSocket consumer (handles market data + user data events)
 	c.Log.Infow("Creating unified WebSocket consumer",
-		"topic", events.TopicWebSocketEvents,
-		"event_types", []string{"kline", "ticker", "depth", "trade", "mark_price", "liquidation"},
+		"topics", []string{events.TopicWebSocketEvents, events.TopicUserDataEvents},
+		"market_data_types", []string{"kline", "ticker", "depth", "trade", "mark_price", "liquidation"},
+		"user_data_types", []string{"order", "position", "balance", "margin_call"},
 		"group_id", c.Config.Kafka.GroupID,
 	)
 	c.Background.WebSocketSvc = consumers.NewWebSocketConsumer(
 		c.Adapters.WebSocketConsumer,
 		c.Repos.MarketData,
+		c.Services.PositionManagement,
 		c.Log,
 	)
 

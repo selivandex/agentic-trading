@@ -5448,6 +5448,138 @@ func (x *UserDataAccountConfigEvent) GetEventTime() *timestamppb.Timestamp {
 	return nil
 }
 
+// UserDataEventWrapper wraps all User Data event types for efficient type detection
+// This allows consumer to determine event type without trial-and-error unmarshaling
+type UserDataEventWrapper struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Event:
+	//
+	//	*UserDataEventWrapper_OrderUpdate
+	//	*UserDataEventWrapper_PositionUpdate
+	//	*UserDataEventWrapper_BalanceUpdate
+	//	*UserDataEventWrapper_MarginCall
+	//	*UserDataEventWrapper_AccountConfig
+	Event         isUserDataEventWrapper_Event `protobuf_oneof:"event"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserDataEventWrapper) Reset() {
+	*x = UserDataEventWrapper{}
+	mi := &file_internal_events_proto_events_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserDataEventWrapper) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserDataEventWrapper) ProtoMessage() {}
+
+func (x *UserDataEventWrapper) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_events_proto_events_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserDataEventWrapper.ProtoReflect.Descriptor instead.
+func (*UserDataEventWrapper) Descriptor() ([]byte, []int) {
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *UserDataEventWrapper) GetEvent() isUserDataEventWrapper_Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+func (x *UserDataEventWrapper) GetOrderUpdate() *UserDataOrderUpdateEvent {
+	if x != nil {
+		if x, ok := x.Event.(*UserDataEventWrapper_OrderUpdate); ok {
+			return x.OrderUpdate
+		}
+	}
+	return nil
+}
+
+func (x *UserDataEventWrapper) GetPositionUpdate() *UserDataPositionUpdateEvent {
+	if x != nil {
+		if x, ok := x.Event.(*UserDataEventWrapper_PositionUpdate); ok {
+			return x.PositionUpdate
+		}
+	}
+	return nil
+}
+
+func (x *UserDataEventWrapper) GetBalanceUpdate() *UserDataBalanceUpdateEvent {
+	if x != nil {
+		if x, ok := x.Event.(*UserDataEventWrapper_BalanceUpdate); ok {
+			return x.BalanceUpdate
+		}
+	}
+	return nil
+}
+
+func (x *UserDataEventWrapper) GetMarginCall() *UserDataMarginCallEvent {
+	if x != nil {
+		if x, ok := x.Event.(*UserDataEventWrapper_MarginCall); ok {
+			return x.MarginCall
+		}
+	}
+	return nil
+}
+
+func (x *UserDataEventWrapper) GetAccountConfig() *UserDataAccountConfigEvent {
+	if x != nil {
+		if x, ok := x.Event.(*UserDataEventWrapper_AccountConfig); ok {
+			return x.AccountConfig
+		}
+	}
+	return nil
+}
+
+type isUserDataEventWrapper_Event interface {
+	isUserDataEventWrapper_Event()
+}
+
+type UserDataEventWrapper_OrderUpdate struct {
+	OrderUpdate *UserDataOrderUpdateEvent `protobuf:"bytes,1,opt,name=order_update,json=orderUpdate,proto3,oneof"`
+}
+
+type UserDataEventWrapper_PositionUpdate struct {
+	PositionUpdate *UserDataPositionUpdateEvent `protobuf:"bytes,2,opt,name=position_update,json=positionUpdate,proto3,oneof"`
+}
+
+type UserDataEventWrapper_BalanceUpdate struct {
+	BalanceUpdate *UserDataBalanceUpdateEvent `protobuf:"bytes,3,opt,name=balance_update,json=balanceUpdate,proto3,oneof"`
+}
+
+type UserDataEventWrapper_MarginCall struct {
+	MarginCall *UserDataMarginCallEvent `protobuf:"bytes,4,opt,name=margin_call,json=marginCall,proto3,oneof"`
+}
+
+type UserDataEventWrapper_AccountConfig struct {
+	AccountConfig *UserDataAccountConfigEvent `protobuf:"bytes,5,opt,name=account_config,json=accountConfig,proto3,oneof"`
+}
+
+func (*UserDataEventWrapper_OrderUpdate) isUserDataEventWrapper_Event() {}
+
+func (*UserDataEventWrapper_PositionUpdate) isUserDataEventWrapper_Event() {}
+
+func (*UserDataEventWrapper_BalanceUpdate) isUserDataEventWrapper_Event() {}
+
+func (*UserDataEventWrapper_MarginCall) isUserDataEventWrapper_Event() {}
+
+func (*UserDataEventWrapper_AccountConfig) isUserDataEventWrapper_Event() {}
+
 // ExchangeDeactivatedEvent is published when exchange account is deactivated due to errors
 type ExchangeDeactivatedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -5464,7 +5596,7 @@ type ExchangeDeactivatedEvent struct {
 
 func (x *ExchangeDeactivatedEvent) Reset() {
 	*x = ExchangeDeactivatedEvent{}
-	mi := &file_internal_events_proto_events_proto_msgTypes[49]
+	mi := &file_internal_events_proto_events_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5476,7 +5608,7 @@ func (x *ExchangeDeactivatedEvent) String() string {
 func (*ExchangeDeactivatedEvent) ProtoMessage() {}
 
 func (x *ExchangeDeactivatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_events_proto_events_proto_msgTypes[49]
+	mi := &file_internal_events_proto_events_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5489,7 +5621,7 @@ func (x *ExchangeDeactivatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExchangeDeactivatedEvent.ProtoReflect.Descriptor instead.
 func (*ExchangeDeactivatedEvent) Descriptor() ([]byte, []int) {
-	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{49}
+	return file_internal_events_proto_events_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ExchangeDeactivatedEvent) GetBase() *BaseEvent {
@@ -6155,7 +6287,15 @@ const file_internal_events_proto_events_proto_rawDesc = "" +
 	"\x06symbol\x18\x04 \x01(\tR\x06symbol\x12\x1a\n" +
 	"\bleverage\x18\x05 \x01(\x05R\bleverage\x129\n" +
 	"\n" +
-	"event_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\xee\x01\n" +
+	"event_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\"\x94\x03\n" +
+	"\x14UserDataEventWrapper\x12E\n" +
+	"\forder_update\x18\x01 \x01(\v2 .events.UserDataOrderUpdateEventH\x00R\vorderUpdate\x12N\n" +
+	"\x0fposition_update\x18\x02 \x01(\v2#.events.UserDataPositionUpdateEventH\x00R\x0epositionUpdate\x12K\n" +
+	"\x0ebalance_update\x18\x03 \x01(\v2\".events.UserDataBalanceUpdateEventH\x00R\rbalanceUpdate\x12B\n" +
+	"\vmargin_call\x18\x04 \x01(\v2\x1f.events.UserDataMarginCallEventH\x00R\n" +
+	"marginCall\x12K\n" +
+	"\x0eaccount_config\x18\x05 \x01(\v2\".events.UserDataAccountConfigEventH\x00R\raccountConfigB\a\n" +
+	"\x05event\"\xee\x01\n" +
 	"\x18ExchangeDeactivatedEvent\x12%\n" +
 	"\x04base\x18\x01 \x01(\v2\x11.events.BaseEventR\x04base\x12\x1d\n" +
 	"\n" +
@@ -6186,7 +6326,7 @@ func file_internal_events_proto_events_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_events_proto_events_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
+var file_internal_events_proto_events_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_internal_events_proto_events_proto_goTypes = []any{
 	(EventUrgency)(0),                   // 0: events.EventUrgency
 	(*BaseEvent)(nil),                   // 1: events.BaseEvent
@@ -6238,28 +6378,29 @@ var file_internal_events_proto_events_proto_goTypes = []any{
 	(*PositionAtRisk)(nil),              // 47: events.PositionAtRisk
 	(*UserDataMarginCallEvent)(nil),     // 48: events.UserDataMarginCallEvent
 	(*UserDataAccountConfigEvent)(nil),  // 49: events.UserDataAccountConfigEvent
-	(*ExchangeDeactivatedEvent)(nil),    // 50: events.ExchangeDeactivatedEvent
-	nil,                                 // 51: events.OpportunityFoundEvent.IndicatorsEntry
-	nil,                                 // 52: events.DecisionMadeEvent.ContextEntry
-	(*timestamppb.Timestamp)(nil),       // 53: google.protobuf.Timestamp
+	(*UserDataEventWrapper)(nil),        // 50: events.UserDataEventWrapper
+	(*ExchangeDeactivatedEvent)(nil),    // 51: events.ExchangeDeactivatedEvent
+	nil,                                 // 52: events.OpportunityFoundEvent.IndicatorsEntry
+	nil,                                 // 53: events.DecisionMadeEvent.ContextEntry
+	(*timestamppb.Timestamp)(nil),       // 54: google.protobuf.Timestamp
 }
 var file_internal_events_proto_events_proto_depIdxs = []int32{
-	53, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
+	54, // 0: events.BaseEvent.timestamp:type_name -> google.protobuf.Timestamp
 	1,  // 1: events.AIUsageEvent.base:type_name -> events.BaseEvent
 	1,  // 2: events.OpportunityFoundEvent.base:type_name -> events.BaseEvent
-	51, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
+	52, // 3: events.OpportunityFoundEvent.indicators:type_name -> events.OpportunityFoundEvent.IndicatorsEntry
 	1,  // 4: events.RegimeChangedEvent.base:type_name -> events.BaseEvent
 	1,  // 5: events.OrderPlacedEvent.base:type_name -> events.BaseEvent
 	1,  // 6: events.OrderFilledEvent.base:type_name -> events.BaseEvent
 	1,  // 7: events.PositionOpenedEvent.base:type_name -> events.BaseEvent
 	1,  // 8: events.PositionClosedEvent.base:type_name -> events.BaseEvent
 	1,  // 9: events.CircuitBreakerTrippedEvent.base:type_name -> events.BaseEvent
-	53, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
+	54, // 10: events.CircuitBreakerTrippedEvent.resume_at:type_name -> google.protobuf.Timestamp
 	1,  // 11: events.AgentExecutedEvent.base:type_name -> events.BaseEvent
 	1,  // 12: events.DecisionMadeEvent.base:type_name -> events.BaseEvent
-	52, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
+	53, // 13: events.DecisionMadeEvent.context:type_name -> events.DecisionMadeEvent.ContextEntry
 	1,  // 14: events.WorkerFailedEvent.base:type_name -> events.BaseEvent
-	53, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
+	54, // 15: events.WorkerFailedEvent.last_success:type_name -> google.protobuf.Timestamp
 	1,  // 16: events.DrawdownAlert.base:type_name -> events.BaseEvent
 	1,  // 17: events.ConsecutiveLossesAlert.base:type_name -> events.BaseEvent
 	1,  // 18: events.PnLUpdatedEvent.base:type_name -> events.BaseEvent
@@ -6290,29 +6431,29 @@ var file_internal_events_proto_events_proto_depIdxs = []int32{
 	1,  // 43: events.VolatilitySpikeEvent.base:type_name -> events.BaseEvent
 	0,  // 44: events.VolatilitySpikeEvent.urgency:type_name -> events.EventUrgency
 	1,  // 45: events.WebSocketKlineEvent.base:type_name -> events.BaseEvent
-	53, // 46: events.WebSocketKlineEvent.open_time:type_name -> google.protobuf.Timestamp
-	53, // 47: events.WebSocketKlineEvent.close_time:type_name -> google.protobuf.Timestamp
-	53, // 48: events.WebSocketKlineEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 46: events.WebSocketKlineEvent.open_time:type_name -> google.protobuf.Timestamp
+	54, // 47: events.WebSocketKlineEvent.close_time:type_name -> google.protobuf.Timestamp
+	54, // 48: events.WebSocketKlineEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 49: events.WebSocketTickerEvent.base:type_name -> events.BaseEvent
-	53, // 50: events.WebSocketTickerEvent.open_time:type_name -> google.protobuf.Timestamp
-	53, // 51: events.WebSocketTickerEvent.close_time:type_name -> google.protobuf.Timestamp
-	53, // 52: events.WebSocketTickerEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 50: events.WebSocketTickerEvent.open_time:type_name -> google.protobuf.Timestamp
+	54, // 51: events.WebSocketTickerEvent.close_time:type_name -> google.protobuf.Timestamp
+	54, // 52: events.WebSocketTickerEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 53: events.WebSocketDepthEvent.base:type_name -> events.BaseEvent
 	37, // 54: events.WebSocketDepthEvent.bids:type_name -> events.PriceLevel
 	37, // 55: events.WebSocketDepthEvent.asks:type_name -> events.PriceLevel
-	53, // 56: events.WebSocketDepthEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 56: events.WebSocketDepthEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 57: events.WebSocketTradeEvent.base:type_name -> events.BaseEvent
-	53, // 58: events.WebSocketTradeEvent.trade_time:type_name -> google.protobuf.Timestamp
-	53, // 59: events.WebSocketTradeEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 58: events.WebSocketTradeEvent.trade_time:type_name -> google.protobuf.Timestamp
+	54, // 59: events.WebSocketTradeEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 60: events.WebSocketFundingRateEvent.base:type_name -> events.BaseEvent
-	53, // 61: events.WebSocketFundingRateEvent.funding_time:type_name -> google.protobuf.Timestamp
-	53, // 62: events.WebSocketFundingRateEvent.next_funding_time:type_name -> google.protobuf.Timestamp
-	53, // 63: events.WebSocketFundingRateEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 61: events.WebSocketFundingRateEvent.funding_time:type_name -> google.protobuf.Timestamp
+	54, // 62: events.WebSocketFundingRateEvent.next_funding_time:type_name -> google.protobuf.Timestamp
+	54, // 63: events.WebSocketFundingRateEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 64: events.WebSocketMarkPriceEvent.base:type_name -> events.BaseEvent
-	53, // 65: events.WebSocketMarkPriceEvent.next_funding_time:type_name -> google.protobuf.Timestamp
-	53, // 66: events.WebSocketMarkPriceEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 65: events.WebSocketMarkPriceEvent.next_funding_time:type_name -> google.protobuf.Timestamp
+	54, // 66: events.WebSocketMarkPriceEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 67: events.WebSocketLiquidationEvent.base:type_name -> events.BaseEvent
-	53, // 68: events.WebSocketLiquidationEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 68: events.WebSocketLiquidationEvent.event_time:type_name -> google.protobuf.Timestamp
 	35, // 69: events.WebSocketEventWrapper.kline:type_name -> events.WebSocketKlineEvent
 	36, // 70: events.WebSocketEventWrapper.ticker:type_name -> events.WebSocketTickerEvent
 	38, // 71: events.WebSocketEventWrapper.depth:type_name -> events.WebSocketDepthEvent
@@ -6321,23 +6462,28 @@ var file_internal_events_proto_events_proto_depIdxs = []int32{
 	42, // 74: events.WebSocketEventWrapper.liquidation:type_name -> events.WebSocketLiquidationEvent
 	40, // 75: events.WebSocketEventWrapper.funding_rate:type_name -> events.WebSocketFundingRateEvent
 	1,  // 76: events.UserDataOrderUpdateEvent.base:type_name -> events.BaseEvent
-	53, // 77: events.UserDataOrderUpdateEvent.trade_time:type_name -> google.protobuf.Timestamp
-	53, // 78: events.UserDataOrderUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 77: events.UserDataOrderUpdateEvent.trade_time:type_name -> google.protobuf.Timestamp
+	54, // 78: events.UserDataOrderUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 79: events.UserDataPositionUpdateEvent.base:type_name -> events.BaseEvent
-	53, // 80: events.UserDataPositionUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 80: events.UserDataPositionUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 81: events.UserDataBalanceUpdateEvent.base:type_name -> events.BaseEvent
-	53, // 82: events.UserDataBalanceUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 82: events.UserDataBalanceUpdateEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 83: events.UserDataMarginCallEvent.base:type_name -> events.BaseEvent
 	47, // 84: events.UserDataMarginCallEvent.positions_at_risk:type_name -> events.PositionAtRisk
-	53, // 85: events.UserDataMarginCallEvent.event_time:type_name -> google.protobuf.Timestamp
+	54, // 85: events.UserDataMarginCallEvent.event_time:type_name -> google.protobuf.Timestamp
 	1,  // 86: events.UserDataAccountConfigEvent.base:type_name -> events.BaseEvent
-	53, // 87: events.UserDataAccountConfigEvent.event_time:type_name -> google.protobuf.Timestamp
-	1,  // 88: events.ExchangeDeactivatedEvent.base:type_name -> events.BaseEvent
-	89, // [89:89] is the sub-list for method output_type
-	89, // [89:89] is the sub-list for method input_type
-	89, // [89:89] is the sub-list for extension type_name
-	89, // [89:89] is the sub-list for extension extendee
-	0,  // [0:89] is the sub-list for field type_name
+	54, // 87: events.UserDataAccountConfigEvent.event_time:type_name -> google.protobuf.Timestamp
+	44, // 88: events.UserDataEventWrapper.order_update:type_name -> events.UserDataOrderUpdateEvent
+	45, // 89: events.UserDataEventWrapper.position_update:type_name -> events.UserDataPositionUpdateEvent
+	46, // 90: events.UserDataEventWrapper.balance_update:type_name -> events.UserDataBalanceUpdateEvent
+	48, // 91: events.UserDataEventWrapper.margin_call:type_name -> events.UserDataMarginCallEvent
+	49, // 92: events.UserDataEventWrapper.account_config:type_name -> events.UserDataAccountConfigEvent
+	1,  // 93: events.ExchangeDeactivatedEvent.base:type_name -> events.BaseEvent
+	94, // [94:94] is the sub-list for method output_type
+	94, // [94:94] is the sub-list for method input_type
+	94, // [94:94] is the sub-list for extension type_name
+	94, // [94:94] is the sub-list for extension extendee
+	0,  // [0:94] is the sub-list for field type_name
 }
 
 func init() { file_internal_events_proto_events_proto_init() }
@@ -6354,13 +6500,20 @@ func file_internal_events_proto_events_proto_init() {
 		(*WebSocketEventWrapper_Liquidation)(nil),
 		(*WebSocketEventWrapper_FundingRate)(nil),
 	}
+	file_internal_events_proto_events_proto_msgTypes[49].OneofWrappers = []any{
+		(*UserDataEventWrapper_OrderUpdate)(nil),
+		(*UserDataEventWrapper_PositionUpdate)(nil),
+		(*UserDataEventWrapper_BalanceUpdate)(nil),
+		(*UserDataEventWrapper_MarginCall)(nil),
+		(*UserDataEventWrapper_AccountConfig)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_events_proto_events_proto_rawDesc), len(file_internal_events_proto_events_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   52,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

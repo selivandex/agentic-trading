@@ -30,7 +30,7 @@ func (wh *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// This handles method validation and JSON parsing
 	update, err := wh.bot.GetAPI().HandleUpdate(r)
 	if err != nil {
-		wh.log.Error("Failed to handle webhook update", "error", err)
+		wh.log.Errorw("Failed to handle webhook update", "error", err)
 
 		// Return error response as JSON (library expects this format)
 		errResp := map[string]string{"error": err.Error()}
@@ -40,7 +40,7 @@ func (wh *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wh.log.Debug("Received webhook update",
+	wh.log.Debugw("Received webhook update",
 		"update_id", update.UpdateID,
 		"has_message", update.Message != nil,
 		"has_callback", update.CallbackQuery != nil,

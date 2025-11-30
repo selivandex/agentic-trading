@@ -159,6 +159,9 @@ func (c *Container) MustInitAdapters() {
 	// Routes by event.Base.Type and batches inserts by type
 	c.Adapters.WebSocketConsumer = provideKafkaConsumer(c.Config, events.TopicWebSocketEvents, c.Log)
 
+	// User Data consumer (for user-specific WebSocket events: orders, positions, balances)
+	c.Adapters.UserDataEventsConsumer = provideKafkaConsumer(c.Config, events.TopicUserDataEvents, c.Log)
+
 	// Crypto
 	c.Adapters.Encryptor, err = crypto.NewEncryptor(c.Config.Crypto.EncryptionKey)
 	if err != nil {
@@ -201,6 +204,9 @@ func (c *Container) MustInitServices() {
 	c.Services.Journal = journal.NewService(c.Repos.Journal)
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)
+
+	// Position management service for WebSocket updates
+	c.Services.PositionManagement = positionservice.NewService(c.Repos.Position, c.Log)
 
 	// Exchange service with notification publisher for Telegram
 	notificationPublisher := events.NewNotificationPublisher(c.Adapters.KafkaProducer)

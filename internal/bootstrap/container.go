@@ -38,6 +38,7 @@ import (
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
 	exchangeservice "prometheus/internal/services/exchange"
+	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
 	"prometheus/internal/tools"
 	"prometheus/internal/workers"
@@ -108,16 +109,17 @@ type Repositories struct {
 
 // Services groups all domain services
 type Services struct {
-	User            *user.Service
-	ExchangeAccount *exchange_account.Service
-	Exchange        *exchangeservice.Service // Exchange account management service
-	TradingPair     *trading_pair.Service
-	Order           *order.Service
-	Position        *position.Service
-	Memory          *memory.Service
-	Journal         *journal.Service
-	Session         *domainsession.Service
-	ADKSession      session.Service // ADK interface
+	User               *user.Service
+	ExchangeAccount    *exchange_account.Service
+	Exchange           *exchangeservice.Service // Exchange account management service
+	TradingPair        *trading_pair.Service
+	Order              *order.Service
+	Position           *position.Service
+	PositionManagement *positionservice.Service // Position management service for WebSocket updates
+	Memory             *memory.Service
+	Journal            *journal.Service
+	Session            *domainsession.Service
+	ADKSession         session.Service // ADK interface
 }
 
 // Adapters groups all external adapters
@@ -135,12 +137,8 @@ type Adapters struct {
 	// WebSocket consumer (unified for all stream types)
 	WebSocketConsumer *kafka.Consumer
 
-	// User Data WebSocket consumers
-	UserDataOrderConsumer         *kafka.Consumer
-	UserDataPositionConsumer      *kafka.Consumer
-	UserDataBalanceConsumer       *kafka.Consumer
-	UserDataMarginCallConsumer    *kafka.Consumer
-	UserDataAccountConfigConsumer *kafka.Consumer
+	// User Data WebSocket consumer (unified for all user data events)
+	UserDataEventsConsumer *kafka.Consumer
 
 	// Crypto & Exchanges
 	Encryptor         *crypto.Encryptor
@@ -191,11 +189,8 @@ type Background struct {
 	AIUsageSvc          *consumers.AIUsageConsumer
 	PositionGuardianSvc *consumers.PositionGuardianConsumer
 
-	// WebSocket consumer service (unified)
+	// WebSocket consumer service (unified for market data + user data)
 	WebSocketSvc *consumers.WebSocketConsumer
-
-	// User Data WebSocket consumer service
-	UserDataSvc *consumers.UserDataConsumer
 }
 
 // NewContainer creates a new dependency container
@@ -230,7 +225,7 @@ func (c *Container) MustInit() {
 	c.MustInitWebSocketClients()
 	c.MustInitMarketDataManager()
 	c.MustInitUserDataManager()
-	c.MustInitUserDataConsumer()
+	// NOTE: User Data events are now consumed by the unified WebSocketConsumer (see websocket.go)
 }
 
 // Start starts all background components
@@ -306,15 +301,6 @@ func (c *Container) startConsumers() error {
 			svc  interface{ Start(context.Context) error }
 		}{"websocket", c.Background.WebSocketSvc})
 		consumerNames = append(consumerNames, "websocket")
-	}
-
-	// Add User Data consumer if enabled
-	if c.Background.UserDataSvc != nil {
-		consumers = append(consumers, struct {
-			name string
-			svc  interface{ Start(context.Context) error }
-		}{"user_data", c.Background.UserDataSvc})
-		consumerNames = append(consumerNames, "user_data")
 	}
 
 	c.WG.Add(len(consumers))

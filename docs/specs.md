@@ -4451,7 +4451,7 @@ func (c *Consumer) Consume(ctx context.Context, handler MessageHandler) error {
             }
 
             if err := handler(ctx, msg); err != nil {
-                c.log.Errorf("Failed to handle message: %v", err)
+                c.log.Errorw("Failed to handle message: %v", err)
                 // Could implement retry logic here
             }
         }

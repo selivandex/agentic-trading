@@ -70,7 +70,7 @@ func (rc *RiskConsumer) Start(ctx context.Context) error {
 		// Allow up to 5s to complete current message processing
 		processCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if err := rc.handleMessage(processCtx, msg); err != nil {
-			rc.log.Error("Failed to handle risk event",
+			rc.log.Errorw("Failed to handle risk event",
 				"topic", msg.Topic,
 				"error", err,
 			)

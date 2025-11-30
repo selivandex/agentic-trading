@@ -12,6 +12,7 @@ import (
 	kafkaadapter "prometheus/internal/adapters/kafka"
 	"prometheus/internal/domain/market_data"
 	eventspb "prometheus/internal/events/proto"
+	positionsvc "prometheus/internal/services/position"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
@@ -24,21 +25,23 @@ const (
 )
 
 // WebSocketConsumer is a unified consumer for all WebSocket events
-// Handles all stream types from TopicWebSocketEvents and routes by event.Base.Type
+// Handles market data from TopicWebSocketEvents and user data from TopicUserDataEvents
 type WebSocketConsumer struct {
-	consumer   *kafkaadapter.Consumer
-	repository market_data.Repository
-	log        *logger.Logger
+	consumer        *kafkaadapter.Consumer
+	repository      market_data.Repository
+	positionService positionService
+	log             *logger.Logger
 
 	// Batching (single batch for all event types)
 	mu    sync.Mutex
-	batch []interface{} // Mixed batch of different domain types
+	batch []interface{} // Mixed batch of market data types
 
 	// Statistics
 	statsMu               sync.Mutex
 	totalReceived         int64
 	totalProcessed        int64
 	totalSkipped          int64 // Events skipped due to type filtering
+	totalDeduplicated     int64 // Events removed as duplicates
 	totalErrors           int64
 	lastFlushTime         time.Time
 	lastStatsLogTime      time.Time
@@ -47,6 +50,11 @@ type WebSocketConsumer struct {
 
 	// Per-type statistics
 	typeStats map[string]*eventTypeStats
+}
+
+// positionService interface for position management
+type positionService interface {
+	UpdateFromWebSocket(ctx context.Context, update *positionsvc.PositionWebSocketUpdate) error
 }
 
 type eventTypeStats struct {
@@ -59,12 +67,14 @@ type eventTypeStats struct {
 func NewWebSocketConsumer(
 	consumer *kafkaadapter.Consumer,
 	repository market_data.Repository,
+	posService positionService,
 	log *logger.Logger,
 ) *WebSocketConsumer {
 	now := time.Now()
 	return &WebSocketConsumer{
 		consumer:         consumer,
 		repository:       repository,
+		positionService:  posService,
 		log:              log,
 		batch:            make([]interface{}, 0, wsBatchSize),
 		lastFlushTime:    now,
@@ -73,10 +83,10 @@ func NewWebSocketConsumer(
 	}
 }
 
-// Start begins consuming WebSocket events
+// Start begins consuming WebSocket events (market data + user data)
 func (c *WebSocketConsumer) Start(ctx context.Context) error {
-	c.log.Infow("Starting WebSocket consumer...",
-		"topic", "websocket.events",
+	c.log.Infow("Starting unified WebSocket consumer...",
+		"topics", []string{"websocket.events", "user-data.events"},
 		"batch_size", wsBatchSize,
 		"flush_interval", wsFlushInterval,
 	)
@@ -125,15 +135,27 @@ func (c *WebSocketConsumer) handleMessage(ctx context.Context, msg kafka.Message
 }
 
 // handleEvent processes a single event based on type
-// Uses WebSocketEventWrapper with oneof for efficient type detection
+// Uses WebSocketEventWrapper or UserDataEventWrapper with oneof for efficient type detection
 func (c *WebSocketConsumer) handleEvent(ctx context.Context, data []byte) error {
-	var wrapper eventspb.WebSocketEventWrapper
-	if err := proto.Unmarshal(data, &wrapper); err != nil {
-		c.log.Debugw("⚠️ Failed to unmarshal wrapper", "error", err, "data_len", len(data))
-		c.incrementStat(&c.totalSkipped)
-		return nil
+	// Try WebSocket market data wrapper first
+	var wsWrapper eventspb.WebSocketEventWrapper
+	if err := proto.Unmarshal(data, &wsWrapper); err == nil && wsWrapper.Event != nil {
+		return c.handleWebSocketEvent(ctx, &wsWrapper)
 	}
 
+	// Try User Data wrapper
+	var udWrapper eventspb.UserDataEventWrapper
+	if err := proto.Unmarshal(data, &udWrapper); err == nil && udWrapper.Event != nil {
+		return c.handleUserDataEvent(ctx, &udWrapper)
+	}
+
+	c.log.Debugw("⚠️ Failed to unmarshal any wrapper type", "data_len", len(data))
+	c.incrementStat(&c.totalSkipped)
+	return nil
+}
+
+// handleWebSocketEvent processes WebSocket market data events
+func (c *WebSocketConsumer) handleWebSocketEvent(ctx context.Context, wrapper *eventspb.WebSocketEventWrapper) error {
 	// Check which event type is set in the oneof
 	switch event := wrapper.Event.(type) {
 	case *eventspb.WebSocketEventWrapper_Kline:
@@ -167,10 +189,98 @@ func (c *WebSocketConsumer) handleEvent(ctx context.Context, data []byte) error 
 		return nil
 
 	default:
-		c.log.Debugw("Unknown WebSocket event in wrapper", "data_len", len(data))
+		c.log.Debugw("Unknown WebSocket event in wrapper")
 		c.incrementStat(&c.totalSkipped)
 		return nil
 	}
+}
+
+// handleUserDataEvent processes User Data events (orders, positions, balances, margin calls)
+func (c *WebSocketConsumer) handleUserDataEvent(ctx context.Context, wrapper *eventspb.UserDataEventWrapper) error {
+	// Check which event type is set in the oneof
+	switch event := wrapper.Event.(type) {
+	case *eventspb.UserDataEventWrapper_PositionUpdate:
+		c.trackTypeReceived("userdata.position_update")
+		if err := c.handlePositionUpdateTyped(ctx, event.PositionUpdate); err != nil {
+			c.trackTypeError("userdata.position_update")
+			return err
+		}
+		c.trackTypeProcessed("userdata.position_update")
+
+	case *eventspb.UserDataEventWrapper_OrderUpdate:
+		c.trackTypeReceived("userdata.order_update")
+		c.log.Debugw("Order update received (not implemented yet)",
+			"order_id", event.OrderUpdate.OrderId,
+			"symbol", event.OrderUpdate.Symbol,
+			"status", event.OrderUpdate.Status,
+		)
+		c.trackTypeProcessed("userdata.order_update")
+		// TODO: Implement order update handling
+
+	case *eventspb.UserDataEventWrapper_BalanceUpdate:
+		c.trackTypeReceived("userdata.balance_update")
+		c.log.Debugw("Balance update received",
+			"user_id", event.BalanceUpdate.Base.UserId,
+			"asset", event.BalanceUpdate.Asset,
+			"wallet_balance", event.BalanceUpdate.WalletBalance,
+		)
+		c.trackTypeProcessed("userdata.balance_update")
+		// TODO: Store balance updates if needed
+
+	case *eventspb.UserDataEventWrapper_MarginCall:
+		c.trackTypeReceived("userdata.margin_call")
+		c.log.Errorw("⚠️ MARGIN CALL RECEIVED",
+			"user_id", event.MarginCall.Base.UserId,
+			"account_id", event.MarginCall.AccountId,
+			"positions_at_risk", len(event.MarginCall.PositionsAtRisk),
+		)
+		c.trackTypeProcessed("userdata.margin_call")
+		// TODO: Implement emergency actions (circuit breaker, telegram alert)
+
+	case *eventspb.UserDataEventWrapper_AccountConfig:
+		c.trackTypeReceived("userdata.account_config")
+		c.log.Debugw("Account config updated",
+			"user_id", event.AccountConfig.Base.UserId,
+			"symbol", event.AccountConfig.Symbol,
+			"leverage", event.AccountConfig.Leverage,
+		)
+		c.trackTypeProcessed("userdata.account_config")
+		// TODO: Store leverage changes
+
+	default:
+		c.log.Debugw("Unknown User Data event in wrapper")
+		c.incrementStat(&c.totalSkipped)
+		return nil
+	}
+
+	return nil
+}
+
+// handlePositionUpdateTyped processes position update events using position service
+func (c *WebSocketConsumer) handlePositionUpdateTyped(ctx context.Context, event *eventspb.UserDataPositionUpdateEvent) error {
+	// Parse event into service update struct
+	update, err := positionsvc.ParsePositionUpdateFromEvent(event)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse position update")
+	}
+
+	c.log.Debugw("Processing position update",
+		"user_id", update.UserID,
+		"account_id", update.AccountID,
+		"symbol", update.Symbol,
+		"side", update.Side,
+		"amount", update.Amount,
+	)
+
+	// Call service to handle update
+	if err := c.positionService.UpdateFromWebSocket(ctx, update); err != nil {
+		return errors.Wrap(err, "failed to update position")
+	}
+
+	c.incrementStat(&c.totalProcessed)
+	c.incrementStat(&c.processedSinceLastLog)
+
+	return nil
 }
 
 // handleKlineTyped processes kline/candlestick events from typed protobuf message
@@ -399,15 +509,31 @@ func (c *WebSocketConsumer) FlushBatch(ctx context.Context) error {
 
 	start := time.Now()
 
+	// Deduplicate batch before insert
+	dedupedBatch := c.deduplicateBatch(batchCopy)
+	dedupCount := originalSize - len(dedupedBatch)
+
+	if dedupCount > 0 {
+		c.statsMu.Lock()
+		c.totalDeduplicated += int64(dedupCount)
+		c.statsMu.Unlock()
+
+		c.log.Infow("🔄 Deduplicated batch",
+			"original", originalSize,
+			"removed", dedupCount,
+			"final", len(dedupedBatch),
+		)
+	}
+
 	// Group items by type and insert
-	if err := c.insertMixedBatch(ctx, batchCopy); err != nil {
+	if err := c.insertMixedBatch(ctx, dedupedBatch); err != nil {
 		c.log.Error("Failed to flush batch", "error", err)
 		return err
 	}
 
 	duration := time.Since(start)
 	c.log.Infow("✅ Flushed mixed batch to ClickHouse",
-		"size", originalSize,
+		"size", len(dedupedBatch),
 		"duration_ms", duration.Milliseconds(),
 	)
 
@@ -489,6 +615,152 @@ func (c *WebSocketConsumer) insertMixedBatch(ctx context.Context, batch []interf
 	return nil
 }
 
+// deduplicateBatch removes duplicate events based on unique keys
+// For each event type, keeps only the latest version based on event_time
+func (c *WebSocketConsumer) deduplicateBatch(batch []interface{}) []interface{} {
+	if len(batch) == 0 {
+		return batch
+	}
+
+	// Separate maps for each type to maintain type-specific deduplication
+	klinesSeen := make(map[string]market_data.OHLCV)
+	tickersSeen := make(map[string]market_data.Ticker)
+	depthsSeen := make(map[string]market_data.OrderBookSnapshot)
+	tradesSeen := make(map[string]market_data.Trade)
+	markPricesSeen := make(map[string]market_data.MarkPrice)
+	liquidationsSeen := make(map[string]market_data.Liquidation)
+
+	// Process each item and deduplicate
+	for _, item := range batch {
+		switch v := item.(type) {
+		case market_data.OHLCV:
+			key := getKlineKey(v)
+			if existing, exists := klinesSeen[key]; exists {
+				// Keep the one with latest event_time
+				if v.EventTime.After(existing.EventTime) {
+					klinesSeen[key] = v
+				}
+			} else {
+				klinesSeen[key] = v
+			}
+
+		case market_data.Ticker:
+			key := getTickerKey(v)
+			if existing, exists := tickersSeen[key]; exists {
+				if v.EventTime.After(existing.EventTime) {
+					tickersSeen[key] = v
+				}
+			} else {
+				tickersSeen[key] = v
+			}
+
+		case market_data.OrderBookSnapshot:
+			key := getDepthKey(v)
+			if existing, exists := depthsSeen[key]; exists {
+				if v.EventTime.After(existing.EventTime) {
+					depthsSeen[key] = v
+				}
+			} else {
+				depthsSeen[key] = v
+			}
+
+		case market_data.Trade:
+			key := getTradeKey(v)
+			if existing, exists := tradesSeen[key]; exists {
+				if v.EventTime.After(existing.EventTime) {
+					tradesSeen[key] = v
+				}
+			} else {
+				tradesSeen[key] = v
+			}
+
+		case market_data.MarkPrice:
+			key := getMarkPriceKey(v)
+			if existing, exists := markPricesSeen[key]; exists {
+				if v.EventTime.After(existing.EventTime) {
+					markPricesSeen[key] = v
+				}
+			} else {
+				markPricesSeen[key] = v
+			}
+
+		case market_data.Liquidation:
+			key := getLiquidationKey(v)
+			if existing, exists := liquidationsSeen[key]; exists {
+				if v.EventTime.After(existing.EventTime) {
+					liquidationsSeen[key] = v
+				}
+			} else {
+				liquidationsSeen[key] = v
+			}
+		}
+	}
+
+	// Rebuild deduplicated batch
+	result := make([]interface{}, 0, len(batch))
+	for _, v := range klinesSeen {
+		result = append(result, v)
+	}
+	for _, v := range tickersSeen {
+		result = append(result, v)
+	}
+	for _, v := range depthsSeen {
+		result = append(result, v)
+	}
+	for _, v := range tradesSeen {
+		result = append(result, v)
+	}
+	for _, v := range markPricesSeen {
+		result = append(result, v)
+	}
+	for _, v := range liquidationsSeen {
+		result = append(result, v)
+	}
+
+	return result
+}
+
+// Deduplication key generators for each type
+
+func getKlineKey(item market_data.OHLCV) string {
+	// exchange_symbol_interval_opentime
+	return item.Exchange + "_" + item.Symbol + "_" + item.Timeframe + "_" +
+		strconv.FormatInt(item.OpenTime.Unix(), 10)
+}
+
+func getTickerKey(item market_data.Ticker) string {
+	// exchange_symbol_markettype_timestamp (rounded to second)
+	return item.Exchange + "_" + item.Symbol + "_" + item.MarketType + "_" +
+		strconv.FormatInt(item.Timestamp.Unix(), 10)
+}
+
+func getDepthKey(item market_data.OrderBookSnapshot) string {
+	// exchange_symbol_markettype_timestamp (rounded to second)
+	// Order book snapshots are frequent, keep only latest per second
+	return item.Exchange + "_" + item.Symbol + "_" + item.MarketType + "_" +
+		strconv.FormatInt(item.Timestamp.Unix(), 10)
+}
+
+func getTradeKey(item market_data.Trade) string {
+	// exchange_symbol_tradeid (trades are unique by ID)
+	return item.Exchange + "_" + item.Symbol + "_" +
+		strconv.FormatInt(item.TradeID, 10)
+}
+
+func getMarkPriceKey(item market_data.MarkPrice) string {
+	// exchange_symbol_timestamp (rounded to second)
+	return item.Exchange + "_" + item.Symbol + "_" +
+		strconv.FormatInt(item.Timestamp.Unix(), 10)
+}
+
+func getLiquidationKey(item market_data.Liquidation) string {
+	// exchange_symbol_side_timestamp_price (liquidations are relatively rare)
+	// Use price as part of key since multiple liquidations can happen at same time
+	return item.Exchange + "_" + item.Symbol + "_" + item.Side + "_" +
+		strconv.FormatInt(item.Timestamp.UnixMilli(), 10) + "_" +
+		strconv.FormatFloat(item.Price, 'f', 2, 64)
+}
+
 // LogStats implements BatchConsumer interface
 func (c *WebSocketConsumer) LogStats(final bool) {
 	c.statsMu.Lock()
@@ -511,6 +783,7 @@ func (c *WebSocketConsumer) LogStats(final bool) {
 	stats := map[string]interface{}{
 		"total_received":        c.totalReceived,
 		"total_processed":       c.totalProcessed,
+		"total_deduplicated":    c.totalDeduplicated,
 		"total_skipped":         c.totalSkipped,
 		"total_errors":          c.totalErrors,
 		"pending_batch":         pendingBatch,

@@ -95,7 +95,7 @@ func (oc *OpportunityConsumer) Start(ctx context.Context) error {
 		// 2. Cancel running workflows early
 		// 3. Wait with timeout for workflow completion
 		if err := oc.handleOpportunity(ctx, msg); err != nil {
-			oc.log.Error("Failed to handle opportunity",
+			oc.log.Errorw("Failed to handle opportunity",
 				"topic", msg.Topic,
 				"error", err,
 			)

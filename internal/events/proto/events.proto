@@ -666,6 +666,18 @@ message UserDataAccountConfigEvent {
   google.protobuf.Timestamp event_time = 6;
 }
 
+// UserDataEventWrapper wraps all User Data event types for efficient type detection
+// This allows consumer to determine event type without trial-and-error unmarshaling
+message UserDataEventWrapper {
+  oneof event {
+    UserDataOrderUpdateEvent order_update = 1;
+    UserDataPositionUpdateEvent position_update = 2;
+    UserDataBalanceUpdateEvent balance_update = 3;
+    UserDataMarginCallEvent margin_call = 4;
+    UserDataAccountConfigEvent account_config = 5;
+  }
+}
+
 // ExchangeDeactivatedEvent is published when exchange account is deactivated due to errors
 message ExchangeDeactivatedEvent {
   BaseEvent base = 1;

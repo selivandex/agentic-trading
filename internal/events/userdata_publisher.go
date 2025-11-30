@@ -28,7 +28,7 @@ func NewUserDataPublisher(producer *kafka.Producer, log *logger.Logger) *UserDat
 	}
 }
 
-// PublishOrderUpdate publishes a UserDataOrderUpdateEvent to Kafka
+// PublishOrderUpdate publishes a UserDataOrderUpdateEvent to Kafka using wrapper
 func (p *UserDataPublisher) PublishOrderUpdate(
 	ctx context.Context,
 	userID, accountID uuid.UUID,
@@ -67,12 +67,19 @@ func (p *UserDataPublisher) PublishOrderUpdate(
 		EventTime:       timestamppb.New(eventTime),
 	}
 
-	data, err := proto.Marshal(event)
+	// Wrap the event
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_OrderUpdate{
+			OrderUpdate: event,
+		},
+	}
+
+	data, err := proto.Marshal(wrapper)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal order update event")
 	}
 
-	if err := p.producer.PublishBinary(ctx, "user-data-order-updates", []byte(userID.String()), data); err != nil {
+	if err := p.producer.PublishBinary(ctx, TopicUserDataEvents, []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish order update event")
 	}
 
@@ -87,7 +94,7 @@ func (p *UserDataPublisher) PublishOrderUpdate(
 	return nil
 }
 
-// PublishPositionUpdate publishes a UserDataPositionUpdateEvent to Kafka
+// PublishPositionUpdate publishes a UserDataPositionUpdateEvent to Kafka using wrapper
 func (p *UserDataPublisher) PublishPositionUpdate(
 	ctx context.Context,
 	userID, accountID uuid.UUID,
@@ -116,12 +123,19 @@ func (p *UserDataPublisher) PublishPositionUpdate(
 		EventTime:         timestamppb.New(eventTime),
 	}
 
-	data, err := proto.Marshal(event)
+	// Wrap the event
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_PositionUpdate{
+			PositionUpdate: event,
+		},
+	}
+
+	data, err := proto.Marshal(wrapper)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal position update event")
 	}
 
-	if err := p.producer.PublishBinary(ctx, "user-data-position-updates", []byte(userID.String()), data); err != nil {
+	if err := p.producer.PublishBinary(ctx, TopicUserDataEvents, []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish position update event")
 	}
 
@@ -135,7 +149,7 @@ func (p *UserDataPublisher) PublishPositionUpdate(
 	return nil
 }
 
-// PublishBalanceUpdate publishes a UserDataBalanceUpdateEvent to Kafka
+// PublishBalanceUpdate publishes a UserDataBalanceUpdateEvent to Kafka using wrapper
 func (p *UserDataPublisher) PublishBalanceUpdate(
 	ctx context.Context,
 	userID, accountID uuid.UUID,
@@ -161,12 +175,19 @@ func (p *UserDataPublisher) PublishBalanceUpdate(
 		EventTime:          timestamppb.New(eventTime),
 	}
 
-	data, err := proto.Marshal(event)
+	// Wrap the event
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_BalanceUpdate{
+			BalanceUpdate: event,
+		},
+	}
+
+	data, err := proto.Marshal(wrapper)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal balance update event")
 	}
 
-	if err := p.producer.PublishBinary(ctx, "user-data-balance-updates", []byte(userID.String()), data); err != nil {
+	if err := p.producer.PublishBinary(ctx, TopicUserDataEvents, []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish balance update event")
 	}
 
@@ -180,7 +201,7 @@ func (p *UserDataPublisher) PublishBalanceUpdate(
 	return nil
 }
 
-// PublishMarginCall publishes a UserDataMarginCallEvent to Kafka (CRITICAL!)
+// PublishMarginCall publishes a UserDataMarginCallEvent to Kafka using wrapper (CRITICAL!)
 func (p *UserDataPublisher) PublishMarginCall(
 	ctx context.Context,
 	userID, accountID uuid.UUID,
@@ -218,16 +239,23 @@ func (p *UserDataPublisher) PublishMarginCall(
 		EventTime:          timestamppb.New(eventTime),
 	}
 
-	data, err := proto.Marshal(event)
+	// Wrap the event
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_MarginCall{
+			MarginCall: event,
+		},
+	}
+
+	data, err := proto.Marshal(wrapper)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal margin call event")
 	}
 
-	if err := p.producer.PublishBinary(ctx, "user-data-margin-calls", []byte(userID.String()), data); err != nil {
+	if err := p.producer.PublishBinary(ctx, TopicUserDataEvents, []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish margin call event")
 	}
 
-	p.logger.Error("⚠️ Published MARGIN CALL event",
+	p.logger.Errorw("⚠️ Published MARGIN CALL event",
 		"user_id", userID,
 		"account_id", accountID,
 		"positions_at_risk", len(positionsAtRisk),
@@ -236,7 +264,7 @@ func (p *UserDataPublisher) PublishMarginCall(
 	return nil
 }
 
-// PublishAccountConfigUpdate publishes a UserDataAccountConfigEvent to Kafka
+// PublishAccountConfigUpdate publishes a UserDataAccountConfigEvent to Kafka using wrapper
 func (p *UserDataPublisher) PublishAccountConfigUpdate(
 	ctx context.Context,
 	userID, accountID uuid.UUID,
@@ -260,12 +288,19 @@ func (p *UserDataPublisher) PublishAccountConfigUpdate(
 		EventTime: timestamppb.New(eventTime),
 	}
 
-	data, err := proto.Marshal(event)
+	// Wrap the event
+	wrapper := &eventspb.UserDataEventWrapper{
+		Event: &eventspb.UserDataEventWrapper_AccountConfig{
+			AccountConfig: event,
+		},
+	}
+
+	data, err := proto.Marshal(wrapper)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal account config update event")
 	}
 
-	if err := p.producer.PublishBinary(ctx, "user-data-account-config", []byte(userID.String()), data); err != nil {
+	if err := p.producer.PublishBinary(ctx, TopicUserDataEvents, []byte(userID.String()), data); err != nil {
 		return errors.Wrap(err, "failed to publish account config update event")
 	}
 
