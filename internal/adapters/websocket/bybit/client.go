@@ -183,11 +183,20 @@ func (c *Client) handleTickerMessage(response bybitws.V5WebsocketPublicTickerRes
 	}
 
 	data := response.Data.LinearInverse
+	symbol := string(data.Symbol)
+
+	// Bybit sends two types of messages:
+	// - "snapshot": full data (on connect and periodically)
+	// - "delta": incremental updates (only changed fields)
+	// We only process snapshot messages to keep implementation simple
+	if response.Type != "snapshot" {
+		return nil
+	}
 
 	// Convert to our generic MarkPriceEvent format
 	event := &websocket.MarkPriceEvent{
 		Exchange:        c.exchange,
-		Symbol:          string(data.Symbol),
+		Symbol:          symbol,
 		MarkPrice:       data.MarkPrice,
 		IndexPrice:      data.IndexPrice,
 		FundingRate:     data.FundingRate,
@@ -218,12 +227,26 @@ func (c *Client) Start(ctx context.Context) error {
 		"exchange", c.exchange,
 	)
 
+	// Define error handler for WebSocket connection issues
+	errHandler := func(isWebsocketClosed bool, err error) {
+		c.errorCount.Add(1)
+		c.logger.Errorw("Bybit WebSocket error",
+			"is_closed", isWebsocketClosed,
+			"error", err,
+		)
+
+		if c.handler != nil {
+			c.handler.OnError(err)
+		}
+	}
+
 	// Start the WebSocket service in a goroutine
 	go func() {
 		defer close(c.doneChan)
 
-		if err := c.wsPublic.Run(); err != nil {
-			c.logger.Errorw("WebSocket service error",
+		// Start() is blocking and handles reconnections
+		if err := c.wsPublic.Start(ctx, errHandler); err != nil {
+			c.logger.Errorw("WebSocket service start error",
 				"error", err,
 			)
 			c.errorCount.Add(1)

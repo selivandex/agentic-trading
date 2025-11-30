@@ -103,11 +103,11 @@ func NewUserDataManager(
 
 // Start initializes all User Data WebSocket connections for active accounts
 func (m *UserDataManager) Start(ctx context.Context) error {
-	m.logger.Info("Starting User Data Manager...")
+	m.logger.Infow("Starting User Data Manager...")
 
 	// Load and connect all active accounts from DB
 	if err := m.loadAllActiveAccounts(ctx); err != nil {
-		m.logger.Error("Failed to load active accounts on startup", "error", err)
+		m.logger.Errorw("Failed to load active accounts on startup", "error", err)
 		// Don't fail startup, continue with empty state
 	}
 
@@ -116,7 +116,7 @@ func (m *UserDataManager) Start(ctx context.Context) error {
 	go m.listenKeyRenewalLoop(ctx)
 	go m.reconciliationLoop(ctx) // Hot reload: sync with DB periodically
 
-	m.logger.Info("✓ User Data Manager started",
+	m.logger.Infow("✓ User Data Manager started",
 		"active_connections", m.GetActiveConnectionCount(),
 	)
 
@@ -125,14 +125,14 @@ func (m *UserDataManager) Start(ctx context.Context) error {
 
 // loadAllActiveAccounts loads all active exchange accounts from DB and connects them
 func (m *UserDataManager) loadAllActiveAccounts(ctx context.Context) error {
-	m.logger.Info("Loading all active exchange accounts from DB...")
+	m.logger.Infow("Loading all active exchange accounts from DB...")
 
 	accounts, err := m.accountRepo.GetAllActive(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to get all active accounts")
 	}
 
-	m.logger.Info("Found active accounts to connect",
+	m.logger.Infow("Found active accounts to connect",
 		"count", len(accounts),
 	)
 
@@ -142,7 +142,7 @@ func (m *UserDataManager) loadAllActiveAccounts(ctx context.Context) error {
 		// Check if shutdown requested during startup
 		select {
 		case <-ctx.Done():
-			m.logger.Warn("Loading accounts interrupted by shutdown",
+			m.logger.Warnw("Loading accounts interrupted by shutdown",
 				"loaded", successCount,
 				"failed", failureCount,
 				"remaining", len(accounts)-successCount-failureCount,
@@ -152,7 +152,7 @@ func (m *UserDataManager) loadAllActiveAccounts(ctx context.Context) error {
 		}
 
 		if err := m.connectAccount(ctx, account); err != nil {
-			m.logger.Error("Failed to connect account on startup",
+			m.logger.Errorw("Failed to connect account on startup",
 				"account_id", account.ID,
 				"user_id", account.UserID,
 				"exchange", account.Exchange,
@@ -164,7 +164,7 @@ func (m *UserDataManager) loadAllActiveAccounts(ctx context.Context) error {
 		successCount++
 	}
 
-	m.logger.Info("✓ Loaded active accounts",
+	m.logger.Infow("✓ Loaded active accounts",
 		"total", len(accounts),
 		"success", successCount,
 		"failures", failureCount,
@@ -175,18 +175,66 @@ func (m *UserDataManager) loadAllActiveAccounts(ctx context.Context) error {
 
 // connectAccount establishes WebSocket connection for a single account
 func (m *UserDataManager) connectAccount(ctx context.Context, account *exchange_account.ExchangeAccount) error {
+	m.logger.Infow("🔌 Connecting User Data WebSocket for account",
+		"account_id", account.ID,
+		"user_id", account.UserID,
+		"exchange", account.Exchange,
+		"label", account.Label,
+		"testnet", account.IsTestnet,
+	)
+
 	// Decrypt credentials
+	m.logger.Debugw("Decrypting API credentials",
+		"account_id", account.ID,
+		"encrypted_api_key_bytes", len(account.APIKeyEncrypted),
+		"encrypted_secret_bytes", len(account.SecretEncrypted),
+	)
+
 	apiKey, err := account.GetAPIKey(m.encryptor)
 	if err != nil {
+		m.logger.Errorw("Failed to decrypt API key",
+			"account_id", account.ID,
+			"encrypted_bytes", len(account.APIKeyEncrypted),
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to decrypt API key")
 	}
 
 	secret, err := account.GetSecret(m.encryptor)
 	if err != nil {
+		m.logger.Errorw("Failed to decrypt secret",
+			"account_id", account.ID,
+			"encrypted_bytes", len(account.SecretEncrypted),
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to decrypt secret")
 	}
 
+	// Log safely (length and first/last chars only for debugging)
+	apiKeyPreview := "empty"
+	if len(apiKey) > 0 {
+		if len(apiKey) >= 8 {
+			apiKeyPreview = apiKey[:4] + "..." + apiKey[len(apiKey)-4:]
+		} else {
+			apiKeyPreview = apiKey[:1] + "..." + apiKey[len(apiKey)-1:]
+		}
+	}
+
+	m.logger.Debugw("Credentials decrypted successfully",
+		"account_id", account.ID,
+		"api_key_length", len(apiKey),
+		"api_key_preview", apiKeyPreview,
+		"secret_length", len(secret),
+		"has_whitespace_start", len(apiKey) > 0 && (apiKey[0] == ' ' || apiKey[0] == '\t' || apiKey[0] == '\n'),
+		"has_whitespace_end", len(apiKey) > 0 && (apiKey[len(apiKey)-1] == ' ' || apiKey[len(apiKey)-1] == '\t' || apiKey[len(apiKey)-1] == '\n'),
+	)
+
 	// Create client
+	m.logger.Debugw("Creating WebSocket client",
+		"account_id", account.ID,
+		"exchange", account.Exchange,
+	)
+
 	client, err := m.factory.Create(
 		account.Exchange,
 		account.ID,
@@ -195,39 +243,84 @@ func (m *UserDataManager) connectAccount(ctx context.Context, account *exchange_
 		account.IsTestnet,
 	)
 	if err != nil {
+		m.logger.Errorw("Failed to create WebSocket client",
+			"account_id", account.ID,
+			"exchange", account.Exchange,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to create client")
 	}
 
+	m.logger.Debugw("WebSocket client created",
+		"account_id", account.ID,
+	)
+
 	// Get or create listenKey
+	m.logger.Debugw("Ensuring listenKey",
+		"account_id", account.ID,
+	)
+
 	listenKey, expiresAt, err := m.ensureListenKey(ctx, account, client, apiKey, secret)
 	if err != nil {
+		m.logger.Errorw("Failed to ensure listenKey",
+			"account_id", account.ID,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to ensure listenKey")
 	}
 
+	m.logger.Debugw("ListenKey ready",
+		"account_id", account.ID,
+		"expires_at", expiresAt,
+	)
+
 	// Connect WebSocket
+	m.logger.Debugw("Connecting WebSocket",
+		"account_id", account.ID,
+	)
+
 	if err := client.Connect(ctx, listenKey, apiKey, secret); err != nil {
+		m.logger.Errorw("Failed to connect WebSocket",
+			"account_id", account.ID,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to connect WebSocket")
 	}
 
+	m.logger.Debugw("WebSocket connected, starting event stream",
+		"account_id", account.ID,
+	)
+
 	// Start receiving events
 	if err := client.Start(ctx); err != nil {
+		m.logger.Errorw("Failed to start WebSocket event stream",
+			"account_id", account.ID,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to start WebSocket")
 	}
+
+	m.logger.Debugw("WebSocket event stream started",
+		"account_id", account.ID,
+	)
 
 	// Store client in pool
 	m.clientsMu.Lock()
 	m.clients[account.ID] = client
 	m.activeConnections++
+	currentConnections := m.activeConnections
 	m.clientsMu.Unlock()
 
 	// Update metrics
 	metrics.UserDataConnections.WithLabelValues(string(account.Exchange)).Inc()
 
-	m.logger.Info("✓ Connected User Data WebSocket",
+	m.logger.Infow("✅ User Data WebSocket connected and streaming",
 		"account_id", account.ID,
 		"user_id", account.UserID,
 		"exchange", account.Exchange,
+		"label", account.Label,
 		"listen_key_expires_at", expiresAt,
+		"total_active_connections", currentConnections,
 	)
 
 	return nil
@@ -240,36 +333,77 @@ func (m *UserDataManager) ensureListenKey(
 	client UserDataStreamer,
 	apiKey, secret string,
 ) (string, time.Time, error) {
+	m.logger.Debugw("Checking listenKey status",
+		"account_id", account.ID,
+		"has_listen_key", account.ListenKeyExpiresAt != nil,
+	)
+
 	// Check if we have a valid listenKey
 	if !account.IsListenKeyExpired() {
 		listenKey, err := account.GetListenKey(m.encryptor)
 		if err == nil && listenKey != "" {
-			m.logger.Debug("Using existing listenKey",
+			m.logger.Debugw("✓ Using existing valid listenKey",
 				"account_id", account.ID,
 				"expires_at", account.ListenKeyExpiresAt,
 			)
 			return listenKey, *account.ListenKeyExpiresAt, nil
 		}
+		m.logger.Debugw("Existing listenKey found but failed to decrypt",
+			"account_id", account.ID,
+			"error", err,
+		)
+	} else {
+		m.logger.Debugw("ListenKey expired or not found, creating new one",
+			"account_id", account.ID,
+		)
 	}
 
 	// Create new listenKey
+	m.logger.Debugw("Requesting new listenKey from exchange",
+		"account_id", account.ID,
+		"exchange", account.Exchange,
+	)
+
 	listenKey, expiresAt, err := client.CreateListenKey(ctx, apiKey, secret)
 	if err != nil {
+		m.logger.Errorw("Failed to create listenKey from exchange",
+			"account_id", account.ID,
+			"exchange", account.Exchange,
+			"error", err,
+		)
 		return "", time.Time{}, errors.Wrap(err, "failed to create listenKey")
 	}
 
+	m.logger.Debugw("ListenKey received from exchange",
+		"account_id", account.ID,
+		"expires_at", expiresAt,
+	)
+
 	// Encrypt and store listenKey in account
 	if err := account.SetListenKey(listenKey, expiresAt, m.encryptor); err != nil {
+		m.logger.Errorw("Failed to encrypt listenKey",
+			"account_id", account.ID,
+			"error", err,
+		)
 		return "", time.Time{}, errors.Wrap(err, "failed to encrypt listenKey")
 	}
 
+	m.logger.Debugw("ListenKey encrypted, persisting to database",
+		"account_id", account.ID,
+	)
+
 	// Persist to DB
 	if err := m.accountRepo.Update(ctx, account); err != nil {
+		m.logger.Errorw("Failed to persist listenKey to database",
+			"account_id", account.ID,
+			"error", err,
+		)
 		return "", time.Time{}, errors.Wrap(err, "failed to persist listenKey")
 	}
 
-	m.logger.Info("Created and persisted new listenKey",
+	m.logger.Infow("✅ Created and persisted new listenKey",
 		"account_id", account.ID,
+		"exchange", account.Exchange,
 		"expires_at", expiresAt,
 	)
 
@@ -278,7 +412,7 @@ func (m *UserDataManager) ensureListenKey(
 
 // Stop gracefully shuts down all WebSocket connections
 func (m *UserDataManager) Stop(ctx context.Context) error {
-	m.logger.Info("Stopping User Data Manager...")
+	m.logger.Infow("Stopping User Data Manager...")
 
 	close(m.stopChan)
 
@@ -296,7 +430,7 @@ func (m *UserDataManager) Stop(ctx context.Context) error {
 		go func(c UserDataStreamer) {
 			defer wg.Done()
 			if err := c.Stop(ctx); err != nil {
-				m.logger.Error("Failed to stop client",
+				m.logger.Errorw("Failed to stop client",
 					"error", err,
 				)
 			}
@@ -312,7 +446,7 @@ func (m *UserDataManager) Stop(ctx context.Context) error {
 
 	close(m.doneChan)
 
-	m.logger.Info("✓ User Data Manager stopped")
+	m.logger.Infow("✓ User Data Manager stopped")
 
 	return nil
 }
@@ -347,7 +481,7 @@ func (m *UserDataManager) performHealthCheck(ctx context.Context) {
 		// Check if shutdown requested
 		select {
 		case <-ctx.Done():
-			m.logger.Debug("Health check interrupted by shutdown")
+			m.logger.Debugw("Health check interrupted by shutdown")
 			return
 		default:
 		}
@@ -361,13 +495,13 @@ func (m *UserDataManager) performHealthCheck(ctx context.Context) {
 		}
 
 		if !client.IsConnected() {
-			m.logger.Warn("Detected disconnected client, attempting reconnect",
+			m.logger.Warnw("Detected disconnected client, attempting reconnect",
 				"account_id", accountID,
 			)
 
 			// Reconnect
 			if err := m.reconnectAccount(ctx, accountID); err != nil {
-				m.logger.Error("Failed to reconnect account",
+				m.logger.Errorw("Failed to reconnect account",
 					"account_id", accountID,
 					"error", err,
 				)
@@ -414,12 +548,12 @@ func (m *UserDataManager) reconciliationLoop(ctx context.Context) {
 
 // performReconciliation syncs manager state with database
 func (m *UserDataManager) performReconciliation(ctx context.Context) {
-	m.logger.Debug("Performing reconciliation with database...")
+	m.logger.Debugw("🔄 Starting reconciliation with database (hot reload check)...")
 
 	// Get all active accounts from DB
 	activeAccounts, err := m.accountRepo.GetAllActive(ctx)
 	if err != nil {
-		m.logger.Error("Failed to get active accounts for reconciliation", "error", err)
+		m.logger.Errorw("Failed to get active accounts for reconciliation", "error", err)
 		metrics.UserDataReconciliations.WithLabelValues("error").Inc()
 		return
 	}
@@ -436,7 +570,13 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 	for accountID := range m.clients {
 		connectedAccountIDs[accountID] = true
 	}
+	currentlyConnected := len(connectedAccountIDs)
 	m.clientsMu.RUnlock()
+
+	m.logger.Debugw("Reconciliation state check",
+		"active_in_db", len(activeAccounts),
+		"currently_connected", currentlyConnected,
+	)
 
 	var addedCount, removedCount int
 
@@ -445,7 +585,7 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 		// Check if shutdown requested
 		select {
 		case <-ctx.Done():
-			m.logger.Info("Reconciliation interrupted by shutdown",
+			m.logger.Infow("Reconciliation interrupted by shutdown",
 				"added_so_far", addedCount,
 				"remaining", len(activeAccounts)-addedCount,
 			)
@@ -454,15 +594,19 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 		}
 
 		if !connectedAccountIDs[account.ID] {
-			m.logger.Info("Hot reload: connecting new active account",
+			m.logger.Infow("🆕 HOT RELOAD: Detected new active account in database",
 				"account_id", account.ID,
 				"user_id", account.UserID,
 				"exchange", account.Exchange,
+				"label", account.Label,
+				"created_at", account.CreatedAt,
 			)
 
 			if err := m.connectAccount(ctx, account); err != nil {
-				m.logger.Error("Failed to connect account during reconciliation",
+				m.logger.Errorw("❌ Failed to connect account during hot reload",
 					"account_id", account.ID,
+					"user_id", account.UserID,
+					"exchange", account.Exchange,
 					"error", err,
 				)
 				continue
@@ -471,6 +615,13 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 			// Record hot reload metric
 			metrics.UserDataHotReload.WithLabelValues("add", string(account.Exchange)).Inc()
 			addedCount++
+
+			m.logger.Infow("✅ HOT RELOAD: Successfully connected new account",
+				"account_id", account.ID,
+				"user_id", account.UserID,
+				"exchange", account.Exchange,
+				"total_connections_now", m.GetActiveConnectionCount(),
+			)
 		}
 	}
 
@@ -479,7 +630,7 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 		// Check if shutdown requested
 		select {
 		case <-ctx.Done():
-			m.logger.Info("Reconciliation interrupted by shutdown during cleanup",
+			m.logger.Infow("Reconciliation interrupted by shutdown during cleanup",
 				"removed_so_far", removedCount,
 			)
 			return
@@ -494,13 +645,13 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 				exchange = string(account.Exchange)
 			}
 
-			m.logger.Info("Hot reload: disconnecting deactivated account",
+			m.logger.Infow("Hot reload: disconnecting deactivated account",
 				"account_id", accountID,
 				"exchange", exchange,
 			)
 
 			if err := m.RemoveAccount(ctx, accountID); err != nil {
-				m.logger.Error("Failed to disconnect account during reconciliation",
+				m.logger.Errorw("Failed to disconnect account during reconciliation",
 					"account_id", accountID,
 					"error", err,
 				)
@@ -523,14 +674,14 @@ func (m *UserDataManager) performReconciliation(ctx context.Context) {
 	metrics.UserDataReconciliations.WithLabelValues("success").Inc()
 
 	if addedCount > 0 || removedCount > 0 {
-		m.logger.Info("✓ Reconciliation completed",
+		m.logger.Infow("✓ Reconciliation completed",
 			"added", addedCount,
 			"removed", removedCount,
 			"total_active", len(activeAccountIDs),
 			"total_connected", m.GetActiveConnectionCount(),
 		)
 	} else {
-		m.logger.Debug("Reconciliation completed, no changes",
+		m.logger.Debugw("Reconciliation completed, no changes",
 			"total_active", len(activeAccountIDs),
 		)
 	}
@@ -549,7 +700,7 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 		// Check if shutdown requested
 		select {
 		case <-ctx.Done():
-			m.logger.Debug("ListenKey renewal interrupted by shutdown")
+			m.logger.Debugw("ListenKey renewal interrupted by shutdown")
 			return
 		default:
 		}
@@ -557,7 +708,7 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 		// Load account from DB
 		account, err := m.accountRepo.GetByID(ctx, accountID)
 		if err != nil {
-			m.logger.Error("Failed to load account for listenKey renewal",
+			m.logger.Errorw("Failed to load account for listenKey renewal",
 				"account_id", accountID,
 				"error", err,
 			)
@@ -569,7 +720,7 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 			continue
 		}
 
-		m.logger.Info("Renewing listenKey",
+		m.logger.Infow("Renewing listenKey",
 			"account_id", accountID,
 			"current_expires_at", account.ListenKeyExpiresAt,
 		)
@@ -590,7 +741,7 @@ func (m *UserDataManager) renewAllListenKeys(ctx context.Context) {
 
 		// Renew
 		if err := client.RenewListenKey(ctx, apiKey, secret, listenKey); err != nil {
-			m.logger.Error("Failed to renew listenKey",
+			m.logger.Errorw("Failed to renew listenKey",
 				"account_id", accountID,
 				"error", err,
 			)
@@ -636,7 +787,7 @@ func (m *UserDataManager) reconnectAccount(ctx context.Context, accountID uuid.U
 	exchange := string(account.Exchange)
 	metrics.UserDataReconnects.WithLabelValues(exchange, "health_check").Inc()
 
-	m.logger.Info("✓ Reconnected account",
+	m.logger.Infow("✓ Reconnected account",
 		"account_id", accountID,
 		"exchange", exchange,
 	)
@@ -693,7 +844,7 @@ func (m *UserDataManager) RemoveAccount(ctx context.Context, accountID uuid.UUID
 	// Update metrics
 	metrics.UserDataConnections.WithLabelValues(exchange).Dec()
 
-	m.logger.Info("Removed account from User Data Manager",
+	m.logger.Infow("Removed account from User Data Manager",
 		"account_id", accountID,
 		"exchange", exchange,
 	)

@@ -89,12 +89,21 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	}
 
 	// Create OKX API client
+	c.logger.Infow("Creating OKX API client",
+		"has_api_key", c.apiKey != "",
+		"has_secret", c.secretKey != "",
+		"has_passphrase", c.passphrase != "",
+		"dest", dest,
+	)
+
 	client, err := api.NewClient(ctx, c.apiKey, c.secretKey, c.passphrase, dest)
 	if err != nil {
 		return errors.Wrap(err, "failed to create OKX client")
 	}
 
 	c.client = client
+
+	c.logger.Info("✓ OKX API client created successfully")
 
 	// Group streams by type
 	var fundingRateSymbols []string
@@ -147,7 +156,7 @@ func (c *Client) subscribeToFundingRates(symbols []string) error {
 	// OKX requires instrument format like BTC-USDT-SWAP
 	for _, symbol := range symbols {
 		instID := c.convertToOKXInstrument(symbol)
-		
+
 		req := ws_public_requests.FundingRate{
 			InstID: instID,
 		}
@@ -173,6 +182,8 @@ func (c *Client) subscribeToFundingRates(symbols []string) error {
 func (c *Client) handleFundingRateEvents(ch chan *public.FundingRate) {
 	defer close(c.doneChan)
 
+	c.logger.Info("OKX funding rate event handler started, waiting for events...")
+
 	for {
 		select {
 		case <-c.stopChan:
@@ -194,10 +205,21 @@ func (c *Client) handleFundingRateEvents(ch chan *public.FundingRate) {
 				continue
 			}
 
+			c.logger.Debugw("Received OKX funding rate event",
+				"rates_count", len(event.Rates),
+			)
+
 			// Process each funding rate in the event
 			for _, rate := range event.Rates {
 				// Convert to standard symbol format
 				symbol := c.convertFromOKXInstrument(rate.InstID)
+
+				c.logger.Debugw("Processing OKX funding rate",
+					"inst_id", rate.InstID,
+					"symbol", symbol,
+					"funding_rate", rate.FundingRate,
+					"next_funding_time", rate.NextFundingTime,
+				)
 
 				// Create mark price event (OKX doesn't provide mark price in funding rate stream)
 				// We'll need to get mark price separately or use funding rate only
@@ -217,6 +239,11 @@ func (c *Client) handleFundingRateEvents(ch chan *public.FundingRate) {
 						"error", err,
 					)
 					c.errorCount.Add(1)
+				} else {
+					c.logger.Infow("Published OKX funding rate to Kafka",
+						"symbol", symbol,
+						"funding_rate", rate.FundingRate,
+					)
 				}
 			}
 		}

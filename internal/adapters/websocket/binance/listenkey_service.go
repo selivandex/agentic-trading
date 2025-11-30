@@ -34,12 +34,39 @@ func NewListenKeyService(useTestnet bool, log *logger.Logger) *ListenKeyService 
 // Binance Futures: POST /fapi/v1/listenKey
 // ListenKey is valid for 24 hours and must be renewed every 30 minutes
 func (s *ListenKeyService) Create(ctx context.Context, apiKey, secret string) (string, time.Time, error) {
+	// Log safely (preview only for debugging)
+	apiKeyPreview := "empty"
+	if len(apiKey) > 0 {
+		if len(apiKey) >= 8 {
+			apiKeyPreview = apiKey[:4] + "..." + apiKey[len(apiKey)-4:]
+		} else {
+			apiKeyPreview = "***"
+		}
+	}
+
+	s.logger.Debugw("Creating Binance listenKey",
+		"testnet", s.useTestnet,
+		"api_key_length", len(apiKey),
+		"api_key_preview", apiKeyPreview,
+		"secret_length", len(secret),
+	)
+
 	futures.UseTestnet = s.useTestnet
 
 	client := futures.NewClient(apiKey, secret)
-	
+
+	s.logger.Debugw("Calling Binance API to create listenKey",
+		"testnet", s.useTestnet,
+	)
+
 	listenKey, err := client.NewStartUserStreamService().Do(ctx)
 	if err != nil {
+		s.logger.Errorw("Binance API returned error when creating listenKey",
+			"testnet", s.useTestnet,
+			"api_key_length", len(apiKey),
+			"api_key_preview", apiKeyPreview,
+			"error", err,
+		)
 		return "", time.Time{}, errors.Wrap(err, "failed to create listenKey")
 	}
 
@@ -51,7 +78,7 @@ func (s *ListenKeyService) Create(ctx context.Context, apiKey, secret string) (s
 	// We set expiration to 60 minutes and renew every 30 minutes for safety
 	expiresAt := time.Now().Add(60 * time.Minute)
 
-	s.logger.Info("Created new Binance listenKey",
+	s.logger.Infow("Created new Binance listenKey",
 		"testnet", s.useTestnet,
 		"expires_at", expiresAt,
 	)
@@ -70,7 +97,7 @@ func (s *ListenKeyService) Renew(ctx context.Context, apiKey, secret, listenKey 
 	futures.UseTestnet = s.useTestnet
 
 	client := futures.NewClient(apiKey, secret)
-	
+
 	err := client.NewKeepaliveUserStreamService().
 		ListenKey(listenKey).
 		Do(ctx)
@@ -81,7 +108,7 @@ func (s *ListenKeyService) Renew(ctx context.Context, apiKey, secret, listenKey 
 	// Reset expiration to 60 minutes from now
 	expiresAt := time.Now().Add(60 * time.Minute)
 
-	s.logger.Debug("Renewed Binance listenKey",
+	s.logger.Debugw("Renewed Binance listenKey",
 		"testnet", s.useTestnet,
 		"new_expires_at", expiresAt,
 	)
@@ -100,7 +127,7 @@ func (s *ListenKeyService) Delete(ctx context.Context, apiKey, secret, listenKey
 	futures.UseTestnet = s.useTestnet
 
 	client := futures.NewClient(apiKey, secret)
-	
+
 	err := client.NewCloseUserStreamService().
 		ListenKey(listenKey).
 		Do(ctx)
@@ -108,7 +135,7 @@ func (s *ListenKeyService) Delete(ctx context.Context, apiKey, secret, listenKey
 		return errors.Wrap(err, "failed to delete listenKey")
 	}
 
-	s.logger.Info("Deleted Binance listenKey",
+	s.logger.Infow("Deleted Binance listenKey",
 		"testnet", s.useTestnet,
 	)
 
@@ -130,11 +157,10 @@ func (s *ListenKeyService) ValidateCredentials(ctx context.Context, apiKey, secr
 
 	// Clean up immediately
 	if err := s.Delete(ctx, apiKey, secret, listenKey); err != nil {
-		s.logger.Warn("Failed to delete validation listenKey",
+		s.logger.Warnw("Failed to delete validation listenKey",
 			"error", err,
 		)
 	}
 
 	return nil
 }
-

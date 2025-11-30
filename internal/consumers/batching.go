@@ -64,7 +64,7 @@ func NewBatchConsumerLifecycle(
 //
 //	// ... process messages ...
 func (l *BatchConsumerLifecycle) Start(ctx context.Context) func() {
-	l.config.Logger.Info("Starting batch consumer lifecycle",
+	l.config.Logger.Infow("Starting batch consumer lifecycle",
 		"consumer", l.config.ConsumerName,
 		"flush_interval", l.config.FlushInterval,
 		"stats_interval", l.config.StatsInterval,
@@ -76,7 +76,7 @@ func (l *BatchConsumerLifecycle) Start(ctx context.Context) func() {
 
 	// Return cleanup function that will be called on defer
 	return func() {
-		l.config.Logger.Info("Closing batch consumer", "consumer", l.config.ConsumerName)
+		l.config.Logger.Infow("Closing batch consumer", "consumer", l.config.ConsumerName)
 
 		// Stop tickers first
 		if l.flushTicker != nil {
@@ -104,7 +104,7 @@ func (l *BatchConsumerLifecycle) Start(ctx context.Context) func() {
 				"error", err,
 			)
 		} else {
-			l.config.Logger.Info("✓ Batch consumer closed",
+			l.config.Logger.Infow("✓ Batch consumer closed",
 				"consumer", l.config.ConsumerName,
 			)
 		}

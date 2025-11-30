@@ -228,7 +228,7 @@ func (c *WebSocketBaseConsumer[T, D]) FlushBatch(ctx context.Context) error {
 
 	duration := time.Since(start)
 
-	c.log.Info("✅ Flushed batch successfully",
+	c.log.Infow("✅ Flushed batch successfully",
 		"consumer", c.config.ConsumerName,
 		"original_size", originalSize,
 		"written_size", len(dedupedBatch),

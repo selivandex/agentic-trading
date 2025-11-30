@@ -91,7 +91,7 @@ func (c *UserDataClient) CreateListenKey(ctx context.Context, apiKey, secret str
 	c.keyExpiresAt = expiresAt
 	c.keyMu.Unlock()
 
-	c.logger.Info("Created listenKey for User Data Stream",
+	c.logger.Infow("Created listenKey for User Data Stream",
 		"account_id", c.accountID,
 		"user_id", c.userID,
 		"expires_at", expiresAt,
@@ -115,7 +115,7 @@ func (c *UserDataClient) RenewListenKey(ctx context.Context, apiKey, secret, lis
 	c.stats.ListenKeyExpiresAt = expiresAt
 	c.statsMu.Unlock()
 
-	c.logger.Debug("Renewed listenKey for User Data Stream",
+	c.logger.Debugw("Renewed listenKey for User Data Stream",
 		"account_id", c.accountID,
 		"new_expires_at", expiresAt,
 	)
@@ -155,7 +155,7 @@ func (c *UserDataClient) Connect(ctx context.Context, listenKey, apiKey, secret 
 
 	futures.UseTestnet = c.useTestnet
 
-	c.logger.Info("Connecting to Binance User Data Stream",
+	c.logger.Infow("Connecting to Binance User Data Stream",
 		"account_id", c.accountID,
 		"user_id", c.userID,
 		"testnet", c.useTestnet,
@@ -224,7 +224,7 @@ func (c *UserDataClient) Connect(ctx context.Context, listenKey, apiKey, secret 
 	c.stats.ListenKeyExpiresAt = c.keyExpiresAt
 	c.statsMu.Unlock()
 
-	c.logger.Info("✓ Connected to User Data Stream",
+	c.logger.Infow("✓ Connected to User Data Stream",
 		"account_id", c.accountID,
 		"user_id", c.userID,
 	)
@@ -244,7 +244,7 @@ func (c *UserDataClient) Start(ctx context.Context) error {
 
 	go c.listenKeyRenewalLoop(ctx)
 
-	c.logger.Info("User Data WebSocket client started",
+	c.logger.Infow("User Data WebSocket client started",
 		"account_id", c.accountID,
 	)
 
@@ -458,7 +458,7 @@ func (c *UserDataClient) Stop(ctx context.Context) error {
 		close(c.renewStop)
 	}
 
-	c.logger.Info("Stopping User Data WebSocket",
+	c.logger.Infow("Stopping User Data WebSocket",
 		"account_id", c.accountID,
 	)
 
@@ -476,7 +476,7 @@ func (c *UserDataClient) Stop(ctx context.Context) error {
 		timeout := 5 * time.Second
 		select {
 		case <-c.doneChannel:
-			c.logger.Info("User Data WebSocket stopped gracefully",
+			c.logger.Infow("User Data WebSocket stopped gracefully",
 				"account_id", c.accountID,
 			)
 		case <-time.After(timeout):

@@ -6,8 +6,6 @@ import (
 
 	"prometheus/internal/adapters/websocket"
 	binancews "prometheus/internal/adapters/websocket/binance"
-	bybitws "prometheus/internal/adapters/websocket/bybit"
-	okxws "prometheus/internal/adapters/websocket/okx"
 	"prometheus/internal/consumers"
 	"prometheus/internal/events"
 	"prometheus/pkg/errors"
@@ -68,49 +66,49 @@ func (c *Container) MustInitWebSocketClients() {
 				"has_credentials", apiKey != "",
 			)
 
-		case "bybit":
-			// Get API credentials for Bybit (optional for public streams)
-			apiKey := c.Config.MarketData.Bybit.APIKey
-			secretKey := c.Config.MarketData.Bybit.Secret
+		// case "bybit":
+		// 	// Get API credentials for Bybit (optional for public streams)
+		// 	apiKey := c.Config.MarketData.Bybit.APIKey
+		// 	secretKey := c.Config.MarketData.Bybit.Secret
 
-			if apiKey == "" {
-				c.Log.Warn("Bybit WebSocket API key not configured - only public streams will be available")
-			}
+		// 	if apiKey == "" {
+		// 		c.Log.Warn("Bybit WebSocket API key not configured - only public streams will be available")
+		// 	}
 
-			client := bybitws.NewClient(
-				"bybit",
-				wsHandler,
-				apiKey,
-				secretKey,
-				c.Config.WebSocket.UseTestnet,
-				c.Log,
-			)
-			clients.Bybit = client
-			c.Log.Info("✓ Bybit WebSocket client created",
-				"has_credentials", apiKey != "",
-			)
+		// 	client := bybitws.NewClient(
+		// 		"bybit",
+		// 		wsHandler,
+		// 		apiKey,
+		// 		secretKey,
+		// 		c.Config.WebSocket.UseTestnet,
+		// 		c.Log,
+		// 	)
+		// 	clients.Bybit = client
+		// 	c.Log.Info("✓ Bybit WebSocket client created",
+		// 		"has_credentials", apiKey != "",
+		// 	)
 
-		case "okx":
-			// Get API credentials for OKX (optional for public streams)
-			apiKey := c.Config.MarketData.OKX.APIKey
-			secretKey := c.Config.MarketData.OKX.Secret
+		// case "okx":
+		// 	// Get API credentials for OKX (optional for public streams)
+		// 	apiKey := c.Config.MarketData.OKX.APIKey
+		// 	secretKey := c.Config.MarketData.OKX.Secret
 
-			if apiKey == "" {
-				c.Log.Warn("OKX WebSocket API key not configured - only public streams will be available")
-			}
+		// 	if apiKey == "" {
+		// 		c.Log.Warn("OKX WebSocket API key not configured - only public streams will be available")
+		// 	}
 
-			client := okxws.NewClient(
-				"okx",
-				wsHandler,
-				apiKey,
-				secretKey,
-				c.Config.WebSocket.UseTestnet,
-				c.Log,
-			)
-			clients.OKX = client
-			c.Log.Info("✓ OKX WebSocket client created",
-				"has_credentials", apiKey != "",
-			)
+		// 	client := okxws.NewClient(
+		// 		"okx",
+		// 		wsHandler,
+		// 		apiKey,
+		// 		secretKey,
+		// 		c.Config.WebSocket.UseTestnet,
+		// 		c.Log,
+		// 	)
+		// 	clients.OKX = client
+		// 	c.Log.Info("✓ OKX WebSocket client created",
+		// 		"has_credentials", apiKey != "",
+		// 	)
 
 		default:
 			c.Log.Warn("Unsupported exchange for WebSocket", "exchange", exchange)
@@ -230,31 +228,31 @@ func (c *Container) connectWebSocketClients(ctx context.Context) error {
 		c.Log.Info("✓ Binance WebSocket connected")
 	}
 
-	// Connect Bybit client
-	if c.Adapters.WebSocketClients.Bybit != nil {
-		if err := c.Adapters.WebSocketClients.Bybit.Connect(ctx, streamConfig); err != nil {
-			return errors.Wrap(err, "connect bybit websocket")
-		}
+	// // Connect Bybit client
+	// if c.Adapters.WebSocketClients.Bybit != nil {
+	// 	if err := c.Adapters.WebSocketClients.Bybit.Connect(ctx, streamConfig); err != nil {
+	// 		return errors.Wrap(err, "connect bybit websocket")
+	// 	}
 
-		if err := c.Adapters.WebSocketClients.Bybit.Start(ctx); err != nil {
-			return errors.Wrap(err, "start bybit websocket")
-		}
+	// 	if err := c.Adapters.WebSocketClients.Bybit.Start(ctx); err != nil {
+	// 		return errors.Wrap(err, "start bybit websocket")
+	// 	}
 
-		c.Log.Info("✓ Bybit WebSocket connected")
-	}
+	// 	c.Log.Info("✓ Bybit WebSocket connected")
+	// }
 
-	// Connect OKX client
-	if c.Adapters.WebSocketClients.OKX != nil {
-		if err := c.Adapters.WebSocketClients.OKX.Connect(ctx, streamConfig); err != nil {
-			return errors.Wrap(err, "connect okx websocket")
-		}
+	// // Connect OKX client
+	// if c.Adapters.WebSocketClients.OKX != nil {
+	// 	if err := c.Adapters.WebSocketClients.OKX.Connect(ctx, streamConfig); err != nil {
+	// 		return errors.Wrap(err, "connect okx websocket")
+	// 	}
 
-		if err := c.Adapters.WebSocketClients.OKX.Start(ctx); err != nil {
-			return errors.Wrap(err, "start okx websocket")
-		}
+	// 	if err := c.Adapters.WebSocketClients.OKX.Start(ctx); err != nil {
+	// 		return errors.Wrap(err, "start okx websocket")
+	// 	}
 
-		c.Log.Info("✓ OKX WebSocket connected")
-	}
+	// 	c.Log.Info("✓ OKX WebSocket connected")
+	// }
 
 	return nil
 }
@@ -391,21 +389,21 @@ func (c *Container) stopWebSocketClients(ctx context.Context) error {
 		}
 	}
 
-	// Stop Bybit client
-	if c.Adapters.WebSocketClients.Bybit != nil {
-		if err := c.Adapters.WebSocketClients.Bybit.Stop(ctx); err != nil {
-			c.Log.Error("Failed to stop Bybit WebSocket", "error", err)
-			lastErr = err
-		}
-	}
+	// // Stop Bybit client
+	// if c.Adapters.WebSocketClients.Bybit != nil {
+	// 	if err := c.Adapters.WebSocketClients.Bybit.Stop(ctx); err != nil {
+	// 		c.Log.Error("Failed to stop Bybit WebSocket", "error", err)
+	// 		lastErr = err
+	// 	}
+	// }
 
-	// Stop OKX client
-	if c.Adapters.WebSocketClients.OKX != nil {
-		if err := c.Adapters.WebSocketClients.OKX.Stop(ctx); err != nil {
-			c.Log.Error("Failed to stop OKX WebSocket", "error", err)
-			lastErr = err
-		}
-	}
+	// // Stop OKX client
+	// if c.Adapters.WebSocketClients.OKX != nil {
+	// 	if err := c.Adapters.WebSocketClients.OKX.Stop(ctx); err != nil {
+	// 		c.Log.Error("Failed to stop OKX WebSocket", "error", err)
+	// 		lastErr = err
+	// 	}
+	// }
 
 	if lastErr != nil {
 		return fmt.Errorf("errors occurred during WebSocket shutdown: %w", lastErr)

@@ -74,15 +74,15 @@ func (b *Bot) Start(ctx context.Context) error {
 	// If webhook mode, just block until context is cancelled
 	// HTTP server handles webhook requests, no polling needed
 	if b.webhookMode {
-		b.log.Info("Telegram bot in webhook mode (no polling)")
+		b.log.Infow("Telegram bot in webhook mode (no polling)")
 		<-ctx.Done()
-		b.log.Info("Telegram bot stopping (context cancelled)")
+		b.log.Infow("Telegram bot stopping (context cancelled)")
 		b.Stop()
 		return nil
 	}
 
 	// Polling mode: get updates from Telegram
-	b.log.Info("Starting Telegram bot in polling mode...")
+	b.log.Infow("Starting Telegram bot in polling mode...")
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -90,13 +90,13 @@ func (b *Bot) Start(ctx context.Context) error {
 	updates := b.api.GetUpdatesChan(u)
 	b.updates = updates
 
-	b.log.Info("✓ Telegram bot started, waiting for updates")
+	b.log.Infow("✓ Telegram bot started, waiting for updates")
 
 	// Process updates until context is cancelled
 	for {
 		select {
 		case <-ctx.Done():
-			b.log.Info("Telegram bot stopping (context cancelled)")
+			b.log.Infow("Telegram bot stopping (context cancelled)")
 			b.Stop()
 			return nil
 
@@ -116,14 +116,18 @@ func (b *Bot) Stop() {
 		return
 	}
 
-	b.log.Info("Stopping Telegram bot...")
+	b.log.Infow("Stopping Telegram bot...")
 	b.api.StopReceivingUpdates()
 	b.running = false
-	b.log.Info("✓ Telegram bot stopped")
+	b.log.Infow("✓ Telegram bot stopped")
 }
 
 // handleUpdate processes a single update
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
+	b.log.Debugw("Handling Telegram update",
+		"update_id", update.UpdateID,
+	)
+
 	// Call registered handler if available
 	if b.msgHandler != nil {
 		b.msgHandler(update)
@@ -132,9 +136,22 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 
 	// Default: just log
 	if update.Message != nil {
-		b.log.Debug("Received message (no handler registered)",
+		b.log.Debugw("Received message (no handler registered)",
+			"update_id", update.UpdateID,
 			"from", update.Message.From.UserName,
+			"from_id", update.Message.From.ID,
 			"text", update.Message.Text,
+		)
+	} else if update.CallbackQuery != nil {
+		b.log.Debugw("Received callback query (no handler registered)",
+			"update_id", update.UpdateID,
+			"from", update.CallbackQuery.From.UserName,
+			"from_id", update.CallbackQuery.From.ID,
+			"data", update.CallbackQuery.Data,
+		)
+	} else {
+		b.log.Debugw("Received update with no recognized type (no handler registered)",
+			"update_id", update.UpdateID,
 		)
 	}
 }
@@ -148,27 +165,54 @@ func (b *Bot) SetMessageHandler(handler func(tgbotapi.Update)) {
 
 // SendMessage sends a text message to a chat
 func (b *Bot) SendMessage(chatID int64, text string) error {
+	b.log.Debugw("Sending message",
+		"chat_id", chatID,
+		"text_length", len(text),
+	)
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
 
 	_, err := b.api.Send(msg)
 	if err != nil {
+		b.log.Errorw("Failed to send message",
+			"chat_id", chatID,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to send message")
 	}
+
+	b.log.Debugw("Message sent successfully",
+		"chat_id", chatID,
+	)
 
 	return nil
 }
 
 // SendMessageWithKeyboard sends a message with inline keyboard
 func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	b.log.Debugw("Sending message with inline keyboard",
+		"chat_id", chatID,
+		"text_length", len(text),
+		"buttons_count", len(keyboard.InlineKeyboard),
+	)
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
 	msg.ReplyMarkup = keyboard
 
 	_, err := b.api.Send(msg)
 	if err != nil {
+		b.log.Errorw("Failed to send message with keyboard",
+			"chat_id", chatID,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to send message with keyboard")
 	}
+
+	b.log.Debugw("Message with keyboard sent successfully",
+		"chat_id", chatID,
+	)
 
 	return nil
 }
@@ -205,12 +249,25 @@ func (b *Bot) DeleteMessage(chatID int64, messageID int) error {
 
 // AnswerCallbackQuery answers a callback query from inline keyboard
 func (b *Bot) AnswerCallbackQuery(callbackQueryID string, text string) error {
+	b.log.Debugw("Answering callback query",
+		"callback_id", callbackQueryID,
+		"text", text,
+	)
+
 	callback := tgbotapi.NewCallback(callbackQueryID, text)
 
 	_, err := b.api.Request(callback)
 	if err != nil {
+		b.log.Errorw("Failed to answer callback query",
+			"callback_id", callbackQueryID,
+			"error", err,
+		)
 		return errors.Wrap(err, "failed to answer callback query")
 	}
+
+	b.log.Debugw("Callback query answered successfully",
+		"callback_id", callbackQueryID,
+	)
 
 	return nil
 }
@@ -238,7 +295,7 @@ func (b *Bot) SendTyping(chatID int64) error {
 func (b *Bot) SendMessageAsync(chatID int64, text string) {
 	go func() {
 		if err := b.SendMessage(chatID, text); err != nil {
-			b.log.Error("Failed to send async message",
+			b.log.Errorw("Failed to send async message",
 				"chat_id", chatID,
 				"error", err,
 			)
@@ -257,7 +314,7 @@ func (b *Bot) SendNotificationWithRetry(chatID int64, notification string, maxRe
 		}
 
 		lastErr = err
-		b.log.Warn("Failed to send notification, retrying...",
+		b.log.Warnw("Failed to send notification, retrying...",
 			"attempt", attempt+1,
 			"max_retries", maxRetries,
 			"error", err,
@@ -322,7 +379,7 @@ func (b *Bot) SetWebhook(webhookURL string, certificate ...string) error {
 		return errors.Wrap(err, "failed to set webhook")
 	}
 
-	b.log.Info("Webhook configured successfully", "url", webhookURL)
+	b.log.Infow("Webhook configured successfully", "url", webhookURL)
 	return nil
 }
 
@@ -337,7 +394,7 @@ func (b *Bot) DeleteWebhook(dropPendingUpdates bool) error {
 		return errors.Wrap(err, "failed to delete webhook")
 	}
 
-	b.log.Info("Webhook deleted successfully")
+	b.log.Infow("Webhook deleted successfully")
 	return nil
 }
 
@@ -348,7 +405,7 @@ func (b *Bot) GetWebhookInfo() (*tgbotapi.WebhookInfo, error) {
 		return nil, errors.Wrap(err, "failed to get webhook info")
 	}
 
-	b.log.Debug("Retrieved webhook info",
+	b.log.Debugw("Retrieved webhook info",
 		"url", info.URL,
 		"has_custom_certificate", info.HasCustomCertificate,
 		"pending_update_count", info.PendingUpdateCount,

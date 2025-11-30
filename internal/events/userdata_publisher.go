@@ -76,7 +76,7 @@ func (p *UserDataPublisher) PublishOrderUpdate(
 		return errors.Wrap(err, "failed to publish order update event")
 	}
 
-	p.logger.Debug("Published order update event",
+	p.logger.Debugw("Published order update event",
 		"user_id", userID,
 		"account_id", accountID,
 		"order_id", orderID,
@@ -125,7 +125,7 @@ func (p *UserDataPublisher) PublishPositionUpdate(
 		return errors.Wrap(err, "failed to publish position update event")
 	}
 
-	p.logger.Debug("Published position update event",
+	p.logger.Debugw("Published position update event",
 		"user_id", userID,
 		"account_id", accountID,
 		"symbol", symbol,
@@ -170,7 +170,7 @@ func (p *UserDataPublisher) PublishBalanceUpdate(
 		return errors.Wrap(err, "failed to publish balance update event")
 	}
 
-	p.logger.Debug("Published balance update event",
+	p.logger.Debugw("Published balance update event",
 		"user_id", userID,
 		"account_id", accountID,
 		"asset", asset,
@@ -269,7 +269,7 @@ func (p *UserDataPublisher) PublishAccountConfigUpdate(
 		return errors.Wrap(err, "failed to publish account config update event")
 	}
 
-	p.logger.Debug("Published account config update event",
+	p.logger.Debugw("Published account config update event",
 		"user_id", userID,
 		"account_id", accountID,
 		"symbol", symbol,

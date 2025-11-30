@@ -87,7 +87,7 @@ func (c *UserDataConsumer) handleOrderUpdate(ctx context.Context, data []byte) e
 		return errors.Wrap(err, "invalid account_id")
 	}
 
-	c.logger.Info("Processing order update",
+	c.logger.Infow("Processing order update",
 		"user_id", userID,
 		"account_id", accountID,
 		"order_id", event.OrderId,
@@ -119,7 +119,7 @@ func (c *UserDataConsumer) handlePositionUpdate(ctx context.Context, data []byte
 		return errors.Wrap(err, "invalid account_id")
 	}
 
-	c.logger.Info("Processing position update",
+	c.logger.Infow("Processing position update",
 		"user_id", userID,
 		"account_id", accountID,
 		"symbol", event.Symbol,
@@ -176,7 +176,7 @@ func (c *UserDataConsumer) handlePositionUpdate(ctx context.Context, data []byte
 			return errors.Wrap(err, "failed to create position")
 		}
 
-		c.logger.Info("Created new position",
+		c.logger.Infow("Created new position",
 			"position_id", newPos.ID,
 			"symbol", event.Symbol,
 		)
@@ -193,7 +193,7 @@ func (c *UserDataConsumer) handlePositionUpdate(ctx context.Context, data []byte
 			return errors.Wrap(err, "failed to update position")
 		}
 
-		c.logger.Debug("Updated position",
+		c.logger.Debugw("Updated position",
 			"position_id", existingPos.ID,
 			"symbol", event.Symbol,
 		)
@@ -209,7 +209,7 @@ func (c *UserDataConsumer) handleBalanceUpdate(ctx context.Context, data []byte)
 		return errors.Wrap(err, "failed to unmarshal balance update event")
 	}
 
-	c.logger.Info("Balance update received",
+	c.logger.Infow("Balance update received",
 		"user_id", event.Base.UserId,
 		"account_id", event.AccountId,
 		"asset", event.Asset,
@@ -251,7 +251,7 @@ func (c *UserDataConsumer) handleAccountConfigUpdate(ctx context.Context, data [
 		return errors.Wrap(err, "failed to unmarshal account config update event")
 	}
 
-	c.logger.Info("Account config updated",
+	c.logger.Infow("Account config updated",
 		"user_id", event.Base.UserId,
 		"account_id", event.AccountId,
 		"symbol", event.Symbol,
@@ -278,7 +278,7 @@ func (c *UserDataConsumer) closePosition(ctx context.Context, userID, accountID 
 				return errors.Wrap(err, "failed to close position")
 			}
 
-			c.logger.Info("Closed position",
+			c.logger.Infow("Closed position",
 				"position_id", pos.ID,
 				"symbol", symbol,
 			)
