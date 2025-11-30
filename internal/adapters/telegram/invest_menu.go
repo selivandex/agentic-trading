@@ -11,6 +11,7 @@ import (
 
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/menu_session"
+	"prometheus/internal/domain/user"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
@@ -21,14 +22,28 @@ type ExchangeService interface {
 	GetAccount(ctx context.Context, accountID uuid.UUID) (*exchange_account.ExchangeAccount, error)
 }
 
+// InvestmentValidator validates investment operations against user limits
+type InvestmentValidator interface {
+	ValidateInvestment(ctx context.Context, usr *user.User, requestedCapital float64) (*ValidationResult, error)
+}
+
+// ValidationResult contains the result of investment validation
+type ValidationResult struct {
+	Allowed         bool
+	Reason          string
+	MaxAllowed      float64
+	CurrentExposure float64
+}
+
 // InvestMenuService handles /invest flow using MenuNavigator
 // Much cleaner with auto-parameter handling!
 type InvestMenuService struct {
-	menuNav         *MenuNavigator
-	exchangeService ExchangeService
-	userService     UserService
-	orchestrator    OnboardingOrchestrator
-	log             *logger.Logger
+	menuNav             *MenuNavigator
+	exchangeService     ExchangeService
+	userService         UserService
+	orchestrator        OnboardingOrchestrator
+	investmentValidator InvestmentValidator
+	log                 *logger.Logger
 }
 
 // NewInvestMenuService creates invest menu service (v2)
@@ -37,14 +52,16 @@ func NewInvestMenuService(
 	exchangeService ExchangeService,
 	userService UserService,
 	orchestrator OnboardingOrchestrator,
+	investmentValidator InvestmentValidator,
 	log *logger.Logger,
 ) *InvestMenuService {
 	return &InvestMenuService{
-		menuNav:         menuNav,
-		exchangeService: exchangeService,
-		userService:     userService,
-		orchestrator:    orchestrator,
-		log:             log.With("component", "invest_menu"),
+		menuNav:             menuNav,
+		exchangeService:     exchangeService,
+		userService:         userService,
+		orchestrator:        orchestrator,
+		investmentValidator: investmentValidator,
+		log:                 log.With("component", "invest_menu"),
 	}
 }
 
@@ -79,8 +96,49 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID uuid.UUI
 
 	// Parse amount
 	amount, err := parseAmount(text)
-	if err != nil || amount < 100 {
-		return ims.menuNav.bot.SendMessage(telegramID, "❌ Invalid amount. Please enter a number ≥ $100.\n\nExample: 1000")
+	if err != nil {
+		return ims.menuNav.bot.SendMessage(telegramID, "❌ Invalid amount. Please enter a valid number.\n\nExample: 1000")
+	}
+
+	// Get user to validate against their limits
+	usr, err := ims.userService.GetByID(ctx, userID)
+	if err != nil {
+		ims.log.Errorw("Failed to get user for validation", "error", err, "user_id", userID)
+		return ims.menuNav.bot.SendMessage(telegramID, "❌ Failed to validate investment. Please try again.")
+	}
+
+	// Validate investment amount against user limits and profile
+	if ims.investmentValidator != nil {
+		validation, err := ims.investmentValidator.ValidateInvestment(ctx, usr, amount)
+		if err != nil {
+			ims.log.Errorw("Investment validation error", "error", err, "user_id", userID, "amount", amount)
+			return ims.menuNav.bot.SendMessage(telegramID, "❌ Failed to validate investment. Please try again.")
+		}
+
+		if !validation.Allowed {
+			ims.log.Infow("Investment rejected by validation",
+				"user_id", userID,
+				"amount", amount,
+				"reason", validation.Reason,
+			)
+
+			// Clear session and show detailed error
+			_ = ims.menuNav.EndMenu(ctx, telegramID)
+
+			errorMsg := fmt.Sprintf("❌ %s", validation.Reason)
+			if validation.MaxAllowed > 0 {
+				errorMsg += fmt.Sprintf("\n\n💡 Maximum you can invest now: $%.2f", validation.MaxAllowed)
+			}
+			errorMsg += "\n\nUse /invest to try again with a different amount."
+
+			return ims.menuNav.bot.SendMessage(telegramID, errorMsg)
+		}
+
+		ims.log.Debugw("Investment validation passed",
+			"user_id", userID,
+			"amount", amount,
+			"current_exposure", validation.CurrentExposure,
+		)
 	}
 
 	// Get account_id from session (saved as "a")
@@ -100,23 +158,26 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID uuid.UUI
 	// Notify user
 	_ = ims.menuNav.bot.SendMessage(telegramID, "⏳ Creating your portfolio... This may take 1-2 minutes.")
 
-	// Start onboarding
+	// Start onboarding (portfolio creation workflow)
 	if ims.orchestrator != nil {
 		onboardingSession := &OnboardingSession{
 			TelegramID:        telegramID,
 			UserID:            userID,
 			Capital:           amount,
 			ExchangeAccountID: &accountID,
-			RiskProfile:       "moderate",
+			RiskProfile:       "moderate", // Default, can be customized later
 		}
 
 		if err := ims.orchestrator.StartOnboarding(ctx, onboardingSession); err != nil {
 			ims.log.Errorw("Onboarding workflow failed", "error", err)
 			return ims.menuNav.bot.SendMessage(telegramID, fmt.Sprintf("❌ Portfolio creation failed: %v\n\nPlease try again with /invest", err))
 		}
+
+		return ims.menuNav.bot.SendMessage(telegramID, "✅ Your portfolio has been created! Use /status to view it.")
 	}
 
-	return ims.menuNav.bot.SendMessage(telegramID, "✅ Your portfolio has been created! Use /status to view it.")
+	// Fallback if orchestrator not available
+	return ims.menuNav.bot.SendMessage(telegramID, "❌ Portfolio service not available")
 }
 
 // IsInInvest checks if user is in invest flow

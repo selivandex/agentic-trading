@@ -132,6 +132,8 @@ func (c *Container) MustInitRepositories() {
 	c.Repos.Session = pgrepo.NewSessionRepository(c.PG.DB())
 	c.Repos.Reasoning = pgrepo.NewReasoningRepository(c.PG.DB())
 	c.Repos.LimitProfile = pgrepo.NewLimitProfileRepository(c.PG.DB())
+	c.Repos.Strategy = pgrepo.NewStrategyRepository(c.PG.DB())
+	c.Repos.StrategyTransaction = pgrepo.NewStrategyTransactionRepository(c.PG.DB())
 	c.Repos.MarketData = chrepo.NewMarketDataRepository(c.CH.Conn())
 	c.Repos.Regime = chrepo.NewRegimeRepository(c.CH.Conn())
 	c.Repos.Sentiment = chrepo.NewSentimentRepository(c.CH.Conn())
@@ -219,6 +221,15 @@ func (c *Container) MustInitServices() {
 	c.Services.Order = order.NewService(c.Repos.Order)
 	c.Services.Position = position.NewService(c.Repos.Position)
 	c.Services.Memory = memory.NewService(c.Repos.Memory, c.Adapters.EmbeddingProvider)
+
+	// Strategy Service (portfolio management with transactions)
+	dbAdapter := strategyservice.NewDBAdapter(c.PG.DB())
+	c.Services.Strategy = strategyservice.NewService(
+		c.Repos.Strategy,
+		c.Repos.StrategyTransaction,
+		dbAdapter,
+		c.Log,
+	)
 	c.Services.Journal = journal.NewService(c.Repos.Journal)
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)
@@ -741,6 +752,7 @@ func provideTelegramBot(
 		templates.Get(),
 		userRepo,
 		exchAcctRepo,
+		c.Services.Strategy, // Strategy service for creating portfolios
 		log,
 	)
 
@@ -780,12 +792,20 @@ func provideTelegramBot(
 		30*time.Minute, // Session TTL
 	)
 
+	// Investment validator (validates investment amounts against limits)
+	investmentValidator := strategyservice.NewInvestmentValidator(
+		c.Repos.LimitProfile,
+		c.Repos.Strategy,
+		log,
+	)
+
 	// Invest menu service (uses MenuNavigator and services, not repos)
 	investMenuService := telegram.NewInvestMenuService(
 		menuNavigator,
 		exchangeService, // Use service, not repo (Clean Architecture)
 		userService,     // Use service, not repo (Clean Architecture)
 		onboardingOrchestrator,
+		investmentValidator, // Validates investment amounts
 		log,
 	)
 

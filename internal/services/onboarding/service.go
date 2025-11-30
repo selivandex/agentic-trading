@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
@@ -14,7 +15,9 @@ import (
 	telegram "prometheus/internal/adapters/telegram"
 	"prometheus/internal/agents/workflows"
 	"prometheus/internal/domain/exchange_account"
+	"prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
+	strategyservice "prometheus/internal/services/strategy"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 	"prometheus/pkg/templates"
@@ -27,6 +30,7 @@ type Service struct {
 	templates       *templates.Registry
 	userRepo        user.Repository
 	exchAcctRepo    exchange_account.Repository
+	strategyService StrategyService
 	log             *logger.Logger
 }
 
@@ -37,6 +41,7 @@ func NewService(
 	tmpl *templates.Registry,
 	userRepo user.Repository,
 	exchAcctRepo exchange_account.Repository,
+	strategyService StrategyService,
 	log *logger.Logger,
 ) *Service {
 	if tmpl == nil {
@@ -49,6 +54,7 @@ func NewService(
 		templates:       tmpl,
 		userRepo:        userRepo,
 		exchAcctRepo:    exchAcctRepo,
+		strategyService: strategyService,
 		log:             log.With("component", "onboarding_orchestrator"),
 	}
 }
@@ -61,7 +67,26 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 		"risk_profile", onboardingSession.RiskProfile,
 	)
 
-	// Create portfolio initialization workflow (PortfolioArchitect agent)
+	// Step 1: Create strategy to track allocated capital and transactions
+	strategyName := fmt.Sprintf("Portfolio %s", time.Now().Format("2006-01-02"))
+	strategy, err := s.strategyService.CreateStrategy(ctx, CreateStrategyParams{
+		UserID:           onboardingSession.UserID,
+		Name:             strategyName,
+		Description:      fmt.Sprintf("Automated portfolio with %s risk profile", onboardingSession.RiskProfile),
+		AllocatedCapital: decimal.NewFromFloat(onboardingSession.Capital),
+		RiskTolerance:    onboardingSession.RiskProfile,
+		ReasoningLog:     nil, // Will be updated after workflow completes
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to create strategy")
+	}
+
+	s.log.Infow("Strategy created",
+		"strategy_id", strategy.ID,
+		"allocated_capital", strategy.AllocatedCapital,
+	)
+
+	// Step 2: Create portfolio initialization workflow (PortfolioArchitect agent)
 	workflow, err := s.workflowFactory.CreatePortfolioInitializationWorkflow()
 	if err != nil {
 		return errors.Wrap(err, "failed to create portfolio initialization workflow")
@@ -98,6 +123,18 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 	// Run workflow
 	sessionID := uuid.New().String()
 	userID := onboardingSession.UserID.String()
+
+	// Create ADK session before running workflow
+	appName := fmt.Sprintf("prometheus_onboarding_%s", onboardingSession.UserID.String())
+	_, err = s.sessionService.Create(ctx, &session.CreateRequest{
+		AppName:   appName,
+		UserID:    userID,
+		SessionID: sessionID,
+		State:     nil, // Empty initial state
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to create session")
+	}
 
 	runConfig := agent.RunConfig{
 		StreamingMode: agent.StreamingModeNone, // No streaming for background workflow

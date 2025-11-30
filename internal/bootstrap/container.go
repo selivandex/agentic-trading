@@ -33,6 +33,7 @@ import (
 	domainRisk "prometheus/internal/domain/risk"
 	"prometheus/internal/domain/sentiment"
 	domainsession "prometheus/internal/domain/session"
+	strategyDomain "prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
@@ -44,6 +45,7 @@ import (
 	marketdatasvc "prometheus/internal/services/market_data"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
+	strategyservice "prometheus/internal/services/strategy"
 	"prometheus/internal/tools"
 	"prometheus/internal/workers"
 	"prometheus/pkg/crypto"
@@ -92,24 +94,26 @@ type Container struct {
 
 // Repositories groups all domain repositories
 type Repositories struct {
-	User            user.Repository
-	ExchangeAccount exchange_account.Repository
-	TradingPair     trading_pair.Repository
-	Order           order.Repository
-	Position        position.Repository
-	Memory          memory.Repository
-	Journal         journal.Repository
-	Risk            domainRisk.Repository
-	Session         domainsession.Repository
-	Reasoning       *pgrepo.ReasoningRepository
-	LimitProfile    limit_profile.Repository // User tier/subscription limits
-	MarketData      market_data.Repository
-	Regime          regime.Repository
-	Sentiment       sentiment.Repository
-	OnChain         onchain.Repository
-	Derivatives     derivatives.Repository
-	Macro           macro.Repository
-	AIUsage         *chrepo.AIUsageRepository
+	User                user.Repository
+	ExchangeAccount     exchange_account.Repository
+	TradingPair         trading_pair.Repository
+	Order               order.Repository
+	Position            position.Repository
+	Memory              memory.Repository
+	Journal             journal.Repository
+	Risk                domainRisk.Repository
+	Strategy            strategyDomain.Repository
+	StrategyTransaction strategyDomain.TransactionRepository
+	Session             domainsession.Repository
+	Reasoning           *pgrepo.ReasoningRepository
+	LimitProfile        limit_profile.Repository // User tier/subscription limits
+	MarketData          market_data.Repository
+	Regime              regime.Repository
+	Sentiment           sentiment.Repository
+	OnChain             onchain.Repository
+	Derivatives         derivatives.Repository
+	Macro               macro.Repository
+	AIUsage             *chrepo.AIUsageRepository
 }
 
 // Services groups all domain services
@@ -122,6 +126,7 @@ type Services struct {
 	Order              *order.Service            // Order domain service
 	Position           *position.Service         // Position domain service
 	PositionManagement *positionservice.Service  // Position management service for WebSocket updates
+	Strategy           *strategyservice.Service  // Strategy service for portfolio management
 	Memory             *memory.Service           // Memory domain service
 	Journal            *journal.Service          // Journal domain service
 	Session            *domainsession.Service    // Session domain service
