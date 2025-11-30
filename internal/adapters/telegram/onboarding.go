@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
@@ -22,6 +23,7 @@ import (
 type OnboardingState string
 
 const (
+	StateSelectExchange      OnboardingState = "select_exchange" // NEW: Select exchange first (for /invest)
 	StateAwaitingCapital     OnboardingState = "awaiting_capital"
 	StateAwaitingRiskProfile OnboardingState = "awaiting_risk_profile"
 	StateAwaitingExchange    OnboardingState = "awaiting_exchange"
@@ -39,6 +41,7 @@ type OnboardingSession struct {
 	RiskProfile       string          `json:"risk_profile"`
 	ExchangeAccountID *uuid.UUID      `json:"exchange_account_id,omitempty"`
 	PreferredAssets   []string        `json:"preferred_assets,omitempty"`
+	LastMessageID     int             `json:"last_msg_id"` // For updating messages (inline keyboard flow)
 	StartedAt         time.Time       `json:"started_at"`
 	LastInteractionAt time.Time       `json:"last_interaction_at"`
 }
@@ -105,6 +108,14 @@ func (os *OnboardingService) HandleMessage(ctx context.Context, userID uuid.UUID
 
 	// Process message based on current state
 	switch session.State {
+	case StateSelectExchange:
+		// This state uses inline keyboard only, not text input
+		msg, err := os.templates.Render("telegram/invest/select_exchange_reminder", nil)
+		if err != nil {
+			return errors.Wrap(err, "failed to render invest_select_exchange_reminder template")
+		}
+		return os.bot.SendMessage(telegramID, msg)
+
 	case StateAwaitingCapital:
 		return os.handleCapitalInput(ctx, session, text)
 
@@ -189,7 +200,7 @@ func (os *OnboardingService) handleRiskProfileInput(ctx context.Context, session
 	case "3", "aggressive", "agg":
 		riskProfile = "aggressive"
 	default:
-		msg, err := os.templates.Render("telegram/onboarding_risk_invalid", nil)
+		msg, err := os.templates.Render("telegram/invest/risk_invalid", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render onboarding_risk_invalid template")
 		}
@@ -289,7 +300,7 @@ func (os *OnboardingService) startOnboardingWithDemo(ctx context.Context, sessio
 // Helper methods for prompting user
 
 func (os *OnboardingService) askCapitalAmount(telegramID int64) error {
-	msg, err := os.templates.Render("telegram/onboarding_capital", nil)
+	msg, err := os.templates.Render("telegram/invest/capital", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render onboarding_capital template")
 	}
@@ -298,7 +309,7 @@ func (os *OnboardingService) askCapitalAmount(telegramID int64) error {
 }
 
 func (os *OnboardingService) askRiskProfile(telegramID int64) error {
-	msg, err := os.templates.Render("telegram/onboarding_risk_profile", nil)
+	msg, err := os.templates.Render("telegram/invest/risk_profile", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render onboarding_risk_profile template")
 	}
@@ -314,7 +325,7 @@ func (os *OnboardingService) askExchangeAccount(ctx context.Context, session *On
 	}
 
 	if len(accounts) == 0 {
-		msg, err := os.templates.Render("telegram/onboarding_exchange_empty", nil)
+		msg, err := os.templates.Render("telegram/invest/exchange_empty", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render onboarding_exchange_empty template")
 		}
@@ -326,7 +337,7 @@ func (os *OnboardingService) askExchangeAccount(ctx context.Context, session *On
 		"Accounts": accounts,
 	}
 
-	msg, err := os.templates.Render("telegram/onboarding_exchange_select", data)
+	msg, err := os.templates.Render("telegram/invest/exchange_select", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render onboarding_exchange_select template")
 	}
@@ -348,6 +359,259 @@ func (os *OnboardingService) parseCapitalAmount(text string) (float64, error) {
 	}
 
 	return amount, nil
+}
+
+// StartWithExchangeSelection starts /invest flow with exchange selection
+func (os *OnboardingService) StartWithExchangeSelection(ctx context.Context, userID uuid.UUID, telegramID int64) error {
+	// Get user's exchange accounts
+	accounts, err := os.exchAcctRepo.GetByUser(ctx, userID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get exchange accounts")
+	}
+
+	if len(accounts) == 0 {
+		msg, err := os.templates.Render("telegram/invest/exchange_empty", nil)
+		if err != nil {
+			return errors.Wrap(err, "failed to render onboarding_exchange_empty template")
+		}
+		return os.bot.SendMessage(telegramID, msg)
+	}
+
+	// Create session in StateSelectExchange
+	session := &OnboardingSession{
+		TelegramID:        telegramID,
+		UserID:            userID,
+		State:             StateSelectExchange,
+		StartedAt:         time.Now(),
+		LastInteractionAt: time.Now(),
+	}
+
+	if err := os.saveSession(ctx, session); err != nil {
+		return err
+	}
+
+	// Show exchange selection with inline keyboard
+	return os.showExchangeSelection(ctx, session, accounts)
+}
+
+// HandleCallback handles callback queries from inline keyboards (for /invest flow)
+func (os *OnboardingService) HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, data string) error {
+	os.log.Debugw("Processing onboarding callback",
+		"telegram_id", telegramID,
+		"callback_data", data,
+		"message_id", messageID,
+	)
+
+	session, err := os.getSession(ctx, telegramID)
+	if err != nil {
+		return errors.Wrap(err, "no active onboarding session")
+	}
+
+	// Update last message ID
+	session.LastMessageID = messageID
+
+	parts := strings.Split(data, ":")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid callback data format: %s", data)
+	}
+
+	action := parts[1]
+
+	switch session.State {
+	case StateSelectExchange:
+		if action == "back" || action == "cancel" {
+			os.deleteSession(ctx, telegramID)
+			msg, err := os.templates.Render("telegram/invest/cancelled", nil)
+			if err != nil {
+				return errors.Wrap(err, "failed to render invest_cancelled template")
+			}
+			return os.bot.SendMessage(telegramID, msg)
+		}
+		// Parse exchange account ID
+		accountID, err := uuid.Parse(action)
+		if err != nil {
+			return errors.Wrap(err, "invalid account ID in callback")
+		}
+		return os.handleExchangeSelectedForInvest(ctx, session, accountID)
+
+	case StateAwaitingCapital:
+		if action == "back" {
+			// Go back to exchange selection
+			return os.goBackToExchangeSelection(ctx, session)
+		}
+
+	default:
+		os.log.Warnw("Unexpected callback in current state",
+			"state", session.State,
+			"callback_data", data,
+		)
+	}
+
+	return nil
+}
+
+// handleExchangeSelectedForInvest handles exchange selection in /invest flow
+func (os *OnboardingService) handleExchangeSelectedForInvest(ctx context.Context, session *OnboardingSession, accountID uuid.UUID) error {
+	os.log.Infow("Exchange selected for invest",
+		"telegram_id", session.TelegramID,
+		"user_id", session.UserID,
+		"account_id", accountID,
+	)
+
+	// Verify user owns this account
+	account, err := os.exchAcctRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get exchange account")
+	}
+	if account.UserID != session.UserID {
+		return fmt.Errorf("account does not belong to user")
+	}
+
+	// Save selected exchange
+	session.ExchangeAccountID = &accountID
+	session.State = StateAwaitingCapital
+	session.LastInteractionAt = time.Now()
+
+	if err := os.saveSession(ctx, session); err != nil {
+		return err
+	}
+
+	// Show capital input prompt with Back button
+	return os.showCapitalInputWithBackButton(ctx, session)
+}
+
+// goBackToExchangeSelection returns to exchange selection from capital input
+func (os *OnboardingService) goBackToExchangeSelection(ctx context.Context, session *OnboardingSession) error {
+	os.log.Debugw("Going back to exchange selection",
+		"telegram_id", session.TelegramID,
+	)
+
+	// Get user's exchange accounts again
+	accounts, err := os.exchAcctRepo.GetByUser(ctx, session.UserID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get exchange accounts")
+	}
+
+	// Reset state
+	session.State = StateSelectExchange
+	session.ExchangeAccountID = nil
+	session.Capital = 0
+	session.LastInteractionAt = time.Now()
+
+	if err := os.saveSession(ctx, session); err != nil {
+		return err
+	}
+
+	// Show exchange selection again
+	return os.showExchangeSelection(ctx, session, accounts)
+}
+
+// showExchangeSelection displays exchange selection with inline keyboard
+func (os *OnboardingService) showExchangeSelection(ctx context.Context, session *OnboardingSession, accounts []*exchange_account.ExchangeAccount) error {
+	// Prepare data for template
+	type ExchangeInfo struct {
+		StatusEmoji string
+		Exchange    string
+		Label       string
+	}
+
+	exchangesData := make([]ExchangeInfo, 0, len(accounts))
+	for _, account := range accounts {
+		if !account.IsActive {
+			continue // Skip inactive accounts
+		}
+		statusEmoji := "✅"
+		exchangesData = append(exchangesData, ExchangeInfo{
+			StatusEmoji: statusEmoji,
+			Exchange:    strings.Title(string(account.Exchange)),
+			Label:       account.Label,
+		})
+	}
+
+	if len(exchangesData) == 0 {
+		msg, err := os.templates.Render("telegram/invest/no_active_exchanges", nil)
+		if err != nil {
+			return errors.Wrap(err, "failed to render invest_no_active_exchanges template")
+		}
+		return os.bot.SendMessage(session.TelegramID, msg)
+	}
+
+	data := map[string]interface{}{
+		"Exchanges": exchangesData,
+	}
+
+	msg, err := os.templates.Render("telegram/invest/select_exchange", data)
+	if err != nil {
+		return errors.Wrap(err, "failed to render invest_select_exchange template")
+	}
+
+	// Create inline keyboard with active exchange accounts
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, account := range accounts {
+		if !account.IsActive {
+			continue
+		}
+
+		buttonText := fmt.Sprintf("📊 %s - %s", strings.Title(string(account.Exchange)), account.Label)
+		row := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(buttonText, fmt.Sprintf("invest:%s", account.ID.String())),
+		)
+		rows = append(rows, row)
+	}
+
+	// Add cancel button
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "invest:cancel"),
+	))
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	return os.sendMessageWithKeyboardAndUpdate(ctx, session, msg, keyboard)
+}
+
+// showCapitalInputWithBackButton shows capital input prompt with Back button
+func (os *OnboardingService) showCapitalInputWithBackButton(ctx context.Context, session *OnboardingSession) error {
+	msg, err := os.templates.Render("telegram/invest/enter_amount", nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to render invest_enter_amount template")
+	}
+
+	// Create keyboard with Back button
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Back", "invest:back"),
+		),
+	)
+
+	return os.sendMessageWithKeyboardAndUpdate(ctx, session, msg, keyboard)
+}
+
+// sendMessageWithKeyboardAndUpdate sends/updates message with inline keyboard
+func (os *OnboardingService) sendMessageWithKeyboardAndUpdate(ctx context.Context, session *OnboardingSession, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	// If we have a previous message, try to update it
+	if session.LastMessageID > 0 {
+		err := os.bot.EditMessageWithKeyboard(session.TelegramID, session.LastMessageID, text, keyboard)
+		if err != nil {
+			os.log.Debugw("Failed to edit message, sending new one",
+				"error", err,
+				"message_id", session.LastMessageID,
+			)
+			// Fallback to sending new message
+			session.LastMessageID = 0
+		} else {
+			// Successfully updated
+			return os.saveSession(ctx, session)
+		}
+	}
+
+	// Send new message
+	sentMsg, err := os.bot.SendMessageWithKeyboardAndGetID(session.TelegramID, text, keyboard)
+	if err != nil {
+		return errors.Wrap(err, "failed to send message with keyboard")
+	}
+
+	// Save message ID
+	session.LastMessageID = sentMsg.MessageID
+	return os.saveSession(ctx, session)
 }
 
 // Redis session management

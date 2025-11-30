@@ -301,7 +301,7 @@ func (es *ExchangeSetupService) handleExchangeSelection(ctx context.Context, ses
 		"ExchangeTitle": strings.Title(string(exchangeType)),
 	}
 
-	msg, err := es.templates.Render("telegram/exchange_api_key_prompt", data)
+	msg, err := es.templates.Render("telegram/exchange/api_key_prompt", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_api_key_prompt template")
 	}
@@ -332,7 +332,7 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 			"telegram_id", session.TelegramID,
 			"provided_length", len(apiKey),
 		)
-		msg, err := es.templates.Render("telegram/exchange_api_key_invalid", nil)
+		msg, err := es.templates.Render("telegram/exchange/api_key_invalid", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render exchange_api_key_invalid template")
 		}
@@ -368,7 +368,7 @@ func (es *ExchangeSetupService) handleAPIKeyInput(ctx context.Context, session *
 	)
 
 	// Ask for secret using template
-	msg, err := es.templates.Render("telegram/exchange_secret_prompt", nil)
+	msg, err := es.templates.Render("telegram/exchange/secret_prompt", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_secret_prompt template")
 	}
@@ -399,7 +399,7 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 			"telegram_id", session.TelegramID,
 			"provided_length", len(secret),
 		)
-		msg, err := es.templates.Render("telegram/exchange_secret_invalid", nil)
+		msg, err := es.templates.Render("telegram/exchange/secret_invalid", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render exchange_secret_invalid template")
 		}
@@ -435,7 +435,7 @@ func (es *ExchangeSetupService) handleSecretInput(ctx context.Context, session *
 	)
 
 	// Ask for label using template
-	msg, err := es.templates.Render("telegram/exchange_label_prompt", nil)
+	msg, err := es.templates.Render("telegram/exchange/label_prompt", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_label_prompt template")
 	}
@@ -507,7 +507,7 @@ func (es *ExchangeSetupService) handleLabelInput(ctx context.Context, session *E
 	)
 
 	// Notify testing using template
-	msg, err := es.templates.Render("telegram/exchange_testing", nil)
+	msg, err := es.templates.Render("telegram/exchange/testing", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_testing template")
 	}
@@ -529,7 +529,7 @@ func (es *ExchangeSetupService) handleLabelInput(ctx context.Context, session *E
 		errorData := map[string]interface{}{
 			"Error": err.Error(),
 		}
-		errorMsg, renderErr := es.templates.Render("telegram/exchange_connection_failed", errorData)
+		errorMsg, renderErr := es.templates.Render("telegram/exchange/connection_failed", errorData)
 		if renderErr != nil {
 			return errors.Wrap(renderErr, "failed to render exchange_connection_failed template")
 		}
@@ -552,7 +552,7 @@ func (es *ExchangeSetupService) handleLabelInput(ctx context.Context, session *E
 		"Label":    session.Label,
 	}
 
-	successMsg, err := es.templates.Render("telegram/exchange_connected", successData)
+	successMsg, err := es.templates.Render("telegram/exchange/connected", successData)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_connected template")
 	}
@@ -645,10 +645,7 @@ func (es *ExchangeSetupService) sendMessageAndCleanup(ctx context.Context, sessi
 	}
 
 	// Send new message
-	msg := tgbotapi.NewMessage(session.TelegramID, text)
-	msg.ParseMode = "Markdown"
-
-	sentMsg, err := es.bot.GetAPI().Send(msg)
+	sentMsg, err := es.bot.SendMessageAndGetID(session.TelegramID, text)
 	if err != nil {
 		return errors.Wrap(err, "failed to send message")
 	}
@@ -666,11 +663,7 @@ func (es *ExchangeSetupService) sendMessageWithKeyboardAndCleanup(ctx context.Co
 	}
 
 	// Send new message with keyboard
-	msg := tgbotapi.NewMessage(session.TelegramID, text)
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = keyboard
-
-	sentMsg, err := es.bot.GetAPI().Send(msg)
+	sentMsg, err := es.bot.SendMessageWithKeyboardAndGetID(session.TelegramID, text, keyboard)
 	if err != nil {
 		return errors.Wrap(err, "failed to send message with keyboard")
 	}
@@ -911,7 +904,7 @@ func (es *ExchangeSetupService) showAccountList(ctx context.Context, session *Ex
 		"Accounts": accountsData,
 	}
 
-	msg, err := es.templates.Render("telegram/exchange_manage_list", data)
+	msg, err := es.templates.Render("telegram/exchange/manage_list", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_manage_list template")
 	}
@@ -990,7 +983,7 @@ func (es *ExchangeSetupService) showActionMenu(ctx context.Context, session *Exc
 		"IsTestnet":  account.IsTestnet,
 	}
 
-	msg, err := es.templates.Render("telegram/exchange_manage_actions", data)
+	msg, err := es.templates.Render("telegram/exchange/manage_actions", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_manage_actions template")
 	}
@@ -1080,7 +1073,7 @@ func (es *ExchangeSetupService) toggleAccountActive(ctx context.Context, session
 
 // showDeleteConfirmation shows delete confirmation dialog
 func (es *ExchangeSetupService) showDeleteConfirmation(ctx context.Context, session *ExchangeSetupSession) error {
-	msg, err := es.templates.Render("telegram/exchange_manage_delete_confirm", nil)
+	msg, err := es.templates.Render("telegram/exchange/manage_delete_confirm", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_manage_delete_confirm template")
 	}

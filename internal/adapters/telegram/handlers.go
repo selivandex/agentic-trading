@@ -19,6 +19,8 @@ type Handler struct {
 	bot              *Bot
 	userService      UserService
 	onboardingMgr    OnboardingManager
+	investMenu       *InvestMenuService // NEW: Menu-based invest flow
+	menuRegistry     *MenuRegistry      // Registry for all menu handlers
 	statusHandler    StatusHandler
 	portfolioHandler PortfolioHandler
 	controlHandler   ControlHandler
@@ -38,6 +40,8 @@ type HandlerDeps struct {
 	Bot              *Bot
 	UserService      UserService
 	OnboardingMgr    OnboardingManager
+	InvestMenu       *InvestMenuService // NEW: Menu-based invest flow
+	MenuRegistry     *MenuRegistry      // Registry for all menu handlers
 	StatusHandler    StatusHandler
 	PortfolioHandler PortfolioHandler
 	ControlHandler   ControlHandler
@@ -56,6 +60,8 @@ func NewHandler(deps HandlerDeps) *Handler {
 		bot:              deps.Bot,
 		userService:      deps.UserService,
 		onboardingMgr:    deps.OnboardingMgr,
+		investMenu:       deps.InvestMenu,
+		menuRegistry:     deps.MenuRegistry,
 		statusHandler:    deps.StatusHandler,
 		portfolioHandler: deps.PortfolioHandler,
 		controlHandler:   deps.ControlHandler,
@@ -69,6 +75,8 @@ func NewHandler(deps HandlerDeps) *Handler {
 type OnboardingManager interface {
 	HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) error
 	IsInOnboarding(ctx context.Context, telegramID int64) (bool, error)
+	StartWithExchangeSelection(ctx context.Context, userID uuid.UUID, telegramID int64) error
+	HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, data string) error
 }
 
 // StatusHandler handles status-related commands
@@ -155,29 +163,7 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) erro
 		return errors.Wrap(err, "failed to get or create user")
 	}
 
-	// Check if user is in exchange setup/management flow
-	if h.exchangeHandler != nil {
-		inSetup, err := h.exchangeHandler.IsInSetup(ctx, telegramID)
-		if err != nil {
-			h.log.Errorw("Failed to check exchange setup status", "error", err)
-		} else if inSetup {
-			// Route to exchange handler (handles both setup and management)
-			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, msg.MessageID, text)
-		}
-	}
-
-	// Check if user is in onboarding flow
-	if h.onboardingMgr != nil {
-		inOnboarding, err := h.onboardingMgr.IsInOnboarding(ctx, telegramID)
-		if err != nil {
-			h.log.Errorw("Failed to check onboarding status", "error", err)
-		} else if inOnboarding {
-			// Route to onboarding manager
-			return h.onboardingMgr.HandleMessage(ctx, usr.ID, telegramID, text)
-		}
-	}
-
-	// Handle commands
+	// PRIORITY 1: Handle commands FIRST (they should cancel any active flow)
 	if msg.IsCommand() {
 		command := msg.Command()
 		args := msg.CommandArguments()
@@ -188,6 +174,40 @@ func (h *Handler) handleMessage(ctx context.Context, msg *tgbotapi.Message) erro
 			"has_args", args != "",
 		)
 		return h.handleCommand(ctx, chatID, telegramID, usr, command, args)
+	}
+
+	// PRIORITY 2: Check if user is in exchange setup/management flow
+	if h.exchangeHandler != nil {
+		inSetup, err := h.exchangeHandler.IsInSetup(ctx, telegramID)
+		if err != nil {
+			h.log.Errorw("Failed to check exchange setup status", "error", err)
+		} else if inSetup {
+			// Route to exchange handler (handles both setup and management)
+			return h.exchangeHandler.HandleMessage(ctx, usr.ID, telegramID, msg.MessageID, text)
+		}
+	}
+
+	// PRIORITY 3: Check if user is in any menu flow (auto-routing via registry)
+	if h.menuRegistry != nil {
+		routed, err := h.menuRegistry.RouteTextMessage(ctx, usr.ID, telegramID, text)
+		if err != nil {
+			h.log.Errorw("Menu text routing failed", "error", err)
+			// Continue to other handlers
+		} else if routed {
+			// Successfully routed to menu handler
+			return nil
+		}
+	}
+
+	// PRIORITY 4: Check if user is in onboarding flow
+	if h.onboardingMgr != nil {
+		inOnboarding, err := h.onboardingMgr.IsInOnboarding(ctx, telegramID)
+		if err != nil {
+			h.log.Errorw("Failed to check onboarding status", "error", err)
+		} else if inOnboarding {
+			// Route to onboarding manager
+			return h.onboardingMgr.HandleMessage(ctx, usr.ID, telegramID, text)
+		}
 	}
 
 	// Non-command message
@@ -309,7 +329,7 @@ func (h *Handler) handleStart(ctx context.Context, chatID int64, usr *user.User)
 		"UserID":    usr.ID.String(),
 	}
 
-	welcomeMsg, err := h.templates.Render("telegram/welcome", data)
+	welcomeMsg, err := h.templates.Render("telegram/common/welcome", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render welcome template")
 	}
@@ -319,7 +339,7 @@ func (h *Handler) handleStart(ctx context.Context, chatID int64, usr *user.User)
 
 // handleHelp handles /help command
 func (h *Handler) handleHelp(ctx context.Context, chatID int64) error {
-	helpMsg, err := h.templates.Render("telegram/help", nil)
+	helpMsg, err := h.templates.Render("telegram/common/help", nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to render help template")
 	}
@@ -327,26 +347,18 @@ func (h *Handler) handleHelp(ctx context.Context, chatID int64) error {
 	return h.bot.SendMessage(chatID, helpMsg)
 }
 
-// handleInvest handles /invest command (starts onboarding)
+// handleInvest handles /invest command (starts menu-based invest flow)
 func (h *Handler) handleInvest(ctx context.Context, chatID int64, usr *user.User, args string) error {
-	if h.onboardingMgr == nil {
-		return h.bot.SendMessage(chatID, "❌ Onboarding service not available")
+	if h.investMenu == nil {
+		return h.bot.SendMessage(chatID, "❌ Investment service not available")
 	}
 
-	// Parse amount if provided
-	amount := strings.TrimSpace(args)
+	// Clear any existing invest session (restart flow)
+	// This ensures /invest always starts fresh
+	_ = h.investMenu.ClearSession(ctx, chatID)
 
-	if amount == "" {
-		// Start interactive onboarding
-		msg, err := h.templates.Render("telegram/invest_start", nil)
-		if err != nil {
-			return errors.Wrap(err, "failed to render invest_start template")
-		}
-		return h.bot.SendMessage(chatID, msg)
-	}
-
-	// Amount provided directly - start onboarding with this amount
-	return h.onboardingMgr.HandleMessage(ctx, usr.ID, chatID, amount)
+	// Start menu-based invest flow
+	return h.investMenu.StartInvest(ctx, usr.ID, chatID)
 }
 
 // handleCallbackQuery processes callback queries from inline keyboards
@@ -455,6 +467,19 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *tgbotapi.Ca
 		h.log.Warnw("Onboarding handler not available or invalid callback data",
 			"telegram_id", telegramID,
 			"parts", parts,
+		)
+
+	case "amt", "cancel", "sel", "back":
+		// Auto-route menu callbacks via registry
+		if h.menuRegistry != nil {
+			h.log.Debugw("Auto-routing callback via menu registry",
+				"telegram_id", telegramID,
+				"callback_data", data,
+			)
+			return h.menuRegistry.RouteCallback(ctx, usr.ID, telegramID, callback.Message.MessageID, data)
+		}
+		h.log.Warnw("Menu registry not available",
+			"telegram_id", telegramID,
 		)
 
 	default:

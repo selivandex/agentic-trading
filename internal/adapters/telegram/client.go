@@ -3,10 +3,12 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"golang.org/x/time/rate"
 
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -21,15 +23,19 @@ type Bot struct {
 	running     bool
 	webhookMode bool                  // If true, use webhook instead of polling
 	msgHandler  func(tgbotapi.Update) // Handler for incoming updates
+	rateLimiter *rate.Limiter         // Rate limiter for Telegram API calls
 }
 
 // Config contains Telegram bot configuration
 type Config struct {
-	Token       string
-	Debug       bool
-	Timeout     int  // Update timeout in seconds
-	BufferSize  int  // Update channel buffer size
-	WebhookMode bool // If true, don't start polling (use webhook instead)
+	Token          string
+	Debug          bool
+	Timeout        int  // Update timeout in seconds
+	BufferSize     int  // Update channel buffer size
+	WebhookMode    bool // If true, don't start polling (use webhook instead)
+	HTTPTimeout    time.Duration
+	RateLimitBurst int // Rate limiter burst (default: 30)
+	RateLimitRate  int // Rate limiter per second (default: 20)
 }
 
 // NewBot creates a new Telegram bot instance
@@ -38,26 +44,51 @@ func NewBot(cfg Config, log *logger.Logger) (*Bot, error) {
 		return nil, errors.Wrapf(errors.ErrInvalidInput, "telegram bot token is required")
 	}
 
-	api, err := tgbotapi.NewBotAPI(cfg.Token)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create telegram bot")
-	}
-
-	api.Debug = cfg.Debug
-
+	// Set defaults
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 60
 	}
 	if cfg.BufferSize == 0 {
 		cfg.BufferSize = 100
 	}
+	if cfg.HTTPTimeout == 0 {
+		cfg.HTTPTimeout = 30 * time.Second
+	}
+	if cfg.RateLimitBurst == 0 {
+		cfg.RateLimitBurst = 30 // Telegram allows bursts
+	}
+	if cfg.RateLimitRate == 0 {
+		cfg.RateLimitRate = 20 // Conservative: 20 msg/sec (Telegram limit is 30)
+	}
+
+	// Create HTTP client with timeout
+	httpClient := &http.Client{
+		Timeout: cfg.HTTPTimeout,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+
+	// Create bot API with custom client
+	api, err := tgbotapi.NewBotAPIWithClient(cfg.Token, tgbotapi.APIEndpoint, httpClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create telegram bot")
+	}
+
+	api.Debug = cfg.Debug
 
 	log.Infof("Authorized on account %s", api.Self.UserName)
+
+	// Create rate limiter
+	rateLimiter := rate.NewLimiter(rate.Limit(cfg.RateLimitRate), cfg.RateLimitBurst)
 
 	return &Bot{
 		api:         api,
 		webhookMode: cfg.WebhookMode,
 		log:         log.With("component", "telegram_bot"),
+		rateLimiter: rateLimiter,
 	}, nil
 }
 
@@ -165,25 +196,42 @@ func (b *Bot) SetMessageHandler(handler func(tgbotapi.Update)) {
 
 // SendMessage sends a text message to a chat
 func (b *Bot) SendMessage(chatID int64, text string) error {
+	return b.SendMessageWithContext(context.Background(), chatID, text)
+}
+
+// SendMessageWithContext sends a text message to a chat with context support
+func (b *Bot) SendMessageWithContext(ctx context.Context, chatID int64, text string) error {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return errors.Wrap(err, "rate limiter wait failed")
+	}
+
 	b.log.Debugw("Sending message",
 		"chat_id", chatID,
 		"text_length", len(text),
 	)
 
+	start := time.Now()
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
 
 	_, err := b.api.Send(msg)
+
+	duration := time.Since(start)
+
 	if err != nil {
 		b.log.Errorw("Failed to send message",
 			"chat_id", chatID,
 			"error", err,
+			"duration_ms", duration.Milliseconds(),
 		)
 		return errors.Wrap(err, "failed to send message")
 	}
 
 	b.log.Debugw("Message sent successfully",
 		"chat_id", chatID,
+		"duration_ms", duration.Milliseconds(),
 	)
 
 	return nil
@@ -191,27 +239,44 @@ func (b *Bot) SendMessage(chatID int64, text string) error {
 
 // SendMessageWithKeyboard sends a message with inline keyboard
 func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	return b.SendMessageWithKeyboardContext(context.Background(), chatID, text, keyboard)
+}
+
+// SendMessageWithKeyboardContext sends a message with inline keyboard and context support
+func (b *Bot) SendMessageWithKeyboardContext(ctx context.Context, chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return errors.Wrap(err, "rate limiter wait failed")
+	}
+
 	b.log.Debugw("Sending message with inline keyboard",
 		"chat_id", chatID,
 		"text_length", len(text),
 		"buttons_count", len(keyboard.InlineKeyboard),
 	)
 
+	start := time.Now()
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
 	msg.ReplyMarkup = keyboard
 
 	_, err := b.api.Send(msg)
+
+	duration := time.Since(start)
+
 	if err != nil {
 		b.log.Errorw("Failed to send message with keyboard",
 			"chat_id", chatID,
 			"error", err,
+			"duration_ms", duration.Milliseconds(),
 		)
 		return errors.Wrap(err, "failed to send message with keyboard")
 	}
 
 	b.log.Debugw("Message with keyboard sent successfully",
 		"chat_id", chatID,
+		"duration_ms", duration.Milliseconds(),
 	)
 
 	return nil
@@ -222,8 +287,133 @@ func (b *Bot) SendNotification(chatID int64, notification string) error {
 	return b.SendMessage(chatID, notification)
 }
 
+// SendMessageAndGetID sends a message and returns the sent message (with ID)
+// Use this when you need to save the message ID for later operations
+func (b *Bot) SendMessageAndGetID(chatID int64, text string) (tgbotapi.Message, error) {
+	return b.SendMessageAndGetIDWithContext(context.Background(), chatID, text)
+}
+
+// SendMessageAndGetIDWithContext sends a message and returns the sent message with context support
+func (b *Bot) SendMessageAndGetIDWithContext(ctx context.Context, chatID int64, text string) (tgbotapi.Message, error) {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return tgbotapi.Message{}, errors.Wrap(err, "rate limiter wait failed")
+	}
+
+	b.log.Debugw("Sending message (with ID return)",
+		"chat_id", chatID,
+		"text_length", len(text),
+	)
+
+	start := time.Now()
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "Markdown"
+
+	sentMsg, err := b.api.Send(msg)
+
+	duration := time.Since(start)
+
+	if err != nil {
+		b.log.Errorw("Failed to send message",
+			"chat_id", chatID,
+			"error", err,
+			"duration_ms", duration.Milliseconds(),
+		)
+		return tgbotapi.Message{}, errors.Wrap(err, "failed to send message")
+	}
+
+	b.log.Debugw("Message sent successfully",
+		"chat_id", chatID,
+		"message_id", sentMsg.MessageID,
+		"duration_ms", duration.Milliseconds(),
+	)
+
+	return sentMsg, nil
+}
+
+// SendMessageWithKeyboardAndGetID sends a message with keyboard and returns the sent message
+func (b *Bot) SendMessageWithKeyboardAndGetID(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) (tgbotapi.Message, error) {
+	return b.SendMessageWithKeyboardAndGetIDContext(context.Background(), chatID, text, keyboard)
+}
+
+// SendMessageWithKeyboardAndGetIDContext sends a message with keyboard and returns the sent message with context
+func (b *Bot) SendMessageWithKeyboardAndGetIDContext(ctx context.Context, chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) (tgbotapi.Message, error) {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return tgbotapi.Message{}, errors.Wrap(err, "rate limiter wait failed")
+	}
+
+	b.log.Debugw("Sending message with inline keyboard (with ID return)",
+		"chat_id", chatID,
+		"text_length", len(text),
+		"buttons_count", len(keyboard.InlineKeyboard),
+	)
+
+	start := time.Now()
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "Markdown"
+	msg.ReplyMarkup = keyboard
+
+	sentMsg, err := b.api.Send(msg)
+
+	duration := time.Since(start)
+
+	if err != nil {
+		b.log.Errorw("Failed to send message with keyboard",
+			"chat_id", chatID,
+			"error", err,
+			"duration_ms", duration.Milliseconds(),
+		)
+		return tgbotapi.Message{}, errors.Wrap(err, "failed to send message with keyboard")
+	}
+
+	b.log.Debugw("Message with keyboard sent successfully",
+		"chat_id", chatID,
+		"message_id", sentMsg.MessageID,
+		"duration_ms", duration.Milliseconds(),
+	)
+
+	return sentMsg, nil
+}
+
+// EditMessageWithKeyboard edits message with new text and keyboard
+func (b *Bot) EditMessageWithKeyboard(chatID int64, messageID int, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	return b.EditMessageWithKeyboardContext(context.Background(), chatID, messageID, text, keyboard)
+}
+
+// EditMessageWithKeyboardContext edits message with new text and keyboard with context support
+func (b *Bot) EditMessageWithKeyboardContext(ctx context.Context, chatID int64, messageID int, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return errors.Wrap(err, "rate limiter wait failed")
+	}
+
+	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
+	edit.ParseMode = "Markdown"
+	edit.ReplyMarkup = &keyboard
+
+	_, err := b.api.Send(edit)
+	if err != nil {
+		return errors.Wrap(err, "failed to edit message")
+	}
+
+	return nil
+}
+
 // EditMessage updates an existing message
 func (b *Bot) EditMessage(chatID int64, messageID int, text string) error {
+	return b.EditMessageWithContext(context.Background(), chatID, messageID, text)
+}
+
+// EditMessageWithContext updates an existing message with context support
+func (b *Bot) EditMessageWithContext(ctx context.Context, chatID int64, messageID int, text string) error {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return errors.Wrap(err, "rate limiter wait failed")
+	}
+
 	msg := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	msg.ParseMode = "Markdown"
 
@@ -274,6 +464,16 @@ func (b *Bot) DeleteMessageAsync(chatID int64, messageID int, reason string) {
 
 // AnswerCallbackQuery answers a callback query from inline keyboard
 func (b *Bot) AnswerCallbackQuery(callbackQueryID string, text string) error {
+	return b.AnswerCallbackQueryWithContext(context.Background(), callbackQueryID, text)
+}
+
+// AnswerCallbackQueryWithContext answers a callback query with context support
+func (b *Bot) AnswerCallbackQueryWithContext(ctx context.Context, callbackQueryID string, text string) error {
+	// Wait for rate limiter
+	if err := b.rateLimiter.Wait(ctx); err != nil {
+		return errors.Wrap(err, "rate limiter wait failed")
+	}
+
 	b.log.Debugw("Answering callback query",
 		"callback_id", callbackQueryID,
 		"text", text,
@@ -317,10 +517,39 @@ func (b *Bot) SendTyping(chatID int64) error {
 }
 
 // SendMessageAsync sends a message asynchronously without blocking
+// Use this for non-critical messages where you don't need to wait for result
 func (b *Bot) SendMessageAsync(chatID int64, text string) {
+	b.SendMessageAsyncWithCallback(chatID, text, nil)
+}
+
+// SendMessageAsyncWithCallback sends a message asynchronously with optional callback
+func (b *Bot) SendMessageAsyncWithCallback(chatID int64, text string, callback func(error)) {
 	go func() {
-		if err := b.SendMessage(chatID, text); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		err := b.SendMessageWithContext(ctx, chatID, text)
+		if err != nil {
 			b.log.Errorw("Failed to send async message",
+				"chat_id", chatID,
+				"error", err,
+			)
+		}
+
+		if callback != nil {
+			callback(err)
+		}
+	}()
+}
+
+// SendMessageWithKeyboardAsync sends a message with keyboard asynchronously
+func (b *Bot) SendMessageWithKeyboardAsync(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := b.SendMessageWithKeyboardContext(ctx, chatID, text, keyboard); err != nil {
+			b.log.Errorw("Failed to send async message with keyboard",
 				"chat_id", chatID,
 				"error", err,
 			)

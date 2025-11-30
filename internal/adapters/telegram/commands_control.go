@@ -66,7 +66,7 @@ func (ch *ControlCommandHandler) HandleStop(ctx context.Context, chatID int64, u
 
 	// Check if already stopped
 	if !usr.IsActive {
-		msg, err := ch.templates.Render("telegram/already_stopped", nil)
+		msg, err := ch.templates.Render("telegram/common/already_stopped", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render already_stopped template")
 		}
@@ -88,7 +88,7 @@ func (ch *ControlCommandHandler) HandleStop(ctx context.Context, chatID int64, u
 		"WillClosePositions": false, // For MVP, keep positions open
 	}
 
-	msg, err := ch.templates.Render("telegram/trading_stopped", data)
+	msg, err := ch.templates.Render("telegram/common/trading_stopped", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render trading_stopped template")
 	}
@@ -117,7 +117,7 @@ func (ch *ControlCommandHandler) HandleSettings(ctx context.Context, chatID int6
 		"MaxPositionSizeUSD": usr.Settings.MaxPositionSizeUSD,
 	}
 
-	msg, err := ch.templates.Render("telegram/settings", data)
+	msg, err := ch.templates.Render("telegram/settings/main", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render settings template")
 	}
@@ -183,7 +183,7 @@ func (ch *ControlCommandHandler) HandleSettingsCallback(ctx context.Context, cha
 		return ch.HandleSettings(ctx, chatID, userID)
 
 	case "done":
-		msg, err := ch.templates.Render("telegram/settings_saved", nil)
+		msg, err := ch.templates.Render("telegram/settings/saved", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render settings_saved template")
 		}
@@ -208,7 +208,7 @@ func (ch *ControlCommandHandler) handleRiskLevelChange(ctx context.Context, chat
 		),
 	)
 
-	msg, err := ch.templates.Render("telegram/settings_risk_select", map[string]interface{}{
+	msg, err := ch.templates.Render("telegram/settings/risk_select", map[string]interface{}{
 		"CurrentRisk": usr.Settings.RiskLevel,
 	})
 	if err != nil {
@@ -236,7 +236,7 @@ func (ch *ControlCommandHandler) handleMaxPositionsChange(ctx context.Context, c
 		),
 	)
 
-	msg, err := ch.templates.Render("telegram/settings_max_positions_select", map[string]interface{}{
+	msg, err := ch.templates.Render("telegram/settings/max_positions_select", map[string]interface{}{
 		"CurrentMaxPositions": usr.Settings.MaxPositions,
 	})
 	if err != nil {

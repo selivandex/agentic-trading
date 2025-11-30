@@ -192,7 +192,7 @@ func (ns *NotificationService) NotifyDailyReport(chatID int64, data DailyReportD
 
 // NotifyExchangeDeactivated sends exchange deactivated notification
 func (ns *NotificationService) NotifyExchangeDeactivated(chatID int64, data ExchangeDeactivatedData) error {
-	text, err := ns.templates.Render("telegram/exchange_deactivated", data)
+	text, err := ns.templates.Render("telegram/exchange/deactivated", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render exchange_deactivated template")
 	}

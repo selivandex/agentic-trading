@@ -16,7 +16,7 @@ import (
 //go:embed prompts/**/*.tmpl
 var promptsFS embed.FS
 
-//go:embed telegram/*.tmpl
+//go:embed telegram/**/*.tmpl
 var telegramFS embed.FS
 
 //go:embed notifications/*.tmpl

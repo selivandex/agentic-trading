@@ -103,7 +103,7 @@ func (qh *QueryCommandHandler) HandleStatus(ctx context.Context, chatID int64, u
 	}
 
 	// Render template
-	msg, err := qh.templates.Render("telegram/status", data)
+	msg, err := qh.templates.Render("telegram/common/status", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render status template")
 	}
@@ -120,7 +120,7 @@ func (qh *QueryCommandHandler) HandlePortfolio(ctx context.Context, chatID int64
 	}
 
 	if len(openPositions) == 0 {
-		msg, err := qh.templates.Render("telegram/portfolio_empty", nil)
+		msg, err := qh.templates.Render("telegram/portfolio/empty", nil)
 		if err != nil {
 			return errors.Wrap(err, "failed to render portfolio_empty template")
 		}
@@ -165,7 +165,7 @@ func (qh *QueryCommandHandler) HandlePortfolio(ctx context.Context, chatID int64
 	}
 
 	// Render template
-	msg, err := qh.templates.Render("telegram/portfolio", data)
+	msg, err := qh.templates.Render("telegram/portfolio/main", data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render portfolio template")
 	}

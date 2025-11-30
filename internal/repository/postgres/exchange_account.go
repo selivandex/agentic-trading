@@ -36,6 +36,7 @@ func scanExchangeAccount(row interface {
 		&acc.APIKeyEncrypted, &acc.SecretEncrypted,
 		&acc.Passphrase, &acc.IsTestnet, pq.Array(&acc.Permissions),
 		&acc.IsActive, &acc.LastSyncAt, &acc.CreatedAt, &acc.UpdatedAt,
+		&acc.ListenKeyEncrypted, &acc.ListenKeyExpiresAt,
 	)
 	if err != nil {
 		return nil, err
@@ -72,7 +73,8 @@ func (r *ExchangeAccountRepository) GetByID(ctx context.Context, id uuid.UUID) (
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
-			is_active, last_sync_at, created_at, updated_at
+			is_active, last_sync_at, created_at, updated_at,
+			listen_key_encrypted, listen_key_expires_at
 		FROM exchange_accounts 
 		WHERE id = $1`
 
@@ -95,7 +97,8 @@ func (r *ExchangeAccountRepository) GetByUser(ctx context.Context, userID uuid.U
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
-			is_active, last_sync_at, created_at, updated_at
+			is_active, last_sync_at, created_at, updated_at,
+			listen_key_encrypted, listen_key_expires_at
 		FROM exchange_accounts 
 		WHERE user_id = $1 
 		ORDER BY created_at DESC`
@@ -129,7 +132,8 @@ func (r *ExchangeAccountRepository) GetActiveByUser(ctx context.Context, userID 
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
-			is_active, last_sync_at, created_at, updated_at
+			is_active, last_sync_at, created_at, updated_at,
+			listen_key_encrypted, listen_key_expires_at
 		FROM exchange_accounts 
 		WHERE user_id = $1 AND is_active = true 
 		ORDER BY created_at DESC`
@@ -164,7 +168,8 @@ func (r *ExchangeAccountRepository) GetAllActive(ctx context.Context) ([]*exchan
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
-			is_active, last_sync_at, created_at, updated_at
+			is_active, last_sync_at, created_at, updated_at,
+			listen_key_encrypted, listen_key_expires_at
 		FROM exchange_accounts 
 		WHERE is_active = true 
 		ORDER BY user_id, created_at DESC`
@@ -198,11 +203,14 @@ func (r *ExchangeAccountRepository) Update(ctx context.Context, account *exchang
 			label = $2,
 			permissions = $3,
 			is_active = $4,
+			listen_key_encrypted = $5,
+			listen_key_expires_at = $6,
 			updated_at = NOW()
 		WHERE id = $1`
 
 	_, err := r.db.ExecContext(ctx, query,
 		account.ID, account.Label, pq.Array(account.Permissions), account.IsActive,
+		account.ListenKeyEncrypted, account.ListenKeyExpiresAt,
 	)
 
 	return err

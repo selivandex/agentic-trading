@@ -37,10 +37,12 @@ import (
 	"prometheus/internal/metrics"
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
+	"prometheus/internal/repository/redis"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	"prometheus/internal/services/exchange"
 	limitsservice "prometheus/internal/services/limits"
 	marketdatasvc "prometheus/internal/services/market_data"
+	"prometheus/internal/services/menu_session"
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
@@ -765,6 +767,33 @@ func provideTelegramBot(
 		log,
 	)
 
+	// Menu session repository and service (Clean Architecture)
+	menuSessionRepo := redis.NewMenuSessionRepository(redisClient.Client())
+	menuSessionService := menu_session.NewService(menuSessionRepo, log)
+
+	// Menu navigator for interactive menus
+	menuNavigator := telegram.NewMenuNavigator(
+		menuSessionService,
+		bot,
+		templates.Get(),
+		log,
+		30*time.Minute, // Session TTL
+	)
+
+	// Invest menu service (uses MenuNavigator and services, not repos)
+	investMenuService := telegram.NewInvestMenuService(
+		menuNavigator,
+		exchangeService, // Use service, not repo (Clean Architecture)
+		userService,     // Use service, not repo (Clean Architecture)
+		onboardingOrchestrator,
+		log,
+	)
+
+	// Menu registry for auto-routing
+	menuRegistry := telegram.NewMenuRegistry(log)
+	menuRegistry.Register(investMenuService)
+	// TODO: Register other menu handlers (settings, etc.)
+
 	queryHandler := telegram.NewQueryCommandHandler(
 		positionRepo,
 		userService, // Use service instead of repository (Clean Architecture)
@@ -785,6 +814,8 @@ func provideTelegramBot(
 		Bot:              bot,
 		UserService:      userService,
 		OnboardingMgr:    onboardingService,
+		InvestMenu:       investMenuService, // NEW: Menu-based invest flow
+		MenuRegistry:     menuRegistry,      // Auto-routing for all menus
 		StatusHandler:    queryHandler,
 		PortfolioHandler: queryHandler,
 		ControlHandler:   controlHandler,

@@ -483,3 +483,186 @@ func TestExchangeAccountRepository_MultipleExchangeTypes(t *testing.T) {
 		assert.True(t, exchangeMap[exch], exch.String()+" should be present")
 	}
 }
+
+func TestExchangeAccountRepository_UpdateListenKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	testDB := testsupport.NewTestPostgres(t)
+	defer testDB.Close()
+
+	fixtures := NewTestFixtures(t, testDB.DB())
+	userID := fixtures.CreateUser()
+
+	repo := NewExchangeAccountRepository(testDB.DB())
+	ctx := context.Background()
+
+	// Create account without listenKey
+	account := &exchange_account.ExchangeAccount{
+		ID:              uuid.New(),
+		UserID:          userID,
+		Exchange:        exchange_account.ExchangeBinance,
+		Label:           "Binance Account",
+		APIKeyEncrypted: []byte("encrypted_api_key"),
+		SecretEncrypted: []byte("encrypted_secret"),
+		IsTestnet:       true,
+		Permissions:     []string{"futures", "trade"},
+		IsActive:        true,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	err := repo.Create(ctx, account)
+	require.NoError(t, err)
+
+	// Verify listenKey is nil initially
+	retrieved, err := repo.GetByID(ctx, account.ID)
+	require.NoError(t, err)
+	assert.Nil(t, retrieved.ListenKeyEncrypted, "ListenKeyEncrypted should be nil initially")
+	assert.Nil(t, retrieved.ListenKeyExpiresAt, "ListenKeyExpiresAt should be nil initially")
+
+	// Update listenKey
+	expiresAt := time.Now().Add(60 * time.Minute)
+	account.ListenKeyEncrypted = []byte("encrypted_listen_key_abc123")
+	account.ListenKeyExpiresAt = &expiresAt
+
+	err = repo.Update(ctx, account)
+	require.NoError(t, err, "Update should save listenKey to database")
+
+	// Retrieve again and verify listenKey was persisted
+	retrieved, err = repo.GetByID(ctx, account.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, retrieved.ListenKeyEncrypted, "ListenKeyEncrypted should be persisted")
+	assert.NotNil(t, retrieved.ListenKeyExpiresAt, "ListenKeyExpiresAt should be persisted")
+	assert.Equal(t, []byte("encrypted_listen_key_abc123"), retrieved.ListenKeyEncrypted)
+	assert.WithinDuration(t, expiresAt, *retrieved.ListenKeyExpiresAt, time.Second)
+
+	// Update listenKey to new value (simulate renewal)
+	newExpiresAt := time.Now().Add(120 * time.Minute)
+	account.ListenKeyEncrypted = []byte("encrypted_listen_key_new_xyz789")
+	account.ListenKeyExpiresAt = &newExpiresAt
+
+	err = repo.Update(ctx, account)
+	require.NoError(t, err)
+
+	// Verify new listenKey
+	retrieved, err = repo.GetByID(ctx, account.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("encrypted_listen_key_new_xyz789"), retrieved.ListenKeyEncrypted)
+	assert.WithinDuration(t, newExpiresAt, *retrieved.ListenKeyExpiresAt, time.Second)
+
+	// Clear listenKey (set to nil)
+	account.ListenKeyEncrypted = nil
+	account.ListenKeyExpiresAt = nil
+
+	err = repo.Update(ctx, account)
+	require.NoError(t, err)
+
+	// Verify listenKey is cleared
+	retrieved, err = repo.GetByID(ctx, account.ID)
+	require.NoError(t, err)
+	assert.Nil(t, retrieved.ListenKeyEncrypted, "ListenKeyEncrypted should be nil after clearing")
+	assert.Nil(t, retrieved.ListenKeyExpiresAt, "ListenKeyExpiresAt should be nil after clearing")
+}
+
+func TestExchangeAccountRepository_GetAllActiveWithListenKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	testDB := testsupport.NewTestPostgres(t)
+	defer testDB.Close()
+
+	fixtures := NewTestFixtures(t, testDB.DB())
+	user1ID := fixtures.CreateUser()
+	user2ID := fixtures.CreateUser()
+
+	repo := NewExchangeAccountRepository(testDB.DB())
+	ctx := context.Background()
+
+	expiresAt := time.Now().Add(60 * time.Minute)
+
+	// Create active account with listenKey for user1
+	account1 := &exchange_account.ExchangeAccount{
+		ID:                 uuid.New(),
+		UserID:             user1ID,
+		Exchange:           exchange_account.ExchangeBinance,
+		Label:              "User1 Binance",
+		APIKeyEncrypted:    []byte("encrypted_key_1"),
+		SecretEncrypted:    []byte("encrypted_secret_1"),
+		IsTestnet:          true,
+		Permissions:        []string{"futures"},
+		IsActive:           true,
+		ListenKeyEncrypted: []byte("encrypted_listen_key_1"),
+		ListenKeyExpiresAt: &expiresAt,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+	err := repo.Create(ctx, account1)
+	require.NoError(t, err)
+
+	// Create active account without listenKey for user2
+	account2 := &exchange_account.ExchangeAccount{
+		ID:              uuid.New(),
+		UserID:          user2ID,
+		Exchange:        exchange_account.ExchangeBybit,
+		Label:           "User2 Bybit",
+		APIKeyEncrypted: []byte("encrypted_key_2"),
+		SecretEncrypted: []byte("encrypted_secret_2"),
+		IsTestnet:       false,
+		Permissions:     []string{"spot"},
+		IsActive:        true,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+	err = repo.Create(ctx, account2)
+	require.NoError(t, err)
+
+	// Create inactive account (should not be returned)
+	account3 := &exchange_account.ExchangeAccount{
+		ID:              uuid.New(),
+		UserID:          user1ID,
+		Exchange:        exchange_account.ExchangeOKX,
+		Label:           "Inactive OKX",
+		APIKeyEncrypted: []byte("encrypted_key_3"),
+		SecretEncrypted: []byte("encrypted_secret_3"),
+		IsTestnet:       false,
+		Permissions:     []string{"futures"},
+		IsActive:        false,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+	err = repo.Create(ctx, account3)
+	require.NoError(t, err)
+
+	// Get all active accounts
+	accounts, err := repo.GetAllActive(ctx)
+	require.NoError(t, err)
+	assert.Len(t, accounts, 2, "Should return only active accounts")
+
+	// Find account1 and verify listenKey
+	var foundAccount1 *exchange_account.ExchangeAccount
+	for _, acc := range accounts {
+		if acc.ID == account1.ID {
+			foundAccount1 = acc
+			break
+		}
+	}
+	require.NotNil(t, foundAccount1, "Should find account1 in results")
+	assert.NotNil(t, foundAccount1.ListenKeyEncrypted)
+	assert.NotNil(t, foundAccount1.ListenKeyExpiresAt)
+	assert.Equal(t, []byte("encrypted_listen_key_1"), foundAccount1.ListenKeyEncrypted)
+
+	// Verify account2 has no listenKey
+	var foundAccount2 *exchange_account.ExchangeAccount
+	for _, acc := range accounts {
+		if acc.ID == account2.ID {
+			foundAccount2 = acc
+			break
+		}
+	}
+	require.NotNil(t, foundAccount2, "Should find account2 in results")
+	assert.Nil(t, foundAccount2.ListenKeyEncrypted)
+	assert.Nil(t, foundAccount2.ListenKeyExpiresAt)
+}
