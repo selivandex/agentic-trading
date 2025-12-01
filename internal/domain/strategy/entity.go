@@ -25,22 +25,22 @@ type Strategy struct {
 	CashReserve      decimal.Decimal `db:"cash_reserve"`      // Unallocated cash (free balance)
 
 	// Strategy configuration
-	RiskTolerance       RiskTolerance       `db:"risk_tolerance"`
-	RebalanceFrequency  RebalanceFrequency  `db:"rebalance_frequency"`
-	TargetAllocations   json.RawMessage     `db:"target_allocations"` // {"BTC/USDT": 0.5, "ETH/USDT": 0.3}
-	
+	RiskTolerance      RiskTolerance      `db:"risk_tolerance"`
+	RebalanceFrequency RebalanceFrequency `db:"rebalance_frequency"`
+	TargetAllocations  json.RawMessage    `db:"target_allocations"` // {"BTC/USDT": 0.5, "ETH/USDT": 0.3}
+
 	// Performance metrics (calculated periodically)
-	TotalPnL        decimal.Decimal `db:"total_pnl"`          // CurrentEquity - AllocatedCapital
-	TotalPnLPercent decimal.Decimal `db:"total_pnl_percent"`  // (CurrentEquity / AllocatedCapital - 1) * 100
-	SharpeRatio     *decimal.Decimal `db:"sharpe_ratio"`       // Risk-adjusted returns
-	MaxDrawdown     *decimal.Decimal `db:"max_drawdown"`       // Maximum peak-to-trough decline
-	WinRate         *decimal.Decimal `db:"win_rate"`           // Winning trades / total trades
+	TotalPnL        decimal.Decimal  `db:"total_pnl"`         // CurrentEquity - AllocatedCapital
+	TotalPnLPercent decimal.Decimal  `db:"total_pnl_percent"` // (CurrentEquity / AllocatedCapital - 1) * 100
+	SharpeRatio     *decimal.Decimal `db:"sharpe_ratio"`      // Risk-adjusted returns
+	MaxDrawdown     *decimal.Decimal `db:"max_drawdown"`      // Maximum peak-to-trough decline
+	WinRate         *decimal.Decimal `db:"win_rate"`          // Winning trades / total trades
 
 	// Timestamps
-	CreatedAt         time.Time  `db:"created_at"`
-	UpdatedAt         time.Time  `db:"updated_at"`
-	ClosedAt          *time.Time `db:"closed_at"`
-	LastRebalancedAt  *time.Time `db:"last_rebalanced_at"`
+	CreatedAt        time.Time  `db:"created_at"`
+	UpdatedAt        time.Time  `db:"updated_at"`
+	ClosedAt         *time.Time `db:"closed_at"`
+	LastRebalancedAt *time.Time `db:"last_rebalanced_at"`
 
 	// Reasoning log (for explainability)
 	ReasoningLog json.RawMessage `db:"reasoning_log"` // Full CoT trace from portfolio creation
@@ -199,8 +199,8 @@ func (s *Strategy) SetTargetAllocations(allocations TargetAllocations) error {
 
 // Errors
 var (
-	ErrInvalidAmount    = &StrategyError{Code: "invalid_amount", Message: "amount must be positive"}
-	ErrInsufficientCash = &StrategyError{Code: "insufficient_cash", Message: "not enough cash reserve"}
+	ErrInvalidAmount     = &StrategyError{Code: "invalid_amount", Message: "amount must be positive"}
+	ErrInsufficientCash  = &StrategyError{Code: "insufficient_cash", Message: "not enough cash reserve"}
 	ErrStrategyNotActive = &StrategyError{Code: "strategy_not_active", Message: "strategy is not active"}
 )
 
@@ -213,4 +213,3 @@ type StrategyError struct {
 func (e *StrategyError) Error() string {
 	return e.Message
 }
-

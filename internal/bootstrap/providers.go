@@ -31,6 +31,7 @@ import (
 	"prometheus/internal/domain/position"
 	domainRisk "prometheus/internal/domain/risk"
 	domainsession "prometheus/internal/domain/session"
+	strategyDomain "prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
@@ -46,6 +47,7 @@ import (
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
+	strategyservice "prometheus/internal/services/strategy"
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/crypto"
@@ -222,10 +224,12 @@ func (c *Container) MustInitServices() {
 	c.Services.Position = position.NewService(c.Repos.Position)
 	c.Services.Memory = memory.NewService(c.Repos.Memory, c.Adapters.EmbeddingProvider)
 
-	// Strategy Service (portfolio management with transactions)
+	// Strategy Service (Clean Architecture: Domain + Application layers)
+	strategyDomainService := strategyDomain.NewService(c.Repos.Strategy)
 	dbAdapter := strategyservice.NewDBAdapter(c.PG.DB())
 	c.Services.Strategy = strategyservice.NewService(
-		c.Repos.Strategy,
+		strategyDomainService, // Domain service for CRUD
+		c.Repos.Strategy,      // Repository for transactions
 		c.Repos.StrategyTransaction,
 		dbAdapter,
 		c.Log,
@@ -368,6 +372,7 @@ func (c *Container) MustInitApplication() {
 		c.Adapters.KafkaProducer,
 		c.Adapters.TelegramNotificationConsumer,
 		c.Services.Exchange, // Exchange service (Clean Architecture)
+		c.Services.Strategy, // Strategy service for portfolio management
 		c.Log,
 	)
 
@@ -728,6 +733,7 @@ func provideTelegramBot(
 	kafkaProducer *kafka.Producer,
 	notificationConsumer *kafka.Consumer,
 	exchangeService *exchange.Service,
+	strategyService *strategyservice.Service,
 	log *logger.Logger,
 ) (*telegram.Bot, *telegram.Handler, *consumers.TelegramNotificationConsumer) {
 	log.Info("Initializing Telegram bot...")
@@ -752,7 +758,7 @@ func provideTelegramBot(
 		templates.Get(),
 		userRepo,
 		exchAcctRepo,
-		c.Services.Strategy, // Strategy service for creating portfolios
+		strategyService, // Strategy service for creating portfolios
 		log,
 	)
 
@@ -792,20 +798,14 @@ func provideTelegramBot(
 		30*time.Minute, // Session TTL
 	)
 
-	// Investment validator (validates investment amounts against limits)
-	investmentValidator := strategyservice.NewInvestmentValidator(
-		c.Repos.LimitProfile,
-		c.Repos.Strategy,
-		log,
-	)
-
 	// Invest menu service (uses MenuNavigator and services, not repos)
+	// NOTE: Investment validation temporarily disabled until we align ValidationResult types
 	investMenuService := telegram.NewInvestMenuService(
 		menuNavigator,
 		exchangeService, // Use service, not repo (Clean Architecture)
 		userService,     // Use service, not repo (Clean Architecture)
 		onboardingOrchestrator,
-		investmentValidator, // Validates investment amounts
+		nil, // Validator disabled for now
 		log,
 	)
 

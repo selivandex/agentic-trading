@@ -30,7 +30,7 @@ type Service struct {
 	templates       *templates.Registry
 	userRepo        user.Repository
 	exchAcctRepo    exchange_account.Repository
-	strategyService StrategyService
+	strategyService *strategyservice.Service
 	log             *logger.Logger
 }
 
@@ -41,7 +41,7 @@ func NewService(
 	tmpl *templates.Registry,
 	userRepo user.Repository,
 	exchAcctRepo exchange_account.Repository,
-	strategyService StrategyService,
+	strategyService *strategyservice.Service,
 	log *logger.Logger,
 ) *Service {
 	if tmpl == nil {
@@ -69,12 +69,24 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 
 	// Step 1: Create strategy to track allocated capital and transactions
 	strategyName := fmt.Sprintf("Portfolio %s", time.Now().Format("2006-01-02"))
-	strategy, err := s.strategyService.CreateStrategy(ctx, CreateStrategyParams{
+
+	// Map string risk profile to strategy.RiskTolerance
+	var riskTolerance strategy.RiskTolerance
+	switch onboardingSession.RiskProfile {
+	case "conservative":
+		riskTolerance = strategy.RiskConservative
+	case "aggressive":
+		riskTolerance = strategy.RiskAggressive
+	default:
+		riskTolerance = strategy.RiskModerate
+	}
+
+	createdStrategy, err := s.strategyService.CreateStrategy(ctx, strategyservice.CreateStrategyParams{
 		UserID:           onboardingSession.UserID,
 		Name:             strategyName,
 		Description:      fmt.Sprintf("Automated portfolio with %s risk profile", onboardingSession.RiskProfile),
 		AllocatedCapital: decimal.NewFromFloat(onboardingSession.Capital),
-		RiskTolerance:    onboardingSession.RiskProfile,
+		RiskTolerance:    riskTolerance,
 		ReasoningLog:     nil, // Will be updated after workflow completes
 	})
 	if err != nil {
@@ -82,8 +94,8 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 	}
 
 	s.log.Infow("Strategy created",
-		"strategy_id", strategy.ID,
-		"allocated_capital", strategy.AllocatedCapital,
+		"strategy_id", createdStrategy.ID,
+		"allocated_capital", createdStrategy.AllocatedCapital,
 	)
 
 	// Step 2: Create portfolio initialization workflow (PortfolioArchitect agent)

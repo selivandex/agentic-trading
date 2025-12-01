@@ -101,9 +101,9 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID uuid.UUI
 	}
 
 	// Get user to validate against their limits
-	usr, err := ims.userService.GetByID(ctx, userID)
+	usr, err := ims.userService.GetByTelegramID(ctx, telegramID)
 	if err != nil {
-		ims.log.Errorw("Failed to get user for validation", "error", err, "user_id", userID)
+		ims.log.Errorw("Failed to get user for validation", "error", err, "telegram_id", telegramID)
 		return ims.menuNav.bot.SendMessage(telegramID, "❌ Failed to validate investment. Please try again.")
 	}
 

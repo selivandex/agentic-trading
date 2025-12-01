@@ -13,9 +13,11 @@ import (
 	"prometheus/pkg/logger"
 )
 
-// Service handles business logic for strategy management
+// Service handles complex business logic for strategy management (Application Layer)
+// Uses domain service for simple operations and handles transactions/orchestration
 type Service struct {
-	strategyRepo    strategy.Repository
+	domainService   *strategy.Service   // Domain service for CRUD
+	strategyRepo    strategy.Repository // Direct repo access for transactions
 	transactionRepo strategy.TransactionRepository
 	db              DB // Database for transactions
 	log             *logger.Logger
@@ -32,18 +34,20 @@ type Tx interface {
 	Rollback() error
 }
 
-// NewService creates a new strategy service
+// NewService creates a new strategy application service
 func NewService(
+	domainService *strategy.Service,
 	strategyRepo strategy.Repository,
 	transactionRepo strategy.TransactionRepository,
 	db DB,
 	log *logger.Logger,
 ) *Service {
 	return &Service{
+		domainService:   domainService,
 		strategyRepo:    strategyRepo,
 		transactionRepo: transactionRepo,
 		db:              db,
-		log:             log.With("component", "strategy_service"),
+		log:             log.With("component", "strategy_app_service"),
 	}
 }
 
@@ -312,21 +316,15 @@ func (s *Service) UpdateStrategyEquity(ctx context.Context, strategyID uuid.UUID
 }
 
 // GetActiveStrategies returns all active strategies for a user
+// Delegates to domain service
 func (s *Service) GetActiveStrategies(ctx context.Context, userID uuid.UUID) ([]*strategy.Strategy, error) {
-	strategies, err := s.strategyRepo.GetActiveByUserID(ctx, userID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get active strategies")
-	}
-	return strategies, nil
+	return s.domainService.GetActiveByUserID(ctx, userID)
 }
 
 // GetStrategyByID retrieves a strategy by ID
+// Delegates to domain service
 func (s *Service) GetStrategyByID(ctx context.Context, strategyID uuid.UUID) (*strategy.Strategy, error) {
-	strat, err := s.strategyRepo.GetByID(ctx, strategyID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get strategy")
-	}
-	return strat, nil
+	return s.domainService.GetByID(ctx, strategyID)
 }
 
 // GetTotalExposure returns total allocated capital + current equity across all active strategies

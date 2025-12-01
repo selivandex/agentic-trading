@@ -2,7 +2,7 @@ package strategy
 
 import (
 	"context"
-	
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -39,4 +39,3 @@ func (a *TxAdapter) Commit() error {
 func (a *TxAdapter) Rollback() error {
 	return a.tx.Rollback()
 }
-
