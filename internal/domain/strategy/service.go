@@ -65,6 +65,14 @@ func (s *Service) Create(ctx context.Context, strategy *Strategy) error {
 		strategy.TotalPnLPercent = decimal.Zero
 	}
 
+	// Initialize JSON fields if nil (PostgreSQL requires valid JSON)
+	if strategy.ReasoningLog == nil {
+		strategy.ReasoningLog = []byte("[]") // Empty JSON array
+	}
+	if strategy.TargetAllocations == nil {
+		strategy.TargetAllocations = []byte("{}") // Empty JSON object
+	}
+
 	if err := s.repo.Create(ctx, strategy); err != nil {
 		return errors.Wrap(err, "create strategy")
 	}
