@@ -3,7 +3,6 @@ package strategy
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -92,27 +91,19 @@ func (s *Service) CreateStrategy(ctx context.Context, params CreateStrategyParam
 		}
 	}()
 
-	// Create strategy entity
+	// Create strategy entity using domain service (ensures proper initialization)
 	newStrategy := &strategy.Strategy{
-		ID:                 uuid.New(),
 		UserID:             params.UserID,
 		Name:               params.Name,
 		Description:        params.Description,
-		Status:             strategy.StrategyActive,
 		AllocatedCapital:   params.AllocatedCapital,
-		CurrentEquity:      params.AllocatedCapital, // Initially equal
-		CashReserve:        params.AllocatedCapital, // All cash initially
 		RiskTolerance:      params.RiskTolerance,
 		RebalanceFrequency: strategy.RebalanceWeekly,
-		TotalPnL:           decimal.Zero,
-		TotalPnLPercent:    decimal.Zero,
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
 		ReasoningLog:       params.ReasoningLog,
 	}
 
-	// Save strategy
-	if err := s.strategyRepo.Create(ctx, newStrategy); err != nil {
+	// Use domain service to create (handles validation + JSON initialization)
+	if err := s.domainService.Create(ctx, newStrategy); err != nil {
 		return nil, errors.Wrap(err, "failed to create strategy")
 	}
 

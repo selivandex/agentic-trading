@@ -152,6 +152,7 @@ func NewTransaction(
 		BalanceBefore: balanceBefore,
 		BalanceAfter:  balanceAfter,
 		Description:   description,
+		Metadata:      []byte("{}"), // Initialize with empty JSON object (PostgreSQL requirement)
 		CreatedAt:     time.Now(),
 	}
 }

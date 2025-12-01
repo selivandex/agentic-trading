@@ -689,3 +689,15 @@ message ExchangeDeactivatedEvent {
   bool is_testnet = 7;
 }
 
+// PortfolioInitializationJobEvent is published to trigger async portfolio creation workflow
+message PortfolioInitializationJobEvent {
+  BaseEvent base = 1;
+  string user_id = 2;
+  string strategy_id = 3;
+  int64 telegram_id = 4;
+  double capital = 5;
+  string exchange_account_id = 6;  // Optional, empty string if not set
+  string risk_profile = 7;  // "conservative", "moderate", "aggressive"
+  string market_type = 8;  // "spot", "futures"
+}
+

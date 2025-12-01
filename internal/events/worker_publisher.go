@@ -425,6 +425,29 @@ func (wp *WorkerPublisher) PublishMarketScanComplete(
 	return wp.publishProto(ctx, TopicMarketEvents, "global", event)
 }
 
+// PublishPortfolioInitializationJob publishes portfolio initialization job to Kafka
+// This triggers async portfolio creation workflow in background consumer
+func (wp *WorkerPublisher) PublishPortfolioInitializationJob(
+	ctx context.Context,
+	userID, strategyID string,
+	telegramID int64,
+	capital float64,
+	exchangeAccountID, riskProfile, marketType string,
+) error {
+	event := &eventspb.PortfolioInitializationJobEvent{
+		Base:              NewBaseEvent("portfolio.initialization_requested", "invest_menu", userID),
+		UserId:            userID,
+		StrategyId:        strategyID,
+		TelegramId:        telegramID,
+		Capital:           capital,
+		ExchangeAccountId: exchangeAccountID,
+		RiskProfile:       riskProfile,
+		MarketType:        marketType,
+	}
+
+	return wp.publishProto(ctx, TopicSystemEvents, userID, event)
+}
+
 // PublishWhaleAlert publishes whale trade alert event
 func (wp *WorkerPublisher) PublishWhaleAlert(
 	ctx context.Context,

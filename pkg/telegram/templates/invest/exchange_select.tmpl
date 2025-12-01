@@ -1,0 +1,10 @@
+🔗 *Select Exchange Account*
+
+Choose which exchange account to use:
+
+{{- range $i, $account := .Accounts}}
+{{$idx := add $i 1}}{{if $account.IsActive}}✅{{else}}⏸️{{end}} {{$idx}}. {{upper $account.Exchange}} ({{$account.Label}})
+{{- end}}
+
+Type the number (1, 2, etc.) or type *demo* for demo mode.
+

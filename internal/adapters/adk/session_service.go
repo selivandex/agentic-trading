@@ -115,10 +115,16 @@ func (s *SessionService) AppendEvent(ctx context.Context, sess session.Session, 
 		return errors.Wrap(errors.ErrInvalidInput, "session and event are required")
 	}
 
-	// Convert ADK session to domain session
-	domainSess, err := s.adkToDomainSession(sess)
+	// Get full domain session from DB (to get correct UUID ID for foreign key)
+	domainSess, err := s.domainService.GetSession(
+		ctx,
+		sess.AppName(),
+		sess.UserID(),
+		sess.ID(), // SessionID (string)
+		&domainsession.GetOptions{NumRecentEvents: 0}, // Don't load events, just metadata
+	)
 	if err != nil {
-		return errors.Wrap(err, "failed to convert session")
+		return errors.Wrap(err, "failed to get session")
 	}
 
 	// Convert ADK event to domain event
@@ -127,7 +133,7 @@ func (s *SessionService) AppendEvent(ctx context.Context, sess session.Session, 
 		return errors.Wrap(err, "failed to convert event")
 	}
 
-	// Append event using domain service
+	// Append event using domain service (now has correct session.ID UUID)
 	return s.domainService.AppendEvent(ctx, domainSess, domainEvent)
 }
 

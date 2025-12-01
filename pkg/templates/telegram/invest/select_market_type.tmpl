@@ -1,0 +1,16 @@
+💰 **Investment Setup - Step 2/4**
+
+Select market type:
+
+{{- range .MarketTypes}}
+
+{{.Emoji}} **{{.Label}}**
+   {{.Description}}
+{{- range .Features}}
+   • {{.}}
+{{- end}}
+{{- end}}
+
+Choose your preferred market type.
+
+

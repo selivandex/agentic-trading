@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"prometheus/internal/adapters/adk"
@@ -21,10 +23,11 @@ import (
 	"prometheus/internal/agents/workflows"
 	"prometheus/internal/api"
 	"prometheus/internal/api/health"
-	telegramapi "prometheus/internal/api/telegram"
+	tgapi "prometheus/internal/api/telegram"
 	"prometheus/internal/consumers"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/journal"
+	"prometheus/internal/domain/limit_profile"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
 	"prometheus/internal/domain/order"
@@ -48,11 +51,14 @@ import (
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
 	strategyservice "prometheus/internal/services/strategy"
+	userservice "prometheus/internal/services/user"
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	tg "prometheus/pkg/telegram"
+	"prometheus/pkg/telegram/adapters/tgbotapi"
 	"prometheus/pkg/templates"
 
 	"github.com/google/uuid"
@@ -166,6 +172,7 @@ func (c *Container) MustInitAdapters() {
 	c.Adapters.AIUsageConsumer = provideKafkaConsumer(c.Config, events.TopicAIEvents, c.Log)
 	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionEvents, c.Log)
 	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
+	c.Adapters.SystemEventsConsumer = provideKafkaConsumer(c.Config, events.TopicSystemEvents, c.Log)
 
 	// WebSocket consumer (unified consumer for ALL websocket.events)
 	// Single consumer handles all WebSocket event types:
@@ -207,7 +214,7 @@ func (c *Container) MustInitAdapters() {
 
 // MustInitServices initializes domain services
 func (c *Container) MustInitServices() {
-	// Create limit profile adapter to avoid circular dependency
+	// Create limit profile adapter for domain service
 	limitProfileAdapter := user.NewLimitProfileAdapter(func(ctx context.Context, name string) (uuid.UUID, error) {
 		profile, err := c.Repos.LimitProfile.GetByName(ctx, name)
 		if err != nil {
@@ -216,8 +223,11 @@ func (c *Container) MustInitServices() {
 		return profile.ID, nil
 	})
 
-	// Core domain services
-	c.Services.User = user.NewService(c.Repos.User, limitProfileAdapter)
+	// Domain user service (pure business logic - for consumers)
+	c.Services.DomainUser = user.NewService(c.Repos.User, limitProfileAdapter)
+
+	// Application user service (wraps domain service + adds side effects)
+	c.Services.User = userservice.NewService(c.Services.DomainUser, c.Log)
 	c.Services.ExchangeAccount = exchange_account.NewService(c.Repos.ExchangeAccount)
 	c.Services.TradingPair = trading_pair.NewService(c.Repos.TradingPair)
 	c.Services.Order = order.NewService(c.Repos.Order)
@@ -261,6 +271,17 @@ func (c *Container) MustInitServices() {
 	// Consumer-facing services (Clean Architecture: abstraction over repositories)
 	c.Services.MarketData = marketdatasvc.NewService(c.Repos.MarketData, c.Log)
 	c.Services.AIUsage = aiusagesvc.NewService(c.Repos.AIUsage, c.Log)
+
+	// Onboarding orchestrator (needs to be in Services for consumer access)
+	c.Services.Onboarding = onboardingservice.NewService(
+		c.Business.WorkflowFactory,
+		c.Services.ADKSession,
+		templates.Get(),
+		c.Repos.User,
+		c.Repos.ExchangeAccount,
+		c.Services.Strategy,
+		c.Log,
+	)
 
 	c.Log.Info("✓ Services initialized")
 }
@@ -354,34 +375,38 @@ func (c *Container) MustInitApplication() {
 		c.Config.App.Version,
 	)
 
-	// Telegram bot and handlers
-	var telegramHandler *telegram.Handler
-	c.Application.TelegramBot,
-		telegramHandler,
-		c.Application.TelegramNotificationSvc = provideTelegramBot(
+	// Telegram bot and handlers (uses new framework)
+	bot, telegramHandler := provideTelegramBot(
 		c.Config,
-		c.Services.User, // User service (Clean Architecture)
-		c.Repos.User,    // Still needed for some components (onboarding)
+		c.Services.User,
+		c.Repos.User,
 		c.Repos.Position,
 		c.Repos.ExchangeAccount,
-		c.Business.WorkflowFactory,
-		c.Services.ADKSession,
 		c.Redis,
 		c.Adapters.Encryptor,
 		c.Adapters.ExchangeFactory,
 		c.Adapters.KafkaProducer,
 		c.Adapters.TelegramNotificationConsumer,
-		c.Services.Exchange, // Exchange service (Clean Architecture)
-		c.Services.Strategy, // Strategy service for portfolio management
+		c.Services.Exchange,
+		c.Services.Onboarding,
+		c.Repos.LimitProfile,
+		c.Repos.Strategy,
 		c.Log,
 	)
+	c.Application.TelegramBot = bot
+	c.Application.TelegramHandler = telegramHandler
+
+	// Telegram notification service (uses new framework)
+	templateAdapter := telegram.NewTemplateRendererAdapter(templates.Get())
+	notificationService := provideTelegramNotificationService(bot, templateAdapter, c.Log)
+	c.Application.TelegramNotificationService = notificationService
 
 	// HTTP server
 	c.Application.HTTPServer = provideHTTPServer(
 		c.Config,
 		c.Application.HealthHandler,
 		c.Application.TelegramBot,
-		telegramHandler,
+		c.Application.TelegramHandler,
 		c.Log,
 	)
 
@@ -428,10 +453,13 @@ func (c *Container) MustInitBackground() {
 		c.Log,
 	)
 
-	// Event consumers
-	// NOTE: Old NotificationConsumer disabled - replaced with TelegramNotificationConsumer
-	// to avoid two consumers competing for same messages on notifications topic
-	c.Background.NotificationSvc = nil // Not used anymore
+	// Telegram Notification Consumer (uses new framework)
+	c.Background.TelegramNotificationSvc = consumers.NewTelegramNotificationConsumer(
+		c.Adapters.TelegramNotificationConsumer,
+		c.Application.TelegramNotificationService,
+		c.Services.DomainUser, // Domain service for getting user chat IDs
+		c.Log,
+	)
 
 	c.Background.RiskSvc = consumers.NewRiskConsumer(
 		c.Adapters.RiskConsumer,
@@ -455,7 +483,7 @@ func (c *Container) MustInitBackground() {
 	c.Background.OpportunitySvc = consumers.NewOpportunityConsumer(
 		c.Adapters.OpportunityConsumer,
 		c.Repos.TradingPair,
-		c.Services.User,
+		c.Services.DomainUser, // Domain service for consumers (lightweight CRUD, no side effects)
 		c.Business.WorkflowFactory,
 		c.Services.ADKSession,
 		c.Config.Workers.MarketScannerMaxConcurrency,
@@ -488,6 +516,14 @@ func (c *Container) MustInitBackground() {
 		c.Adapters.PositionGuardianConsumer,
 		criticalHandler,
 		agentHandler,
+		c.Log,
+	)
+
+	// System events consumer (portfolio initialization, worker failures)
+	c.Background.SystemEventsSvc = consumers.NewSystemEventsConsumer(
+		c.Adapters.SystemEventsConsumer,
+		c.Services.Onboarding, // Use from container
+		c.Application.TelegramBot,
 		c.Log,
 	)
 
@@ -699,13 +735,15 @@ func registerExpertTools(
 func provideHTTPServer(
 	cfg *config.Config,
 	healthHandler *health.Handler,
-	telegramBot *telegram.Bot,
+	telegramBot tg.Bot,
 	telegramHandler *telegram.Handler,
 	log *logger.Logger,
 ) *api.Server {
-	var webhookHandler *telegramapi.WebhookHandler
+	var webhookHandler *tg.WebhookHandler
 	if cfg.Telegram.WebhookURL != "" {
-		webhookHandler = telegramapi.NewWebhookHandler(telegramBot, telegramHandler, log)
+		// Create webhook handler using pkg/telegram framework
+		// Pass the handler's HandleUpdate method as the update processor
+		webhookHandler = tgapi.NewWebhookHandler(telegramHandler.HandleUpdate, log)
 		log.Infow("✓ Telegram webhook mode enabled", "url", cfg.Telegram.WebhookURL)
 	} else {
 		log.Info("✓ Telegram polling mode enabled")
@@ -721,25 +759,26 @@ func provideHTTPServer(
 
 func provideTelegramBot(
 	cfg *config.Config,
-	userService *user.Service,
+	userService *userservice.Service,
 	userRepo user.Repository,
 	positionRepo position.Repository,
 	exchAcctRepo exchange_account.Repository,
-	workflowFactory *workflows.Factory,
-	sessionService session.Service,
 	redisClient *redisclient.Client,
 	encryptor *crypto.Encryptor,
 	exchFactory exchanges.Factory,
 	kafkaProducer *kafka.Producer,
 	notificationConsumer *kafka.Consumer,
 	exchangeService *exchange.Service,
-	strategyService *strategyservice.Service,
+	onboardingSvc *onboardingservice.Service,
+	limitProfileRepo limit_profile.Repository,
+	strategyRepo strategyDomain.Repository,
 	log *logger.Logger,
-) (*telegram.Bot, *telegram.Handler, *consumers.TelegramNotificationConsumer) {
+) (tg.Bot, *telegram.Handler) {
 	log.Info("Initializing Telegram bot...")
 
+	// Create bot using tgbotapi adapter (only place that knows about tgbotapi!)
 	webhookMode := cfg.Telegram.WebhookURL != ""
-	bot, err := telegram.NewBot(telegram.Config{
+	bot, err := tgbotapi.NewBot(tgbotapi.Config{
 		Token:       cfg.Telegram.BotToken,
 		Debug:       cfg.Telegram.Debug,
 		Timeout:     60,
@@ -750,104 +789,79 @@ func provideTelegramBot(
 		log.Fatalf("Failed to create Telegram bot: %v", err)
 	}
 
-	notificationService := telegram.NewNotificationService(bot, templates.Get(), log)
+	// TODO: Migrate notification service to new framework
+	// notificationService := telegram.NewNotificationService(bot, templates.Get(), log)
 
-	onboardingOrchestrator := onboardingservice.NewService(
-		workflowFactory,
-		sessionService,
-		templates.Get(),
-		userRepo,
-		exchAcctRepo,
-		strategyService, // Strategy service for creating portfolios
-		log,
-	)
-
-	onboardingService := telegram.NewOnboardingService(
-		redisClient.Client(),
-		bot,
-		userRepo,
-		exchAcctRepo,
-		onboardingOrchestrator,
-		templates.Get(),
-		log,
-	)
-
-	// Create Telegram UI adapter (wraps business service)
-	exchangeSetupService := telegram.NewExchangeSetupService(
-		redisClient.Client(),
-		bot,
-		exchangeService, // Injected from container
-		exchFactory,
-		templates.Get(),
-		cfg.MarketData.Binance.UseTestnet, // Binance testnet flag
-		cfg.MarketData.Bybit.UseTestnet,   // Bybit testnet flag
-		cfg.MarketData.OKX.UseTestnet,     // OKX testnet flag
-		log,
-	)
+	// TODO: Migrate onboarding to new framework
+	// TODO: Migrate exchange setup to new framework
 
 	// Menu session repository and service (Clean Architecture)
 	menuSessionRepo := redis.NewMenuSessionRepository(redisClient.Client())
 	menuSessionService := menu_session.NewService(menuSessionRepo, log)
 
-	// Menu navigator for interactive menus
-	menuNavigator := telegram.NewMenuNavigator(
-		menuSessionService,
+	// Create adapters for pkg/telegram framework
+	sessionAdapter := telegram.NewSessionServiceAdapter(menuSessionService)
+	templateAdapter := telegram.NewTemplateRendererAdapter(templates.Get())
+
+	// Menu navigator for interactive menus (uses framework)
+	menuNavigator := tg.NewMenuNavigator(
+		sessionAdapter,
 		bot,
-		templates.Get(),
+		templateAdapter,
 		log,
 		30*time.Minute, // Session TTL
 	)
 
-	// Invest menu service (uses MenuNavigator and services, not repos)
-	// NOTE: Investment validation temporarily disabled until we align ValidationResult types
-	investMenuService := telegram.NewInvestMenuService(
-		menuNavigator,
-		exchangeService, // Use service, not repo (Clean Architecture)
-		userService,     // Use service, not repo (Clean Architecture)
-		onboardingOrchestrator,
-		nil, // Validator disabled for now
+	// Job publisher for async workflows
+	jobPublisher := events.NewWorkerPublisher(kafkaProducer)
+
+	// User service adapter for telegram (uses application service for side effects)
+	userServiceAdapter := telegram.NewUserServiceAdapter(userService)
+
+	// Investment validator (checks tier limits + user risk settings)
+	investmentValidator := strategyservice.NewInvestmentValidator(
+		limitProfileRepo,
+		strategyRepo,
 		log,
 	)
 
-	// Menu registry for auto-routing
-	menuRegistry := telegram.NewMenuRegistry(log)
+	// Invest menu service (async portfolio creation via Kafka)
+	investMenuService := telegram.NewInvestMenuService(
+		menuNavigator,
+		exchangeService,     // Exchange service
+		userServiceAdapter,  // User service adapter
+		jobPublisher,        // Job publisher for async portfolio creation
+		investmentValidator, // Validates against tier limits + user settings
+		log,
+	)
+
+	// Menu registry for auto-routing (uses framework)
+	menuRegistry := tg.NewMenuRegistry(log)
 	menuRegistry.Register(investMenuService)
 	// TODO: Register other menu handlers (settings, etc.)
 
-	queryHandler := telegram.NewQueryCommandHandler(
-		positionRepo,
-		userService, // Use service instead of repository (Clean Architecture)
-		templates.Get(),
+	// Command registry (uses framework)
+	commandRegistry := tg.NewCommandRegistry(bot, log)
+	commandRegistry.Use(tg.LoggingMiddleware(log))
+	commandRegistry.Use(tg.RecoveryMiddleware(log))
+
+	// Register commands
+	registerTelegramCommands(commandRegistry, investMenuService, userServiceAdapter, log)
+
+	// Create handler (uses framework)
+	handler := telegram.NewHandler(
 		bot,
+		commandRegistry,
+		menuRegistry,
+		userServiceAdapter,
 		log,
 	)
 
-	controlHandler := telegram.NewControlCommandHandler(
-		positionRepo,
-		userService, // Use service instead of repository (Clean Architecture)
-		templates.Get(),
-		bot,
-		log,
-	)
-
-	handler := telegram.NewHandler(telegram.HandlerDeps{
-		Bot:              bot,
-		UserService:      userService,
-		OnboardingMgr:    onboardingService,
-		InvestMenu:       investMenuService, // NEW: Menu-based invest flow
-		MenuRegistry:     menuRegistry,      // Auto-routing for all menus
-		StatusHandler:    queryHandler,
-		PortfolioHandler: queryHandler,
-		ControlHandler:   controlHandler,
-		ExchangeHandler:  exchangeSetupService,
-		Templates:        templates.Get(),
-		Log:              log,
-	})
-
-	handler.RegisterHandlers()
-
+	// Configure webhook if needed
 	if cfg.Telegram.WebhookURL != "" {
 		log.Infow("Configuring Telegram webhook...", "url", cfg.Telegram.WebhookURL)
+
+		// Cast to concrete type to call SetWebhook (bot is already *tgbotapi.Bot)
 		if err := bot.SetWebhook(cfg.Telegram.WebhookURL); err != nil {
 			log.Fatalf("Failed to set Telegram webhook: %v", err)
 		}
@@ -860,17 +874,135 @@ func provideTelegramBot(
 		}
 	}
 
-	// Telegram Notification Consumer - uses UserService (Clean Architecture)
-	telegramNotificationSvc := consumers.NewTelegramNotificationConsumer(
-		notificationConsumer,
-		bot,
-		notificationService,
-		userService,
-		log,
-	)
+	// Set handler for updates
+	bot.SetHandler(handler.HandleUpdate)
 
 	log.Info("✓ Telegram bot initialized")
-	return bot, handler, telegramNotificationSvc
+	return bot, handler
+}
+
+// provideTelegramNotificationService creates notification service for Telegram
+func provideTelegramNotificationService(
+	bot tg.Bot,
+	templates tg.TemplateRenderer,
+	log *logger.Logger,
+) *telegram.NotificationService {
+	return telegram.NewNotificationService(bot, templates, log)
+}
+
+// registerTelegramCommands registers all bot commands with the command registry
+func registerTelegramCommands(
+	registry *tg.CommandRegistry,
+	investMenu *telegram.InvestMenuService,
+	userService telegram.UserService,
+	log *logger.Logger,
+) {
+	// /start - Welcome message
+	registry.Register(tg.CommandConfig{
+		Name:        "start",
+		Description: "Start the bot and see welcome message",
+		Category:    "General",
+		Handler: func(ctx *tg.CommandContext) error {
+			welcomeText := "👋 Welcome to Prometheus Trading!\n\n" +
+				"Your AI-powered hedge fund running 24/7.\n\n" +
+				"🚀 Quick Start:\n" +
+				"/invest - Start investing\n" +
+				"/status - Check portfolio status\n" +
+				"/help - Show all commands\n\n" +
+				"Let's make some money! 💰"
+			return ctx.Bot.SendMessage(ctx.ChatID, welcomeText)
+		},
+	})
+
+	// /help - Show available commands
+	registry.Register(tg.CommandConfig{
+		Name:        "help",
+		Aliases:     []string{"h"},
+		Description: "Show available commands",
+		Category:    "General",
+		Handler: func(ctx *tg.CommandContext) error {
+			commandsByCategory := registry.GetCommandsByCategory(false)
+
+			helpText := "📋 *Available Commands*\n\n"
+			for category, commands := range commandsByCategory {
+				helpText += fmt.Sprintf("*%s*\n", category)
+				for _, cmd := range commands {
+					helpText += fmt.Sprintf("/%s", cmd.Name)
+					if len(cmd.Aliases) > 0 {
+						helpText += fmt.Sprintf(" (/%s)", strings.Join(cmd.Aliases, ", /"))
+					}
+					helpText += fmt.Sprintf(" - %s\n", cmd.Description)
+				}
+				helpText += "\n"
+			}
+
+			_, err := ctx.Bot.SendMessageWithOptions(ctx.ChatID, helpText, tg.MessageOptions{
+				ParseMode: "Markdown",
+			})
+			return err
+		},
+	})
+
+	// /invest - Start investment flow
+	registry.Register(tg.CommandConfig{
+		Name:        "invest",
+		Aliases:     []string{"i"},
+		Description: "Start new investment",
+		Category:    "Trading",
+		Handler: func(ctx *tg.CommandContext) error {
+			usr := ctx.User.(*user.User)
+			log.Infow("Starting invest flow",
+				"user_id", usr.ID,
+				"telegram_id", ctx.TelegramID,
+			)
+
+			if err := investMenu.StartInvest(ctx.Ctx, usr.ID, ctx.TelegramID); err != nil {
+				log.Errorw("Failed to start invest menu", "error", err)
+				return ctx.Bot.SendMessage(ctx.ChatID, "❌ Failed to start investment flow. Please try again.")
+			}
+
+			return nil
+		},
+	})
+
+	// /status - Show portfolio status
+	registry.Register(tg.CommandConfig{
+		Name:        "status",
+		Aliases:     []string{"s", "portfolio"},
+		Description: "View your portfolio status",
+		Category:    "Portfolio",
+		Handler: func(ctx *tg.CommandContext) error {
+			usr := ctx.User.(*user.User)
+			// TODO: Implement portfolio status
+			statusText := fmt.Sprintf("📊 *Portfolio Status*\n\n"+
+				"User: %s\n"+
+				"Status: Active\n\n"+
+				"_Full portfolio view coming soon..._",
+				usr.FirstName,
+			)
+			_, err := ctx.Bot.SendMessageWithOptions(ctx.ChatID, statusText, tg.MessageOptions{
+				ParseMode: "Markdown",
+			})
+			return err
+		},
+	})
+
+	// /cancel - Cancel current operation
+	registry.Register(tg.CommandConfig{
+		Name:        "cancel",
+		Description: "Cancel current operation",
+		Category:    "General",
+		Handler: func(ctx *tg.CommandContext) error {
+			// End any active menu session
+			if err := investMenu.EndMenu(ctx.Ctx, ctx.TelegramID); err != nil {
+				log.Debugw("No active menu to cancel", "telegram_id", ctx.TelegramID)
+			}
+
+			return ctx.Bot.SendMessage(ctx.ChatID, "✅ Operation cancelled. Use /help to see available commands.")
+		},
+	})
+
+	log.Info("✓ Telegram commands registered")
 }
 
 // provideWorkers is defined in workers.go due to its size

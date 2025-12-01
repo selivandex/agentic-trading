@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS user_strategies (
     cash_reserve DECIMAL(20, 8) NOT NULL DEFAULT 0,  -- Unallocated cash
     
     -- Strategy configuration
+    market_type market_type NOT NULL DEFAULT 'spot',
     risk_tolerance risk_tolerance NOT NULL,
     rebalance_frequency rebalance_frequency,
     target_allocations JSONB NOT NULL,    -- {"BTC/USDT": 0.5, "ETH/USDT": 0.3, ...}

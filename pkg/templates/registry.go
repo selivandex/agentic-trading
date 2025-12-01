@@ -16,9 +16,6 @@ import (
 //go:embed prompts/**/*.tmpl
 var promptsFS embed.FS
 
-//go:embed telegram/**/*.tmpl
-var telegramFS embed.FS
-
 //go:embed notifications/*.tmpl
 var notificationsFS embed.FS
 
@@ -234,12 +231,6 @@ func newEmbeddedRegistry() (*Registry, error) {
 	r.fs = promptsSubFS
 	if err := r.loadAll(); err != nil {
 		return nil, errors.Wrap(err, "load prompts templates")
-	}
-
-	// Load telegram templates
-	r.fs = telegramFS
-	if err := r.loadAll(); err != nil {
-		return nil, errors.Wrap(err, "load telegram templates")
 	}
 
 	// Load notification templates

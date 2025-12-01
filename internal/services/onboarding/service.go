@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/runner"
@@ -133,20 +132,22 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 	}
 
 	// Run workflow
-	sessionID := uuid.New().String()
 	userID := onboardingSession.UserID.String()
-
-	// Create ADK session before running workflow
 	appName := fmt.Sprintf("prometheus_onboarding_%s", onboardingSession.UserID.String())
-	_, err = s.sessionService.Create(ctx, &session.CreateRequest{
+
+	// Create ADK session before running workflow (let it generate session ID)
+	createResp, err := s.sessionService.Create(ctx, &session.CreateRequest{
 		AppName:   appName,
 		UserID:    userID,
-		SessionID: sessionID,
-		State:     nil, // Empty initial state
+		SessionID: "", // Empty = auto-generate
+		State:     nil,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create session")
 	}
+
+	// Use the generated session ID
+	sessionID := createResp.Session.ID()
 
 	runConfig := agent.RunConfig{
 		StreamingMode: agent.StreamingModeNone, // No streaming for background workflow

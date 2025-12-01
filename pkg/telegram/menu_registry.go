@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"prometheus/pkg/logger"
 )
 
@@ -16,10 +14,10 @@ type MenuHandler interface {
 	GetScreenIDs() []string
 
 	// HandleCallback processes callback for this menu
-	HandleCallback(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, data string) error
+	HandleCallback(ctx context.Context, userID interface{}, telegramID int64, messageID int, data string) error
 
 	// HandleMessage processes text message for this menu (optional)
-	HandleMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) error
+	HandleMessage(ctx context.Context, userID interface{}, telegramID int64, text string) error
 
 	// IsInMenu checks if user has active session in this menu
 	IsInMenu(ctx context.Context, telegramID int64) (bool, error)
@@ -66,7 +64,7 @@ func (mr *MenuRegistry) Register(handler MenuHandler) {
 }
 
 // RouteCallback routes callback to appropriate handler based on screen ID
-func (mr *MenuRegistry) RouteCallback(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int, callbackData string) error {
+func (mr *MenuRegistry) RouteCallback(ctx context.Context, userID interface{}, telegramID int64, messageID int, callbackData string) error {
 	// Special handling for "back" button - find active menu
 	if callbackData == "back" {
 		return mr.routeBackButton(ctx, userID, telegramID, messageID)
@@ -102,7 +100,7 @@ func (mr *MenuRegistry) RouteCallback(ctx context.Context, userID uuid.UUID, tel
 }
 
 // routeBackButton routes "back" button to active menu
-func (mr *MenuRegistry) routeBackButton(ctx context.Context, userID uuid.UUID, telegramID int64, messageID int) error {
+func (mr *MenuRegistry) routeBackButton(ctx context.Context, userID interface{}, telegramID int64, messageID int) error {
 	mr.log.Debugw("Routing back button",
 		"telegram_id", telegramID,
 	)
@@ -135,7 +133,7 @@ func (mr *MenuRegistry) routeBackButton(ctx context.Context, userID uuid.UUID, t
 }
 
 // RouteTextMessage routes text message to active menu
-func (mr *MenuRegistry) RouteTextMessage(ctx context.Context, userID uuid.UUID, telegramID int64, text string) (bool, error) {
+func (mr *MenuRegistry) RouteTextMessage(ctx context.Context, userID interface{}, telegramID int64, text string) (bool, error) {
 	// Check each menu to see if user has active session
 	for _, handler := range mr.textMenus {
 		inMenu, err := handler.IsInMenu(ctx, telegramID)
@@ -181,4 +179,15 @@ func (mr *MenuRegistry) HasActiveMenu(ctx context.Context, telegramID int64) (bo
 	}
 
 	return false, nil
+}
+
+// GetHandlers returns all registered handlers (for debugging)
+func (mr *MenuRegistry) GetHandlers() []MenuHandler {
+	return mr.textMenus
+}
+
+// GetHandlerForScreen returns handler for specific screen ID
+func (mr *MenuRegistry) GetHandlerForScreen(screenID string) (MenuHandler, bool) {
+	handler, exists := mr.handlers[screenID]
+	return handler, exists
 }

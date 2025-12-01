@@ -19,26 +19,23 @@ import (
 // TelegramNotificationConsumer sends Telegram notifications for trading events
 type TelegramNotificationConsumer struct {
 	consumer     *kafka.Consumer
-	bot          *telegram.Bot
-	notifService *telegram.NotificationService
-	userService  *user.Service
+	notifService *telegram.NotificationService // Uses new framework service
+	userService  *user.Service                 // Domain service (no side effects needed)
 	log          *logger.Logger
 }
 
 // NewTelegramNotificationConsumer creates a new Telegram notification consumer
 func NewTelegramNotificationConsumer(
 	consumer *kafka.Consumer,
-	bot *telegram.Bot,
 	notifService *telegram.NotificationService,
 	userService *user.Service,
 	log *logger.Logger,
 ) *TelegramNotificationConsumer {
 	return &TelegramNotificationConsumer{
 		consumer:     consumer,
-		bot:          bot,
 		notifService: notifService,
 		userService:  userService,
-		log:          log,
+		log:          log.With("component", "telegram_notification_consumer"),
 	}
 }
 

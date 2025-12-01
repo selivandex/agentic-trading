@@ -84,3 +84,40 @@ func (s *Session) GetString(key string) (string, bool) {
 func (s *Session) HasNavigationHistory() bool {
 	return len(s.NavigationStack) > 0
 }
+
+// GetTelegramID returns telegram user ID (implements telegram.Session interface)
+func (s *Session) GetTelegramID() int64 {
+	return s.TelegramID
+}
+
+// GetMessageID returns current message ID (implements telegram.Session interface)
+func (s *Session) GetMessageID() int {
+	return s.MessageID
+}
+
+// SetMessageID sets current message ID (implements telegram.Session interface)
+func (s *Session) SetMessageID(messageID int) {
+	s.MessageID = messageID
+	s.UpdatedAt = time.Now()
+}
+
+// GetCurrentScreen returns current screen ID (implements telegram.Session interface)
+func (s *Session) GetCurrentScreen() string {
+	return s.CurrentScreen
+}
+
+// SetCurrentScreen sets current screen ID (implements telegram.Session interface)
+func (s *Session) SetCurrentScreen(screenID string) {
+	s.CurrentScreen = screenID
+	s.UpdatedAt = time.Now()
+}
+
+// GetCreatedAt returns session creation time (implements telegram.Session interface)
+func (s *Session) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns last update time (implements telegram.Session interface)
+func (s *Session) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}

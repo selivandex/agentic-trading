@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"prometheus/internal/api/health"
-	telegramapi "prometheus/internal/api/telegram"
 	"prometheus/internal/metrics"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	"prometheus/pkg/telegram"
 )
 
 // ServerConfig contains configuration for HTTP server
@@ -18,7 +18,7 @@ type ServerConfig struct {
 	Port            int
 	ServiceName     string
 	Version         string
-	TelegramWebhook *telegramapi.WebhookHandler // Optional Telegram webhook handler
+	TelegramWebhook *telegram.WebhookHandler // Optional Telegram webhook handler (from pkg/telegram)
 }
 
 // Server wraps HTTP server with lifecycle management

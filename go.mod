@@ -4,11 +4,13 @@ go 1.25.3
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.41.0
+	github.com/adshao/go-binance/v2 v2.8.7
+	github.com/amir-the-h/okex v1.1.4-alpha
 	github.com/dustin/go-humanize v1.0.1
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/websocket v1.5.3
+	github.com/hirokisan/bybit/v2 v2.39.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -34,8 +36,6 @@ require (
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/ClickHouse/ch-go v0.69.0 // indirect
-	github.com/adshao/go-binance/v2 v2.8.7 // indirect
-	github.com/amir-the-h/okex v1.1.4-alpha // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
@@ -54,7 +54,7 @@ require (
 	github.com/google/safehtml v0.1.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
-	github.com/hirokisan/bybit/v2 v2.39.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

@@ -232,3 +232,4 @@ ReconciliationInterval: 30 * time.Second,
 5. **Compression**: Enable WebSocket compression for bandwidth savings
 6. **Rate Limiting**: Respect exchange rate limits during reconnects
 
+

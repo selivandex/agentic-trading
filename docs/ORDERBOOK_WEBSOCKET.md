@@ -323,3 +323,4 @@ Change to 1000ms (1s) updates by modifying stream configuration in client.
 - [Binance Futures WebSocket Depth Streams](https://binance-docs.github.io/apidocs/futures/en/#partial-book-depth-streams)
 - [Binance Spot WebSocket Depth Streams](https://binance-docs.github.io/apidocs/spot/en/#partial-book-depth-streams)
 
+

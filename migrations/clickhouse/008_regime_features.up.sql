@@ -64,3 +64,4 @@ AS SELECT
 FROM regime_features
 GROUP BY symbol, hour;
 
+

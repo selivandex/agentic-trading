@@ -43,14 +43,17 @@ import (
 	exchangeservice "prometheus/internal/services/exchange"
 	limitsservice "prometheus/internal/services/limits"
 	marketdatasvc "prometheus/internal/services/market_data"
+	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
 	riskservice "prometheus/internal/services/risk"
 	strategyservice "prometheus/internal/services/strategy"
+	userservice "prometheus/internal/services/user"
 	"prometheus/internal/tools"
 	"prometheus/internal/workers"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	tg "prometheus/pkg/telegram"
 	"prometheus/pkg/templates"
 )
 
@@ -118,22 +121,24 @@ type Repositories struct {
 
 // Services groups all domain services
 type Services struct {
-	// Domain services (Clean Architecture: Service Layer)
-	User               *user.Service             // User business logic
-	ExchangeAccount    *exchange_account.Service // Exchange account domain service
-	Exchange           *exchangeservice.Service  // Exchange account management service
-	TradingPair        *trading_pair.Service     // Trading pair business logic
-	Order              *order.Service            // Order domain service
-	Position           *position.Service         // Position domain service
-	PositionManagement *positionservice.Service  // Position management service for WebSocket updates
-	Strategy           *strategyservice.Service  // Strategy service for portfolio management
-	Memory             *memory.Service           // Memory domain service
-	Journal            *journal.Service          // Journal domain service
-	Session            *domainsession.Service    // Session domain service
-	ADKSession         session.Service           // ADK interface
-	Limits             *limitsservice.Service    // Limit validation service (tiers, quotas)
-	MarketData         *marketdatasvc.Service    // Market data service (abstraction over ClickHouse)
-	AIUsage            *aiusagesvc.Service       // AI usage tracking service (abstraction over batch writer)
+	// Application services (Clean Architecture: Application Layer)
+	User               *userservice.Service       // User application service (coordinates domain + side effects)
+	DomainUser         *user.Service              // Domain user service (for consumers - pure CRUD)
+	ExchangeAccount    *exchange_account.Service  // Exchange account domain service
+	Exchange           *exchangeservice.Service   // Exchange account management service
+	TradingPair        *trading_pair.Service      // Trading pair business logic
+	Order              *order.Service             // Order domain service
+	Position           *position.Service          // Position domain service
+	PositionManagement *positionservice.Service   // Position management service for WebSocket updates
+	Strategy           *strategyservice.Service   // Strategy service for portfolio management
+	Memory             *memory.Service            // Memory domain service
+	Journal            *journal.Service           // Journal domain service
+	Session            *domainsession.Service     // Session domain service
+	ADKSession         session.Service            // ADK interface
+	Limits             *limitsservice.Service     // Limit validation service (tiers, quotas)
+	MarketData         *marketdatasvc.Service     // Market data service (abstraction over ClickHouse)
+	AIUsage            *aiusagesvc.Service        // AI usage tracking service (abstraction over batch writer)
+	Onboarding         *onboardingservice.Service // Onboarding orchestrator (portfolio initialization)
 }
 
 // Adapters groups all external adapters
@@ -147,6 +152,7 @@ type Adapters struct {
 	AIUsageConsumer              *kafka.Consumer
 	PositionGuardianConsumer     *kafka.Consumer
 	TelegramNotificationConsumer *kafka.Consumer
+	SystemEventsConsumer         *kafka.Consumer
 
 	// WebSocket consumer (unified for ALL WebSocket events: market data + user data)
 	WebSocketConsumer *kafka.Consumer
@@ -179,13 +185,11 @@ type Business struct {
 
 // Application groups application layer components
 type Application struct {
-	HTTPServer      *api.Server
-	HealthHandler   *health.Handler
-	TelegramBot     *telegram.Bot
-	TelegramHandler *telegram.Handler
-
-	// Notification services
-	TelegramNotificationSvc *consumers.TelegramNotificationConsumer
+	HTTPServer                  *api.Server
+	HealthHandler               *health.Handler
+	TelegramBot                 tg.Bot // telegram.Bot interface from pkg/telegram
+	TelegramHandler             *telegram.Handler
+	TelegramNotificationService *telegram.NotificationService
 }
 
 // Background groups all background processing components
@@ -193,12 +197,13 @@ type Background struct {
 	WorkerScheduler *workers.Scheduler
 
 	// Event consumers
-	NotificationSvc     *consumers.NotificationConsumer
-	RiskSvc             *consumers.RiskConsumer
-	AnalyticsSvc        *consumers.AnalyticsConsumer
-	OpportunitySvc      *consumers.OpportunityConsumer
-	AIUsageSvc          *consumers.AIUsageConsumer
-	PositionGuardianSvc *consumers.PositionGuardianConsumer
+	TelegramNotificationSvc *consumers.TelegramNotificationConsumer // Telegram notifications (uses new framework)
+	RiskSvc                 *consumers.RiskConsumer
+	AnalyticsSvc            *consumers.AnalyticsConsumer
+	OpportunitySvc          *consumers.OpportunityConsumer
+	AIUsageSvc              *consumers.AIUsageConsumer
+	PositionGuardianSvc     *consumers.PositionGuardianConsumer
+	SystemEventsSvc         *consumers.SystemEventsConsumer // System events (portfolio init, worker failures)
 
 	// WebSocket consumer service (unified for market data + user data)
 	WebSocketSvc *consumers.WebSocketConsumer
@@ -293,19 +298,17 @@ func (c *Container) startConsumers() error {
 		name string
 		svc  interface{ Start(context.Context) error }
 	}{
-		// NOTE: Old "notification" consumer removed - replaced with "telegram_notifications"
-		// to avoid two consumers competing for same messages on notifications topic
 		{"risk", c.Background.RiskSvc},
 		{"analytics", c.Background.AnalyticsSvc},
 		{"opportunity", c.Background.OpportunitySvc},
 		{"ai_usage", c.Background.AIUsageSvc},
 		{"position_guardian", c.Background.PositionGuardianSvc},
-		{"telegram_bot", c.Application.TelegramBot},
-		{"telegram_notifications", c.Application.TelegramNotificationSvc},
+		{"system_events", c.Background.SystemEventsSvc},
+		{"telegram_notifications", c.Background.TelegramNotificationSvc},
 	}
 
 	// Add unified WebSocket consumer (handles all stream types)
-	consumerNames := []string{"risk", "analytics", "opportunity", "ai_usage", "position_guardian", "telegram_bot", "telegram_notifications"}
+	consumerNames := []string{"risk", "analytics", "opportunity", "ai_usage", "position_guardian", "system_events"}
 
 	if c.Background.WebSocketSvc != nil {
 		consumers = append(consumers, struct {

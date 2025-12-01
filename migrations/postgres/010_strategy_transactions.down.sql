@@ -12,3 +12,4 @@ DROP TABLE IF EXISTS strategy_transactions;
 -- Drop enum type
 DROP TYPE IF EXISTS strategy_transaction_type;
 
+

@@ -159,3 +159,4 @@ echo "4. Check /status and /portfolio"
 echo ""
 echo "Cleanup: Run 'make clean-test-data' to remove test user"
 
+

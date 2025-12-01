@@ -9,3 +9,4 @@ ALTER TABLE ohlcv
     DROP COLUMN IF EXISTS is_closed,
     DROP COLUMN IF EXISTS event_time;
 
+
