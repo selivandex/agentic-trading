@@ -7,6 +7,7 @@
 .PHONY: gen-encryption-key lint fmt test test-short test-integration test-coverage test-repo
 .PHONY: build build-linux build-prod run run-dev setup
 .PHONY: docker-build docker-run
+.PHONY: start stop restart status
 
 # Load environment variables from .env file (if exists)
 -include .env
@@ -82,6 +83,12 @@ help:
 	@echo "  make deps               - Install dependencies"
 	@echo "  make proto-gen          - Generate protobuf code"
 	@echo "  make setup              - Full setup (deps + docker + db + migrations)"
+	@echo ""
+	@echo "🚀 Server Control:"
+	@echo "  make start              - Start server in background (saves PID to /tmp/prometheus.pid)"
+	@echo "  make stop               - Stop server using saved PID"
+	@echo "  make restart            - Restart server (stop + start)"
+	@echo "  make status             - Check server status"
 
 # Docker commands
 docker-up:
@@ -404,3 +411,74 @@ docker-build:
 
 docker-run:
 	docker run --env-file .env -p 8080:8080 prometheus:latest
+
+# ============================================================================
+# Server Control (with PID management)
+# ============================================================================
+
+PID_FILE ?= /tmp/prometheus.pid
+
+start:
+	@if [ -f $(PID_FILE) ]; then \
+		if ps -p $$(cat $(PID_FILE)) > /dev/null 2>&1; then \
+			echo "⚠️  Server is already running (PID: $$(cat $(PID_FILE)))"; \
+			echo "Use 'make stop' to stop it first, or 'make restart' to restart"; \
+			exit 1; \
+		else \
+			echo "🧹 Cleaning up stale PID file..."; \
+			rm -f $(PID_FILE); \
+		fi; \
+	fi
+	@echo "🔨 Building server..."
+	@$(MAKE) build
+	@echo "🚀 Starting server in background..."
+	@nohup ./bin/prometheus > /tmp/prometheus.log 2>&1 & echo $$! > $(PID_FILE)
+	@sleep 1
+	@if ps -p $$(cat $(PID_FILE)) > /dev/null 2>&1; then \
+		echo "✅ Server started successfully (PID: $$(cat $(PID_FILE)))"; \
+		echo "📋 Logs: tail -f /tmp/prometheus.log"; \
+		echo "🛑 Stop: make stop"; \
+	else \
+		echo "❌ Failed to start server. Check logs: tail /tmp/prometheus.log"; \
+		rm -f $(PID_FILE); \
+		exit 1; \
+	fi
+
+stop:
+	@if [ ! -f $(PID_FILE) ]; then \
+		echo "⚠️  PID file not found. Server may not be running."; \
+		exit 1; \
+	fi
+	@PID=$$(cat $(PID_FILE)); \
+	if ps -p $$PID > /dev/null 2>&1; then \
+		echo "🛑 Stopping server (PID: $$PID)..."; \
+		kill $$PID; \
+		sleep 2; \
+		if ps -p $$PID > /dev/null 2>&1; then \
+			echo "⚠️  Server didn't stop gracefully, forcing..."; \
+			kill -9 $$PID; \
+		fi; \
+		rm -f $(PID_FILE); \
+		echo "✅ Server stopped"; \
+	else \
+		echo "⚠️  Server is not running (stale PID file)"; \
+		rm -f $(PID_FILE); \
+	fi
+
+restart: stop start
+	@echo "✅ Server restarted"
+
+status:
+	@if [ ! -f $(PID_FILE) ]; then \
+		echo "❌ Server is not running (no PID file)"; \
+		exit 1; \
+	fi
+	@PID=$$(cat $(PID_FILE)); \
+	if ps -p $$PID > /dev/null 2>&1; then \
+		echo "✅ Server is running (PID: $$PID)"; \
+		ps -p $$PID -o pid,ppid,%cpu,%mem,etime,command; \
+	else \
+		echo "❌ Server is not running (stale PID file)"; \
+		rm -f $(PID_FILE); \
+		exit 1; \
+	fi

@@ -9,6 +9,7 @@ type Session struct {
 	TelegramID      int64                             `json:"telegram_id"`
 	MessageID       int                               `json:"message_id"`       // Current bot message ID (for editing)
 	CurrentScreen   string                            `json:"current_screen"`   // Current screen ID
+	MenuType        string                            `json:"menu_type"`        // Active menu type (invest, exchanges, etc.)
 	NavigationStack []string                          `json:"navigation_stack"` // Stack of screen IDs for back button
 	Data            map[string]interface{}            `json:"data"`             // Screen-specific data
 	CallbackData    map[string]map[string]interface{} `json:"callback_data"`    // Callback key -> params (for Telegram 64-byte limit)
@@ -111,6 +112,17 @@ func (s *Session) GetCurrentScreen() string {
 // SetCurrentScreen sets current screen ID (implements telegram.Session interface)
 func (s *Session) SetCurrentScreen(screenID string) {
 	s.CurrentScreen = screenID
+	s.UpdatedAt = time.Now()
+}
+
+// GetMenuType returns active menu type (implements telegram.Session interface)
+func (s *Session) GetMenuType() string {
+	return s.MenuType
+}
+
+// SetMenuType sets active menu type (implements telegram.Session interface)
+func (s *Session) SetMenuType(menuType string) {
+	s.MenuType = menuType
 	s.UpdatedAt = time.Now()
 }
 

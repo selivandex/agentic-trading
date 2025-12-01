@@ -146,7 +146,8 @@ func NewExchangesMenuService(
 // StartExchanges starts exchanges flow with list of accounts
 func (ems *ExchangesMenuService) StartExchanges(ctx context.Context, userID uuid.UUID, telegramID int64) error {
 	initialData := map[string]interface{}{
-		"user_id": userID.String(),
+		"user_id":    userID.String(),
+		"_menu_type": "exchanges", // Mark session as exchanges menu
 	}
 
 	screen := ems.buildListScreen()
@@ -155,11 +156,7 @@ func (ems *ExchangesMenuService) StartExchanges(ctx context.Context, userID uuid
 
 // HandleCallback processes exchanges menu callbacks
 func (ems *ExchangesMenuService) HandleCallback(ctx context.Context, userID interface{}, telegramID int64, messageID int, callbackKey string) error {
-	// Handle cancel button (special case - no storage needed)
-	if callbackKey == "cancel" {
-		_ = ems.menuNav.EndMenu(ctx, telegramID)
-		return nil
-	}
+	// Note: "cancel" and "back" are handled by MenuRegistry before reaching here
 
 	// Check if this is a toggle callback by looking at stored params
 	session, _ := ems.menuNav.GetSession(ctx, telegramID)
@@ -204,9 +201,9 @@ func (ems *ExchangesMenuService) HandleMessage(ctx context.Context, userID inter
 	}
 }
 
-// IsInMenu checks if user has active session in this menu
-func (ems *ExchangesMenuService) IsInMenu(ctx context.Context, telegramID int64) (bool, error) {
-	return ems.menuNav.IsInMenu(ctx, telegramID)
+// GetMenuType returns menu type identifier
+func (ems *ExchangesMenuService) GetMenuType() string {
+	return "exchanges"
 }
 
 // EndMenu ends the exchanges menu session

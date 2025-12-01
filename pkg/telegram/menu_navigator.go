@@ -2,6 +2,8 @@ package telegram
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -80,13 +82,50 @@ func NewMenuNavigator(
 
 // StartMenu starts new menu session
 func (mn *MenuNavigator) StartMenu(ctx context.Context, telegramID int64, initialScreen *Screen, initialData map[string]interface{}) error {
+	// Check if user has existing session - close it first to avoid conflicts
+	existingSession, err := mn.sessionService.GetSession(ctx, telegramID)
+	if err == nil && existingSession != nil {
+		mn.log.Infow("Closing existing menu session before starting new one",
+			"telegram_id", telegramID,
+			"old_menu", existingSession.GetMenuType(),
+			"old_screen", existingSession.GetCurrentScreen(),
+		)
+
+		// Delete old menu message
+		if existingSession.GetMessageID() > 0 {
+			mn.bot.DeleteMessageAsync(telegramID, existingSession.GetMessageID(), "starting new menu")
+		}
+
+		// Delete old session
+		_ = mn.sessionService.DeleteSession(ctx, telegramID)
+	}
+
+	// Extract menu type from initial data
+	menuType := ""
+	if mt, ok := initialData["_menu_type"].(string); ok {
+		menuType = mt
+	}
+
+	// Create new session
 	session, err := mn.sessionService.CreateSession(ctx, telegramID, initialScreen.ID, initialData, mn.sessionTTL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create session")
 	}
 
-	// Set current screen (important for text message routing)
+	// Set menu type and current screen
+	session.SetMenuType(menuType)
 	session.SetCurrentScreen(initialScreen.ID)
+
+	// Save session with menu type
+	if err := mn.sessionService.SaveSession(ctx, session, mn.sessionTTL); err != nil {
+		return errors.Wrap(err, "failed to save session with menu type")
+	}
+
+	mn.log.Infow("Started new menu session",
+		"telegram_id", telegramID,
+		"menu_type", menuType,
+		"initial_screen", initialScreen.ID,
+	)
 
 	// Call OnEnter if defined
 	if initialScreen.OnEnter != nil {
@@ -119,8 +158,29 @@ func (mn *MenuNavigator) HandleCallback(ctx context.Context, telegramID int64, m
 		mn.log.Warnw("Callback data not found in session (expired or invalid)",
 			"callback_key", callbackData,
 			"telegram_id", telegramID,
+			"current_screen", session.GetCurrentScreen(),
+			"hint", "session might have been cleared or callback from old message",
 		)
 		return fmt.Errorf("callback data expired or invalid")
+	}
+
+	mn.log.Debugw("Retrieved callback params from session",
+		"callback_key", callbackData,
+		"screen", callbackParams["screen"],
+		"params_count", len(callbackParams)-1,
+		"callback_menu_type", callbackParams["_menu_type"],
+		"current_menu_type", session.GetMenuType(),
+	)
+
+	// Validate callback belongs to current menu (prevent old buttons from wrong menu)
+	callbackMenuType, _ := callbackParams["_menu_type"].(string)
+	if callbackMenuType != "" && callbackMenuType != session.GetMenuType() {
+		mn.log.Warnw("Callback from different menu type ignored (old button clicked)",
+			"callback_menu_type", callbackMenuType,
+			"current_menu_type", session.GetMenuType(),
+			"callback_key", callbackData,
+		)
+		return fmt.Errorf("callback from old menu session (please use current menu buttons)")
 	}
 
 	// Extract screen ID from stored params
@@ -181,8 +241,11 @@ func (mn *MenuNavigator) HandleCallback(ctx context.Context, telegramID int64, m
 // Uses short keys to avoid Telegram's 64-byte callback_data limit
 // Example: MakeCallback(session, "detail", "account_id", "uuid") → "cb:a1f2e9"
 func (mn *MenuNavigator) MakeCallback(session Session, screenID string, params ...string) string {
-	// Build params map
-	paramsMap := map[string]interface{}{"screen": screenID}
+	// Build params map with menu type for proper routing
+	paramsMap := map[string]interface{}{
+		"screen":     screenID,
+		"_menu_type": session.GetMenuType(), // Store which menu created this callback
+	}
 	for i := 0; i < len(params); i += 2 {
 		if i+1 < len(params) {
 			paramsMap[params[i]] = params[i+1]
@@ -195,14 +258,28 @@ func (mn *MenuNavigator) MakeCallback(session Session, screenID string, params .
 	// Store params in session
 	session.SetCallbackData(key, paramsMap)
 
+	if mn.log != nil {
+		mn.log.Debugw("Generated callback key",
+			"key", key,
+			"screen", screenID,
+			"params_count", len(params)/2,
+			"menu_type", session.GetMenuType(),
+		)
+	}
+
 	return key
 }
 
 // generateCallbackKey generates a short random key for callback data
+// Similar to Rails SecureRandom.hex - generates 8 random hex characters
 func generateCallbackKey() string {
-	// Use timestamp + random for uniqueness (6 chars hex)
-	now := time.Now().UnixNano()
-	return fmt.Sprintf("cb:%x", now%0xFFFFFF) // 6 hex digits
+	// Generate 4 random bytes → 8 hex chars (4.3B combinations)
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp if crypto/rand fails (extremely rare)
+		return fmt.Sprintf("%x", time.Now().UnixNano()%0xFFFFFFFF)
+	}
+	return hex.EncodeToString(b) // "a1f2e9b4" (8 chars, 4,294,967,296 combinations)
 }
 
 // GetSession retrieves current session
@@ -223,6 +300,16 @@ func (mn *MenuNavigator) RenderTemplate(templatePath string, data map[string]int
 // IsInMenu checks if user has active menu session
 func (mn *MenuNavigator) IsInMenu(ctx context.Context, telegramID int64) (bool, error) {
 	return mn.sessionService.SessionExists(ctx, telegramID)
+}
+
+// IsInMenuType checks if user has active session for specific menu type
+func (mn *MenuNavigator) IsInMenuType(ctx context.Context, telegramID int64, menuType string) (bool, error) {
+	session, err := mn.sessionService.GetSession(ctx, telegramID)
+	if err != nil {
+		return false, nil // No session = not in menu
+	}
+
+	return session.GetMenuType() == menuType, nil
 }
 
 // EndMenu ends menu session and cleans up

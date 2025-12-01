@@ -851,7 +851,7 @@ func provideTelegramBot(
 	)
 
 	// Menu registry for auto-routing (uses framework)
-	menuRegistry := tg.NewMenuRegistry(log)
+	menuRegistry := tg.NewMenuRegistry(log, sessionAdapter)
 	menuRegistry.Register(investMenuService)
 	menuRegistry.Register(exchangesMenuService)
 	// TODO: Register other menu handlers (settings, etc.)

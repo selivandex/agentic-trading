@@ -205,7 +205,8 @@ func (ims *InvestMenuService) StartInvest(ctx context.Context, userID uuid.UUID,
 	)
 
 	initialData := map[string]interface{}{
-		"user_id": userID.String(),
+		"user_id":    userID.String(),
+		"_menu_type": "invest", // Mark session as invest menu
 	}
 
 	screen := ims.buildExchangeSelectionScreen()
@@ -214,11 +215,7 @@ func (ims *InvestMenuService) StartInvest(ctx context.Context, userID uuid.UUID,
 
 // HandleCallback processes invest menu callbacks
 func (ims *InvestMenuService) HandleCallback(ctx context.Context, userID interface{}, telegramID int64, messageID int, data string) error {
-	// Handle cancel button
-	if data == "cancel" {
-		_ = ims.menuNav.EndMenu(ctx, telegramID)
-		return nil
-	}
+	// Note: "cancel" and "back" are handled by MenuRegistry before reaching here
 
 	screens := ims.getScreens()
 	return ims.menuNav.HandleCallback(ctx, telegramID, messageID, data, screens)
@@ -288,9 +285,9 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 	return ims.finalizeInvestment(ctx, session)
 }
 
-// IsInMenu checks if user has active session in this menu
-func (ims *InvestMenuService) IsInMenu(ctx context.Context, telegramID int64) (bool, error) {
-	return ims.menuNav.IsInMenu(ctx, telegramID)
+// GetMenuType returns menu type identifier
+func (ims *InvestMenuService) GetMenuType() string {
+	return "invest"
 }
 
 // EndMenu ends the invest menu session
@@ -300,7 +297,7 @@ func (ims *InvestMenuService) EndMenu(ctx context.Context, telegramID int64) err
 
 // GetScreenIDs returns all screen IDs this handler owns (for MenuRegistry)
 func (ims *InvestMenuService) GetScreenIDs() []string {
-	return []string{"sel", "mkt", "risk", "amt", "cancel"}
+	return []string{"sel", "mkt", "risk", "amt"}
 }
 
 // getScreens returns all invest screens (using framework builders - DRY!)

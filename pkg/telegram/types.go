@@ -89,6 +89,12 @@ type Session interface {
 	// SetCurrentScreen sets current screen ID
 	SetCurrentScreen(screenID string)
 
+	// GetMenuType returns active menu type (invest, exchanges, etc.)
+	GetMenuType() string
+
+	// SetMenuType sets active menu type
+	SetMenuType(menuType string)
+
 	// GetData retrieves session data by key
 	GetData(key string) (interface{}, bool)
 

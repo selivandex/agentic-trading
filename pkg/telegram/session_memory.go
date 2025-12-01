@@ -12,6 +12,7 @@ type InMemorySession struct {
 	telegramID      int64
 	messageID       int
 	currentScreen   string
+	menuType        string // Active menu type (invest, exchanges, etc.)
 	data            map[string]interface{}
 	callbackData    map[string]map[string]interface{} // callback key -> params
 	navigationStack []string
@@ -74,6 +75,21 @@ func (s *InMemorySession) SetCurrentScreen(screenID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.currentScreen = screenID
+	s.updatedAt = time.Now()
+}
+
+// GetMenuType returns active menu type
+func (s *InMemorySession) GetMenuType() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.menuType
+}
+
+// SetMenuType sets active menu type
+func (s *InMemorySession) SetMenuType(menuType string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.menuType = menuType
 	s.updatedAt = time.Now()
 }
 
