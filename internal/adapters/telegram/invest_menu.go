@@ -18,7 +18,7 @@ import (
 
 // ExchangeService defines interface for exchange operations
 type ExchangeService interface {
-	GetUserAccounts(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error)
+	GetActiveUserAccounts(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error)
 	GetAccount(ctx context.Context, accountID uuid.UUID) (*exchange_account.ExchangeAccount, error)
 }
 
@@ -173,6 +173,37 @@ func NewInvestMenuService(
 
 // StartInvest starts invest flow with exchange selection
 func (ims *InvestMenuService) StartInvest(ctx context.Context, userID uuid.UUID, telegramID int64) error {
+	// Get only active exchange accounts from DB
+	accounts, err := ims.exchangeService.GetActiveUserAccounts(ctx, userID)
+	if err != nil {
+		ims.log.Errorw("Failed to get active user accounts", "error", err, "user_id", userID)
+		return errors.Wrap(err, "failed to get active user accounts")
+	}
+
+	// If no active accounts, send helpful message using template
+	if len(accounts) == 0 {
+		ims.log.Infow("User has no active exchange accounts",
+			"user_id", userID,
+			"telegram_id", telegramID,
+		)
+
+		// Render template for "no active exchanges" message
+		msg, err := ims.menuNav.RenderTemplate("invest/no_active_exchanges", nil)
+		if err != nil {
+			ims.log.Errorw("Failed to render no_active_exchanges template", "error", err)
+			// Fallback to simple message
+			msg = "❌ No exchange accounts found. Use /settings to add an exchange account."
+		}
+
+		return ims.menuNav.GetBot().SendMessage(telegramID, msg)
+	}
+
+	ims.log.Debugw("Starting invest flow",
+		"user_id", userID,
+		"telegram_id", telegramID,
+		"active_accounts", len(accounts),
+	)
+
 	initialData := map[string]interface{}{
 		"user_id": userID.String(),
 	}
@@ -301,10 +332,15 @@ func (ims *InvestMenuService) buildExchangeSelectionScreen() *telegram.Screen {
 				return nil, errors.Wrap(err, "invalid user_id")
 			}
 
-			accounts, err := ims.exchangeService.GetUserAccounts(ctx, userID)
+			accounts, err := ims.exchangeService.GetActiveUserAccounts(ctx, userID)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to get exchange accounts")
+				return nil, errors.Wrap(err, "failed to get active exchange accounts")
 			}
+
+			ims.log.Debugw("Fetched active user exchange accounts",
+				"user_id", userID,
+				"count", len(accounts),
+			)
 
 			// Template data structure
 			type ExchangeInfo struct {
@@ -315,10 +351,6 @@ func (ims *InvestMenuService) buildExchangeSelectionScreen() *telegram.Screen {
 
 			var items []telegram.ListItem
 			for _, account := range accounts {
-				if !account.IsActive {
-					continue
-				}
-
 				items = append(items, telegram.ListItem{
 					ID:         account.ID.String(),
 					ButtonText: fmt.Sprintf("📊 %s - %s", strings.Title(string(account.Exchange)), account.Label),

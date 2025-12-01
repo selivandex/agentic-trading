@@ -20,7 +20,7 @@ type MockExchangeService struct {
 	mock.Mock
 }
 
-func (m *MockExchangeService) GetUserAccounts(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error) {
+func (m *MockExchangeService) GetActiveUserAccounts(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

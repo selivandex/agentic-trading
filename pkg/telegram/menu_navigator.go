@@ -188,6 +188,16 @@ func (mn *MenuNavigator) GetSession(ctx context.Context, telegramID int64) (Sess
 	return mn.sessionService.GetSession(ctx, telegramID)
 }
 
+// GetBot returns the bot instance for sending messages
+func (mn *MenuNavigator) GetBot() Bot {
+	return mn.bot
+}
+
+// RenderTemplate renders a template with given data
+func (mn *MenuNavigator) RenderTemplate(templatePath string, data map[string]interface{}) (string, error) {
+	return mn.templates.Render(templatePath, data)
+}
+
 // IsInMenu checks if user has active menu session
 func (mn *MenuNavigator) IsInMenu(ctx context.Context, telegramID int64) (bool, error) {
 	return mn.sessionService.SessionExists(ctx, telegramID)
@@ -229,6 +239,12 @@ func (mn *MenuNavigator) showScreen(ctx context.Context, session Session, screen
 		if err != nil {
 			return errors.Wrap(err, "failed to build keyboard")
 		}
+
+		mn.log.Debugw("Built screen keyboard",
+			"screen_id", screen.ID,
+			"keyboard_rows", len(keyboard.InlineKeyboard),
+			"has_navigation_history", session.HasNavigationHistory(),
+		)
 
 		// Auto-add back button if navigation history exists
 		if session.HasNavigationHistory() {
