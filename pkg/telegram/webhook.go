@@ -40,6 +40,11 @@ func (wh *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Post-process: parse commands from message text
+	if update.Message != nil {
+		update.Message.ParseCommand()
+	}
+
 	wh.log.Debugw("Received webhook update",
 		"update_id", update.UpdateID,
 		"has_message", update.HasMessage(),

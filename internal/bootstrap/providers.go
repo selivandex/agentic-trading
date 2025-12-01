@@ -396,7 +396,9 @@ func (c *Container) MustInitApplication() {
 	c.Application.TelegramBot = bot
 	c.Application.TelegramHandler = telegramHandler
 
-	// Telegram notification service (uses new framework)
+	// Telegram notification service (uses telegram embedded templates for notifications)
+	// Note: Notification templates are in pkg/templates/notifications/, not pkg/telegram/templates/
+	// So we use main templates registry here, not telegram's embedded one
 	templateAdapter := telegram.NewTemplateRendererAdapter(templates.Get())
 	notificationService := provideTelegramNotificationService(bot, templateAdapter, c.Log)
 	c.Application.TelegramNotificationService = notificationService
@@ -801,13 +803,18 @@ func provideTelegramBot(
 
 	// Create adapters for pkg/telegram framework
 	sessionAdapter := telegram.NewSessionServiceAdapter(menuSessionService)
-	templateAdapter := telegram.NewTemplateRendererAdapter(templates.Get())
 
-	// Menu navigator for interactive menus (uses framework)
+	// Use telegram's embedded template registry for menus (has invest/, common/, etc.)
+	telegramTemplates, err := tg.NewDefaultTemplateRegistry()
+	if err != nil {
+		log.Fatalf("Failed to create telegram template registry: %v", err)
+	}
+
+	// Menu navigator for interactive menus (uses telegram templates from pkg/telegram/templates/)
 	menuNavigator := tg.NewMenuNavigator(
 		sessionAdapter,
 		bot,
-		templateAdapter,
+		telegramTemplates, // Direct use of telegram.TemplateRegistry (implements TemplateRenderer)
 		log,
 		30*time.Minute, // Session TTL
 	)
@@ -948,8 +955,14 @@ func registerTelegramCommands(
 		Name:        "invest",
 		Aliases:     []string{"i"},
 		Description: "Start new investment",
+		Usage:       "/invest",
 		Category:    "Trading",
 		Handler: func(ctx *tg.CommandContext) error {
+			// Invest command doesn't accept arguments
+			if ctx.Args != "" {
+				return ctx.Bot.SendMessage(ctx.ChatID, "❌ `/invest` command doesn't take arguments.\n\nJust use: `/invest`")
+			}
+
 			usr := ctx.User.(*user.User)
 			log.Infow("Starting invest flow",
 				"user_id", usr.ID,

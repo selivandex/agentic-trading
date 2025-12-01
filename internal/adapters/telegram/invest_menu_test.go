@@ -150,7 +150,7 @@ func TestInvestMenuService_BuildRiskSelectionScreen(t *testing.T) {
 	screen := service.buildRiskSelectionScreen()
 
 	assert.Equal(t, "risk", screen.ID)
-	assert.Equal(t, "telegram/invest/select_risk", screen.Template)
+	assert.Equal(t, "invest/select_risk", screen.Template)
 	assert.NotNil(t, screen.Data, "Data function should not be nil")
 	assert.NotNil(t, screen.Keyboard, "Keyboard function should not be nil")
 
@@ -177,7 +177,7 @@ func TestInvestMenuService_BuildMarketTypeSelectionScreen(t *testing.T) {
 	screen := service.buildMarketTypeSelectionScreen()
 
 	assert.Equal(t, "mkt", screen.ID)
-	assert.Equal(t, "telegram/invest/select_market_type", screen.Template)
+	assert.Equal(t, "invest/select_market_type", screen.Template)
 	assert.NotNil(t, screen.Data, "Data function should not be nil")
 	assert.NotNil(t, screen.Keyboard, "Keyboard function should not be nil")
 

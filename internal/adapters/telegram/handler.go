@@ -99,7 +99,7 @@ func (h *Handler) handleMessage(ctx context.Context, msg *telegram.Message) erro
 	// Get or create user
 	usr, err := h.getOrCreateUser(ctx, msg.From)
 	if err != nil {
-		h.bot.SendMessage(chatID, "❌ Failed to process your request. Please try again.")
+		_ = h.bot.SendMessage(chatID, "❌ Failed to process your request. Please try again.")
 		return errors.Wrap(err, "failed to get or create user")
 	}
 
@@ -134,7 +134,7 @@ func (h *Handler) handleMessage(ctx context.Context, msg *telegram.Message) erro
 		"text_length", len(text),
 	)
 
-	h.bot.SendMessage(chatID, "I don't understand that message. Use /help to see available commands.")
+	_ = h.bot.SendMessage(chatID, "I don't understand that message. Use /help to see available commands.")
 	return nil
 }
 
@@ -154,7 +154,7 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *telegram.Ca
 	usr, err := h.getOrCreateUser(ctx, callback.From)
 	if err != nil {
 		// Answer callback to stop loading spinner
-		h.bot.AnswerCallback(callback.ID, "❌ Error processing request", true)
+		_ = h.bot.AnswerCallback(callback.ID, "❌ Error processing request", true)
 		return errors.Wrap(err, "failed to get user")
 	}
 
@@ -172,7 +172,7 @@ func (h *Handler) handleCallbackQuery(ctx context.Context, callback *telegram.Ca
 				"error", err,
 			)
 
-			h.bot.SendMessage(telegramID, "❌ Failed to process your selection. Please try again.")
+			_ = h.bot.SendMessage(telegramID, "❌ Failed to process your selection. Please try again.")
 			return err
 		}
 	}

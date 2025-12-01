@@ -212,7 +212,11 @@ func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard telegr
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = convertKeyboardToTgbotapi(keyboard)
+	
+	// Only set keyboard if it has buttons
+	if len(keyboard.InlineKeyboard) > 0 {
+		msg.ReplyMarkup = convertKeyboardToTgbotapi(keyboard)
+	}
 
 	_, err := b.api.Send(msg)
 	if err != nil {
@@ -245,7 +249,7 @@ func (b *Bot) SendMessageWithOptions(chatID int64, text string, opts telegram.Me
 		msg.ReplyToMessageID = opts.ReplyToMessageID
 	}
 
-	if opts.Keyboard != nil {
+	if opts.Keyboard != nil && len(opts.Keyboard.InlineKeyboard) > 0 {
 		msg.ReplyMarkup = convertKeyboardToTgbotapi(*opts.Keyboard)
 	}
 
@@ -281,7 +285,7 @@ func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *te
 	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	edit.ParseMode = "Markdown"
 
-	if keyboard != nil {
+	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
 		tgKeyboard := convertKeyboardToTgbotapi(*keyboard)
 		edit.ReplyMarkup = &tgKeyboard
 	}
