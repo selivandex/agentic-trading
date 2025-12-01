@@ -287,6 +287,11 @@ func (mn *MenuNavigator) GetSession(ctx context.Context, telegramID int64) (Sess
 	return mn.sessionService.GetSession(ctx, telegramID)
 }
 
+// SaveSession saves session with default TTL
+func (mn *MenuNavigator) SaveSession(ctx context.Context, session Session) error {
+	return mn.sessionService.SaveSession(ctx, session, mn.sessionTTL)
+}
+
 // GetBot returns the bot instance for sending messages
 func (mn *MenuNavigator) GetBot() Bot {
 	return mn.bot

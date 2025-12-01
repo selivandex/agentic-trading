@@ -119,8 +119,11 @@ func (h *Handler) handleMessage(ctx context.Context, msg *telegram.Message) erro
 	if h.menuRegistry != nil {
 		routed, err := h.menuRegistry.RouteTextMessage(ctx, usr, telegramID, msg.MessageID, text)
 		if err != nil {
-			h.log.Errorw("Menu text routing failed", "error", err)
-			// Continue to other handlers
+			h.log.Errorw("Menu text routing failed", "error", err, "telegram_id", telegramID)
+			
+			// Send error message to user
+			_ = h.bot.SendMessage(chatID, err.Error())
+			return err
 		} else if routed {
 			// Successfully routed to menu handler
 			return nil

@@ -128,6 +128,11 @@ func TestMarketTypeOptions(t *testing.T) {
 	assert.NotEmpty(t, futures.Features)
 }
 
+func TestInvestMenuService_GetMenuType(t *testing.T) {
+	service := &InvestMenuService{}
+	assert.Equal(t, "invest", service.GetMenuType())
+}
+
 func TestInvestMenuService_GetScreenIDs(t *testing.T) {
 	log := logger.Get()
 	service := &InvestMenuService{
@@ -136,8 +141,8 @@ func TestInvestMenuService_GetScreenIDs(t *testing.T) {
 
 	screenIDs := service.GetScreenIDs()
 
-	// Should return all screen IDs in correct order
-	expected := []string{"sel", "mkt", "risk", "amt", "cancel"}
+	// Should return all screen IDs in correct order (cancel/back handled by MenuRegistry)
+	expected := []string{"sel", "mkt", "risk", "amt"}
 	assert.Equal(t, expected, screenIDs)
 }
 

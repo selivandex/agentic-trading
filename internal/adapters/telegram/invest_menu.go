@@ -40,15 +40,15 @@ type JobPublisher interface {
 
 // InvestFlowKeys defines parameter keys for callback data
 type InvestFlowKeys struct {
-	Account     string // "a" - exchange account ID
-	MarketType  string // "m" - market type (spot/futures)
-	RiskProfile string // "r" - risk profile
+	Account     string // exchange account ID
+	MarketType  string // market type (spot/futures)
+	RiskProfile string // risk profile
 }
 
 var investKeys = InvestFlowKeys{
-	Account:     "a",
-	MarketType:  "m",
-	RiskProfile: "r",
+	Account:     "account_id",
+	MarketType:  "market_type",
+	RiskProfile: "risk_profile",
 }
 
 // RiskProfileOption represents a risk profile selection option
@@ -239,8 +239,7 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 	usr, err := ims.userService.GetByTelegramID(ctx, telegramID)
 	if err != nil {
 		ims.log.Errorw("Failed to get user for validation", "error", err, "telegram_id", telegramID)
-		// Need bot reference - will fix in next iteration
-		return nil
+		return fmt.Errorf("❌ Failed to process your request. Please try /cancel and start over.")
 	}
 
 	// Validate investment amount against user limits and profile
@@ -248,7 +247,7 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 		validation, err := ims.investmentValidator.ValidateInvestment(ctx, usr, amount)
 		if err != nil {
 			ims.log.Errorw("Investment validation error", "error", err, "user_id", usr.ID, "amount", amount)
-			return nil
+			return fmt.Errorf("❌ Failed to validate investment. Please try a different amount.")
 		}
 
 		if !validation.Allowed {
@@ -258,16 +257,14 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 				"reason", validation.Reason,
 			)
 
-			// Clear session and show detailed error
-			_ = ims.menuNav.EndMenu(ctx, telegramID)
-
+			// Return error - user can try different amount without restarting
 			errorMsg := fmt.Sprintf("❌ %s", validation.Reason)
 			if validation.MaxAllowed > 0 {
-				errorMsg += fmt.Sprintf("\n\n💡 Maximum you can invest now: $%.2f", validation.MaxAllowed)
+				errorMsg += fmt.Sprintf("\n\n💡 Maximum you can invest: $%.2f", validation.MaxAllowed)
 			}
-			errorMsg += "\n\nUse /invest to try again with a different amount."
+			errorMsg += "\n\nPlease enter a different amount:"
 
-			return nil
+			return fmt.Errorf(errorMsg)
 		}
 
 		ims.log.Debugw("Investment validation passed",

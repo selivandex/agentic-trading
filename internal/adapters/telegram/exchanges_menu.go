@@ -18,7 +18,7 @@ import (
 
 // ExchangesServiceInterface defines interface for exchange operations
 type ExchangesServiceInterface interface {
-	GetActiveUserAccounts(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error)
+	GetUserAccounts(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error)
 	GetAccount(ctx context.Context, accountID uuid.UUID) (*exchange_account.ExchangeAccount, error)
 	CreateAccount(ctx context.Context, input exchange.CreateAccountInput) (*exchange_account.ExchangeAccount, error)
 	UpdateAccount(ctx context.Context, input exchange.UpdateAccountInput) (*exchange_account.ExchangeAccount, error)
@@ -27,25 +27,25 @@ type ExchangesServiceInterface interface {
 
 // ExchangesFlowKeys defines parameter keys for callback data
 type ExchangesFlowKeys struct {
-	AccountID    string // "acc" - exchange account ID
-	ExchangeType string // "ex" - exchange type (binance, bybit, okx, etc.)
-	IsTestnet    string // "test" - testnet flag (true/false)
-	Label        string // "lbl" - account label
-	APIKey       string // "key" - API key
-	Secret       string // "sec" - secret key
-	Passphrase   string // "pass" - passphrase (for OKX)
-	CredIndex    string // "idx" - current credential field index
+	AccountID    string // exchange account ID
+	ExchangeType string // exchange type (binance, bybit, okx, etc.)
+	IsTestnet    string // testnet flag (true/false)
+	Label        string // account label
+	APIKey       string // API key
+	Secret       string // secret key
+	Passphrase   string // passphrase (for OKX)
+	CredIndex    string // current credential field index
 }
 
 var exchangeKeys = ExchangesFlowKeys{
-	AccountID:    "acc",
-	ExchangeType: "ex",
-	IsTestnet:    "test",
-	Label:        "lbl",
-	APIKey:       "key",
-	Secret:       "sec",
-	Passphrase:   "pass",
-	CredIndex:    "idx",
+	AccountID:    "account_id",
+	ExchangeType: "exchange_type",
+	IsTestnet:    "is_testnet",
+	Label:        "label",
+	APIKey:       "api_key",
+	Secret:       "secret",
+	Passphrase:   "passphrase",
+	CredIndex:    "credential_index",
 }
 
 // ExchangeTypeOption represents an exchange type selection option
@@ -184,15 +184,15 @@ func (ems *ExchangesMenuService) HandleMessage(ctx context.Context, userID inter
 	currentScreen := session.GetCurrentScreen()
 
 	switch currentScreen {
-	case "ent_lbl_add": // Enter label for new account
+	case "enter_label_add": // Enter label for new account
 		return ems.handleEnterLabelAdd(ctx, session, text)
-	case "ent_cred_add": // Enter credential for new account
+	case "enter_credential_add": // Enter credential for new account
 		// Delete credential message after 3 seconds for security
 		ems.menuNav.GetBot().DeleteMessageAfter(telegramID, messageID, 3*time.Second)
 		return ems.handleEnterCredentialAdd(ctx, session, text)
-	case "edit_lbl": // Edit existing account label
+	case "edit_label": // Edit existing account label
 		return ems.handleEditLabel(ctx, session, text)
-	case "ent_cred_edit": // Edit existing account credentials
+	case "edit_credentials": // Edit existing account credentials
 		// Delete credential message after 3 seconds for security
 		ems.menuNav.GetBot().DeleteMessageAfter(telegramID, messageID, 3*time.Second)
 		return ems.handleEnterCredentialEdit(ctx, session, text)
@@ -214,23 +214,23 @@ func (ems *ExchangesMenuService) EndMenu(ctx context.Context, telegramID int64) 
 // GetScreenIDs returns all screen IDs this handler owns (for MenuRegistry)
 func (ems *ExchangesMenuService) GetScreenIDs() []string {
 	return []string{
-		"list", "detail", "sel_type", "sel_test", "ent_lbl_add", "ent_cred_add",
-		"edit_lbl", "edit_cred", "ent_cred_edit",
+		"list", "detail", "select_exchange_type", "select_testnet",
+		"enter_label_add", "enter_credential_add",
+		"edit_label", "edit_credentials",
 	}
 }
 
 // getScreens returns all exchanges screens
 func (ems *ExchangesMenuService) getScreens() map[string]*telegram.Screen {
 	return map[string]*telegram.Screen{
-		"list":          ems.buildListScreen(),
-		"detail":        ems.buildDetailScreen(),
-		"sel_type":      ems.buildSelectExchangeTypeScreen(),
-		"sel_test":      ems.buildSelectTestnetScreen(),
-		"ent_lbl_add":   ems.buildEnterLabelAddScreen(),
-		"ent_cred_add":  ems.buildEnterCredentialAddScreen(),
-		"edit_lbl":      ems.buildEditLabelScreen(),
-		"edit_cred":     ems.buildEditCredentialsScreen(),
-		"ent_cred_edit": ems.buildEnterCredentialEditScreen(),
+		"list":                 ems.buildListScreen(),
+		"detail":               ems.buildDetailScreen(),
+		"select_exchange_type": ems.buildSelectExchangeTypeScreen(),
+		"select_testnet":       ems.buildSelectTestnetScreen(),
+		"enter_label_add":      ems.buildEnterLabelAddScreen(),
+		"enter_credential_add": ems.buildEnterCredentialAddScreen(),
+		"edit_label":           ems.buildEditLabelScreen(),
+		"edit_credentials":     ems.buildEditCredentialsScreen(),
 	}
 }
 
@@ -250,7 +250,7 @@ func (ems *ExchangesMenuService) buildListScreen() *telegram.Screen {
 				return nil, errors.Wrap(err, "invalid user_id")
 			}
 
-			accounts, err := ems.exchangeService.GetActiveUserAccounts(ctx, userID)
+			accounts, err := ems.exchangeService.GetUserAccounts(ctx, userID)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get active exchange accounts")
 			}
@@ -259,16 +259,23 @@ func (ems *ExchangesMenuService) buildListScreen() *telegram.Screen {
 				Label         string
 				Exchange      string
 				ExchangeEmoji string
+				StatusEmoji   string
 				IsTestnet     bool
 				IsActive      bool
 			}
 
 			var accountsData []AccountInfo
 			for _, account := range accounts {
+				statusEmoji := "✅"
+				if !account.IsActive {
+					statusEmoji = "⏸️"
+				}
+
 				accountsData = append(accountsData, AccountInfo{
 					Label:         account.Label,
 					Exchange:      exchange_account.GetExchangeDisplayName(account.Exchange),
 					ExchangeEmoji: exchange_account.GetExchangeEmoji(account.Exchange),
+					StatusEmoji:   statusEmoji,
 					IsTestnet:     account.IsTestnet,
 					IsActive:      account.IsActive,
 				})
@@ -284,7 +291,7 @@ func (ems *ExchangesMenuService) buildListScreen() *telegram.Screen {
 			userIDStr, _ := session.GetString("user_id")
 			userID, _ := uuid.Parse(userIDStr)
 
-			accounts, err := ems.exchangeService.GetActiveUserAccounts(ctx, userID)
+			accounts, err := ems.exchangeService.GetUserAccounts(ctx, userID)
 			if err != nil {
 				return telegram.InlineKeyboardMarkup{}, errors.Wrap(err, "failed to get accounts for keyboard")
 			}
@@ -302,7 +309,7 @@ func (ems *ExchangesMenuService) buildListScreen() *telegram.Screen {
 
 			// Add "Add New" button
 			rows = append(rows, telegram.NewInlineKeyboardRow(
-				telegram.NewInlineKeyboardButtonData("➕ Add New Exchange", nav.MakeCallback(session, "sel_type")),
+				telegram.NewInlineKeyboardButtonData("➕ Add New Exchange", nav.MakeCallback(session, "select_exchange_type")),
 			))
 
 			return telegram.NewInlineKeyboardMarkup(rows...), nil
@@ -331,12 +338,18 @@ func (ems *ExchangesMenuService) buildDetailScreen() *telegram.Screen {
 				return nil, errors.Wrap(err, "failed to get exchange account")
 			}
 
+			statusText := "✅ Active"
+			if !account.IsActive {
+				statusText = "⏸️ Inactive"
+			}
+
 			return map[string]interface{}{
 				"Label":         account.Label,
 				"Exchange":      exchange_account.GetExchangeDisplayName(account.Exchange),
 				"ExchangeEmoji": exchange_account.GetExchangeEmoji(account.Exchange),
 				"IsTestnet":     account.IsTestnet,
 				"IsActive":      account.IsActive,
+				"StatusText":    statusText,
 				"AccountID":     account.ID.String(),
 			}, nil
 		},
@@ -357,16 +370,13 @@ func (ems *ExchangesMenuService) buildDetailScreen() *telegram.Screen {
 
 			rows := [][]telegram.InlineKeyboardButton{
 				telegram.NewInlineKeyboardRow(
-					telegram.NewInlineKeyboardButtonData("✏️ Edit Label", nav.MakeCallback(session, "edit_lbl", exchangeKeys.AccountID, accountIDStr)),
+					telegram.NewInlineKeyboardButtonData("✏️ Edit Label", nav.MakeCallback(session, "edit_label", exchangeKeys.AccountID, accountIDStr)),
 				),
 				telegram.NewInlineKeyboardRow(
-					telegram.NewInlineKeyboardButtonData("🔑 Edit Credentials", nav.MakeCallback(session, "edit_cred", exchangeKeys.AccountID, accountIDStr)),
+					telegram.NewInlineKeyboardButtonData("🔑 Edit Credentials", nav.MakeCallback(session, "edit_credentials", exchangeKeys.AccountID, accountIDStr)),
 				),
 				telegram.NewInlineKeyboardRow(
 					telegram.NewInlineKeyboardButtonData(toggleText, nav.MakeCallback(session, "toggle", exchangeKeys.AccountID, accountIDStr)),
-				),
-				telegram.NewInlineKeyboardRow(
-					telegram.NewInlineKeyboardButtonData("⬅️ Back", nav.MakeCallback(session, "list")),
 				),
 			}
 
@@ -378,9 +388,9 @@ func (ems *ExchangesMenuService) buildDetailScreen() *telegram.Screen {
 // buildSelectExchangeTypeScreen builds exchange type selection screen
 func (ems *ExchangesMenuService) buildSelectExchangeTypeScreen() *telegram.Screen {
 	return ems.menuNav.BuildOptionScreen(telegram.OptionScreenConfig{
-		ID:           "sel_type",
+		ID:           "select_exchange_type",
 		Template:     "exchange/select",
-		NextScreenID: "sel_test",
+		NextScreenID: "select_testnet",
 		ParamKey:     exchangeKeys.ExchangeType,
 		Options: func(ctx context.Context, session telegram.Session) ([]telegram.MenuOption, error) {
 			options := make([]telegram.MenuOption, len(exchangeTypeOptions))
@@ -400,9 +410,9 @@ func (ems *ExchangesMenuService) buildSelectExchangeTypeScreen() *telegram.Scree
 // buildSelectTestnetScreen builds testnet selection screen
 func (ems *ExchangesMenuService) buildSelectTestnetScreen() *telegram.Screen {
 	return ems.menuNav.BuildOptionScreen(telegram.OptionScreenConfig{
-		ID:           "sel_test",
+		ID:           "select_testnet",
 		Template:     "exchange/select_testnet",
-		NextScreenID: "ent_lbl_add",
+		NextScreenID: "enter_label_add",
 		ParamKey:     exchangeKeys.IsTestnet,
 		Options: func(ctx context.Context, session telegram.Session) ([]telegram.MenuOption, error) {
 			options := make([]telegram.MenuOption, len(testnetOptions))
@@ -422,7 +432,7 @@ func (ems *ExchangesMenuService) buildSelectTestnetScreen() *telegram.Screen {
 // buildEnterLabelAddScreen builds label input screen for new account
 func (ems *ExchangesMenuService) buildEnterLabelAddScreen() *telegram.Screen {
 	return ems.menuNav.BuildTextInputScreen(
-		"ent_lbl_add",
+		"enter_label_add",
 		"exchange/label_prompt",
 		func(ctx context.Context, nav *telegram.MenuNavigator, params map[string]string) error {
 			ems.log.Debugw("Entered label add screen", "params", params)
@@ -434,7 +444,7 @@ func (ems *ExchangesMenuService) buildEnterLabelAddScreen() *telegram.Screen {
 // buildEnterCredentialAddScreen builds credential input screen for new account
 func (ems *ExchangesMenuService) buildEnterCredentialAddScreen() *telegram.Screen {
 	return &telegram.Screen{
-		ID:       "ent_cred_add",
+		ID:       "enter_credential_add",
 		Template: "exchange/enter_credential",
 		Data: func(ctx context.Context, session telegram.Session) (map[string]interface{}, error) {
 			exchangeTypeStr, _ := session.GetString(exchangeKeys.ExchangeType)
@@ -469,7 +479,7 @@ func (ems *ExchangesMenuService) buildEnterCredentialAddScreen() *telegram.Scree
 // buildEditLabelScreen builds label edit screen for existing account
 func (ems *ExchangesMenuService) buildEditLabelScreen() *telegram.Screen {
 	return ems.menuNav.BuildTextInputScreen(
-		"edit_lbl",
+		"edit_label",
 		"exchange/label_prompt",
 		func(ctx context.Context, nav *telegram.MenuNavigator, params map[string]string) error {
 			ems.log.Debugw("Entered edit label screen", "params", params)
@@ -478,33 +488,10 @@ func (ems *ExchangesMenuService) buildEditLabelScreen() *telegram.Screen {
 	)
 }
 
-// buildEditCredentialsScreen builds credentials edit start screen
+// buildEditCredentialsScreen builds credentials edit screen
 func (ems *ExchangesMenuService) buildEditCredentialsScreen() *telegram.Screen {
 	return &telegram.Screen{
-		ID:       "edit_cred",
-		Template: "exchange/label_prompt", // Reuse same template, will transition to input
-		OnEnter: func(ctx context.Context, nav *telegram.MenuNavigator, params map[string]string) error {
-			// Initialize credential index to 0
-			session, _ := nav.GetSession(ctx, 0) // Will get from context in real implementation
-			session.SetData(exchangeKeys.CredIndex, "0")
-			return nil
-		},
-		Data: func(ctx context.Context, session telegram.Session) (map[string]interface{}, error) {
-			return map[string]interface{}{
-				"IsCredentialEdit": true,
-			}, nil
-		},
-		Keyboard: func(ctx context.Context, nav *telegram.MenuNavigator, session telegram.Session) (telegram.InlineKeyboardMarkup, error) {
-			// Immediately transition to credential input
-			return telegram.InlineKeyboardMarkup{}, nil
-		},
-	}
-}
-
-// buildEnterCredentialEditScreen builds credential input screen for existing account
-func (ems *ExchangesMenuService) buildEnterCredentialEditScreen() *telegram.Screen {
-	return &telegram.Screen{
-		ID:       "ent_cred_edit",
+		ID:       "edit_credentials",
 		Template: "exchange/enter_credential",
 		Data: func(ctx context.Context, session telegram.Session) (map[string]interface{}, error) {
 			accountIDStr, _ := session.GetString(exchangeKeys.AccountID)
@@ -519,6 +506,9 @@ func (ems *ExchangesMenuService) buildEnterCredentialEditScreen() *telegram.Scre
 			credIndex := 0
 			if credIndexStr != "" {
 				credIndex, _ = strconv.Atoi(credIndexStr)
+			} else {
+				// First time on this screen - initialize to 0
+				session.SetData(exchangeKeys.CredIndex, "0")
 			}
 
 			fields := exchange_account.GetRequiredCredentials(account.Exchange)
@@ -612,11 +602,25 @@ func (ems *ExchangesMenuService) handleToggleActive(ctx context.Context, telegra
 		return errors.Wrap(err, "failed to render detail screen")
 	}
 
+	// Clear old callback data before building new keyboard
+	session.ClearCallbackData()
+
 	// Build keyboard with updated toggle button
 	keyboard, err := detailScreen.Keyboard(ctx, ems.menuNav, session)
 	if err != nil {
 		return errors.Wrap(err, "failed to build detail keyboard")
 	}
+
+	// IMPORTANT: Save session with new callback data
+	if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+		ems.log.Errorw("Failed to save session after toggle", "error", err)
+		return errors.Wrap(err, "failed to save session")
+	}
+
+	ems.log.Debugw("Saved session after toggle with new callback data",
+		"account_id", accountID,
+		"new_state", newState,
+	)
 
 	// Update message
 	return ems.menuNav.GetBot().EditMessage(telegramID, messageID, text, &keyboard)
@@ -639,32 +643,44 @@ func (ems *ExchangesMenuService) handleEnterLabelAdd(ctx context.Context, sessio
 	// Initialize credential index
 	session.SetData(exchangeKeys.CredIndex, "0")
 
-	// Navigate to credential input screen
-	screens := ems.getScreens()
-	credScreen := screens["ent_cred_add"]
+	// Update navigation to credential input screen
+	session.PushScreen("enter_credential_add")
+	session.SetCurrentScreen("enter_credential_add")
 
-	// Show credential input screen
-	data, _ := credScreen.Data(ctx, session)
-	text, _ := ems.menuNav.RenderTemplate(credScreen.Template, data)
-	keyboard, _ := credScreen.Keyboard(ctx, ems.menuNav, session)
-
-	telegramID := session.GetTelegramID()
-	messageID := session.GetMessageID()
-
-	// Update current screen in session
-	session.PushScreen("ent_cred_add")
-	session.SetCurrentScreen("ent_cred_add")
-
-	if messageID > 0 {
-		return ems.menuNav.GetBot().EditMessage(telegramID, messageID, text, &keyboard)
+	// Save session with updated state
+	if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+		ems.log.Errorw("Failed to save session after label", "error", err)
+		return fmt.Errorf("Failed to proceed. Please try again.")
 	}
 
+	// Get credential screen and show it
+	screens := ems.getScreens()
+	credScreen := screens["enter_credential_add"]
+
+	// Render template
+	data, _ := credScreen.Data(ctx, session)
+	text, _ := ems.menuNav.RenderTemplate(credScreen.Template, data)
+
+	// Clear old callback data and build new keyboard
+	session.ClearCallbackData()
+	keyboard, _ := credScreen.Keyboard(ctx, ems.menuNav, session)
+
+	// Save session with new callback data
+	if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+		ems.log.Errorw("Failed to save session with callback data", "error", err)
+	}
+
+	telegramID := session.GetTelegramID()
+
+	// Send NEW message for credential input (don't edit - clearer UX)
 	sentMessageID, err := ems.menuNav.GetBot().SendMessageWithOptions(telegramID, text, telegram.MessageOptions{
 		Keyboard:  &keyboard,
 		ParseMode: "Markdown",
 	})
 	if err == nil {
 		session.SetMessageID(sentMessageID)
+		// Save updated message ID
+		_ = ems.menuNav.SaveSession(ctx, session)
 	}
 	return err
 }
@@ -697,21 +713,40 @@ func (ems *ExchangesMenuService) handleEnterCredentialAdd(ctx context.Context, s
 		// Move to next credential
 		session.SetData(exchangeKeys.CredIndex, strconv.Itoa(credIndex+1))
 
-		// Show next credential input screen
-		screens := ems.getScreens()
-		credScreen := screens["ent_cred_add"]
+		// Save session with updated index
+		if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+			ems.log.Errorw("Failed to save session after credential", "error", err)
+		}
 
+		// Get next credential screen
+		screens := ems.getScreens()
+		credScreen := screens["enter_credential_add"]
+
+		// Render template
 		data, _ := credScreen.Data(ctx, session)
 		text, _ := ems.menuNav.RenderTemplate(credScreen.Template, data)
+
+		// Clear old callback data and build new keyboard
+		session.ClearCallbackData()
 		keyboard, _ := credScreen.Keyboard(ctx, ems.menuNav, session)
 
-		telegramID := session.GetTelegramID()
-		messageID := session.GetMessageID()
-
-		if messageID > 0 {
-			return ems.menuNav.GetBot().EditMessage(telegramID, messageID, text, &keyboard)
+		// Save session with new callback data
+		if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+			ems.log.Errorw("Failed to save session with callback data", "error", err)
 		}
-		return nil
+
+		telegramID := session.GetTelegramID()
+
+		// Send NEW message for next credential (don't edit - clearer UX)
+		sentMessageID, err := ems.menuNav.GetBot().SendMessageWithOptions(telegramID, text, telegram.MessageOptions{
+			Keyboard:  &keyboard,
+			ParseMode: "Markdown",
+		})
+		if err == nil {
+			session.SetMessageID(sentMessageID)
+			_ = ems.menuNav.SaveSession(ctx, session)
+		}
+		return err
 	}
 
 	// All credentials collected, create account
@@ -786,21 +821,40 @@ func (ems *ExchangesMenuService) handleEnterCredentialEdit(ctx context.Context, 
 		// Move to next credential
 		session.SetData(exchangeKeys.CredIndex, strconv.Itoa(credIndex+1))
 
-		// Show next credential input screen
-		screens := ems.getScreens()
-		credScreen := screens["ent_cred_edit"]
+		// Save session with updated index
+		if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+			ems.log.Errorw("Failed to save session after credential", "error", err)
+		}
 
+		// Get next credential screen
+		screens := ems.getScreens()
+		credScreen := screens["edit_credentials"]
+
+		// Render template
 		data, _ := credScreen.Data(ctx, session)
 		text, _ := ems.menuNav.RenderTemplate(credScreen.Template, data)
+
+		// Clear old callback data and build new keyboard
+		session.ClearCallbackData()
 		keyboard, _ := credScreen.Keyboard(ctx, ems.menuNav, session)
 
-		telegramID := session.GetTelegramID()
-		messageID := session.GetMessageID()
-
-		if messageID > 0 {
-			return ems.menuNav.GetBot().EditMessage(telegramID, messageID, text, &keyboard)
+		// Save session with new callback data
+		if err := ems.menuNav.SaveSession(ctx, session); err != nil {
+			ems.log.Errorw("Failed to save session with callback data", "error", err)
 		}
-		return nil
+
+		telegramID := session.GetTelegramID()
+
+		// Send NEW message for next credential (don't edit - clearer UX)
+		sentMessageID, err := ems.menuNav.GetBot().SendMessageWithOptions(telegramID, text, telegram.MessageOptions{
+			Keyboard:  &keyboard,
+			ParseMode: "Markdown",
+		})
+		if err == nil {
+			session.SetMessageID(sentMessageID)
+			_ = ems.menuNav.SaveSession(ctx, session)
+		}
+		return err
 	}
 
 	// All credentials collected, update account

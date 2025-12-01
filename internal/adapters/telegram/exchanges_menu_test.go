@@ -50,15 +50,20 @@ func TestTestnetOptions(t *testing.T) {
 }
 
 func TestExchangesFlowKeys(t *testing.T) {
-	// Test that flow keys are properly defined with short values (for Telegram callback limits)
-	assert.Equal(t, "acc", exchangeKeys.AccountID, "AccountID key should be short")
-	assert.Equal(t, "ex", exchangeKeys.ExchangeType, "ExchangeType key should be short")
-	assert.Equal(t, "test", exchangeKeys.IsTestnet, "IsTestnet key should be short")
-	assert.Equal(t, "lbl", exchangeKeys.Label, "Label key should be short")
-	assert.Equal(t, "key", exchangeKeys.APIKey, "APIKey key should be short")
-	assert.Equal(t, "sec", exchangeKeys.Secret, "Secret key should be short")
-	assert.Equal(t, "pass", exchangeKeys.Passphrase, "Passphrase key should be short")
-	assert.Equal(t, "idx", exchangeKeys.CredIndex, "CredIndex key should be short")
+	// Test that flow keys are properly defined with readable names (stored in session, not in callback_data)
+	assert.Equal(t, "account_id", exchangeKeys.AccountID)
+	assert.Equal(t, "exchange_type", exchangeKeys.ExchangeType)
+	assert.Equal(t, "is_testnet", exchangeKeys.IsTestnet)
+	assert.Equal(t, "label", exchangeKeys.Label)
+	assert.Equal(t, "api_key", exchangeKeys.APIKey)
+	assert.Equal(t, "secret", exchangeKeys.Secret)
+	assert.Equal(t, "passphrase", exchangeKeys.Passphrase)
+	assert.Equal(t, "credential_index", exchangeKeys.CredIndex)
+}
+
+func TestExchangesMenuService_GetMenuType(t *testing.T) {
+	ems := &ExchangesMenuService{}
+	assert.Equal(t, "exchanges", ems.GetMenuType())
 }
 
 func TestExchangesMenuService_GetScreenIDs(t *testing.T) {
@@ -66,10 +71,11 @@ func TestExchangesMenuService_GetScreenIDs(t *testing.T) {
 
 	screenIDs := ems.GetScreenIDs()
 
-	// Should return all screen IDs
+	// Should return all screen IDs with readable names
 	expected := []string{
-		"list", "detail", "sel_type", "sel_test", "ent_lbl_add", "ent_cred_add",
-		"edit_lbl", "edit_cred", "ent_cred_edit",
+		"list", "detail", "select_exchange_type", "select_testnet",
+		"enter_label_add", "enter_credential_add",
+		"edit_label", "edit_credentials",
 	}
 	assert.Equal(t, expected, screenIDs)
 }
@@ -165,4 +171,3 @@ func TestGetExchangeEmoji(t *testing.T) {
 		})
 	}
 }
-
