@@ -3,8 +3,6 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 
 	"prometheus/pkg/errors"
@@ -87,6 +85,9 @@ func (mn *MenuNavigator) StartMenu(ctx context.Context, telegramID int64, initia
 		return errors.Wrap(err, "failed to create session")
 	}
 
+	// Set current screen (important for text message routing)
+	session.SetCurrentScreen(initialScreen.ID)
+
 	// Call OnEnter if defined
 	if initialScreen.OnEnter != nil {
 		if err := initialScreen.OnEnter(ctx, mn, nil); err != nil {
@@ -97,8 +98,8 @@ func (mn *MenuNavigator) StartMenu(ctx context.Context, telegramID int64, initia
 	return mn.showScreen(ctx, session, initialScreen)
 }
 
-// HandleCallback processes callback with auto-parameter parsing
-// Format: screenID:key=val:key2=val2 or just "back"
+// HandleCallback processes callback with stored parameters
+// Format: "cb:a1f2e9" (short key) or "back" (special case)
 func (mn *MenuNavigator) HandleCallback(ctx context.Context, telegramID int64, messageID int, callbackData string, screens map[string]*Screen) error {
 	session, err := mn.sessionService.GetSession(ctx, telegramID)
 	if err != nil {
@@ -107,25 +108,34 @@ func (mn *MenuNavigator) HandleCallback(ctx context.Context, telegramID int64, m
 
 	session.SetMessageID(messageID)
 
-	// Handle back button
+	// Handle back button (special case - no storage needed)
 	if callbackData == "back" {
 		return mn.goBack(ctx, session, screens)
 	}
 
-	// Parse callback: screenID:key=val:key2=val2
-	parts := strings.Split(callbackData, ":")
-	screenID := parts[0]
-	params := make(map[string]string)
+	// Retrieve callback parameters from session storage
+	callbackParams, ok := session.GetCallbackData(callbackData)
+	if !ok {
+		mn.log.Warnw("Callback data not found in session (expired or invalid)",
+			"callback_key", callbackData,
+			"telegram_id", telegramID,
+		)
+		return fmt.Errorf("callback data expired or invalid")
+	}
 
-	// Parse parameters
-	for i := 1; i < len(parts); i++ {
-		kv := strings.SplitN(parts[i], "=", 2)
-		if len(kv) == 2 {
-			// URL decode values
-			if decoded, err := url.QueryUnescape(kv[1]); err == nil {
-				params[kv[0]] = decoded
-			} else {
-				params[kv[0]] = kv[1]
+	// Extract screen ID from stored params
+	screenIDInterface, ok := callbackParams["screen"]
+	if !ok {
+		return fmt.Errorf("screen ID not found in callback params")
+	}
+	screenID := screenIDInterface.(string)
+
+	// Convert params to map[string]string for OnEnter handler
+	params := make(map[string]string)
+	for k, v := range callbackParams {
+		if k != "screen" {
+			if strVal, ok := v.(string); ok {
+				params[k] = strVal
 			}
 		}
 	}
@@ -156,6 +166,9 @@ func (mn *MenuNavigator) HandleCallback(ctx context.Context, telegramID int64, m
 	// Push to navigation stack
 	session.PushScreen(screen.ID)
 
+	// Set current screen (important for text message routing)
+	session.SetCurrentScreen(screen.ID)
+
 	// Save navigation state
 	if err := mn.sessionService.SaveSession(ctx, session, mn.sessionTTL); err != nil {
 		return errors.Wrap(err, "failed to save navigation state")
@@ -164,23 +177,32 @@ func (mn *MenuNavigator) HandleCallback(ctx context.Context, telegramID int64, m
 	return mn.showScreen(ctx, session, screen)
 }
 
-// MakeCallback creates callback string with parameters
-// Example: MakeCallback("select_exchange", "account_id", "123") → "select_exchange:account_id=123"
-func (mn *MenuNavigator) MakeCallback(screenID string, params ...string) string {
-	if len(params) == 0 {
-		return screenID
-	}
-
-	parts := []string{screenID}
+// MakeCallback creates callback string with parameters stored in session
+// Uses short keys to avoid Telegram's 64-byte callback_data limit
+// Example: MakeCallback(session, "detail", "account_id", "uuid") → "cb:a1f2e9"
+func (mn *MenuNavigator) MakeCallback(session Session, screenID string, params ...string) string {
+	// Build params map
+	paramsMap := map[string]interface{}{"screen": screenID}
 	for i := 0; i < len(params); i += 2 {
 		if i+1 < len(params) {
-			key := params[i]
-			value := url.QueryEscape(params[i+1]) // URL encode for safety
-			parts = append(parts, fmt.Sprintf("%s=%s", key, value))
+			paramsMap[params[i]] = params[i+1]
 		}
 	}
 
-	return strings.Join(parts, ":")
+	// Generate short callback key (6 hex chars = 16M combinations)
+	key := generateCallbackKey()
+
+	// Store params in session
+	session.SetCallbackData(key, paramsMap)
+
+	return key
+}
+
+// generateCallbackKey generates a short random key for callback data
+func generateCallbackKey() string {
+	// Use timestamp + random for uniqueness (6 chars hex)
+	now := time.Now().UnixNano()
+	return fmt.Sprintf("cb:%x", now%0xFFFFFF) // 6 hex digits
 }
 
 // GetSession retrieves current session
@@ -232,6 +254,9 @@ func (mn *MenuNavigator) showScreen(ctx context.Context, session Session, screen
 		return errors.Wrap(err, "failed to render screen template")
 	}
 
+	// Clear old callback data before building new keyboard (prevent memory leak from stale callbacks)
+	session.ClearCallbackData()
+
 	// Build keyboard
 	var keyboard InlineKeyboardMarkup
 	if screen.Keyboard != nil {
@@ -244,6 +269,7 @@ func (mn *MenuNavigator) showScreen(ctx context.Context, session Session, screen
 			"screen_id", screen.ID,
 			"keyboard_rows", len(keyboard.InlineKeyboard),
 			"has_navigation_history", session.HasNavigationHistory(),
+			"note", "old_callback_data_cleared",
 		)
 
 		// Auto-add back button if navigation history exists
@@ -253,6 +279,11 @@ func (mn *MenuNavigator) showScreen(ctx context.Context, session Session, screen
 					NewInlineKeyboardButtonData("⬅️ Back", "back"),
 				),
 			)
+		}
+
+		// Save session after building keyboard (callback data was added)
+		if err := mn.sessionService.SaveSession(ctx, session, mn.sessionTTL); err != nil {
+			return errors.Wrap(err, "failed to save session with callback data")
 		}
 	}
 
@@ -299,6 +330,9 @@ func (mn *MenuNavigator) goBack(ctx context.Context, session Session, screens ma
 	if !exists {
 		return fmt.Errorf("previous screen not found: %s", prevScreenID)
 	}
+
+	// Set current screen (important for text message routing)
+	session.SetCurrentScreen(prevScreenID)
 
 	// Save navigation state
 	if err := mn.sessionService.SaveSession(ctx, session, mn.sessionTTL); err != nil {
@@ -352,20 +386,20 @@ func (mn *MenuNavigator) BuildOptionScreen(config OptionScreenConfig) *Screen {
 			}
 
 			// Default keyboard builder: one button per option
-			return mn.BuildOptionKeyboard(config.NextScreenID, config.ParamKey, options), nil
+			return mn.BuildOptionKeyboard(session, config.NextScreenID, config.ParamKey, options), nil
 		},
 	}
 }
 
 // BuildOptionKeyboard creates keyboard with one button per option
-func (mn *MenuNavigator) BuildOptionKeyboard(nextScreenID, paramKey string, options []MenuOption) InlineKeyboardMarkup {
+func (mn *MenuNavigator) BuildOptionKeyboard(session Session, nextScreenID, paramKey string, options []MenuOption) InlineKeyboardMarkup {
 	var rows [][]InlineKeyboardButton
 	for _, option := range options {
 		buttonText := option.GetLabel()
 		if emoji := option.GetEmoji(); emoji != "" {
 			buttonText = fmt.Sprintf("%s %s", emoji, buttonText)
 		}
-		callbackData := mn.MakeCallback(nextScreenID, paramKey, option.GetValue())
+		callbackData := mn.MakeCallback(session, nextScreenID, paramKey, option.GetValue())
 		row := NewInlineKeyboardRow(
 			NewInlineKeyboardButtonData(buttonText, callbackData),
 		)
@@ -429,7 +463,7 @@ func (mn *MenuNavigator) BuildListScreen(config ListScreenConfig) *Screen {
 
 			var rows [][]InlineKeyboardButton
 			for _, item := range items {
-				callbackData := nav.MakeCallback(config.NextScreenID, config.ParamKey, item.ID)
+				callbackData := nav.MakeCallback(session, config.NextScreenID, config.ParamKey, item.ID)
 				row := NewInlineKeyboardRow(
 					NewInlineKeyboardButtonData(item.ButtonText, callbackData),
 				)

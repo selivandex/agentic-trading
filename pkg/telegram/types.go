@@ -38,6 +38,9 @@ type Bot interface {
 	// DeleteMessageAsync deletes a message asynchronously
 	DeleteMessageAsync(chatID int64, messageID int, reason string)
 
+	// DeleteMessageAfter deletes a message after specified delay (for security - credential messages)
+	DeleteMessageAfter(chatID int64, messageID int, delay time.Duration)
+
 	// SendTemporaryMessage sends a message that auto-deletes after duration
 	SendTemporaryMessage(chatID int64, text string, duration time.Duration) error
 
@@ -94,6 +97,15 @@ type Session interface {
 
 	// GetString retrieves string value from session
 	GetString(key string) (string, bool)
+
+	// SetCallbackData stores callback parameters with short key (for Telegram 64-byte limit)
+	SetCallbackData(key string, data map[string]interface{})
+
+	// GetCallbackData retrieves callback parameters by short key
+	GetCallbackData(key string) (map[string]interface{}, bool)
+
+	// ClearCallbackData removes all callback data (called when navigating to new screen)
+	ClearCallbackData()
 
 	// PushScreen adds screen to navigation stack
 	PushScreen(screenID string)

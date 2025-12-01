@@ -225,7 +225,7 @@ func (ims *InvestMenuService) HandleCallback(ctx context.Context, userID interfa
 }
 
 // HandleMessage processes text messages (amount input)
-func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interface{}, telegramID int64, text string) error {
+func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interface{}, telegramID int64, messageID int, text string) error {
 	session, err := ims.menuNav.GetSession(ctx, telegramID)
 	if err != nil {
 		return errors.Wrap(err, "no active invest session")

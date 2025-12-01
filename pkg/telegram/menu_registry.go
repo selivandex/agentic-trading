@@ -16,8 +16,8 @@ type MenuHandler interface {
 	// HandleCallback processes callback for this menu
 	HandleCallback(ctx context.Context, userID interface{}, telegramID int64, messageID int, data string) error
 
-	// HandleMessage processes text message for this menu (optional)
-	HandleMessage(ctx context.Context, userID interface{}, telegramID int64, text string) error
+	// HandleMessage processes text message for this menu (messageID for deleting sensitive messages)
+	HandleMessage(ctx context.Context, userID interface{}, telegramID int64, messageID int, text string) error
 
 	// IsInMenu checks if user has active session in this menu
 	IsInMenu(ctx context.Context, telegramID int64) (bool, error)
@@ -133,7 +133,7 @@ func (mr *MenuRegistry) routeBackButton(ctx context.Context, userID interface{},
 }
 
 // RouteTextMessage routes text message to active menu
-func (mr *MenuRegistry) RouteTextMessage(ctx context.Context, userID interface{}, telegramID int64, text string) (bool, error) {
+func (mr *MenuRegistry) RouteTextMessage(ctx context.Context, userID interface{}, telegramID int64, messageID int, text string) (bool, error) {
 	// Check each menu to see if user has active session
 	for _, handler := range mr.textMenus {
 		inMenu, err := handler.IsInMenu(ctx, telegramID)
@@ -151,7 +151,7 @@ func (mr *MenuRegistry) RouteTextMessage(ctx context.Context, userID interface{}
 				"handler_type", fmt.Sprintf("%T", handler),
 			)
 
-			if err := handler.HandleMessage(ctx, userID, telegramID, text); err != nil {
+			if err := handler.HandleMessage(ctx, userID, telegramID, messageID, text); err != nil {
 				return true, err
 			}
 			return true, nil

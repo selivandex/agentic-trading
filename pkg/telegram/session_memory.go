@@ -13,6 +13,7 @@ type InMemorySession struct {
 	messageID       int
 	currentScreen   string
 	data            map[string]interface{}
+	callbackData    map[string]map[string]interface{} // callback key -> params
 	navigationStack []string
 	createdAt       time.Time
 	updatedAt       time.Time
@@ -32,6 +33,7 @@ func NewInMemorySession(telegramID int64, initialScreen string, initialData map[
 		telegramID:      telegramID,
 		currentScreen:   initialScreen,
 		data:            data,
+		callbackData:    make(map[string]map[string]interface{}),
 		navigationStack: make([]string, 0),
 		createdAt:       now,
 		updatedAt:       now,
@@ -149,6 +151,30 @@ func (s *InMemorySession) GetUpdatedAt() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.updatedAt
+}
+
+// SetCallbackData stores callback parameters with short key (for Telegram 64-byte limit)
+func (s *InMemorySession) SetCallbackData(key string, data map[string]interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.callbackData[key] = data
+	s.updatedAt = time.Now()
+}
+
+// GetCallbackData retrieves callback parameters by short key
+func (s *InMemorySession) GetCallbackData(key string) (map[string]interface{}, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, ok := s.callbackData[key]
+	return data, ok
+}
+
+// ClearCallbackData removes all callback data (called when navigating to new screen)
+func (s *InMemorySession) ClearCallbackData() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.callbackData = make(map[string]map[string]interface{})
+	s.updatedAt = time.Now()
 }
 
 // InMemorySessionService implements SessionService with in-memory storage

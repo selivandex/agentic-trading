@@ -842,9 +842,18 @@ func provideTelegramBot(
 		log,
 	)
 
+	// Exchanges menu service (manage exchange accounts)
+	exchangesMenuService := telegram.NewExchangesMenuService(
+		menuNavigator,
+		exchangeService,    // Exchange service
+		userServiceAdapter, // User service adapter
+		log,
+	)
+
 	// Menu registry for auto-routing (uses framework)
 	menuRegistry := tg.NewMenuRegistry(log)
 	menuRegistry.Register(investMenuService)
+	menuRegistry.Register(exchangesMenuService)
 	// TODO: Register other menu handlers (settings, etc.)
 
 	// Command registry (uses framework)
@@ -853,7 +862,7 @@ func provideTelegramBot(
 	commandRegistry.Use(tg.RecoveryMiddleware(log))
 
 	// Register commands
-	registerTelegramCommands(commandRegistry, investMenuService, userServiceAdapter, log)
+	registerTelegramCommands(commandRegistry, investMenuService, exchangesMenuService, userServiceAdapter, log)
 
 	// Create handler (uses framework)
 	handler := telegram.NewHandler(
@@ -901,6 +910,7 @@ func provideTelegramNotificationService(
 func registerTelegramCommands(
 	registry *tg.CommandRegistry,
 	investMenu *telegram.InvestMenuService,
+	exchangesMenu *telegram.ExchangesMenuService,
 	userService telegram.UserService,
 	log *logger.Logger,
 ) {
@@ -972,6 +982,34 @@ func registerTelegramCommands(
 			if err := investMenu.StartInvest(ctx.Ctx, usr.ID, ctx.TelegramID); err != nil {
 				log.Errorw("Failed to start invest menu", "error", err)
 				return ctx.Bot.SendMessage(ctx.ChatID, "❌ Failed to start investment flow. Please try again.")
+			}
+
+			return nil
+		},
+	})
+
+	// /exchanges - Manage exchange accounts
+	registry.Register(tg.CommandConfig{
+		Name:        "exchanges",
+		Aliases:     []string{"ex"},
+		Description: "Manage exchange accounts",
+		Usage:       "/exchanges",
+		Category:    "Settings",
+		Handler: func(ctx *tg.CommandContext) error {
+			// Exchanges command doesn't accept arguments
+			if ctx.Args != "" {
+				return ctx.Bot.SendMessage(ctx.ChatID, "❌ `/exchanges` command doesn't take arguments.\n\nJust use: `/exchanges`")
+			}
+
+			usr := ctx.User.(*user.User)
+			log.Infow("Starting exchanges management flow",
+				"user_id", usr.ID,
+				"telegram_id", ctx.TelegramID,
+			)
+
+			if err := exchangesMenu.StartExchanges(ctx.Ctx, usr.ID, ctx.TelegramID); err != nil {
+				log.Errorw("Failed to start exchanges menu", "error", err)
+				return ctx.Bot.SendMessage(ctx.ChatID, "❌ Failed to start exchanges management. Please try again.")
 			}
 
 			return nil

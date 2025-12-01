@@ -117,7 +117,7 @@ func (h *Handler) handleMessage(ctx context.Context, msg *telegram.Message) erro
 
 	// PRIORITY 2: Check if user is in any menu flow (auto-routing via registry)
 	if h.menuRegistry != nil {
-		routed, err := h.menuRegistry.RouteTextMessage(ctx, usr, telegramID, text)
+		routed, err := h.menuRegistry.RouteTextMessage(ctx, usr, telegramID, msg.MessageID, text)
 		if err != nil {
 			h.log.Errorw("Menu text routing failed", "error", err)
 			// Continue to other handlers

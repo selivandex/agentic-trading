@@ -6,13 +6,14 @@ import (
 
 // Session represents a menu navigation session
 type Session struct {
-	TelegramID      int64                  `json:"telegram_id"`
-	MessageID       int                    `json:"message_id"`       // Current bot message ID (for editing)
-	CurrentScreen   string                 `json:"current_screen"`   // Current screen ID
-	NavigationStack []string               `json:"navigation_stack"` // Stack of screen IDs for back button
-	Data            map[string]interface{} `json:"data"`             // Screen-specific data
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
+	TelegramID      int64                             `json:"telegram_id"`
+	MessageID       int                               `json:"message_id"`       // Current bot message ID (for editing)
+	CurrentScreen   string                            `json:"current_screen"`   // Current screen ID
+	NavigationStack []string                          `json:"navigation_stack"` // Stack of screen IDs for back button
+	Data            map[string]interface{}            `json:"data"`             // Screen-specific data
+	CallbackData    map[string]map[string]interface{} `json:"callback_data"`    // Callback key -> params (for Telegram 64-byte limit)
+	CreatedAt       time.Time                         `json:"created_at"`
+	UpdatedAt       time.Time                         `json:"updated_at"`
 }
 
 // NewSession creates a new menu session
@@ -26,6 +27,7 @@ func NewSession(telegramID int64, initialScreen string, initialData map[string]i
 		CurrentScreen:   initialScreen,
 		NavigationStack: []string{},
 		Data:            initialData,
+		CallbackData:    make(map[string]map[string]interface{}),
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 	}
@@ -120,4 +122,28 @@ func (s *Session) GetCreatedAt() time.Time {
 // GetUpdatedAt returns last update time (implements telegram.Session interface)
 func (s *Session) GetUpdatedAt() time.Time {
 	return s.UpdatedAt
+}
+
+// SetCallbackData stores callback parameters with short key (for Telegram 64-byte limit)
+func (s *Session) SetCallbackData(key string, data map[string]interface{}) {
+	if s.CallbackData == nil {
+		s.CallbackData = make(map[string]map[string]interface{})
+	}
+	s.CallbackData[key] = data
+	s.UpdatedAt = time.Now()
+}
+
+// GetCallbackData retrieves callback parameters by short key
+func (s *Session) GetCallbackData(key string) (map[string]interface{}, bool) {
+	if s.CallbackData == nil {
+		return nil, false
+	}
+	data, ok := s.CallbackData[key]
+	return data, ok
+}
+
+// ClearCallbackData removes all callback data (called when navigating to new screen)
+func (s *Session) ClearCallbackData() {
+	s.CallbackData = make(map[string]map[string]interface{})
+	s.UpdatedAt = time.Now()
 }

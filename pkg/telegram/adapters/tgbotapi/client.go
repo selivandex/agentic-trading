@@ -212,7 +212,7 @@ func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard telegr
 
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
-	
+
 	// Only set keyboard if it has buttons
 	if len(keyboard.InlineKeyboard) > 0 {
 		msg.ReplyMarkup = convertKeyboardToTgbotapi(keyboard)
@@ -321,6 +321,28 @@ func (b *Bot) DeleteMessageAsync(chatID int64, messageID int, reason string) {
 				"message_id", messageID,
 				"reason", reason,
 				"error", err,
+			)
+		}
+	}()
+}
+
+// DeleteMessageAfter deletes a message after specified delay (for security - credential messages)
+func (b *Bot) DeleteMessageAfter(chatID int64, messageID int, delay time.Duration) {
+	go func() {
+		time.Sleep(delay)
+		deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+		if _, err := b.api.Request(deleteMsg); err != nil {
+			b.log.Debugw("Failed to delete message after delay",
+				"chat_id", chatID,
+				"message_id", messageID,
+				"delay", delay,
+				"error", err,
+			)
+		} else {
+			b.log.Debugw("Deleted message after delay for security",
+				"chat_id", chatID,
+				"message_id", messageID,
+				"delay", delay,
 			)
 		}
 	}()
