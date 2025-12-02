@@ -24,17 +24,16 @@ func TestOrderRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "BINANCE_12345",
 		Symbol:            "BTC/USDT",
@@ -76,12 +75,12 @@ func TestOrderRepository_CreateBatch(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create batch of orders
 	orders := []*order.Order{
@@ -170,17 +169,16 @@ func TestOrderRepository_GetByID(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "TEST_ORDER",
 		Symbol:            "BTC/USDT",
@@ -226,12 +224,12 @@ func TestOrderRepository_GetByExchangeOrderID(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	exchangeOrderID := "EXCHANGE_ORDER_" + uuid.New().String()[:8]
 
@@ -274,12 +272,12 @@ func TestOrderRepository_GetOpenByUser(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create mix of open and filled orders
 	statuses := []order.OrderStatus{
@@ -338,17 +336,16 @@ func TestOrderRepository_UpdateStatus(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "UPDATE_TEST",
 		Symbol:            "BTC/USDT",
@@ -402,12 +399,12 @@ func TestOrderRepository_UpdateStatusBatch(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create multiple open orders
 	orderIDs := make([]uuid.UUID, 3)
@@ -479,17 +476,16 @@ func TestOrderRepository_Cancel(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "CANCEL_TEST",
 		Symbol:            "BTC/USDT",
@@ -528,12 +524,12 @@ func TestOrderRepository_ParentChildOrders(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.DB())
+	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create parent order (main position)
 	parentOrder := &order.Order{

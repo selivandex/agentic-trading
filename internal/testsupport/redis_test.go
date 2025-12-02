@@ -6,9 +6,7 @@ import (
 )
 
 func TestRedisClientIsCleanedBetweenTests(t *testing.T) {
-	configs := LoadDatabaseConfigsFromEnv(t)
-
-	client := NewRedisClient(t, configs.Redis)
+	client := NewRedisClient(t, GetConfig().Redis)
 	if err := client.Set(context.Background(), "integration-key", "value", 0).Err(); err != nil {
 		t.Fatalf("failed to set key: %v", err)
 	}

@@ -47,7 +47,7 @@ func TestMarketDataRepository_InsertAndGetOHLCV(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	// Create repository
@@ -247,7 +247,7 @@ func TestMarketDataRepository_Ticker(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	repo := NewMarketDataRepository(helper.Client().Conn())
@@ -313,7 +313,7 @@ func TestMarketDataRepository_Trades(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	repo := NewMarketDataRepository(helper.Client().Conn())
@@ -410,7 +410,7 @@ func TestMarketDataRepository_MarkPrice(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	repo := NewMarketDataRepository(helper.Client().Conn())
@@ -496,7 +496,7 @@ func TestMarketDataRepository_OrderBook(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	repo := NewMarketDataRepository(helper.Client().Conn())
@@ -574,7 +574,7 @@ func TestMarketDataRepository_Liquidations(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	repo := NewMarketDataRepository(helper.Client().Conn())
@@ -674,7 +674,7 @@ func TestMarketDataRepository_OpenInterest(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := testsupport.LoadDatabaseConfigsFromEnv(t)
+	cfg := testsupport.GetConfig()
 	helper := testsupport.NewClickHouseTestHelper(t, cfg.ClickHouse)
 
 	repo := NewMarketDataRepository(helper.Client().Conn())

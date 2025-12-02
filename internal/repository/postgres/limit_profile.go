@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 
 	"prometheus/internal/domain/limit_profile"
 	pkgerrors "prometheus/pkg/errors"
@@ -16,11 +15,11 @@ var _ limit_profile.Repository = (*LimitProfileRepository)(nil)
 
 // LimitProfileRepository implements limit_profile.Repository using sqlx
 type LimitProfileRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewLimitProfileRepository creates a new limit profile repository
-func NewLimitProfileRepository(db *sqlx.DB) *LimitProfileRepository {
+func NewLimitProfileRepository(db DBTX) *LimitProfileRepository {
 	return &LimitProfileRepository{db: db}
 }
 

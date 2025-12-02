@@ -31,10 +31,10 @@ func TestMemoryRepository_StoreUserMemory(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	embedding := createTestEmbedding(1536)
@@ -82,10 +82,10 @@ func TestMemoryRepository_StoreCollectiveMemory(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	sourceUserID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	validatedAt := time.Now()
@@ -134,10 +134,10 @@ func TestMemoryRepository_SearchSimilarUser(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	agentID := "test_agent"
@@ -184,7 +184,7 @@ func TestMemoryRepository_SearchCollectiveSimilar(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	agentID := "portfolio_manager"
@@ -235,7 +235,7 @@ func TestMemoryRepository_GetValidated(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	agentID := "opportunity_synthesizer"
@@ -283,7 +283,7 @@ func TestMemoryRepository_UpdateValidation(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	validatedAt := time.Now()
@@ -325,10 +325,10 @@ func TestMemoryRepository_PromoteToCollective(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create user memory
@@ -381,10 +381,10 @@ func TestMemoryRepository_DeleteExpired(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create expired memory
@@ -445,10 +445,10 @@ func TestMemoryRepository_GetByAgent(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	agent1 := "agent_1"
@@ -504,10 +504,10 @@ func TestMemoryRepository_GetByType(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewMemoryRepository(testDB.DB())
+	repo := NewMemoryRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create memories of different types

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 
 	"prometheus/internal/domain/exchange_account"
@@ -17,11 +16,11 @@ var _ exchange_account.Repository = (*ExchangeAccountRepository)(nil)
 
 // ExchangeAccountRepository implements exchange_account.Repository using sqlx
 type ExchangeAccountRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewExchangeAccountRepository creates a new exchange account repository
-func NewExchangeAccountRepository(db *sqlx.DB) *ExchangeAccountRepository {
+func NewExchangeAccountRepository(db DBTX) *ExchangeAccountRepository {
 	return &ExchangeAccountRepository{db: db}
 }
 
@@ -51,16 +50,20 @@ func (r *ExchangeAccountRepository) Create(ctx context.Context, account *exchang
 	query := `
 		INSERT INTO exchange_accounts (
 			id, user_id, exchange, label, api_key_encrypted, secret_encrypted,
-			passphrase, is_testnet, permissions, is_active, created_at, updated_at
+			passphrase, is_testnet, permissions, is_active, 
+			listen_key_encrypted, listen_key_expires_at,
+			created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		account.ID, account.UserID, account.Exchange, account.Label,
 		account.APIKeyEncrypted, account.SecretEncrypted,
 		account.Passphrase, account.IsTestnet, pq.Array(account.Permissions),
-		account.IsActive, account.CreatedAt, account.UpdatedAt,
+		account.IsActive,
+		account.ListenKeyEncrypted, account.ListenKeyExpiresAt,
+		account.CreatedAt, account.UpdatedAt,
 	)
 
 	return err

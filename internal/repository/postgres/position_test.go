@@ -24,12 +24,11 @@ func TestPositionRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	pos := &position.Position{
 		ID:                uuid.New(),
@@ -76,12 +75,11 @@ func TestPositionRepository_GetByID(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	pos := &position.Position{
 		ID:                uuid.New(),
@@ -130,12 +128,12 @@ func TestPositionRepository_GetOpenByUser(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create mix of open and closed positions
 	symbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT"}
@@ -191,12 +189,11 @@ func TestPositionRepository_UpdatePnL(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	pos := &position.Position{
 		ID:                uuid.New(),
@@ -257,12 +254,11 @@ func TestPositionRepository_Close(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	fixtures := NewTestFixtures(t, testDB.Tx())
+	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
 	pos := &position.Position{
 		ID:                uuid.New(),
@@ -308,12 +304,12 @@ func TestPositionRepository_UpdatePnLBatch(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create multiple open positions
 	positionIDs := make([]uuid.UUID, 3)
@@ -383,12 +379,12 @@ func TestPositionRepository_GetByTradingPair(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create positions for same trading pair
 	for i := 0; i < 3; i++ {
@@ -430,12 +426,12 @@ func TestPositionRepository_ShortPosition(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create short position with leverage
 	pos := &position.Position{
@@ -494,12 +490,12 @@ func TestPositionRepository_StopLossTakeProfit(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	// Create SL/TP orders first
 	stopLossOrderID := fixtures.CreateOrder(userID, strategyID, exchangeAccountID,
@@ -553,12 +549,12 @@ func TestPositionRepository_GetClosedInRange(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewPositionRepository(testDB.DB())
+	repo := NewPositionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := uuid.New() // Mock strategy ID for tests
+	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
 
 	now := time.Now()
 	yesterday := now.Add(-24 * time.Hour)

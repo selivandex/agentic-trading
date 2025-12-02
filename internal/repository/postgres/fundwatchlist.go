@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 
 	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/pkg/errors"
@@ -16,11 +15,11 @@ var _ fundwatchlist.Repository = (*FundWatchlistRepository)(nil)
 
 // FundWatchlistRepository implements fundwatchlist.Repository using sqlx
 type FundWatchlistRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewFundWatchlistRepository creates a new fund watchlist repository
-func NewFundWatchlistRepository(db *sqlx.DB) *FundWatchlistRepository {
+func NewFundWatchlistRepository(db DBTX) *FundWatchlistRepository {
 	return &FundWatchlistRepository{db: db}
 }
 

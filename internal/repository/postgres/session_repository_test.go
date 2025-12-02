@@ -21,7 +21,7 @@ func TestSessionRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	sess := &session.Session{
@@ -60,7 +60,7 @@ func TestSessionRepository_Get(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	sess := &session.Session{
@@ -101,7 +101,7 @@ func TestSessionRepository_UpdateState(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	sess := &session.Session{
@@ -148,7 +148,7 @@ func TestSessionRepository_AppendEvent(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create session
@@ -211,7 +211,7 @@ func TestSessionRepository_GetEvents(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create session
@@ -274,7 +274,7 @@ func TestSessionRepository_List(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	appName := "trading_agent"
@@ -316,7 +316,7 @@ func TestSessionRepository_Delete(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	sess := &session.Session{
@@ -355,7 +355,7 @@ func TestSessionRepository_SetGetAppState(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	appName := "trading_agent"
@@ -393,7 +393,7 @@ func TestSessionRepository_SetGetUserState(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	appName := "trading_agent"
@@ -434,7 +434,7 @@ func TestSessionRepository_EventWithUsageMetadata(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	sess := &session.Session{
@@ -500,7 +500,7 @@ func TestSessionRepository_MultipleApps(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	userID := uuid.New().String()    // Unique user for this test
@@ -540,7 +540,7 @@ func TestSessionRepository_EventActions(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewSessionRepository(testDB.DB())
+	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
 	sess := &session.Session{

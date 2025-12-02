@@ -5,3 +5,4 @@ CREATE INDEX IF NOT EXISTS idx_positions_strategy ON positions (strategy_id);
 
 -- Add comment
 COMMENT ON COLUMN positions.strategy_id IS 'Link to user_strategies table for capital allocation and PnL tracking';
+

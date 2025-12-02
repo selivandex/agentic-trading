@@ -315,9 +315,9 @@ fmt:
 	goimports -w .
 
 # Testing
-test:
+test: test-db-reset
 	@echo "Running all tests (unit + integration)..."
-	go test -v -race -coverprofile=coverage.out ./...
+	ENV=test go test -v -race ./...
 
 test-short:
 	@echo "Running unit tests only (skipping integration tests)..."

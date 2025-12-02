@@ -93,19 +93,19 @@ func (lp *LimitProfile) SetLimits(limits *Limits) error {
 func FreeTierLimits() Limits {
 	return Limits{
 		ExchangesCount:         1,        // 1 exchange only
-		ActivePositions:        20,       // Max 2 positions
-		DailyTradesCount:       1000,     // 5 trades per day
-		MonthlyTradesCount:     10000000, // 50 trades per month
-		TradingPairsCount:      20,       // Watch 5 pairs
-		MonthlyAIRequests:      10000000, // 100 AI requests/month
-		MaxAgentsCount:         10,       // 2 simple agents
-		AdvancedAgentsAccess:   true,     // No premium agents
-		CustomAgentsAllowed:    true,
-		MaxAgentMemoryMB:       100,    // 50MB memory
-		MaxPromptTokens:        300000, // Basic tokens
+		ActivePositions:        2,        // Max 2 positions
+		DailyTradesCount:       5,        // 5 trades per day
+		MonthlyTradesCount:     50,       // 50 trades per month
+		TradingPairsCount:      5,        // Watch 5 pairs
+		MonthlyAIRequests:      100,      // 100 AI requests/month
+		MaxAgentsCount:         2,        // 2 simple agents
+		AdvancedAgentsAccess:   false,    // No premium agents
+		CustomAgentsAllowed:    false,
+		MaxAgentMemoryMB:       50,     // 50MB memory
+		MaxPromptTokens:        10000,  // Basic tokens
 		AdvancedAIModels:       false,  // Only basic models
-		AgentHistoryDays:       70,     // 1 week history
-		ReasoningHistoryDays:   30,     // 3 days reasoning logs
+		AgentHistoryDays:       7,      // 1 week history
+		ReasoningHistoryDays:   3,      // 3 days reasoning logs
 		MaxMemoriesPerAgent:    20,     // Limited memories
 		DataRetentionDays:      30,     // 30 days data
 		AnalysisHistoryDays:    7,      // 1 week analysis
@@ -113,13 +113,13 @@ func FreeTierLimits() Limits {
 		BacktestingAllowed:     false,  // No backtesting
 		MaxBacktestMonths:      0,      // N/A
 		PaperTradingAllowed:    true,   // Paper trading only
-		LiveTradingAllowed:     true,   // No live trading
-		MaxLeverage:            3.0,    // No leverage
-		MaxPositionSizeUSD:     10000,  // $100 max position
-		MaxTotalExposureUSD:    10000,  // $200 total exposure
-		MinInvestmentAmountUSD: 100,    // $10 min to start
+		LiveTradingAllowed:     false,  // No live trading
+		MaxLeverage:            1.0,    // No leverage
+		MaxPositionSizeUSD:     100,    // $100 max position
+		MaxTotalExposureUSD:    200,    // $200 total exposure
+		MinInvestmentAmountUSD: 10,     // $10 min to start
 		MinPositionSizeUSD:     5,      // $5 min per position
-		AdvancedOrderTypes:     true,   // Basic orders only
+		AdvancedOrderTypes:     false,  // Basic orders only
 		PriorityExecution:      true,   // Standard execution
 		WebhooksAllowed:        true,   // No webhooks
 		MaxWebhooks:            100000, // N/A

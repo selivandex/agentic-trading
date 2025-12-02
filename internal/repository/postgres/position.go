@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/domain/position"
+	"prometheus/pkg/errors"
 )
 
 // Compile-time check
@@ -16,11 +16,11 @@ var _ position.Repository = (*PositionRepository)(nil)
 
 // PositionRepository implements position.Repository using sqlx
 type PositionRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewPositionRepository creates a new position repository
-func NewPositionRepository(db *sqlx.DB) *PositionRepository {
+func NewPositionRepository(db DBTX) *PositionRepository {
 	return &PositionRepository{db: db}
 }
 
@@ -201,4 +201,126 @@ func (r *PositionRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM positions WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
+}
+
+// UpdatePnLBatch updates PnL for multiple positions
+// NOTE: Caller should manage transaction if atomicity is required
+func (r *PositionRepository) UpdatePnLBatch(ctx context.Context, updates []PositionPnLUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE positions SET
+			current_price = $2,
+			unrealized_pnl = $3,
+			unrealized_pnl_pct = $4,
+			updated_at = NOW()
+		WHERE id = $1`
+
+	for i, update := range updates {
+		result, err := r.db.ExecContext(ctx, query,
+			update.PositionID,
+			update.CurrentPrice,
+			update.UnrealizedPnL,
+			update.UnrealizedPnLPct,
+		)
+		if err != nil {
+			return errors.Wrapf(err, "failed to update position at index %d", i)
+		}
+
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return errors.Wrapf(err, "failed to get rows affected at index %d", i)
+		}
+
+		if rows == 0 {
+			return errors.Wrapf(errors.ErrPositionNotFound, "position %s at index %d", update.PositionID, i)
+		}
+	}
+
+	return nil
+}
+
+// PositionPnLUpdate represents a batch PnL update
+type PositionPnLUpdate struct {
+	PositionID       uuid.UUID
+	CurrentPrice     decimal.Decimal
+	UnrealizedPnL    decimal.Decimal
+	UnrealizedPnLPct decimal.Decimal
+}
+
+// ClosePositionsBatch closes multiple positions
+func (r *PositionRepository) ClosePositionsBatch(ctx context.Context, positionIDs []uuid.UUID, reason string) error {
+	if len(positionIDs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE positions SET
+			status = $2,
+			closed_at = NOW(),
+			updated_at = NOW()
+		WHERE id = ANY($1)
+			AND status = 'open'`
+
+	result, err := r.db.ExecContext(ctx, query, positionIDs, position.PositionClosed)
+	if err != nil {
+		return errors.Wrap(err, "failed to close positions")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to get rows affected")
+	}
+
+	if rows == 0 {
+		return errors.Wrap(errors.ErrPositionNotFound, "no positions were closed")
+	}
+
+	return nil
+}
+
+// UpdateRealizedPnLBatch updates realized PnL for closed positions
+func (r *PositionRepository) UpdateRealizedPnLBatch(ctx context.Context, updates []PositionRealizedPnLUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	// NOTE: Caller should manage transaction if atomicity is required
+	query := `
+		UPDATE positions SET
+			realized_pnl = $2,
+			status = $3,
+			closed_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $1`
+
+	for i, update := range updates {
+		result, err := r.db.ExecContext(ctx, query,
+			update.PositionID,
+			update.RealizedPnL,
+			position.PositionClosed,
+		)
+		if err != nil {
+			return errors.Wrapf(err, "failed to update realized PnL at index %d", i)
+		}
+
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return errors.Wrapf(err, "failed to get rows affected at index %d", i)
+		}
+
+		if rows == 0 {
+			return errors.Wrapf(errors.ErrPositionNotFound, "position %s at index %d", update.PositionID, i)
+		}
+	}
+
+	return nil
+}
+
+// PositionRealizedPnLUpdate represents a realized PnL update
+type PositionRealizedPnLUpdate struct {
+	PositionID  uuid.UUID
+	RealizedPnL decimal.Decimal
 }

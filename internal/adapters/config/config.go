@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -385,11 +386,48 @@ func (wc WebSocketConfig) GetMarketTypes() []string {
 	return splitAndTrim(wc.MarketTypes)
 }
 
+// findProjectRoot searches for go.mod file to determine project root
+func findProjectRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+
+	// Walk up the directory tree looking for go.mod
+	for {
+		if _, err := os.Stat(fmt.Sprintf("%s/go.mod", dir)); err == nil {
+			return dir
+		}
+
+		parent := fmt.Sprintf("%s/..", dir)
+		if parent == dir || dir == "/" {
+			// Reached root without finding go.mod
+			return "."
+		}
+		dir = parent
+	}
+}
+
 // Load reads configuration from environment variables
 // It first tries to load .env file (useful for local development)
 func Load() (*Config, error) {
-	// Load .env file if exists (ignore error if not exists)
-	_ = godotenv.Load()
+	// Load .env file based on environment
+	// Check ENV variable to determine which env file to load
+	env := os.Getenv("ENV")
+
+	// Find project root to load .env files from there
+	projectRoot := findProjectRoot()
+
+	switch env {
+	case "test":
+		// Try loading .env.test for test environment
+		envPath := fmt.Sprintf("%s/.env.test", projectRoot)
+		_ = godotenv.Load(envPath)
+	default:
+		// Default: load .env for development/production
+		envPath := fmt.Sprintf("%s/.env", projectRoot)
+		_ = godotenv.Load(envPath)
+	}
 
 	var cfg Config
 	if err := envconfig.Process("", &cfg); err != nil {

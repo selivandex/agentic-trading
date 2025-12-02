@@ -25,7 +25,7 @@ func TestADKSessionService_AppendEvent(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := postgres.NewSessionRepository(testDB.DB())
+	repo := postgres.NewSessionRepository(testDB.Tx())
 	domainService := domainsession.NewService(repo)
 	adkService := adk.NewSessionService(domainService)
 
@@ -86,7 +86,7 @@ func TestADKSessionService_MultipleEvents(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := postgres.NewSessionRepository(testDB.DB())
+	repo := postgres.NewSessionRepository(testDB.Tx())
 	domainService := domainsession.NewService(repo)
 	adkService := adk.NewSessionService(domainService)
 

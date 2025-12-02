@@ -22,10 +22,10 @@ func TestRiskRepository_SaveState(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 	now := time.Now()
 
@@ -67,10 +67,10 @@ func TestRiskRepository_GetState(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 	now := time.Now()
 
@@ -113,10 +113,10 @@ func TestRiskRepository_CircuitBreakerTriggered(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 	now := time.Now()
 	triggeredAt := now
@@ -160,10 +160,10 @@ func TestRiskRepository_CreateEvent(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 
 	event := &risk.RiskEvent{
@@ -190,10 +190,10 @@ func TestRiskRepository_GetEvents(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create multiple risk events
@@ -242,10 +242,10 @@ func TestRiskRepository_AcknowledgeEvent(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create unacknowledged event
@@ -289,9 +289,9 @@ func TestRiskRepository_ResetDaily(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create states for multiple users
@@ -343,10 +343,10 @@ func TestRiskRepository_UpdateState(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 	now := time.Now()
 
@@ -397,10 +397,10 @@ func TestRiskRepository_MultipleEventTypes(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create events of all types
@@ -452,10 +452,10 @@ func TestRiskRepository_EventSeverity(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create warning event
@@ -513,10 +513,10 @@ func TestRiskRepository_ConsecutiveLossesTracking(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	userID := fixtures.CreateUser()
 
-	repo := NewRiskRepository(testDB.DB())
+	repo := NewRiskRepository(testDB.Tx())
 	ctx := context.Background()
 	now := time.Now()
 

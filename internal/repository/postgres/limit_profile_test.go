@@ -21,7 +21,7 @@ func TestLimitProfileRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create test limit profile
@@ -65,11 +65,11 @@ func TestLimitProfileRepository_GetByID(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create test profile using fixture
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 	profileID := fixtures.CreateLimitProfile(
 		WithLimitProfileName("test_get_by_id"),
 		WithLimitProfileDescription("Test GetByID method"),
@@ -95,7 +95,7 @@ func TestLimitProfileRepository_GetByName(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Test GetByName with default profiles from migration
@@ -146,7 +146,7 @@ func TestLimitProfileRepository_GetAll(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Get all profiles (should include at least the 3 default ones from migration)
@@ -173,9 +173,9 @@ func TestLimitProfileRepository_GetAllActive(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 
 	// Create active and inactive profiles
 	_ = fixtures.CreateLimitProfile(
@@ -215,7 +215,7 @@ func TestLimitProfileRepository_Update(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create initial profile
@@ -270,9 +270,9 @@ func TestLimitProfileRepository_Delete(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
-	fixtures := NewTestFixtures(t, testDB.DB())
+	fixtures := NewTestFixtures(t, testDB.Tx())
 
 	// Create profile to delete
 	profileID := fixtures.CreateLimitProfile(
@@ -313,7 +313,7 @@ func TestLimitProfileRepository_LimitsJSONB(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewLimitProfileRepository(testDB.DB())
+	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create profile with custom limits
@@ -441,12 +441,6 @@ func TestLimitProfileRepository_TierLimits(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
-
-	repo := NewLimitProfileRepository(testDB.DB())
-	ctx := context.Background()
-
 	tests := []struct {
 		name                 string
 		limitsFunc           func() limit_profile.Limits
@@ -483,11 +477,19 @@ func TestLimitProfileRepository_TierLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Each subtest gets its own transaction for isolation
+			testDB := testsupport.NewTestPostgres(t)
+			defer testDB.Close()
+
+			repo := NewLimitProfileRepository(testDB.Tx())
+			ctx := context.Background()
+
 			limits := tt.limitsFunc()
 
+			profileID := uuid.New()
 			profile := &limit_profile.LimitProfile{
-				ID:          uuid.New(),
-				Name:        "test_" + tt.name,
+				ID:          profileID,
+				Name:        "test_" + tt.name + "_" + profileID.String()[:8], // Unique name
 				Description: tt.name + " limits test",
 				IsActive:    true,
 				CreatedAt:   time.Now(),

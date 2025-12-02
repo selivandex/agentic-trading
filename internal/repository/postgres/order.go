@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/domain/order"
@@ -15,11 +14,11 @@ var _ order.Repository = (*OrderRepository)(nil)
 
 // OrderRepository implements order.Repository using sqlx
 type OrderRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewOrderRepository creates a new order repository
-func NewOrderRepository(db *sqlx.DB) *OrderRepository {
+func NewOrderRepository(db DBTX) *OrderRepository {
 	return &OrderRepository{db: db}
 }
 
@@ -54,14 +53,9 @@ func (r *OrderRepository) Create(ctx context.Context, o *order.Order) error {
 	return err
 }
 
-// CreateBatch inserts multiple orders in a transaction
+// CreateBatch inserts multiple orders
+// NOTE: Caller should manage transaction if atomicity is required
 func (r *OrderRepository) CreateBatch(ctx context.Context, orders []*order.Order) error {
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
 	query := `
 		INSERT INTO orders (
 			id, user_id, strategy_id, exchange_account_id,
@@ -78,7 +72,7 @@ func (r *OrderRepository) CreateBatch(ctx context.Context, orders []*order.Order
 		)`
 
 	for _, o := range orders {
-		_, err := tx.ExecContext(ctx, query,
+		_, err := r.db.ExecContext(ctx, query,
 			o.ID, o.UserID, o.StrategyID, o.ExchangeAccountID,
 			o.ExchangeOrderID, o.Symbol, o.MarketType,
 			o.Side, o.Type, o.Status,
@@ -93,7 +87,7 @@ func (r *OrderRepository) CreateBatch(ctx context.Context, orders []*order.Order
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // GetByID retrieves an order by ID
@@ -223,12 +217,7 @@ func (r *OrderRepository) UpdateStatusBatch(ctx context.Context, updates []Order
 		return nil
 	}
 
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
+	// NOTE: Caller should manage transaction if atomicity is required
 	query := `
 		UPDATE orders SET
 			status = $2,
@@ -238,7 +227,7 @@ func (r *OrderRepository) UpdateStatusBatch(ctx context.Context, updates []Order
 		WHERE id = $1`
 
 	for _, update := range updates {
-		_, err := tx.ExecContext(ctx, query,
+		_, err := r.db.ExecContext(ctx, query,
 			update.OrderID,
 			update.Status,
 			update.FilledAmount,
@@ -250,14 +239,14 @@ func (r *OrderRepository) UpdateStatusBatch(ctx context.Context, updates []Order
 
 		// Update filled_at if status is filled
 		if update.Status == order.OrderStatusFilled {
-			_, err = tx.ExecContext(ctx, `UPDATE orders SET filled_at = NOW() WHERE id = $1`, update.OrderID)
+			_, err = r.db.ExecContext(ctx, `UPDATE orders SET filled_at = NOW() WHERE id = $1`, update.OrderID)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // OrderStatusUpdate represents a batch status update

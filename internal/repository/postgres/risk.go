@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 
 	"prometheus/internal/domain/risk"
 )
@@ -14,11 +13,11 @@ var _ risk.Repository = (*RiskRepository)(nil)
 
 // RiskRepository implements risk.Repository using sqlx
 type RiskRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewRiskRepository creates a new risk repository
-func NewRiskRepository(db *sqlx.DB) *RiskRepository {
+func NewRiskRepository(db DBTX) *RiskRepository {
 	return &RiskRepository{db: db}
 }
 

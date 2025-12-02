@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pgvector/pgvector-go"
 
@@ -20,11 +19,11 @@ var _ memory.Repository = (*MemoryRepository)(nil)
 
 // MemoryRepository implements unified memory.Repository using sqlx and pgvector
 type MemoryRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewMemoryRepository creates a new unified memory repository
-func NewMemoryRepository(db *sqlx.DB) *MemoryRepository {
+func NewMemoryRepository(db DBTX) *MemoryRepository {
 	return &MemoryRepository{db: db}
 }
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 
 	"prometheus/internal/domain/user"
 	"prometheus/pkg/errors"
@@ -16,11 +15,11 @@ var _ user.Repository = (*UserRepository)(nil)
 
 // UserRepository implements user.Repository using sqlx
 type UserRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewUserRepository creates a new user repository
-func NewUserRepository(db *sqlx.DB) *UserRepository {
+func NewUserRepository(db DBTX) *UserRepository {
 	return &UserRepository{db: db}
 }
 

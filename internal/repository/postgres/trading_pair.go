@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 
 	"prometheus/internal/domain/trading_pair"
@@ -17,11 +16,11 @@ var _ trading_pair.Repository = (*TradingPairRepository)(nil)
 
 // TradingPairRepository implements trading_pair.Repository using sqlx
 type TradingPairRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewTradingPairRepository creates a new trading pair repository
-func NewTradingPairRepository(db *sqlx.DB) *TradingPairRepository {
+func NewTradingPairRepository(db DBTX) *TradingPairRepository {
 	return &TradingPairRepository{db: db}
 }
 

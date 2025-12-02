@@ -21,7 +21,7 @@ func TestUserRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create test user with default settings
@@ -60,7 +60,7 @@ func TestUserRepository_GetByID(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create test user
@@ -101,7 +101,7 @@ func TestUserRepository_GetByTelegramID(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	telegramID := randomTelegramID()
@@ -144,7 +144,7 @@ func TestUserRepository_Update(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create initial user
@@ -195,7 +195,7 @@ func TestUserRepository_List(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create multiple users
@@ -236,7 +236,7 @@ func TestUserRepository_Delete(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create user to delete
@@ -278,7 +278,7 @@ func TestUserRepository_SettingsJSONB(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewUserRepository(testDB.DB())
+	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
 	// Create user with custom settings

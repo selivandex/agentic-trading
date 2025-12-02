@@ -7,9 +7,8 @@ import (
 )
 
 func TestPostgresTransactionIsRolledBack(t *testing.T) {
-	configs := LoadDatabaseConfigsFromEnv(t)
-
-	helper := NewPostgresTestHelper(t, configs.Postgres)
+	pgCfg := GetConfig().Postgres
+	helper := NewPostgresTestHelper(t, pgCfg)
 	tx := helper.Tx()
 
 	// Create table and insert inside the transaction

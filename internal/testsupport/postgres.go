@@ -33,6 +33,8 @@ func NewPostgresTestHelper(t *testing.T, cfg config.PostgresConfig) *PostgresTes
 	}
 
 	helper := &PostgresTestHelper{client: client, tx: tx}
+
+	// Cleanup: rollback transaction and close connection
 	t.Cleanup(helper.Rollback)
 	t.Cleanup(func() {
 		_ = client.Close()
@@ -70,8 +72,5 @@ func (h *PostgresTestHelper) Close() {
 func NewTestPostgres(t *testing.T) *PostgresTestHelper {
 	t.Helper()
 
-	// Load database configs from .env.test (uses godotenv internally)
-	dbConfigs := LoadDatabaseConfigsFromEnv(t)
-
-	return NewPostgresTestHelper(t, dbConfigs.Postgres)
+	return NewPostgresTestHelper(t, GetConfig().Postgres)
 }

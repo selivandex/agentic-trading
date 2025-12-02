@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/domain/strategy"
@@ -18,11 +17,11 @@ var _ strategy.TransactionRepository = (*StrategyTransactionRepository)(nil)
 
 // StrategyTransactionRepository implements strategy.TransactionRepository using PostgreSQL
 type StrategyTransactionRepository struct {
-	db *sqlx.DB
+	db DBTX
 }
 
 // NewStrategyTransactionRepository creates a new strategy transaction repository
-func NewStrategyTransactionRepository(db *sqlx.DB) *StrategyTransactionRepository {
+func NewStrategyTransactionRepository(db DBTX) *StrategyTransactionRepository {
 	return &StrategyTransactionRepository{db: db}
 }
 

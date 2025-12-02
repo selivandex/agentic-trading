@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 
 	"prometheus/internal/domain/session"
 	"prometheus/pkg/errors"
@@ -17,12 +16,12 @@ import (
 
 // SessionRepository implements session.Repository using PostgreSQL
 type SessionRepository struct {
-	db  *sqlx.DB
+	db  DBTX
 	log *logger.Logger
 }
 
 // NewSessionRepository creates a new PostgreSQL session repository
-func NewSessionRepository(db *sqlx.DB) *SessionRepository {
+func NewSessionRepository(db DBTX) *SessionRepository {
 	return &SessionRepository{
 		db:  db,
 		log: logger.Get().With("component", "session_repository"),

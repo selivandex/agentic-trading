@@ -1,12 +1,12 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
@@ -18,12 +18,12 @@ func randomTelegramID() int64 {
 
 // TestFixtures provides factory methods for creating test data
 type TestFixtures struct {
-	db *sqlx.DB
+	db DBTX
 	t  *testing.T
 }
 
 // NewTestFixtures creates a new test fixtures factory
-func NewTestFixtures(t *testing.T, db *sqlx.DB) *TestFixtures {
+func NewTestFixtures(t *testing.T, db DBTX) *TestFixtures {
 	t.Helper()
 	return &TestFixtures{
 		db: db,
@@ -50,7 +50,7 @@ func (f *TestFixtures) CreateUser(opts ...func(*UserFixture)) uuid.UUID {
 	query := `INSERT INTO users (id, telegram_id, telegram_username, first_name, last_name, is_active, is_premium, settings, created_at, updated_at) 
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, fixture.TelegramID, fixture.Username, fixture.FirstName, fixture.LastName,
+	_, err := f.db.ExecContext(context.Background(), query, id, fixture.TelegramID, fixture.Username, fixture.FirstName, fixture.LastName,
 		fixture.IsActive, fixture.IsPremium, fixture.Settings)
 	require.NoError(f.t, err, "Failed to create test user")
 
@@ -76,18 +76,11 @@ func (f *TestFixtures) CreateExchangeAccount(userID uuid.UUID, opts ...func(*Exc
 	query := `INSERT INTO exchange_accounts (id, user_id, exchange, label, api_key_encrypted, secret_encrypted, is_testnet, is_active, created_at, updated_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, userID, fixture.Exchange, fixture.Label, "encrypted_key", "encrypted_secret",
+	_, err := f.db.ExecContext(context.Background(), query, id, userID, fixture.Exchange, fixture.Label, "encrypted_key", "encrypted_secret",
 		fixture.IsTestnet, fixture.IsActive)
 	require.NoError(f.t, err, "Failed to create test exchange account")
 
 	return id
-}
-
-// CreateTradingPair - DEPRECATED: trading_pairs removed, returning dummy UUID
-func (f *TestFixtures) CreateTradingPair(userID, exchangeAccountID uuid.UUID, opts ...func(*TradingPairFixture)) uuid.UUID {
-	f.t.Helper()
-	// trading_pairs table removed in MVP cleanup - return dummy UUID for backward compatibility
-	return uuid.New()
 }
 
 // CreateOrder creates a test order in the database
@@ -114,7 +107,7 @@ func (f *TestFixtures) CreateOrder(userID, strategyID, exchangeAccountID uuid.UU
 			  market_type, side, type, status, price, amount, filled_amount, avg_fill_price, agent_id, fee_currency, created_at, updated_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, userID, strategyID, exchangeAccountID, fixture.ExchangeOrderID,
+	_, err := f.db.ExecContext(context.Background(), query, id, userID, strategyID, exchangeAccountID, fixture.ExchangeOrderID,
 		fixture.Symbol, fixture.MarketType, fixture.Side, fixture.Type, fixture.Status, fixture.Price, fixture.Amount,
 		decimal.Zero, decimal.Zero, "test_agent", "USDT")
 	require.NoError(f.t, err, "Failed to create test order")
@@ -145,7 +138,7 @@ func (f *TestFixtures) CreatePosition(userID, strategyID, exchangeAccountID uuid
 			  status, opened_at, updated_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, userID, strategyID, exchangeAccountID, fixture.Symbol, fixture.MarketType,
+	_, err := f.db.ExecContext(context.Background(), query, id, userID, strategyID, exchangeAccountID, fixture.Symbol, fixture.MarketType,
 		fixture.Side, fixture.Size, fixture.EntryPrice, fixture.EntryPrice, 1, "cross",
 		decimal.Zero, decimal.Zero, decimal.Zero, fixture.Status)
 	require.NoError(f.t, err, "Failed to create test position")
@@ -153,8 +146,8 @@ func (f *TestFixtures) CreatePosition(userID, strategyID, exchangeAccountID uuid
 	return id
 }
 
-// WithFullStack creates user, exchange account, and trading pair - returns all IDs
-func (f *TestFixtures) WithFullStack(opts ...func(*StackFixture)) (userID, exchangeAccountID, tradingPairID uuid.UUID) {
+// WithFullStack creates user, exchange account, strategy, and trading pair - returns all IDs
+func (f *TestFixtures) WithFullStack(opts ...func(*StackFixture)) (userID, exchangeAccountID, strategyID uuid.UUID) {
 	f.t.Helper()
 
 	fixture := &StackFixture{}
@@ -164,9 +157,29 @@ func (f *TestFixtures) WithFullStack(opts ...func(*StackFixture)) (userID, excha
 
 	userID = f.CreateUser(fixture.UserOpts...)
 	exchangeAccountID = f.CreateExchangeAccount(userID, fixture.ExchangeAccountOpts...)
-	tradingPairID = f.CreateTradingPair(userID, exchangeAccountID, fixture.TradingPairOpts...)
+	strategyID = f.CreateStrategy(userID)
 
 	return
+}
+
+// CreateStrategy creates a test strategy in the database
+func (f *TestFixtures) CreateStrategy(userID uuid.UUID) uuid.UUID {
+	f.t.Helper()
+
+	id := uuid.New()
+	query := `INSERT INTO user_strategies (
+		id, user_id, name, status, allocated_capital, current_equity, cash_reserve,
+		market_type, risk_tolerance, target_allocations,
+		created_at, updated_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`
+
+	_, err := f.db.ExecContext(context.Background(), query,
+		id, userID, "Test Strategy", "active",
+		decimal.NewFromInt(10000), decimal.NewFromInt(10000), decimal.NewFromInt(5000),
+		"spot", "moderate", `{"BTC/USDT": 0.5, "ETH/USDT": 0.3}`)
+	require.NoError(f.t, err, "Failed to create test strategy")
+
+	return id
 }
 
 // Fixture option types
@@ -311,7 +324,7 @@ func (f *TestFixtures) CreateMemory(userID uuid.UUID, opts ...func(*MemoryFixtur
 		symbol, timeframe, importance, created_at, updated_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, fixture.Scope, userID, fixture.AgentID, fixture.SessionID,
+	_, err := f.db.ExecContext(context.Background(), query, id, fixture.Scope, userID, fixture.AgentID, fixture.SessionID,
 		fixture.Type, fixture.Content, fixture.Symbol, fixture.Timeframe, 0.5)
 	require.NoError(f.t, err, "Failed to create test memory")
 
@@ -372,7 +385,7 @@ func (f *TestFixtures) CreateLimitProfile(opts ...func(*LimitProfileFixture)) uu
 		id, name, description, limits, is_active, created_at, updated_at
 	) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, fixture.Name, fixture.Description, fixture.Limits, fixture.IsActive)
+	_, err := f.db.ExecContext(context.Background(), query, id, fixture.Name, fixture.Description, fixture.Limits, fixture.IsActive)
 	require.NoError(f.t, err, "Failed to create test limit profile")
 
 	return id
