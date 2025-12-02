@@ -272,16 +272,7 @@ func (c *Container) MustInitServices() {
 	c.Services.MarketData = marketdatasvc.NewService(c.Repos.MarketData, c.Log)
 	c.Services.AIUsage = aiusagesvc.NewService(c.Repos.AIUsage, c.Log)
 
-	// Onboarding orchestrator (needs to be in Services for consumer access)
-	c.Services.Onboarding = onboardingservice.NewService(
-		c.Business.WorkflowFactory,
-		c.Services.ADKSession,
-		templates.Get(),
-		c.Repos.User,
-		c.Repos.ExchangeAccount,
-		c.Services.Strategy,
-		c.Log,
-	)
+	// NOTE: Onboarding orchestrator moved to Phase 6 (depends on WorkflowFactory)
 
 	c.Log.Info("✓ Services initialized")
 }
@@ -354,6 +345,17 @@ func (c *Container) MustInitBusiness() {
 		c.Business.AgentFactory,
 		c.Business.DefaultProvider,
 		c.Business.DefaultModel,
+	)
+
+	// Onboarding orchestrator (depends on WorkflowFactory, so initialized here)
+	c.Services.Onboarding = onboardingservice.NewService(
+		c.Business.WorkflowFactory,
+		c.Services.ADKSession,
+		templates.Get(),
+		c.Repos.User,
+		c.Repos.ExchangeAccount,
+		c.Services.Strategy,
+		c.Log,
 	)
 
 	c.Log.With("tools", len(c.Business.ToolRegistry.List())).Info("✓ Business logic initialized")

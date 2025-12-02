@@ -1,0 +1,16 @@
+📊 *Exchange Accounts*
+
+{{if .HasAccounts}}Manage your connected exchange accounts:
+
+{{range .Accounts}}{{.ExchangeEmoji}} *{{.Label}}* - {{.Exchange}}{{if .IsTestnet}} (Testnet){{end}}
+{{if .IsActive}}✅ Active{{else}}⏸️ Inactive{{end}}
+{{end}}
+
+*Total: {{.AccountCount}} account(s)*
+{{else}}You don't have any exchange accounts yet.
+
+Connect an exchange to start trading!
+{{end}}
+
+Use the buttons below to manage your exchanges.
+
