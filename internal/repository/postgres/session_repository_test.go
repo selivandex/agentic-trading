@@ -278,8 +278,8 @@ func TestSessionRepository_List(t *testing.T) {
 	repo := NewSessionRepository(testDB.Tx())
 	ctx := context.Background()
 
-	appName := "trading_agent"
-	userID := "user123"
+	appName := testsupport.UniqueName("trading_agent")
+	userID := testsupport.UniqueName("user")
 
 	// Create multiple sessions for same user
 	for i := 0; i < 4; i++ {
