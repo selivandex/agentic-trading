@@ -154,6 +154,8 @@ type openAIUsage struct {
 func (p *DeepSeekProvider) convertToOpenAI(req ChatRequest) openAIRequest {
 	openAIReq := openAIRequest{
 		Model:       req.Model,
+		Messages:    []openAIMessage{}, // Initialize as empty slice (never nil)
+		Tools:       []openAITool{},    // Initialize as empty slice (never nil)
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
 		TopP:        req.TopP,

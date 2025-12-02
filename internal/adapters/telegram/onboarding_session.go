@@ -25,6 +25,7 @@ const (
 type OnboardingSession struct {
 	TelegramID        int64           `json:"telegram_id"`
 	UserID            uuid.UUID       `json:"user_id"`
+	StrategyID        *uuid.UUID      `json:"strategy_id,omitempty"` // Pre-created strategy ID from invest flow
 	State             OnboardingState `json:"state"`
 	Capital           float64         `json:"capital"`
 	RiskProfile       string          `json:"risk_profile"` // conservative, moderate, aggressive

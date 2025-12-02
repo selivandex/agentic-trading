@@ -71,3 +71,17 @@ type ExchangeDeactivatedData struct {
 	ErrorMessage string
 	IsTestnet    bool
 }
+
+// InvestmentAcceptedData represents data for investment accepted notification
+type InvestmentAcceptedData struct {
+	Capital     float64
+	RiskProfile string
+	Exchange    string
+}
+
+// PortfolioCreatedData represents data for portfolio created notification
+type PortfolioCreatedData struct {
+	StrategyName   string
+	Invested       float64
+	PositionsCount int
+}

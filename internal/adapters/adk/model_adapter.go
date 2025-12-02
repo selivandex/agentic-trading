@@ -132,6 +132,8 @@ func (m *ModelAdapter) streamingGenerateContent(
 func (m *ModelAdapter) convertToChatRequest(req *model.LLMRequest) ai.ChatRequest {
 	chatReq := ai.ChatRequest{
 		Model:       m.modelName,
+		Messages:    []ai.Message{},        // Initialize as empty slice (never nil)
+		Tools:       []ai.ToolDefinition{}, // Initialize as empty slice (never nil)
 		MaxTokens:   4096,
 		Temperature: 0.7,
 	}

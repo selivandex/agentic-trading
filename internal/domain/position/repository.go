@@ -15,6 +15,8 @@ type Repository interface {
 	GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*Position, error)
 	GetClosedInRange(ctx context.Context, userID uuid.UUID, start, end time.Time) ([]*Position, error)
 	GetByTradingPair(ctx context.Context, tradingPairID uuid.UUID) ([]*Position, error)
+	GetOpenByStrategy(ctx context.Context, strategyID uuid.UUID) ([]*Position, error)
+	GetByStrategy(ctx context.Context, strategyID uuid.UUID) ([]*Position, error)
 	Update(ctx context.Context, position *Position) error
 	UpdatePnL(ctx context.Context, id uuid.UUID, currentPrice, unrealizedPnL, unrealizedPnLPct decimal.Decimal) error
 	Close(ctx context.Context, id uuid.UUID, exitPrice, realizedPnL decimal.Decimal) error

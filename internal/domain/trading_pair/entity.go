@@ -11,6 +11,7 @@ import (
 type TradingPair struct {
 	ID                uuid.UUID  `db:"id"`
 	UserID            uuid.UUID  `db:"user_id"`
+	StrategyID        *uuid.UUID `db:"strategy_id"` // Link to user_strategies table
 	ExchangeAccountID uuid.UUID  `db:"exchange_account_id"`
 	Symbol            string     `db:"symbol"`      // BTC/USDT
 	MarketType        MarketType `db:"market_type"` // spot, futures

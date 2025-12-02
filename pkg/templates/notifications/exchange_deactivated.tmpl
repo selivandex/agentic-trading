@@ -1,0 +1,14 @@
+❌ *Exchange Account Deactivated*
+
+🏦 Exchange: {{.Exchange}}
+{{if .Label}}📝 Label: {{.Label}}{{end}}
+{{if .IsTestnet}}⚠️ Type: Testnet{{else}}🔴 Type: Live{{end}}
+
+🚫 Reason: {{.Reason}}
+{{if .ErrorMessage}}
+❗️ Error: {{.ErrorMessage}}
+{{end}}
+
+Your exchange account has been automatically deactivated due to authentication issues.
+Please reconnect using /exchanges
+

@@ -124,6 +124,12 @@ func (tnc *TelegramNotificationConsumer) handleMessage(ctx context.Context, msg 
 	case "exchange.deactivated":
 		return tnc.handleExchangeDeactivated(ctx, msg.Value)
 
+	case "investment.accepted":
+		return tnc.handleInvestmentAccepted(ctx, msg.Value)
+
+	case "portfolio.created":
+		return tnc.handlePortfolioCreated(ctx, msg.Value)
+
 	default:
 		tnc.log.Debugw("Ignoring unknown event type", "event_type", eventType)
 		return nil
@@ -336,4 +342,38 @@ func (tnc *TelegramNotificationConsumer) handleExchangeDeactivated(ctx context.C
 	}
 
 	return tnc.notifService.NotifyExchangeDeactivated(chatID, notifData)
+}
+
+// handleInvestmentAccepted handles investment accepted events
+func (tnc *TelegramNotificationConsumer) handleInvestmentAccepted(ctx context.Context, data []byte) error {
+	var event eventspb.InvestmentAcceptedEvent
+	if err := proto.Unmarshal(data, &event); err != nil {
+		return errors.Wrap(err, "unmarshal investment_accepted")
+	}
+
+	// Use telegram_id directly from event (no need to query user)
+	notifData := telegram.InvestmentAcceptedData{
+		Capital:     event.Capital,
+		RiskProfile: event.RiskProfile,
+		Exchange:    event.Exchange,
+	}
+
+	return tnc.notifService.NotifyInvestmentAccepted(event.TelegramId, notifData)
+}
+
+// handlePortfolioCreated handles portfolio created events
+func (tnc *TelegramNotificationConsumer) handlePortfolioCreated(ctx context.Context, data []byte) error {
+	var event eventspb.PortfolioCreatedEvent
+	if err := proto.Unmarshal(data, &event); err != nil {
+		return errors.Wrap(err, "unmarshal portfolio_created")
+	}
+
+	// Use telegram_id directly from event (no need to query user)
+	notifData := telegram.PortfolioCreatedData{
+		StrategyName:   event.StrategyName,
+		Invested:       event.Invested,
+		PositionsCount: int(event.PositionsCount),
+	}
+
+	return tnc.notifService.NotifyPortfolioCreated(event.TelegramId, notifData)
 }

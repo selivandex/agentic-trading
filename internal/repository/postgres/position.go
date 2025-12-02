@@ -35,11 +35,11 @@ func (r *PositionRepository) Create(ctx context.Context, p *position.Position) e
 			unrealized_pnl, unrealized_pnl_pct, realized_pnl,
 			stop_loss_price, take_profit_price, trailing_stop_pct,
 			stop_loss_order_id, take_profit_order_id,
-			open_reasoning,
+			open_reasoning, strategy_id,
 			status, opened_at, closed_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -50,7 +50,7 @@ func (r *PositionRepository) Create(ctx context.Context, p *position.Position) e
 		p.UnrealizedPnL, p.UnrealizedPnLPct, p.RealizedPnL,
 		p.StopLossPrice, p.TakeProfitPrice, p.TrailingStopPct,
 		p.StopLossOrderID, p.TakeProfitOrderID,
-		p.OpenReasoning,
+		p.OpenReasoning, p.StrategyID,
 		p.Status, p.OpenedAt, p.ClosedAt, p.UpdatedAt,
 	)
 
@@ -98,6 +98,40 @@ func (r *PositionRepository) GetByTradingPair(ctx context.Context, tradingPairID
 		ORDER BY opened_at DESC`
 
 	err := r.db.SelectContext(ctx, &positions, query, tradingPairID)
+	if err != nil {
+		return nil, err
+	}
+
+	return positions, nil
+}
+
+// GetOpenByStrategy retrieves all open positions for a strategy
+func (r *PositionRepository) GetOpenByStrategy(ctx context.Context, strategyID uuid.UUID) ([]*position.Position, error) {
+	var positions []*position.Position
+
+	query := `
+		SELECT * FROM positions
+		WHERE strategy_id = $1 AND status = 'open'
+		ORDER BY opened_at DESC`
+
+	err := r.db.SelectContext(ctx, &positions, query, strategyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return positions, nil
+}
+
+// GetByStrategy retrieves all positions (open and closed) for a strategy
+func (r *PositionRepository) GetByStrategy(ctx context.Context, strategyID uuid.UUID) ([]*position.Position, error) {
+	var positions []*position.Position
+
+	query := `
+		SELECT * FROM positions
+		WHERE strategy_id = $1
+		ORDER BY opened_at DESC`
+
+	err := r.db.SelectContext(ctx, &positions, query, strategyID)
 	if err != nil {
 		return nil, err
 	}

@@ -122,6 +122,16 @@ func (sec *SystemEventsConsumer) handlePortfolioInitialization(ctx context.Conte
 		return nil
 	}
 
+	var strategyID *uuid.UUID
+	if job.StrategyId != "" {
+		sID, err := uuid.Parse(job.StrategyId)
+		if err != nil {
+			sec.log.Errorw("Invalid strategy_id", "error", err, "strategy_id", job.StrategyId)
+			return nil
+		}
+		strategyID = &sID
+	}
+
 	var accountID *uuid.UUID
 	if job.ExchangeAccountId != "" {
 		accID, err := uuid.Parse(job.ExchangeAccountId)
@@ -136,13 +146,14 @@ func (sec *SystemEventsConsumer) handlePortfolioInitialization(ctx context.Conte
 	onboardingSession := &telegram.OnboardingSession{
 		TelegramID:        job.TelegramId,
 		UserID:            userID,
+		StrategyID:        strategyID, // Pass pre-created strategy ID
 		Capital:           job.Capital,
 		ExchangeAccountID: accountID,
 		RiskProfile:       job.RiskProfile,
 		MarketType:        job.MarketType,
 	}
 
-	// Run portfolio initialization workflow
+	// Run portfolio initialization workflow (service will publish notifications)
 	if err := sec.orchestrator.StartOnboarding(ctx, onboardingSession); err != nil {
 		sec.log.Errorw("Portfolio initialization failed",
 			"error", err,
@@ -159,9 +170,6 @@ func (sec *SystemEventsConsumer) handlePortfolioInitialization(ctx context.Conte
 		"user_id", job.UserId,
 		"strategy_id", job.StrategyId,
 	)
-
-	// Notify user about success
-	_ = sec.bot.SendMessage(job.TelegramId, "✅ Your portfolio has been created! Use /status to view it.")
 
 	return nil
 }

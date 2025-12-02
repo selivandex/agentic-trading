@@ -48,16 +48,16 @@ func scanTradingPair(row interface {
 func (r *TradingPairRepository) Create(ctx context.Context, pair *trading_pair.TradingPair) error {
 	query := `
 		INSERT INTO trading_pairs (
-			id, user_id, exchange_account_id, symbol, market_type,
+			id, user_id, strategy_id, exchange_account_id, symbol, market_type,
 			budget, max_position_size, max_leverage, stop_loss_percent, take_profit_percent,
 			ai_provider, strategy_mode, timeframes,
 			is_active, is_paused, paused_reason, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
-		pair.ID, pair.UserID, pair.ExchangeAccountID, pair.Symbol, pair.MarketType,
+		pair.ID, pair.UserID, pair.StrategyID, pair.ExchangeAccountID, pair.Symbol, pair.MarketType,
 		pair.Budget, pair.MaxPositionSize, pair.MaxLeverage, pair.StopLossPercent, pair.TakeProfitPercent,
 		pair.AIProvider, pair.StrategyMode, pq.Array(pair.Timeframes),
 		pair.IsActive, pair.IsPaused, pair.PausedReason, pair.CreatedAt, pair.UpdatedAt,

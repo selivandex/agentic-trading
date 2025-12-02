@@ -21,6 +21,45 @@ func NewNotificationPublisher(kafka *kafka.Producer) *NotificationPublisher {
 	return &NotificationPublisher{kafka: kafka}
 }
 
+// PublishInvestmentAccepted publishes an investment accepted notification
+func (np *NotificationPublisher) PublishInvestmentAccepted(
+	ctx context.Context,
+	userID string,
+	telegramID int64,
+	capital float64,
+	riskProfile, exchange string,
+) error {
+	event := &eventspb.InvestmentAcceptedEvent{
+		Base:        NewBaseEvent("investment.accepted", "system_events_consumer", userID),
+		TelegramId:  telegramID,
+		Capital:     capital,
+		RiskProfile: riskProfile,
+		Exchange:    exchange,
+	}
+
+	return np.publishNotification(ctx, userID, event)
+}
+
+// PublishPortfolioCreated publishes a portfolio created notification
+func (np *NotificationPublisher) PublishPortfolioCreated(
+	ctx context.Context,
+	userID, strategyID, strategyName string,
+	telegramID int64,
+	invested float64,
+	positionsCount int32,
+) error {
+	event := &eventspb.PortfolioCreatedEvent{
+		Base:           NewBaseEvent("portfolio.created", "system_events_consumer", userID),
+		TelegramId:     telegramID,
+		StrategyId:     strategyID,
+		StrategyName:   strategyName,
+		Invested:       invested,
+		PositionsCount: positionsCount,
+	}
+
+	return np.publishNotification(ctx, userID, event)
+}
+
 // PublishExchangeDeactivated publishes an exchange deactivated notification
 func (np *NotificationPublisher) PublishExchangeDeactivated(
 	ctx context.Context,

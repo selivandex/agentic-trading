@@ -348,6 +348,7 @@ func (c *Container) MustInitBusiness() {
 	)
 
 	// Onboarding orchestrator (depends on WorkflowFactory, so initialized here)
+	onboardingNotificationPublisher := events.NewNotificationPublisher(c.Adapters.KafkaProducer)
 	c.Services.Onboarding = onboardingservice.NewService(
 		c.Business.WorkflowFactory,
 		c.Services.ADKSession,
@@ -355,6 +356,7 @@ func (c *Container) MustInitBusiness() {
 		c.Repos.User,
 		c.Repos.ExchangeAccount,
 		c.Services.Strategy,
+		onboardingNotificationPublisher,
 		c.Log,
 	)
 

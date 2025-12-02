@@ -7,6 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"prometheus/internal/domain/position"
+	"prometheus/internal/domain/trading_pair"
 	eventspb "prometheus/internal/events/proto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -14,15 +15,21 @@ import (
 
 // Service handles business logic for position management
 type Service struct {
-	repo position.Repository
-	log  *logger.Logger
+	repo            position.Repository
+	tradingPairRepo trading_pair.Repository
+	log             *logger.Logger
 }
 
 // NewService creates a new position service
-func NewService(repo position.Repository, log *logger.Logger) *Service {
+func NewService(
+	repo position.Repository,
+	tradingPairRepo trading_pair.Repository,
+	log *logger.Logger,
+) *Service {
 	return &Service{
-		repo: repo,
-		log:  log,
+		repo:            repo,
+		tradingPairRepo: tradingPairRepo,
+		log:             log,
 	}
 }
 
@@ -49,17 +56,44 @@ func (s *Service) UpdateFromWebSocket(ctx context.Context, update *PositionWebSo
 	}
 
 	if existingPos == nil {
+		// Resolve trading_pair and strategy_id for this symbol + account
+		var tradingPairID uuid.UUID
+		var strategyID *uuid.UUID
+		var marketType string
+
+		// Get trading pair for this symbol and account
+		pairs, err := s.tradingPairRepo.GetByUser(ctx, update.UserID)
+		if err != nil {
+			s.log.Warnw("Failed to get trading pairs for user",
+				"user_id", update.UserID,
+				"error", err,
+			)
+		} else {
+			// Find matching trading pair for this symbol and account
+			for _, pair := range pairs {
+				if pair.Symbol == update.Symbol && pair.ExchangeAccountID == update.AccountID {
+					tradingPairID = pair.ID
+					strategyID = pair.StrategyID
+					marketType = string(pair.MarketType)
+					break
+				}
+			}
+		}
+
 		// Create new position
 		newPos := &position.Position{
 			ID:                uuid.New(),
 			UserID:            update.UserID,
+			TradingPairID:     tradingPairID, // Now resolved
 			ExchangeAccountID: update.AccountID,
 			Symbol:            update.Symbol,
+			MarketType:        marketType, // Now resolved
 			Side:              mapPositionSide(update.Side),
 			Size:              update.Amount,
 			EntryPrice:        update.EntryPrice,
 			CurrentPrice:      update.MarkPrice,
 			UnrealizedPnL:     update.UnrealizedPnL,
+			StrategyID:        strategyID, // Now resolved through trading_pair
 			Status:            position.PositionOpen,
 		}
 
@@ -71,6 +105,7 @@ func (s *Service) UpdateFromWebSocket(ctx context.Context, update *PositionWebSo
 			"position_id", newPos.ID,
 			"symbol", update.Symbol,
 			"user_id", update.UserID,
+			"strategy_id", strategyID,
 		)
 		return nil
 	}

@@ -91,3 +91,31 @@ func (ns *NotificationService) NotifyExchangeDeactivated(chatID int64, data Exch
 
 	return ns.bot.SendMessage(chatID, text)
 }
+
+// NotifyInvestmentAccepted sends investment accepted notification
+func (ns *NotificationService) NotifyInvestmentAccepted(chatID int64, data InvestmentAcceptedData) error {
+	text, err := ns.templates.Render("notifications/investment_accepted", data)
+	if err != nil {
+		ns.log.Errorw("Failed to render investment_accepted template", "error", err)
+		return err
+	}
+
+	_, err = ns.bot.SendMessageWithOptions(chatID, text, telegram.MessageOptions{
+		ParseMode: "Markdown",
+	})
+	return err
+}
+
+// NotifyPortfolioCreated sends portfolio created notification
+func (ns *NotificationService) NotifyPortfolioCreated(chatID int64, data PortfolioCreatedData) error {
+	text, err := ns.templates.Render("notifications/portfolio_created", data)
+	if err != nil {
+		ns.log.Errorw("Failed to render portfolio_created template", "error", err)
+		return err
+	}
+
+	_, err = ns.bot.SendMessageWithOptions(chatID, text, telegram.MessageOptions{
+		ParseMode: "Markdown",
+	})
+	return err
+}

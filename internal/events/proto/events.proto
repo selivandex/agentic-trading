@@ -701,3 +701,22 @@ message PortfolioInitializationJobEvent {
   string market_type = 8;  // "spot", "futures"
 }
 
+// InvestmentAcceptedEvent notifies user that investment was accepted and processing started
+message InvestmentAcceptedEvent {
+  BaseEvent base = 1;
+  int64 telegram_id = 2;
+  double capital = 3;
+  string risk_profile = 4;
+  string exchange = 5;
+}
+
+// PortfolioCreatedEvent notifies user that portfolio was successfully created
+message PortfolioCreatedEvent {
+  BaseEvent base = 1;
+  int64 telegram_id = 2;
+  string strategy_id = 3;
+  string strategy_name = 4;
+  double invested = 5;
+  int32 positions_count = 6;
+}
+

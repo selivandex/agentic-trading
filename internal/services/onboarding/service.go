@@ -3,7 +3,9 @@ package onboarding
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/shopspring/decimal"
 	"google.golang.org/adk/agent"
@@ -24,13 +26,20 @@ import (
 
 // Service orchestrates the portfolio initialization workflow during onboarding
 type Service struct {
-	workflowFactory *workflows.Factory
-	sessionService  session.Service
-	templates       *templates.Registry
-	userRepo        user.Repository
-	exchAcctRepo    exchange_account.Repository
-	strategyService *strategyservice.Service
-	log             *logger.Logger
+	workflowFactory       *workflows.Factory
+	sessionService        session.Service
+	templates             *templates.Registry
+	userRepo              user.Repository
+	exchAcctRepo          exchange_account.Repository
+	strategyService       *strategyservice.Service
+	notificationPublisher NotificationPublisher
+	log                   *logger.Logger
+}
+
+// NotificationPublisher interface for publishing notifications (DI for testability)
+type NotificationPublisher interface {
+	PublishInvestmentAccepted(ctx context.Context, userID string, telegramID int64, capital float64, riskProfile, exchange string) error
+	PublishPortfolioCreated(ctx context.Context, userID, strategyID, strategyName string, telegramID int64, invested float64, positionsCount int32) error
 }
 
 // NewService creates a new onboarding orchestration service
@@ -41,6 +50,7 @@ func NewService(
 	userRepo user.Repository,
 	exchAcctRepo exchange_account.Repository,
 	strategyService *strategyservice.Service,
+	notificationPublisher NotificationPublisher,
 	log *logger.Logger,
 ) *Service {
 	if tmpl == nil {
@@ -48,13 +58,14 @@ func NewService(
 	}
 
 	return &Service{
-		workflowFactory: workflowFactory,
-		sessionService:  sessionService,
-		templates:       tmpl,
-		userRepo:        userRepo,
-		exchAcctRepo:    exchAcctRepo,
-		strategyService: strategyService,
-		log:             log.With("component", "onboarding_orchestrator"),
+		workflowFactory:       workflowFactory,
+		sessionService:        sessionService,
+		templates:             tmpl,
+		userRepo:              userRepo,
+		exchAcctRepo:          exchAcctRepo,
+		strategyService:       strategyService,
+		notificationPublisher: notificationPublisher,
+		log:                   log.With("component", "onboarding_orchestrator"),
 	}
 }
 
@@ -66,36 +77,80 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 		"risk_profile", onboardingSession.RiskProfile,
 	)
 
-	// Step 1: Create strategy to track allocated capital and transactions
-	strategyName := fmt.Sprintf("Portfolio %s", time.Now().Format("2006-01-02"))
+	// Step 1: Get or create strategy
+	var createdStrategy *strategy.Strategy
+	
+	if onboardingSession.StrategyID != nil {
+		// Use pre-created strategy from invest flow
+		s.log.Infow("Using pre-created strategy",
+			"strategy_id", *onboardingSession.StrategyID,
+			"user_id", onboardingSession.UserID,
+		)
+		
+		createdStrategy, err = s.strategyService.GetStrategyByID(ctx, *onboardingSession.StrategyID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get pre-created strategy")
+		}
+	} else {
+		// Fallback: Create strategy if not provided (backward compatibility)
+		strategyName := fmt.Sprintf("Portfolio %s", time.Now().Format("2006-01-02"))
 
-	// Map string risk profile to strategy.RiskTolerance
-	var riskTolerance strategy.RiskTolerance
-	switch onboardingSession.RiskProfile {
-	case "conservative":
-		riskTolerance = strategy.RiskConservative
-	case "aggressive":
-		riskTolerance = strategy.RiskAggressive
-	default:
-		riskTolerance = strategy.RiskModerate
+		// Map string risk profile to strategy.RiskTolerance
+		var riskTolerance strategy.RiskTolerance
+		switch onboardingSession.RiskProfile {
+		case "conservative":
+			riskTolerance = strategy.RiskConservative
+		case "aggressive":
+			riskTolerance = strategy.RiskAggressive
+		default:
+			riskTolerance = strategy.RiskModerate
+		}
+
+		createdStrategy, err = s.strategyService.CreateStrategy(ctx, strategyservice.CreateStrategyParams{
+			UserID:           onboardingSession.UserID,
+			Name:             strategyName,
+			Description:      fmt.Sprintf("Automated portfolio with %s risk profile", onboardingSession.RiskProfile),
+			AllocatedCapital: decimal.NewFromFloat(onboardingSession.Capital),
+			RiskTolerance:    riskTolerance,
+			ReasoningLog:     nil, // Will be updated after workflow completes
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to create strategy")
+		}
+
+		s.log.Infow("Strategy created (fallback)",
+			"strategy_id", createdStrategy.ID,
+			"allocated_capital", createdStrategy.AllocatedCapital,
+		)
 	}
 
-	createdStrategy, err := s.strategyService.CreateStrategy(ctx, strategyservice.CreateStrategyParams{
-		UserID:           onboardingSession.UserID,
-		Name:             strategyName,
-		Description:      fmt.Sprintf("Automated portfolio with %s risk profile", onboardingSession.RiskProfile),
-		AllocatedCapital: decimal.NewFromFloat(onboardingSession.Capital),
-		RiskTolerance:    riskTolerance,
-		ReasoningLog:     nil, // Will be updated after workflow completes
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to create strategy")
+	// Get exchange name for notification (sanitize for protobuf)
+	var exchangeName string
+	if onboardingSession.ExchangeAccountID != nil {
+		exchAcct, err := s.exchAcctRepo.GetByID(ctx, *onboardingSession.ExchangeAccountID)
+		if err == nil {
+			// Sanitize exchange name to ensure valid UTF-8 for protobuf
+			exchangeName = sanitizeUTF8(string(exchAcct.Exchange))
+		} else {
+			s.log.Warnw("Failed to get exchange account", "error", err)
+		}
+	}
+	if exchangeName == "" {
+		exchangeName = "demo"
 	}
 
-	s.log.Infow("Strategy created",
-		"strategy_id", createdStrategy.ID,
-		"allocated_capital", createdStrategy.AllocatedCapital,
-	)
+	// Notify user immediately that investment is accepted
+	if err := s.notificationPublisher.PublishInvestmentAccepted(
+		ctx,
+		onboardingSession.UserID.String(),
+		onboardingSession.TelegramID,
+		onboardingSession.Capital,
+		sanitizeUTF8(onboardingSession.RiskProfile), // Sanitize for protobuf
+		exchangeName,
+	); err != nil {
+		s.log.Errorw("Failed to publish investment accepted notification", "error", err)
+		// Continue anyway - notification is not critical
+	}
 
 	// Step 2: Create portfolio initialization workflow (PortfolioArchitect agent)
 	workflow, err := s.workflowFactory.CreatePortfolioInitializationWorkflow()
@@ -111,18 +166,6 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create ADK runner")
-	}
-
-	// Get exchange account details
-	var exchangeName string
-	if onboardingSession.ExchangeAccountID != nil {
-		exchAcct, err := s.exchAcctRepo.GetByID(ctx, *onboardingSession.ExchangeAccountID)
-		if err != nil {
-			return errors.Wrap(err, "failed to get exchange account")
-		}
-		exchangeName = string(exchAcct.Exchange)
-	} else {
-		exchangeName = "demo"
 	}
 
 	// Build input prompt for PortfolioArchitect
@@ -201,6 +244,20 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 		)
 	}
 
+	// Notify user that portfolio was created successfully
+	if err := s.notificationPublisher.PublishPortfolioCreated(
+		ctx,
+		onboardingSession.UserID.String(),
+		createdStrategy.ID.String(),
+		sanitizeUTF8(createdStrategy.Name), // Sanitize for protobuf
+		onboardingSession.TelegramID,
+		onboardingSession.Capital,
+		int32(tradesExecuted), // Use actual trades count
+	); err != nil {
+		s.log.Errorw("Failed to publish portfolio created notification", "error", err)
+		// Continue anyway - notification is not critical
+	}
+
 	return nil
 }
 
@@ -248,4 +305,20 @@ Use tools systematically. Be thorough but decisive.`,
 			{Text: promptText},
 		},
 	}, nil
+}
+
+// sanitizeUTF8 removes invalid UTF-8 characters to prevent protobuf marshaling errors
+func sanitizeUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	// Remove invalid UTF-8 bytes
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r != utf8.RuneError {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
