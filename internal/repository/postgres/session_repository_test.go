@@ -167,10 +167,11 @@ func TestSessionRepository_AppendEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test AppendEvent
+	eventID := testsupport.UniqueEventID()
 	event := &session.Event{
 		ID:        uuid.New(),
 		SessionID: sess.ID,
-		EventID:   "event_001",
+		EventID:   eventID,
 		Author:    "user",
 		Content: map[string]interface{}{
 			"type":    "text",
@@ -199,7 +200,7 @@ func TestSessionRepository_AppendEvent(t *testing.T) {
 	retrieved, err := repo.Get(ctx, sess.AppName, sess.UserID, sess.SessionID, opts)
 	require.NoError(t, err)
 	assert.Len(t, retrieved.Events, 1, "Should have 1 event")
-	assert.Equal(t, "event_001", retrieved.Events[0].EventID)
+	assert.Equal(t, eventID, retrieved.Events[0].EventID)
 	assert.Equal(t, "user", retrieved.Events[0].Author)
 }
 
@@ -234,7 +235,7 @@ func TestSessionRepository_GetEvents(t *testing.T) {
 		event := &session.Event{
 			ID:        uuid.New(),
 			SessionID: sess.ID,
-			EventID:   "event_" + string(rune(i+'0')),
+			EventID:   testsupport.UniqueEventID(),
 			Author:    "agent",
 			Content: map[string]interface{}{
 				"response": "Analysis result " + string(rune(i+'0')),
@@ -286,7 +287,7 @@ func TestSessionRepository_List(t *testing.T) {
 			ID:        uuid.New(),
 			AppName:   appName,
 			UserID:    userID,
-			SessionID: "session_" + string(rune(i+'0')),
+			SessionID: testsupport.UniqueSessionID(),
 			State:     map[string]interface{}{},
 			Events:    []session.Event{},
 			CreatedAt: time.Now().Add(-time.Duration(i) * time.Hour),
@@ -323,7 +324,7 @@ func TestSessionRepository_Delete(t *testing.T) {
 		ID:        uuid.New(),
 		AppName:   "trading_agent",
 		UserID:    "user123",
-		SessionID: "session_to_delete",
+		SessionID: testsupport.UniqueSessionID(),
 		State:     map[string]interface{}{},
 		Events:    []session.Event{},
 		CreatedAt: time.Now(),
@@ -455,7 +456,7 @@ func TestSessionRepository_EventWithUsageMetadata(t *testing.T) {
 	event := &session.Event{
 		ID:        uuid.New(),
 		SessionID: sess.ID,
-		EventID:   "event_with_usage",
+		EventID:   testsupport.UniqueEventID(),
 		Author:    "opportunity_synthesizer",
 		Content: map[string]interface{}{
 			"analysis": "Market shows bullish momentum",
@@ -561,7 +562,7 @@ func TestSessionRepository_EventActions(t *testing.T) {
 	event := &session.Event{
 		ID:           uuid.New(),
 		SessionID:    sess.ID,
-		EventID:      "event_with_actions",
+		EventID:      testsupport.UniqueEventID(),
 		Author:       "agent",
 		Content:      map[string]interface{}{"message": "Transfer to specialist"},
 		Timestamp:    time.Now(),

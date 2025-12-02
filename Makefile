@@ -113,6 +113,7 @@ db-pg-create:
 
 db-pg-drop:
 	@echo "Dropping PostgreSQL database: $(DB_PG_NAME)..."
+	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$(DB_PG_NAME)' AND pid <> pg_backend_pid();" 2>/dev/null || true
 	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_PG_NAME);"
 	@echo "✓ PostgreSQL database dropped"
 

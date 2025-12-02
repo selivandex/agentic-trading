@@ -2,19 +2,14 @@ package postgres
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
-)
 
-// randomTelegramID generates unique telegram IDs for tests
-func randomTelegramID() int64 {
-	return 100000000 + rand.Int63n(900000000)
-}
+	"prometheus/internal/testsupport"
+)
 
 // TestFixtures provides factory methods for creating test data
 type TestFixtures struct {
@@ -36,8 +31,8 @@ func (f *TestFixtures) CreateUser(opts ...func(*UserFixture)) uuid.UUID {
 	f.t.Helper()
 
 	fixture := &UserFixture{
-		TelegramID: 100000 + rand.Int63n(900000),
-		Username:   fmt.Sprintf("test_user_%d", rand.Intn(999999)),
+		TelegramID: testsupport.UniqueTelegramID(),
+		Username:   testsupport.UniqueUsername(),
 		IsActive:   true,
 		Settings:   "{}",
 	}
@@ -95,7 +90,7 @@ func (f *TestFixtures) CreateOrder(userID, strategyID, exchangeAccountID uuid.UU
 		Status:          "open",
 		Price:           decimal.NewFromFloat(40000.0),
 		Amount:          decimal.NewFromFloat(0.1),
-		ExchangeOrderID: fmt.Sprintf("ORDER_%d", rand.Intn(999999)),
+		ExchangeOrderID: testsupport.UniqueName("ORDER"),
 	}
 
 	for _, opt := range opts {
@@ -365,7 +360,7 @@ func (f *TestFixtures) CreateLimitProfile(opts ...func(*LimitProfileFixture)) uu
 	f.t.Helper()
 
 	fixture := &LimitProfileFixture{
-		Name:        fmt.Sprintf("test_profile_%d", rand.Intn(999999)),
+		Name:        testsupport.UniqueName("test_profile"),
 		Description: "Test limit profile",
 		IsActive:    true,
 		Limits: `{

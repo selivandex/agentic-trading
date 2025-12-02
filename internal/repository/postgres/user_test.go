@@ -27,8 +27,8 @@ func TestUserRepository_Create(t *testing.T) {
 	// Create test user with default settings
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       randomTelegramID(),
-		TelegramUsername: "testuser_" + uuid.New().String()[:8],
+		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Test",
 		LastName:         "User",
 		LanguageCode:     "en",
@@ -66,8 +66,8 @@ func TestUserRepository_GetByID(t *testing.T) {
 	// Create test user
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       randomTelegramID(),
-		TelegramUsername: "getbyidtest_" + uuid.New().String()[:8],
+		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "GetByID",
 		LastName:         "Test",
 		LanguageCode:     "en",
@@ -104,13 +104,11 @@ func TestUserRepository_GetByTelegramID(t *testing.T) {
 	repo := NewUserRepository(testDB.Tx())
 	ctx := context.Background()
 
-	telegramID := randomTelegramID()
-
 	// Create test user
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       telegramID,
-		TelegramUsername: "telegramtest_" + uuid.New().String()[:8],
+		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Telegram",
 		LastName:         "Test",
 		LanguageCode:     "ru",
@@ -125,10 +123,10 @@ func TestUserRepository_GetByTelegramID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test GetByTelegramID - critical for Telegram bot
-	retrieved, err := repo.GetByTelegramID(ctx, telegramID)
+	retrieved, err := repo.GetByTelegramID(ctx, u.TelegramID)
 	require.NoError(t, err)
 	assert.Equal(t, u.ID, retrieved.ID)
-	assert.Equal(t, telegramID, retrieved.TelegramID)
+	assert.Equal(t, u.TelegramID, retrieved.TelegramID)
 	assert.Equal(t, "ru", retrieved.LanguageCode)
 
 	// Test non-existent Telegram ID
@@ -150,8 +148,8 @@ func TestUserRepository_Update(t *testing.T) {
 	// Create initial user
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       randomTelegramID(),
-		TelegramUsername: "updatetest_" + uuid.New().String()[:8],
+		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Update",
 		LastName:         "Test",
 		LanguageCode:     "en",
@@ -202,8 +200,8 @@ func TestUserRepository_List(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		u := &user.User{
 			ID:               uuid.New(),
-			TelegramID:       randomTelegramID(),
-			TelegramUsername: "listtest_" + uuid.New().String()[:8],
+			TelegramID:       testsupport.UniqueTelegramID(),
+			TelegramUsername: testsupport.UniqueUsername(),
 			FirstName:        "User",
 			LastName:         string(rune(i + '0')),
 			LanguageCode:     "en",
@@ -242,8 +240,8 @@ func TestUserRepository_Delete(t *testing.T) {
 	// Create user to delete
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       randomTelegramID(),
-		TelegramUsername: "deletetest_" + uuid.New().String()[:8],
+		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Delete",
 		LastName:         "Test",
 		LanguageCode:     "en",
@@ -303,8 +301,8 @@ func TestUserRepository_SettingsJSONB(t *testing.T) {
 
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       randomTelegramID(),
-		TelegramUsername: "jsonbtest_" + uuid.New().String()[:8],
+		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "JSONB",
 		LastName:         "Test",
 		LanguageCode:     "en",

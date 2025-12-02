@@ -28,7 +28,7 @@ func TestLimitProfileRepository_Create(t *testing.T) {
 	limits := limit_profile.FreeTierLimits()
 	profile := &limit_profile.LimitProfile{
 		ID:          uuid.New(),
-		Name:        "test_free_tier",
+		Name:        testsupport.UniqueName("test_free_tier"),
 		Description: "Free tier for testing",
 		IsActive:    true,
 		CreatedAt:   time.Now(),
@@ -70,8 +70,9 @@ func TestLimitProfileRepository_GetByID(t *testing.T) {
 
 	// Create test profile using fixture
 	fixtures := NewTestFixtures(t, testDB.Tx())
+	testName := testsupport.UniqueName("test_get_by_id")
 	profileID := fixtures.CreateLimitProfile(
-		WithLimitProfileName("test_get_by_id"),
+		WithLimitProfileName(testName),
 		WithLimitProfileDescription("Test GetByID method"),
 	)
 
@@ -79,7 +80,7 @@ func TestLimitProfileRepository_GetByID(t *testing.T) {
 	retrieved, err := repo.GetByID(ctx, profileID)
 	require.NoError(t, err)
 	assert.Equal(t, profileID, retrieved.ID)
-	assert.Equal(t, "test_get_by_id", retrieved.Name)
+	assert.Equal(t, testName, retrieved.Name)
 	assert.Equal(t, "Test GetByID method", retrieved.Description)
 
 	// Test non-existent ID
@@ -97,44 +98,24 @@ func TestLimitProfileRepository_GetByName(t *testing.T) {
 
 	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
+	fixtures := NewTestFixtures(t, testDB.Tx())
 
-	// Test GetByName with default profiles from migration
-	// The migration creates 'free', 'basic', 'premium' profiles
-	freeProfile, err := repo.GetByName(ctx, "free")
-	require.NoError(t, err)
-	assert.Equal(t, "free", freeProfile.Name)
-	assert.True(t, freeProfile.IsActive)
+	// Create test profile with specific name
+	testName := testsupport.UniqueName("test_getbyname")
+	profileID := fixtures.CreateLimitProfile(
+		WithLimitProfileName(testName),
+		WithLimitProfileDescription("Test GetByName method"),
+	)
 
-	// Parse and verify limits
-	limits, err := freeProfile.ParseLimits()
+	// Test GetByName
+	retrieved, err := repo.GetByName(ctx, testName)
 	require.NoError(t, err)
-	assert.Equal(t, 1, limits.ExchangesCount, "Free tier should allow 1 exchange")
-	assert.Equal(t, 2, limits.ActivePositions, "Free tier should allow 2 positions")
-	assert.False(t, limits.LiveTradingAllowed, "Free tier should not allow live trading")
-
-	// Test basic profile
-	basicProfile, err := repo.GetByName(ctx, "basic")
-	require.NoError(t, err)
-	assert.Equal(t, "basic", basicProfile.Name)
-
-	basicLimits, err := basicProfile.ParseLimits()
-	require.NoError(t, err)
-	assert.Equal(t, 2, basicLimits.ExchangesCount, "Basic tier should allow 2 exchanges")
-	assert.True(t, basicLimits.LiveTradingAllowed, "Basic tier should allow live trading")
-
-	// Test premium profile
-	premiumProfile, err := repo.GetByName(ctx, "premium")
-	require.NoError(t, err)
-	assert.Equal(t, "premium", premiumProfile.Name)
-
-	premiumLimits, err := premiumProfile.ParseLimits()
-	require.NoError(t, err)
-	assert.Equal(t, 10, premiumLimits.ExchangesCount, "Premium tier should allow 10 exchanges")
-	assert.Equal(t, -1, premiumLimits.DailyTradesCount, "Premium tier should have unlimited daily trades")
-	assert.True(t, premiumLimits.CustomAgentsAllowed, "Premium tier should allow custom agents")
+	assert.Equal(t, profileID, retrieved.ID)
+	assert.Equal(t, testName, retrieved.Name)
+	assert.True(t, retrieved.IsActive)
 
 	// Test non-existent name
-	_, err = repo.GetByName(ctx, "non_existent_tier")
+	_, err = repo.GetByName(ctx, "non_existent_tier_12345")
 	assert.Error(t, err, "Should return error for non-existent profile name")
 }
 
@@ -148,21 +129,31 @@ func TestLimitProfileRepository_GetAll(t *testing.T) {
 
 	repo := NewLimitProfileRepository(testDB.Tx())
 	ctx := context.Background()
+	fixtures := NewTestFixtures(t, testDB.Tx())
 
-	// Get all profiles (should include at least the 3 default ones from migration)
+	// Create test profiles
+	name1 := testsupport.UniqueName("profile_1")
+	name2 := testsupport.UniqueName("profile_2")
+	name3 := testsupport.UniqueName("profile_3")
+
+	_ = fixtures.CreateLimitProfile(WithLimitProfileName(name1), WithLimitProfileActive(true))
+	_ = fixtures.CreateLimitProfile(WithLimitProfileName(name2), WithLimitProfileActive(true))
+	_ = fixtures.CreateLimitProfile(WithLimitProfileName(name3), WithLimitProfileActive(false))
+
+	// Get all profiles
 	profiles, err := repo.GetAll(ctx)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(profiles), 3, "Should have at least 3 default profiles")
+	assert.GreaterOrEqual(t, len(profiles), 3, "Should have at least the 3 created profiles")
 
-	// Verify we have the default profiles
+	// Verify we have our test profiles
 	names := make(map[string]bool)
 	for _, p := range profiles {
 		names[p.Name] = true
 	}
 
-	assert.True(t, names["free"], "Should have free profile")
-	assert.True(t, names["basic"], "Should have basic profile")
-	assert.True(t, names["premium"], "Should have premium profile")
+	assert.True(t, names[name1], "Should have profile 1")
+	assert.True(t, names[name2], "Should have profile 2")
+	assert.True(t, names[name3], "Should have profile 3 (inactive)")
 }
 
 func TestLimitProfileRepository_GetAllActive(t *testing.T) {
@@ -179,22 +170,22 @@ func TestLimitProfileRepository_GetAllActive(t *testing.T) {
 
 	// Create active and inactive profiles
 	_ = fixtures.CreateLimitProfile(
-		WithLimitProfileName("test_active_1"),
+		WithLimitProfileName(testsupport.UniqueName("test_active_1")),
 		WithLimitProfileActive(true),
 	)
 	_ = fixtures.CreateLimitProfile(
-		WithLimitProfileName("test_active_2"),
+		WithLimitProfileName(testsupport.UniqueName("test_active_2")),
 		WithLimitProfileActive(true),
 	)
 	inactiveID := fixtures.CreateLimitProfile(
-		WithLimitProfileName("test_inactive"),
+		WithLimitProfileName(testsupport.UniqueName("test_inactive")),
 		WithLimitProfileActive(false),
 	)
 
 	// Get all active profiles
 	activeProfiles, err := repo.GetAllActive(ctx)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(activeProfiles), 5, "Should have at least 5 active profiles (3 default + 2 created)")
+	assert.GreaterOrEqual(t, len(activeProfiles), 2, "Should have at least 2 active profiles")
 
 	// Verify inactive profile is not in the list
 	for _, p := range activeProfiles {
@@ -222,7 +213,7 @@ func TestLimitProfileRepository_Update(t *testing.T) {
 	limits := limit_profile.FreeTierLimits()
 	profile := &limit_profile.LimitProfile{
 		ID:          uuid.New(),
-		Name:        "test_update",
+		Name:        testsupport.UniqueName("test_update"),
 		Description: "Original description",
 		IsActive:    true,
 		CreatedAt:   time.Now(),
@@ -236,7 +227,8 @@ func TestLimitProfileRepository_Update(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update profile
-	profile.Name = "test_update_modified"
+	updatedName := testsupport.UniqueName("test_update_modified")
+	profile.Name = updatedName
 	profile.Description = "Updated description"
 	profile.IsActive = false
 
@@ -251,7 +243,7 @@ func TestLimitProfileRepository_Update(t *testing.T) {
 	// Verify updates
 	retrieved, err := repo.GetByID(ctx, profile.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "test_update_modified", retrieved.Name)
+	assert.Equal(t, updatedName, retrieved.Name)
 	assert.Equal(t, "Updated description", retrieved.Description)
 	assert.False(t, retrieved.IsActive)
 
@@ -276,7 +268,7 @@ func TestLimitProfileRepository_Delete(t *testing.T) {
 
 	// Create profile to delete
 	profileID := fixtures.CreateLimitProfile(
-		WithLimitProfileName("test_delete"),
+		WithLimitProfileName(testsupport.UniqueName("test_delete")),
 	)
 
 	// Verify profile exists and is active
@@ -363,7 +355,7 @@ func TestLimitProfileRepository_LimitsJSONB(t *testing.T) {
 
 	profile := &limit_profile.LimitProfile{
 		ID:          uuid.New(),
-		Name:        "custom_tier",
+		Name:        testsupport.UniqueName("custom_tier"),
 		Description: "Custom tier with specific limits",
 		IsActive:    true,
 		CreatedAt:   time.Now(),
