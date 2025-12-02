@@ -83,38 +83,15 @@ func (f *TestFixtures) CreateExchangeAccount(userID uuid.UUID, opts ...func(*Exc
 	return id
 }
 
-// CreateTradingPair creates a test trading pair in the database
+// CreateTradingPair - DEPRECATED: trading_pairs removed, returning dummy UUID
 func (f *TestFixtures) CreateTradingPair(userID, exchangeAccountID uuid.UUID, opts ...func(*TradingPairFixture)) uuid.UUID {
 	f.t.Helper()
-
-	fixture := &TradingPairFixture{
-		Symbol:     "BTC/USDT",
-		MarketType: "spot",
-		Budget:     decimal.NewFromFloat(1000.0),
-		IsActive:   true,
-		IsPaused:   false,
-	}
-
-	for _, opt := range opts {
-		opt(fixture)
-	}
-
-	id := uuid.New()
-	query := `INSERT INTO trading_pairs (id, user_id, exchange_account_id, symbol, market_type, budget, 
-			  max_position_size, max_leverage, stop_loss_percent, take_profit_percent, ai_provider, strategy_mode, 
-			  timeframes, is_active, is_paused, created_at, updated_at)
-			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())`
-
-	_, err := f.db.Exec(query, id, userID, exchangeAccountID, fixture.Symbol, fixture.MarketType, fixture.Budget,
-		decimal.NewFromFloat(500.0), 1, decimal.NewFromFloat(2.0), decimal.NewFromFloat(5.0),
-		"claude", "auto", "{1h}", fixture.IsActive, fixture.IsPaused)
-	require.NoError(f.t, err, "Failed to create test trading pair")
-
-	return id
+	// trading_pairs table removed in MVP cleanup - return dummy UUID for backward compatibility
+	return uuid.New()
 }
 
 // CreateOrder creates a test order in the database
-func (f *TestFixtures) CreateOrder(userID, tradingPairID, exchangeAccountID uuid.UUID, opts ...func(*OrderFixture)) uuid.UUID {
+func (f *TestFixtures) CreateOrder(userID, strategyID, exchangeAccountID uuid.UUID, opts ...func(*OrderFixture)) uuid.UUID {
 	f.t.Helper()
 
 	fixture := &OrderFixture{
@@ -133,11 +110,11 @@ func (f *TestFixtures) CreateOrder(userID, tradingPairID, exchangeAccountID uuid
 	}
 
 	id := uuid.New()
-	query := `INSERT INTO orders (id, user_id, trading_pair_id, exchange_account_id, exchange_order_id, symbol, 
+	query := `INSERT INTO orders (id, user_id, strategy_id, exchange_account_id, exchange_order_id, symbol, 
 			  market_type, side, type, status, price, amount, filled_amount, avg_fill_price, agent_id, fee_currency, created_at, updated_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, userID, tradingPairID, exchangeAccountID, fixture.ExchangeOrderID,
+	_, err := f.db.Exec(query, id, userID, strategyID, exchangeAccountID, fixture.ExchangeOrderID,
 		fixture.Symbol, fixture.MarketType, fixture.Side, fixture.Type, fixture.Status, fixture.Price, fixture.Amount,
 		decimal.Zero, decimal.Zero, "test_agent", "USDT")
 	require.NoError(f.t, err, "Failed to create test order")
@@ -146,7 +123,7 @@ func (f *TestFixtures) CreateOrder(userID, tradingPairID, exchangeAccountID uuid
 }
 
 // CreatePosition creates a test position in the database
-func (f *TestFixtures) CreatePosition(userID, tradingPairID, exchangeAccountID uuid.UUID, opts ...func(*PositionFixture)) uuid.UUID {
+func (f *TestFixtures) CreatePosition(userID, strategyID, exchangeAccountID uuid.UUID, opts ...func(*PositionFixture)) uuid.UUID {
 	f.t.Helper()
 
 	fixture := &PositionFixture{
@@ -163,12 +140,12 @@ func (f *TestFixtures) CreatePosition(userID, tradingPairID, exchangeAccountID u
 	}
 
 	id := uuid.New()
-	query := `INSERT INTO positions (id, user_id, trading_pair_id, exchange_account_id, symbol, market_type, side, 
+	query := `INSERT INTO positions (id, user_id, strategy_id, exchange_account_id, symbol, market_type, side, 
 			  size, entry_price, current_price, leverage, margin_mode, unrealized_pnl, unrealized_pnl_pct, realized_pnl, 
 			  status, opened_at, updated_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())`
 
-	_, err := f.db.Exec(query, id, userID, tradingPairID, exchangeAccountID, fixture.Symbol, fixture.MarketType,
+	_, err := f.db.Exec(query, id, userID, strategyID, exchangeAccountID, fixture.Symbol, fixture.MarketType,
 		fixture.Side, fixture.Size, fixture.EntryPrice, fixture.EntryPrice, 1, "cross",
 		decimal.Zero, decimal.Zero, decimal.Zero, fixture.Status)
 	require.NoError(f.t, err, "Failed to create test position")

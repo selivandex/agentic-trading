@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # Database Entities Architecture
 
 ## Overview
@@ -24,6 +26,7 @@ The system follows **Clean Architecture** principles with strict separation betw
 Represents a hedge fund participant (client). Each user operates their own autonomous portfolio managed by AI agents.
 
 **Key Fields:**
+
 - `id`: UUID (primary key)
 - `telegram_id`: int64 (Telegram bot integration)
 - `telegram_username`, `first_name`, `last_name`: User profile data
@@ -33,6 +36,7 @@ Represents a hedge fund participant (client). Each user operates their own auton
 - `settings`: JSONB (risk parameters, AI preferences, circuit breaker config)
 
 **Settings JSONB Structure:**
+
 ```json
 {
   "default_ai_provider": "claude",
@@ -53,6 +57,7 @@ Represents a hedge fund participant (client). Each user operates their own auton
 ```
 
 **Relationships:**
+
 - 1 User → N ExchangeAccounts (multi-exchange support)
 - 1 User → N Strategies (portfolios)
 - 1 User → N Positions (open trades)
@@ -67,6 +72,7 @@ Represents a hedge fund participant (client). Each user operates their own auton
 Defines usage limits based on subscription tier (Free, Basic, Premium, Enterprise).
 
 **Key Fields:**
+
 - `id`: UUID
 - `name`: string ("free", "basic", "premium", "enterprise")
 - `description`: string
@@ -74,6 +80,7 @@ Defines usage limits based on subscription tier (Free, Basic, Premium, Enterpris
 - `is_active`: bool
 
 **Limits JSONB Structure:**
+
 ```json
 {
   "exchanges_count": 2,
@@ -95,6 +102,7 @@ Defines usage limits based on subscription tier (Free, Basic, Premium, Enterpris
 ```
 
 **Purpose in Hedge Fund:**
+
 - Enforces **capital limits** per tier (prevents over-leveraging)
 - Controls **AI agent usage** (cost management)
 - Manages **data access** (real-time vs delayed market data)
@@ -109,6 +117,7 @@ Defines usage limits based on subscription tier (Free, Basic, Premium, Enterpris
 Represents a user's connection to a cryptocurrency exchange. Each user can connect multiple exchanges with different trading accounts.
 
 **Key Fields:**
+
 - `id`: UUID
 - `user_id`: UUID (FK to User)
 - `exchange`: enum (binance, bybit, okx, kucoin, gate)
@@ -124,17 +133,20 @@ Represents a user's connection to a cryptocurrency exchange. Each user can conne
 - `listen_key_expires_at`: timestamp (auto-renewal tracking)
 
 **Security:**
+
 - All credentials stored **encrypted at rest**
 - Uses `pkg/crypto` encryption helpers
 - Never logs or exposes plaintext keys
 - WebSocket listen keys auto-renewed via background worker
 
 **Relationships:**
+
 - 1 ExchangeAccount → N Positions
 - 1 ExchangeAccount → N Orders
 - 1 ExchangeAccount → N TradingPairs
 
 **Hedge Fund Specifics:**
+
 - Users can segregate capital across multiple exchanges
 - Each exchange account operates independently (risk isolation)
 - Automated health checks deactivate accounts with invalid API keys
@@ -149,6 +161,7 @@ Represents a user's connection to a cryptocurrency exchange. Each user can conne
 Represents a **trading portfolio** (hedge fund strategy). Each user can have multiple strategies with different risk profiles and asset allocations.
 
 **Key Fields:**
+
 - `id`: UUID
 - `user_id`: UUID (FK to User)
 - `name`: string ("Conservative Growth", "Momentum Trading")
@@ -162,24 +175,26 @@ Represents a **trading portfolio** (hedge fund strategy). Each user can have mul
 - `rebalance_frequency`: enum (daily, weekly, monthly, never)
 - `target_allocations`: JSONB ({"BTC/USDT": 0.5, "ETH/USDT": 0.3, "SOL/USDT": 0.2})
 - `total_pnl`: decimal (CurrentEquity - AllocatedCapital)
-- `total_pnl_percent`: decimal ((CurrentEquity/AllocatedCapital - 1) * 100)
+- `total_pnl_percent`: decimal ((CurrentEquity/AllocatedCapital - 1) \* 100)
 - `sharpe_ratio`: decimal (risk-adjusted returns)
 - `max_drawdown`: decimal (peak-to-trough decline)
 - `win_rate`: decimal (winning trades %)
 - `reasoning_log`: JSONB (AI reasoning for portfolio creation - **explainability**)
 
 **Target Allocations Example:**
+
 ```json
 {
-  "BTC/USDT": 0.40,
-  "ETH/USDT": 0.30,
+  "BTC/USDT": 0.4,
+  "ETH/USDT": 0.3,
   "SOL/USDT": 0.15,
-  "AVAX/USDT": 0.10,
+  "AVAX/USDT": 0.1,
   "USDT": 0.05
 }
 ```
 
 **Business Logic:**
+
 ```go
 // Capital allocation flow
 CurrentEquity = CashReserve + Sum(PositionsMarketValue)
@@ -195,10 +210,12 @@ strategy.UpdateEquity(positionsValue) -> recalculates metrics
 ```
 
 **Relationships:**
+
 - 1 Strategy → N Positions (portfolio holdings)
 - 1 Strategy → N TradingPairs (watchlist/allocation targets)
 
 **Hedge Fund Specifics:**
+
 - Tracks **allocated capital separately** from current equity (essential for PnL)
 - Supports **portfolio rebalancing** based on target allocations
 - Stores **AI reasoning** for regulatory compliance and explainability
@@ -213,6 +230,7 @@ strategy.UpdateEquity(positionsValue) -> recalculates metrics
 Represents an **open trading position** (long or short). This is the core entity for active trades.
 
 **Key Fields:**
+
 - `id`: UUID
 - `user_id`: UUID (FK to User)
 - `trading_pair_id`: UUID (FK to TradingPair)
@@ -241,6 +259,7 @@ Represents an **open trading position** (long or short). This is the core entity
 - `closed_at`: timestamp (NULL if open)
 
 **Real-time P&L Calculation:**
+
 ```go
 // For LONG position:
 UnrealizedPnL = (CurrentPrice - EntryPrice) * Size
@@ -252,12 +271,14 @@ UnrealizedPnLPct = ((EntryPrice / CurrentPrice) - 1) * 100 * Leverage
 ```
 
 **Relationships:**
+
 - 1 Position → 1 Strategy (portfolio allocation)
 - 1 Position → 1 TradingPair (market configuration)
 - 1 Position → 1 ExchangeAccount (execution venue)
 - 1 Position → N Orders (entry, SL, TP orders)
 
 **Hedge Fund Specifics:**
+
 - **Real-time price updates** via WebSocket (sub-second latency)
 - **Automatic SL/TP order placement** on position open
 - **Liquidation monitoring** for futures positions (risk alert system)
@@ -271,6 +292,7 @@ UnrealizedPnLPct = ((EntryPrice / CurrentPrice) - 1) * 100 * Leverage
 Represents a **trading order** (buy/sell instruction sent to exchange).
 
 **Key Fields:**
+
 - `id`: UUID (internal ID)
 - `exchange_order_id`: string (exchange's order ID - for tracking)
 - `user_id`: UUID (FK to User)
@@ -296,6 +318,7 @@ Represents a **trading order** (buy/sell instruction sent to exchange).
 - `filled_at`: timestamp (NULL if not filled yet)
 
 **Order Lifecycle:**
+
 ```
 pending -> open -> partial -> filled
                     ↓
@@ -303,10 +326,12 @@ pending -> open -> partial -> filled
 ```
 
 **Relationships:**
+
 - 1 Order → 0..1 Position (entry order creates position)
 - 1 Order → 0..1 ParentOrder (SL/TP linked to main order)
 
 **Hedge Fund Specifics:**
+
 - **Agent attribution** (`agent_id`) for performance tracking
 - **Reasoning storage** for compliance and explainability
 - **Parent-child relationships** for SL/TP order management
@@ -320,6 +345,7 @@ pending -> open -> partial -> filled
 Represents a **configured trading pair** (watchlist item) for a user.
 
 **Key Fields:**
+
 - `id`: UUID
 - `user_id`: UUID (FK to User)
 - `strategy_id`: UUID (FK to Strategy - links to portfolio)
@@ -339,15 +365,18 @@ Represents a **configured trading pair** (watchlist item) for a user.
 - `paused_reason`: string (e.g., "high volatility", "circuit breaker")
 
 **Strategy Modes:**
+
 - **auto**: Fully autonomous trading (no human approval)
 - **semi_auto**: Requires user confirmation before execution
 - **signals**: Only sends trade signals, no execution
 
 **Relationships:**
+
 - 1 TradingPair → N Positions (historical positions on this pair)
 - 1 TradingPair → 1 Strategy (portfolio allocation)
 
 **Hedge Fund Specifics:**
+
 - Links **market configuration** to **portfolio strategy**
 - Enables **per-pair risk limits** (max size, leverage)
 - Supports **pausing individual pairs** without closing positions
@@ -362,6 +391,7 @@ Represents a **configured trading pair** (watchlist item) for a user.
 Tracks **risk metrics** and circuit breaker status per user. Auto-halts trading when risk thresholds are breached.
 
 **Key Fields:**
+
 - `user_id`: UUID (FK to User - primary key)
 - `is_triggered`: bool (circuit breaker active?)
 - `triggered_at`: timestamp
@@ -377,6 +407,7 @@ Tracks **risk metrics** and circuit breaker status per user. Auto-halts trading 
 - `reset_at`: timestamp (next day 00:00 UTC - auto-reset)
 
 **Circuit Breaker Logic:**
+
 ```go
 // Trigger conditions (any of):
 1. DailyPnLPercent <= -MaxDailyDrawdown
@@ -391,9 +422,11 @@ Tracks **risk metrics** and circuit breaker status per user. Auto-halts trading 
 ```
 
 **Relationships:**
+
 - 1 CircuitBreakerState → 1 User (one-to-one)
 
 **Hedge Fund Specifics:**
+
 - **Automatic risk protection** prevents catastrophic losses
 - **Daily reset** allows fresh start each trading day
 - **Consecutive loss tracking** detects strategy breakdown
@@ -406,6 +439,7 @@ Tracks **risk metrics** and circuit breaker status per user. Auto-halts trading 
 Historical log of **risk alerts and circuit breaker triggers**.
 
 **Key Fields:**
+
 - `id`: UUID
 - `user_id`: UUID (FK to User)
 - `timestamp`: timestamp
@@ -416,6 +450,7 @@ Historical log of **risk alerts and circuit breaker triggers**.
 - `acknowledged`: bool (user has seen the alert)
 
 **Event Types:**
+
 - `drawdown_warning`: Approaching drawdown limit (80% threshold)
 - `consecutive_loss`: Multiple losing trades in a row
 - `circuit_breaker_triggered`: Trading halted
@@ -424,6 +459,7 @@ Historical log of **risk alerts and circuit breaker triggers**.
 - `anomaly_detected`: ML-based anomaly detection
 
 **Hedge Fund Specifics:**
+
 - **Audit trail** for risk events (regulatory compliance)
 - **Real-time alerts** to user via Telegram
 - **ML anomaly detection** for unusual trading patterns
@@ -437,6 +473,7 @@ Historical log of **risk alerts and circuit breaker triggers**.
 Unified memory system for AI agents. Supports **episodic** (user-specific) and **semantic** (collective) memory.
 
 **Key Fields:**
+
 - `id`: UUID
 - `scope`: enum (user, collective, working)
 - `user_id`: UUID (NULL for collective memories)
@@ -460,11 +497,13 @@ Unified memory system for AI agents. Supports **episodic** (user-specific) and *
 - `expires_at`: timestamp (NULL for permanent memories)
 
 **Memory Scopes:**
+
 - **user**: Agent-level episodic memory for specific user (e.g., "I opened BTC long at $42k")
 - **collective**: Agent-level shared knowledge across all users (e.g., "BTC breakouts above $45k succeed 73% of the time")
 - **working**: Temporary scratch space (e.g., current analysis context)
 
 **Memory Types:**
+
 - **observation**: Market pattern observed ("volume spike detected")
 - **decision**: Trade decision reasoning ("entering long due to bullish divergence")
 - **trade**: Trade outcome ("closed position with +5.2% profit")
@@ -473,6 +512,7 @@ Unified memory system for AI agents. Supports **episodic** (user-specific) and *
 - **pattern**: Detected recurring pattern ("cup and handle formation")
 
 **Semantic Search:**
+
 ```sql
 -- Find similar memories using cosine similarity
 SELECT *, 1 - (embedding <=> query_embedding) AS similarity
@@ -484,17 +524,20 @@ LIMIT 10;
 ```
 
 **Collective Memory Validation:**
+
 - Memories start with `validation_score = 0.0`
 - Each successful trade using the memory increases validation
 - Memories with high validation scores are prioritized
 - Low-scoring memories auto-expire after N days
 
 **Relationships:**
+
 - N Memories → 1 User (episodic memories)
 - N Memories → 1 Agent (agent attribution)
 - N Memories → 1 SourceTrade (memory provenance)
 
 **Hedge Fund Specifics:**
+
 - **Semantic search** retrieves relevant past experiences for current decision
 - **Collective learning** allows agents to learn from all users' trades
 - **Validation system** ensures only high-quality patterns are retained
@@ -508,6 +551,7 @@ LIMIT 10;
 Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 
 **Key Fields:**
+
 - `id`: UUID
 - `app_name`: string ("prometheus-agents")
 - `user_id`: string (maps to User.ID)
@@ -518,15 +562,16 @@ Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 - `created_at`: timestamp
 
 **Event Structure:**
+
 ```json
 {
   "event_id": "evt_abc123",
   "author": "market_analyst",
-  "content": {"type": "text", "text": "Analyzing BTC momentum..."},
+  "content": { "type": "text", "text": "Analyzing BTC momentum..." },
   "timestamp": "2024-01-15T10:30:00Z",
   "actions": {
     "transfer_to_agent": "risk_manager",
-    "state_delta": {"analysis_complete": true}
+    "state_delta": { "analysis_complete": true }
   },
   "usage_metadata": {
     "prompt_tokens": 1500,
@@ -537,11 +582,13 @@ Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 ```
 
 **State Management:**
+
 - `_app_` prefix: Application-level state (all users)
 - `_user_` prefix: User-level state (across sessions)
 - `_temp_` prefix: Session-specific temporary state
 
 **Hedge Fund Specifics:**
+
 - **Multi-agent conversations** (10-20 agents per session)
 - **Token usage tracking** for cost management
 - **Agent handoffs** via `transfer_to_agent`
@@ -556,6 +603,7 @@ Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 **Trade journal** with post-trade analysis and lessons learned.
 
 **Key Fields:**
+
 - `id`: UUID
 - `user_id`: UUID (FK to User)
 - `trade_id`: UUID (FK to Position)
@@ -578,6 +626,7 @@ Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 - `improvement_tips`: text (AI suggestions)
 
 **Business Logic:**
+
 ```go
 // Post-trade analysis (AI-generated):
 1. Was entry timing optimal? (check if max_profit > exit_price)
@@ -588,6 +637,7 @@ Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 ```
 
 **Hedge Fund Specifics:**
+
 - **Automated trade journal** generation (no manual input)
 - **AI-powered post-mortem** analysis
 - **Pattern extraction** (feeds into collective memory)
@@ -600,6 +650,7 @@ Tracks **ADK (Agent Development Kit) agent sessions** for conversation history.
 Tracks **AI model usage and costs** (stored in ClickHouse for analytics).
 
 **Key Fields:**
+
 - `timestamp`: DateTime
 - `event_id`: string
 - `user_id`: string
@@ -616,6 +667,7 @@ Tracks **AI model usage and costs** (stored in ClickHouse for analytics).
 - `workflow_name`: string (MarketResearchWorkflow)
 
 **Analytics Queries:**
+
 ```sql
 -- Cost per user per day
 SELECT user_id, toDate(timestamp) as date, sum(total_cost_usd) as cost
@@ -631,6 +683,7 @@ ORDER BY total_cost DESC;
 ```
 
 **Hedge Fund Specifics:**
+
 - **Cost attribution** per user and agent
 - **Prompt caching analytics** (cost savings)
 - **Performance monitoring** (latency tracking)
@@ -645,12 +698,14 @@ ORDER BY total_cost DESC;
 High-frequency market data stored in **ClickHouse** for fast analytics.
 
 **Tables:**
+
 - `market_data_tick`: Real-time tick data (WebSocket)
 - `market_data_kline`: Candlestick data (1m, 5m, 15m, 1h, 4h, 1d)
 - `market_data_orderbook`: Order book snapshots
 - `market_data_trades`: Executed trades
 
 **Example Schema (market_data_kline):**
+
 ```sql
 CREATE TABLE market_data_kline (
     timestamp DateTime64(3),
@@ -669,6 +724,7 @@ ORDER BY (symbol, exchange, timeframe, timestamp);
 ```
 
 **Hedge Fund Specifics:**
+
 - **Sub-second latency** for real-time data
 - **Historical backtesting** data (years of candles)
 - **Cross-exchange aggregation** (multi-venue analytics)
@@ -680,6 +736,7 @@ ORDER BY (symbol, exchange, timeframe, timestamp);
 ML-based **market regime detection** (trend, range, volatile).
 
 **Key Fields:**
+
 - `id`: UUID
 - `symbol`: string (BTC/USDT)
 - `timeframe`: string (1h, 4h, 1d)
@@ -690,6 +747,7 @@ ML-based **market regime detection** (trend, range, volatile).
 - `model_version`: string (regime_model_v1.2)
 
 **Business Logic:**
+
 ```
 Trend Up:    ADX > 25, Price > MA(50), ATR stable
 Trend Down:  ADX > 25, Price < MA(50), ATR stable
@@ -699,6 +757,7 @@ Transition:  Regime change in progress
 ```
 
 **Hedge Fund Specifics:**
+
 - **Regime-aware trading** (different strategies per regime)
 - **ML model predictions** updated every 15 minutes
 - **Agent context** for decision-making
@@ -748,6 +807,7 @@ Strategy.TotalPnL = CurrentEquity - AllocatedCapital
 ### 2. **Position-Strategy Linkage**
 
 Every `Position` has `strategy_id` linking it to a portfolio. This enables:
+
 - Portfolio-level risk aggregation
 - Per-strategy performance analytics
 - Multi-strategy accounts (conservative + aggressive)
@@ -763,6 +823,7 @@ Every `Position` has `strategy_id` linking it to a portfolio. This enables:
 ### 4. **Circuit Breaker Integration**
 
 Before opening position:
+
 ```go
 1. Check CircuitBreakerState.is_triggered
 2. If triggered → reject order
@@ -776,6 +837,7 @@ Before opening position:
 ### 5. **Memory-Driven Trading**
 
 Before making decision:
+
 ```go
 1. Query relevant memories (semantic search)
 2. Filter by market regime, symbol, timeframe
@@ -828,6 +890,7 @@ Before making decision:
 ## Compliance & Explainability
 
 Every trade has **full audit trail**:
+
 1. `Position.open_reasoning` (why opened)
 2. `Order.reasoning` (why this order type/price)
 3. `Memory` (historical context used)
@@ -835,6 +898,7 @@ Every trade has **full audit trail**:
 5. `JournalEntry.lessons_learned` (post-mortem)
 
 This enables:
+
 - Regulatory compliance (MiFID II, SEC requirements)
 - User transparency (explain any trade)
 - ML model validation (verify decision quality)
@@ -844,6 +908,7 @@ This enables:
 ## Conclusion
 
 This database architecture supports a **fully autonomous AI-driven hedge fund** with:
+
 - ✅ Multi-user portfolio management
 - ✅ Real-time risk monitoring
 - ✅ AI agent memory and learning
@@ -853,4 +918,3 @@ This database architecture supports a **fully autonomous AI-driven hedge fund** 
 - ✅ Advanced analytics
 
 The design follows **Clean Architecture** principles with strict separation of concerns, enabling easy testing, maintenance, and scalability.
-

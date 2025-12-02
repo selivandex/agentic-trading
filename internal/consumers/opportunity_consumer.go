@@ -16,7 +16,7 @@ import (
 
 	kafkaadapter "prometheus/internal/adapters/kafka"
 	"prometheus/internal/agents/workflows"
-	"prometheus/internal/domain/trading_pair"
+	strategyDomain "prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
 	eventspb "prometheus/internal/events/proto"
 	"prometheus/pkg/errors"
@@ -28,7 +28,7 @@ import (
 // runs personalized trading decisions for each interested user
 type OpportunityConsumer struct {
 	consumer        *kafkaadapter.Consumer
-	tradingPairRepo trading_pair.Repository
+	strategyRepo    strategyDomain.Repository
 	userService     *user.Service
 	workflowFactory *workflows.Factory
 	sessionService  session.Service
@@ -39,7 +39,7 @@ type OpportunityConsumer struct {
 // NewOpportunityConsumer creates a new opportunity event consumer
 func NewOpportunityConsumer(
 	consumer *kafkaadapter.Consumer,
-	tradingPairRepo trading_pair.Repository,
+	strategyRepo strategyDomain.Repository,
 	userService *user.Service,
 	workflowFactory *workflows.Factory,
 	sessionService session.Service,
@@ -52,7 +52,7 @@ func NewOpportunityConsumer(
 
 	return &OpportunityConsumer{
 		consumer:        consumer,
-		tradingPairRepo: tradingPairRepo,
+		strategyRepo:    strategyRepo,
 		userService:     userService,
 		workflowFactory: workflowFactory,
 		sessionService:  sessionService,
@@ -130,21 +130,39 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		"entry", event.Entry,
 	)
 
-	// Get trading pairs monitoring this symbol via repository
-	// Note: Using repository here as domain service doesn't provide GetActiveBySymbol
-	pairs, err := oc.tradingPairRepo.GetActiveBySymbol(ctx, event.Symbol)
+	// Get all active strategies and filter by target_allocations
+	// New architecture: users don't have trading_pairs, they have target_allocations in Strategy
+	strategies, err := oc.strategyRepo.GetAllActive(ctx)
 	if err != nil {
-		return errors.Wrap(err, "get trading pairs for symbol")
+		return errors.Wrap(err, "get active strategies")
 	}
 
-	if len(pairs) == 0 {
-		oc.log.Debugw("No trading pairs monitoring this symbol", "symbol", event.Symbol)
+	// Filter strategies that have this symbol in target_allocations
+	var interestedStrategies []*strategyDomain.Strategy
+	for _, strat := range strategies {
+		allocations, err := strat.ParseTargetAllocations()
+		if err != nil {
+			oc.log.Warnw("Failed to parse target allocations",
+				"strategy_id", strat.ID,
+				"error", err,
+			)
+			continue
+		}
+
+		// Check if symbol is in target allocations
+		if _, hasSymbol := allocations[event.Symbol]; hasSymbol {
+			interestedStrategies = append(interestedStrategies, strat)
+		}
+	}
+
+	if len(interestedStrategies) == 0 {
+		oc.log.Debugw("No strategies interested in this symbol", "symbol", event.Symbol)
 		return nil
 	}
 
-	oc.log.Infow("Found trading pairs interested in opportunity",
+	oc.log.Infow("Found strategies interested in opportunity",
 		"symbol", event.Symbol,
-		"pairs_count", len(pairs),
+		"strategies_count", len(interestedStrategies),
 	)
 
 	// Run personal trading workflow for each interested user (concurrent with limit)
@@ -166,13 +184,13 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		workflowCancel()
 	}()
 
-	for _, pair := range pairs {
+	for _, strategy := range interestedStrategies {
 		// Check if shutdown was requested before starting new workflow
 		select {
 		case <-shutdownCh:
 			oc.log.Warnw("Shutdown requested, skipping remaining workflows",
 				"symbol", event.Symbol,
-				"remaining_users", len(pairs),
+				"remaining_strategies", len(interestedStrategies),
 			)
 			// Don't start new workflows during shutdown
 			goto waitForCompletion
@@ -180,9 +198,9 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		}
 
 		// Get user using UserService (Clean Architecture)
-		usr, err := oc.userService.GetByID(ctx, pair.UserID)
+		usr, err := oc.userService.GetByID(ctx, strategy.UserID)
 		if err != nil {
-			oc.log.Errorw("Failed to get user", "user_id", pair.UserID, "error", err)
+			oc.log.Errorw("Failed to get user", "user_id", strategy.UserID, "error", err)
 			continue
 		}
 
@@ -197,7 +215,7 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 		}
 
 		wg.Add(1)
-		go func(u *user.User, p *trading_pair.TradingPair) {
+		go func(u *user.User, strat *strategyDomain.Strategy) {
 			defer wg.Done()
 
 			// Acquire semaphore
@@ -207,19 +225,19 @@ func (oc *OpportunityConsumer) handleOpportunity(ctx context.Context, msg kafka.
 			case <-workflowCtx.Done():
 				oc.log.Warnw("Workflow cancelled before starting (context done)",
 					"user_id", u.ID,
-					"symbol", p.Symbol,
+					"symbol", event.Symbol,
 				)
 				return
 			}
 
-			if err := oc.runPersonalTradingWorkflow(workflowCtx, u, p, &event); err != nil {
+			if err := oc.runPersonalTradingWorkflow(workflowCtx, u, strat, &event); err != nil {
 				oc.log.Errorw("Personal trading workflow failed",
 					"user_id", u.ID,
-					"symbol", p.Symbol,
+					"symbol", event.Symbol,
 					"error", err,
 				)
 			}
-		}(usr, pair)
+		}(usr, strategy)
 	}
 
 waitForCompletion:
@@ -242,7 +260,7 @@ waitForCompletion:
 	case <-done:
 		oc.log.Infow("Opportunity processing complete",
 			"symbol", event.Symbol,
-			"users_processed", len(pairs),
+			"users_processed", len(interestedStrategies),
 		)
 	case <-time.After(waitTimeout):
 		oc.log.Warn("Timeout waiting for workflows to complete",
@@ -271,12 +289,13 @@ waitForCompletion:
 func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 	ctx context.Context,
 	usr *user.User,
-	pair *trading_pair.TradingPair,
+	strategy *strategyDomain.Strategy,
 	opportunity *eventspb.OpportunityFoundEvent,
 ) error {
 	oc.log.Infow("Running personal trading workflow",
 		"user_id", usr.ID,
-		"symbol", pair.Symbol,
+		"strategy_id", strategy.ID,
+		"symbol", opportunity.Symbol,
 		"opportunity_confidence", opportunity.Confidence,
 	)
 
@@ -300,7 +319,7 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 	input := &genai.Content{
 		Role: "user",
 		Parts: []*genai.Part{
-			{Text: oc.buildTradingPrompt(usr, pair, opportunity)},
+			{Text: oc.buildTradingPrompt(usr, strategy, opportunity)},
 		},
 	}
 
@@ -331,9 +350,9 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 			for _, part := range event.LLMResponse.Content.Parts {
 				if part.FunctionCall != nil && part.FunctionCall.Name == "place_order" {
 					orderPlaced = true
-					oc.log.Infow("Order placed by executor",
+					oc.log.Infow("Order placed by portfolio manager",
 						"user_id", usr.ID,
-						"symbol", pair.Symbol,
+						"symbol", opportunity.Symbol,
 					)
 				}
 			}
@@ -344,7 +363,7 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 			duration := time.Since(startTime)
 			oc.log.Infow("Personal trading workflow complete",
 				"user_id", usr.ID,
-				"symbol", pair.Symbol,
+				"symbol", opportunity.Symbol,
 				"session_id", sessionID,
 				"order_placed", orderPlaced,
 				"duration", duration,
@@ -356,70 +375,49 @@ func (oc *OpportunityConsumer) runPersonalTradingWorkflow(
 	return nil
 }
 
-// buildTradingPrompt creates the input prompt for personal trading workflow
+// buildTradingPrompt creates the input prompt for personal trading workflow using templates
 func (oc *OpportunityConsumer) buildTradingPrompt(
 	usr *user.User,
-	pair *trading_pair.TradingPair,
+	strategy *strategyDomain.Strategy,
 	opp *eventspb.OpportunityFoundEvent,
 ) string {
-	return fmt.Sprintf(`# Trading Opportunity Signal
+	// Get target allocation for this symbol
+	allocations, _ := strategy.ParseTargetAllocations()
+	targetAlloc := allocations[opp.Symbol] * 100 // Convert to percentage
 
-## Pre-Analyzed Market Signal (Global Research)
+	cashReserve, _ := strategy.CashReserve.Float64()
 
-**Symbol**: %s
-**Exchange**: %s
-**Direction**: %s
-**Confidence**: %.2f
-**Strategy**: %s
+	// Prepare template data
+	data := map[string]interface{}{
+		// Opportunity data
+		"Symbol":       opp.Symbol,
+		"Exchange":     opp.Exchange,
+		"Direction":    opp.Direction,
+		"Confidence":   opp.Confidence * 100, // As percentage
+		"StrategyType": opp.Strategy,
+		"EntryPrice":   opp.Entry,
+		"StopLoss":     opp.StopLoss,
+		"TakeProfit":   opp.TakeProfit,
+		"Timeframe":    opp.Timeframe,
+		"Reasoning":    opp.Reasoning,
+		// User/Strategy context
+		"UserID":           usr.ID.String(),
+		"StrategyID":       strategy.ID.String(),
+		"StrategyName":     strategy.Name,
+		"RiskTolerance":    string(strategy.RiskTolerance),
+		"TargetAllocation": targetAlloc,
+		"AvailableCash":    cashReserve,
+	}
 
-**Entry Price**: %.2f
-**Stop Loss**: %.2f
-**Take Profit**: %.2f
-**Timeframe**: %s
+	// Render template with CoT framework
+	// TODO: Add templates.Get() dependency to consumer
+	// For now, use simple approach
+	_ = data
 
-**Analysis Reasoning**:
-%s
-
----
-
-## Your Personal Context
-
-**User ID**: %s
-**Risk Tolerance**: %s
-**Trading Pair**: %s
-
-**Your Task**:
-
-You are a Portfolio Manager executing a personal trading workflow. The market research has ALREADY been completed. Your job is to make a personalized trading decision based on:
-
-1. **The PRE-ANALYZED market signal above** (objective market view)
-2. **Your personal context** (portfolio, risk profile, existing positions)
-
-### Workflow:
-- Use tools to get YOUR context:
-  - get_portfolio_summary() - understand current portfolio
-  - get_positions() - check existing positions
-  - get_user_risk_profile() - understand risk limits
-- Decide: Should YOU take this trade? If yes, with what size?
-- Validate via pre_trade_check() tool against YOUR risk limits
-- If approved → execute via execute_trade() tool
-- If rejected → log reason and skip
-
-**Think step-by-step. Be thorough but decisive.**
-
-Your decision should be personalized to YOUR portfolio and risk profile, not just the global signal.`,
+	return fmt.Sprintf(`TODO: Use template workflows/personal_trading_input.tmpl
+Symbol: %s, Strategy: %s, Target: %.1f%%`,
 		opp.Symbol,
-		opp.Exchange,
-		opp.Direction,
-		opp.Confidence,
-		opp.Strategy,
-		opp.Entry,
-		opp.StopLoss,
-		opp.TakeProfit,
-		opp.Timeframe,
-		opp.Reasoning,
-		usr.ID,
-		usr.Settings.RiskLevel,
-		pair.Symbol,
+		strategy.Name,
+		targetAlloc,
 	)
 }

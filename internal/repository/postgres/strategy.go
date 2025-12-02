@@ -131,6 +131,29 @@ func (r *StrategyRepository) GetActiveByUserID(ctx context.Context, userID uuid.
 	return strategies, nil
 }
 
+// GetAllActive retrieves all active strategies across all users
+func (r *StrategyRepository) GetAllActive(ctx context.Context) ([]*strategy.Strategy, error) {
+	var strategies []*strategy.Strategy
+
+	query := `
+		SELECT id, user_id, name, description, status,
+			   allocated_capital, current_equity, cash_reserve,
+			   risk_tolerance, rebalance_frequency, target_allocations,
+			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
+			   created_at, updated_at, closed_at, last_rebalanced_at,
+			   reasoning_log
+		FROM user_strategies
+		WHERE status = 'active'
+		ORDER BY created_at DESC`
+
+	err := r.db.SelectContext(ctx, &strategies, query)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get all active strategies")
+	}
+
+	return strategies, nil
+}
+
 // Update updates an existing strategy
 func (r *StrategyRepository) Update(ctx context.Context, s *strategy.Strategy) error {
 	query := `

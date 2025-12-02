@@ -12,6 +12,7 @@ Before AND after writing code, ask yourself:
 1. Am I following CLEAN architecture principles? (separation of concerns, dependency rule)
 2. Am I following SOLID principles? (SRP, OCP, LSP, ISP, DIP)
 3. Am I following DRY? (no code duplication, single source of truth)
+4. Am I following golang naming convention?
 
 If answer is NO to any — STOP and refactor.
 

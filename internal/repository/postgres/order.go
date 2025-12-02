@@ -27,7 +27,7 @@ func NewOrderRepository(db *sqlx.DB) *OrderRepository {
 func (r *OrderRepository) Create(ctx context.Context, o *order.Order) error {
 	query := `
 		INSERT INTO orders (
-			id, user_id, trading_pair_id, exchange_account_id,
+			id, user_id, strategy_id, exchange_account_id,
 			exchange_order_id, symbol, market_type,
 			side, type, status,
 			price, amount, filled_amount, avg_fill_price,
@@ -41,7 +41,7 @@ func (r *OrderRepository) Create(ctx context.Context, o *order.Order) error {
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
-		o.ID, o.UserID, o.TradingPairID, o.ExchangeAccountID,
+		o.ID, o.UserID, o.StrategyID, o.ExchangeAccountID,
 		o.ExchangeOrderID, o.Symbol, o.MarketType,
 		o.Side, o.Type, o.Status,
 		o.Price, o.Amount, o.FilledAmount, o.AvgFillPrice,
@@ -64,7 +64,7 @@ func (r *OrderRepository) CreateBatch(ctx context.Context, orders []*order.Order
 
 	query := `
 		INSERT INTO orders (
-			id, user_id, trading_pair_id, exchange_account_id,
+			id, user_id, strategy_id, exchange_account_id,
 			exchange_order_id, symbol, market_type,
 			side, type, status,
 			price, amount, filled_amount, avg_fill_price,
@@ -79,7 +79,7 @@ func (r *OrderRepository) CreateBatch(ctx context.Context, orders []*order.Order
 
 	for _, o := range orders {
 		_, err := tx.ExecContext(ctx, query,
-			o.ID, o.UserID, o.TradingPairID, o.ExchangeAccountID,
+			o.ID, o.UserID, o.StrategyID, o.ExchangeAccountID,
 			o.ExchangeOrderID, o.Symbol, o.MarketType,
 			o.Side, o.Type, o.Status,
 			o.Price, o.Amount, o.FilledAmount, o.AvgFillPrice,
@@ -141,16 +141,16 @@ func (r *OrderRepository) GetOpenByUser(ctx context.Context, userID uuid.UUID) (
 	return orders, nil
 }
 
-// GetByTradingPair retrieves all orders for a trading pair
-func (r *OrderRepository) GetByTradingPair(ctx context.Context, tradingPairID uuid.UUID) ([]*order.Order, error) {
+// GetByStrategy retrieves all orders for a strategy
+func (r *OrderRepository) GetByStrategy(ctx context.Context, strategyID uuid.UUID) ([]*order.Order, error) {
 	var orders []*order.Order
 
 	query := `
 		SELECT * FROM orders
-		WHERE trading_pair_id = $1
+		WHERE strategy_id = $1
 		ORDER BY created_at DESC`
 
-	err := r.db.SelectContext(ctx, &orders, query, tradingPairID)
+	err := r.db.SelectContext(ctx, &orders, query, strategyID)
 	if err != nil {
 		return nil, err
 	}

@@ -2,18 +2,18 @@ package shared
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
+
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
-	"prometheus/internal/domain/reasoning"
 	"prometheus/internal/domain/risk"
 	"prometheus/internal/domain/user"
 	"prometheus/pkg/logger"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 // RiskEngine interface to avoid circular dependency
@@ -30,16 +30,24 @@ type EmbeddingProvider interface {
 	Name() string
 }
 
+// OrderService interface to avoid circular dependency
+type OrderService interface {
+	Place(ctx context.Context, params order.PlaceParams) (*order.Order, error)
+	Cancel(ctx context.Context, id uuid.UUID) error
+	GetByID(ctx context.Context, id uuid.UUID) (*order.Order, error)
+	GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*order.Order, error)
+}
+
 // Deps bundles dependencies required by concrete tool implementations
 // Note: Stats tracking is now handled by ADK callbacks, not tool middleware
 // Note: KafkaProducer is not included here - tools that need it receive it directly
 type Deps struct {
 	MarketDataRepo      market_data.Repository
 	OrderRepo           order.Repository
+	OrderService        OrderService // Injected service for business logic
 	PositionRepo        position.Repository
 	ExchangeAccountRepo exchange_account.Repository
 	MemoryRepo          memory.Repository
-	ReasoningRepo       reasoning.Repository
 	RiskRepo            risk.Repository
 	UserRepo            user.Repository
 	RiskEngine          RiskEngine

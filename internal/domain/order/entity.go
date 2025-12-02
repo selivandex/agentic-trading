@@ -9,10 +9,10 @@ import (
 
 // Order represents a trading order
 type Order struct {
-	ID                uuid.UUID `db:"id"`
-	UserID            uuid.UUID `db:"user_id"`
-	TradingPairID     uuid.UUID `db:"trading_pair_id"`
-	ExchangeAccountID uuid.UUID `db:"exchange_account_id"`
+	ID                uuid.UUID  `db:"id"`
+	UserID            uuid.UUID  `db:"user_id"`
+	StrategyID        *uuid.UUID `db:"strategy_id"` // Link to user_strategies table
+	ExchangeAccountID uuid.UUID  `db:"exchange_account_id"`
 
 	// Exchange data
 	ExchangeOrderID string `db:"exchange_order_id"`

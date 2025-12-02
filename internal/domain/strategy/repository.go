@@ -22,6 +22,9 @@ type Repository interface {
 	// GetActiveByUserID retrieves all active strategies for a user
 	GetActiveByUserID(ctx context.Context, userID uuid.UUID) ([]*Strategy, error)
 
+	// GetAllActive retrieves all active strategies across all users
+	GetAllActive(ctx context.Context) ([]*Strategy, error)
+
 	// Update updates an existing strategy
 	Update(ctx context.Context, strategy *Strategy) error
 

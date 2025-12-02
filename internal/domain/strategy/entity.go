@@ -6,8 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-
-	"prometheus/internal/domain/trading_pair"
 )
 
 // Strategy represents a user's trading strategy (portfolio)
@@ -27,10 +25,10 @@ type Strategy struct {
 	CashReserve      decimal.Decimal `db:"cash_reserve"`      // Unallocated cash (free balance)
 
 	// Strategy configuration
-	MarketType         trading_pair.MarketType `db:"market_type"` // spot or futures
-	RiskTolerance      RiskTolerance           `db:"risk_tolerance"`
-	RebalanceFrequency RebalanceFrequency      `db:"rebalance_frequency"`
-	TargetAllocations  json.RawMessage         `db:"target_allocations"` // {"BTC/USDT": 0.5, "ETH/USDT": 0.3}
+	MarketType         MarketType         `db:"market_type"` // spot or futures
+	RiskTolerance      RiskTolerance      `db:"risk_tolerance"`
+	RebalanceFrequency RebalanceFrequency `db:"rebalance_frequency"`
+	TargetAllocations  json.RawMessage    `db:"target_allocations"` // {"BTC/USDT": 0.5, "ETH/USDT": 0.3}
 
 	// Performance metrics (calculated periodically)
 	TotalPnL        decimal.Decimal  `db:"total_pnl"`         // CurrentEquity - AllocatedCapital
@@ -61,6 +59,24 @@ const (
 // Valid checks if status is valid
 func (s StrategyStatus) Valid() bool {
 	return s == StrategyActive || s == StrategyPaused || s == StrategyClosed
+}
+
+// MarketType represents market type for strategy
+type MarketType string
+
+const (
+	MarketSpot    MarketType = "spot"
+	MarketFutures MarketType = "futures"
+)
+
+// Valid checks if market type is valid
+func (m MarketType) Valid() bool {
+	return m == MarketSpot || m == MarketFutures
+}
+
+// String returns string representation
+func (m MarketType) String() string {
+	return string(m)
 }
 
 // RiskTolerance represents risk profile

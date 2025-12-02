@@ -15,10 +15,16 @@ func TestClickHouseCleanupDropsTable(t *testing.T) {
 		t.Fatalf("failed to insert row: %v", err)
 	}
 
-	var count uint64
-	if err := helper.Client().Query(context.Background(), &count, "SELECT count() FROM "+table); err != nil {
+	var counts []uint64
+	if err := helper.Client().Query(context.Background(), &counts, "SELECT count() FROM "+table); err != nil {
 		t.Fatalf("failed to count rows: %v", err)
 	}
+
+	if len(counts) == 0 {
+		t.Fatal("no count returned")
+	}
+
+	count := counts[0]
 
 	if count != 1 {
 		t.Fatalf("unexpected row count: %d", count)

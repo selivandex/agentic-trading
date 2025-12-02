@@ -6,6 +6,7 @@ import (
 	"prometheus/pkg/errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"google.golang.org/adk/tool"
 )
@@ -16,8 +17,8 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 		"place_order",
 		"Place a market or limit order",
 		func(ctx tool.Context, args map[string]interface{}) (map[string]interface{}, error) {
-			if deps.OrderRepo == nil {
-				return nil, errors.Wrapf(errors.ErrInternal, "place_order: order repository not configured")
+			if deps.OrderService == nil {
+				return nil, errors.Wrapf(errors.ErrInternal, "place_order: order service not configured")
 			}
 			userID, err := parseUUIDArg(args["user_id"], "user_id")
 			if err != nil {
@@ -27,10 +28,16 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 					return nil, err
 				}
 			}
-			tradingPairID, err := parseUUIDArg(args["trading_pair_id"], "trading_pair_id")
-			if err != nil {
-				return nil, err
+
+			// Optional strategy_id
+			var strategyID *uuid.UUID
+			if strategyIDStr, ok := args["strategy_id"].(string); ok && strategyIDStr != "" {
+				sID, err := uuid.Parse(strategyIDStr)
+				if err == nil {
+					strategyID = &sID
+				}
 			}
+
 			accountID, err := parseUUIDArg(args["exchange_account_id"], "exchange_account_id")
 			if err != nil {
 				return nil, err
@@ -66,10 +73,9 @@ func NewPlaceOrderTool(deps shared.Deps) tool.Tool {
 					return nil, errors.Wrap(err, "place_order: parse stop price")
 				}
 			}
-			service := order.NewService(deps.OrderRepo)
-			created, err := service.Place(ctx, order.PlaceParams{
+			created, err := deps.OrderService.Place(ctx, order.PlaceParams{
 				UserID:            userID,
-				TradingPairID:     tradingPairID,
+				StrategyID:        strategyID,
 				ExchangeAccountID: accountID,
 				Symbol:            symbol,
 				MarketType:        marketType,

@@ -79,14 +79,15 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 
 	// Step 1: Get or create strategy
 	var createdStrategy *strategy.Strategy
-	
+	var err error
+
 	if onboardingSession.StrategyID != nil {
 		// Use pre-created strategy from invest flow
 		s.log.Infow("Using pre-created strategy",
 			"strategy_id", *onboardingSession.StrategyID,
 			"user_id", onboardingSession.UserID,
 		)
-		
+
 		createdStrategy, err = s.strategyService.GetStrategyByID(ctx, *onboardingSession.StrategyID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get pre-created strategy")

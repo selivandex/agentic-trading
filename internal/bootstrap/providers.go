@@ -26,7 +26,6 @@ import (
 	tgapi "prometheus/internal/api/telegram"
 	"prometheus/internal/consumers"
 	"prometheus/internal/domain/exchange_account"
-	"prometheus/internal/domain/journal"
 	"prometheus/internal/domain/limit_profile"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
@@ -35,7 +34,6 @@ import (
 	domainRisk "prometheus/internal/domain/risk"
 	domainsession "prometheus/internal/domain/session"
 	strategyDomain "prometheus/internal/domain/strategy"
-	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
 	"prometheus/internal/metrics"
@@ -44,7 +42,6 @@ import (
 	"prometheus/internal/repository/redis"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	"prometheus/internal/services/exchange"
-	limitsservice "prometheus/internal/services/limits"
 	marketdatasvc "prometheus/internal/services/market_data"
 	"prometheus/internal/services/menu_session"
 	onboardingservice "prometheus/internal/services/onboarding"
@@ -131,23 +128,18 @@ func (c *Container) MustInitInfrastructure() {
 func (c *Container) MustInitRepositories() {
 	c.Repos.User = pgrepo.NewUserRepository(c.PG.DB())
 	c.Repos.ExchangeAccount = pgrepo.NewExchangeAccountRepository(c.PG.DB())
-	c.Repos.TradingPair = pgrepo.NewTradingPairRepository(c.PG.DB())
+	c.Repos.FundWatchlist = pgrepo.NewFundWatchlistRepository(c.PG.DB())
 	c.Repos.Order = pgrepo.NewOrderRepository(c.PG.DB())
 	c.Repos.Position = pgrepo.NewPositionRepository(c.PG.DB())
 	c.Repos.Memory = pgrepo.NewMemoryRepository(c.PG.DB())
-	c.Repos.Journal = pgrepo.NewJournalRepository(c.PG.DB())
 	c.Repos.Risk = pgrepo.NewRiskRepository(c.PG.DB())
 	c.Repos.Session = pgrepo.NewSessionRepository(c.PG.DB())
-	c.Repos.Reasoning = pgrepo.NewReasoningRepository(c.PG.DB())
 	c.Repos.LimitProfile = pgrepo.NewLimitProfileRepository(c.PG.DB())
 	c.Repos.Strategy = pgrepo.NewStrategyRepository(c.PG.DB())
 	c.Repos.StrategyTransaction = pgrepo.NewStrategyTransactionRepository(c.PG.DB())
 	c.Repos.MarketData = chrepo.NewMarketDataRepository(c.CH.Conn())
+	c.Repos.Stats = chrepo.NewStatsRepository(c.CH.Conn())
 	c.Repos.Regime = chrepo.NewRegimeRepository(c.CH.Conn())
-	c.Repos.Sentiment = chrepo.NewSentimentRepository(c.CH.Conn())
-	c.Repos.OnChain = chrepo.NewOnChainRepository(c.CH.Conn())
-	c.Repos.Derivatives = chrepo.NewDerivativesRepository(c.CH.Conn())
-	c.Repos.Macro = chrepo.NewMacroRepository(c.CH.Conn())
 	c.Repos.AIUsage = chrepo.NewAIUsageRepository(c.CH.Conn())
 
 	c.Log.Info("✓ Repositories initialized")
@@ -167,10 +159,7 @@ func (c *Container) MustInitAdapters() {
 	// to avoid two consumers competing for same messages on notifications topic
 	c.Adapters.NotificationConsumer = nil // Not used anymore, kept for backwards compatibility
 	c.Adapters.RiskConsumer = provideKafkaConsumer(c.Config, events.TopicRiskEvents, c.Log)
-	c.Adapters.AnalyticsConsumer = provideKafkaConsumer(c.Config, events.TopicAnalytics, c.Log)
 	c.Adapters.OpportunityConsumer = provideKafkaConsumer(c.Config, events.TopicMarketEvents, c.Log)
-	c.Adapters.AIUsageConsumer = provideKafkaConsumer(c.Config, events.TopicAIEvents, c.Log)
-	c.Adapters.PositionGuardianConsumer = provideKafkaConsumer(c.Config, events.TopicPositionEvents, c.Log)
 	c.Adapters.TelegramNotificationConsumer = provideKafkaConsumer(c.Config, events.TopicNotifications, c.Log)
 	c.Adapters.SystemEventsConsumer = provideKafkaConsumer(c.Config, events.TopicSystemEvents, c.Log)
 
@@ -229,7 +218,6 @@ func (c *Container) MustInitServices() {
 	// Application user service (wraps domain service + adds side effects)
 	c.Services.User = userservice.NewService(c.Services.DomainUser, c.Log)
 	c.Services.ExchangeAccount = exchange_account.NewService(c.Repos.ExchangeAccount)
-	c.Services.TradingPair = trading_pair.NewService(c.Repos.TradingPair)
 	c.Services.Order = order.NewService(c.Repos.Order)
 	c.Services.Position = position.NewService(c.Repos.Position)
 	c.Services.Memory = memory.NewService(c.Repos.Memory, c.Adapters.EmbeddingProvider)
@@ -244,26 +232,18 @@ func (c *Container) MustInitServices() {
 		dbAdapter,
 		c.Log,
 	)
-	c.Services.Journal = journal.NewService(c.Repos.Journal)
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)
 
 	// Position management service for WebSocket updates
 	c.Services.PositionManagement = positionservice.NewService(c.Repos.Position, c.Log)
 
-	// Limits service for tier/subscription management
-	c.Services.Limits = limitsservice.NewService(
-		c.Repos.LimitProfile,
-		c.Repos.ExchangeAccount,
-		c.Repos.User,
-	)
-
 	// Exchange service with notification publisher for Telegram
 	notificationPublisher := events.NewNotificationPublisher(c.Adapters.KafkaProducer)
 	c.Services.Exchange = exchange.NewService(
 		c.Repos.ExchangeAccount,
 		c.Adapters.Encryptor,
-		c.Services.Limits, // Inject limits service for validation
+		nil, // limitsChecker - can be nil, validation moved to strategy service
 		notificationPublisher,
 		c.Log,
 	)
@@ -296,6 +276,7 @@ func (c *Container) MustInitBusiness() {
 	c.Business.ToolRegistry = provideToolRegistry(
 		c.Repos.MarketData,
 		c.Repos.Order,
+		c.Services.Order, // Inject order service for DI
 		c.Repos.Position,
 		c.Repos.ExchangeAccount,
 		c.Repos.Memory,
@@ -322,7 +303,7 @@ func (c *Container) MustInitBusiness() {
 		c.Business.RiskEngine,
 		c.Adapters.KafkaProducer,
 		c.Repos.AIUsage,
-		c.Repos.Reasoning,
+		c.Repos.Stats.(*chrepo.StatsRepository), // Type assertion
 		c.Log,
 	)
 	if err != nil {
@@ -434,16 +415,11 @@ func (c *Container) MustInitBackground() {
 	// Workers
 	c.Background.WorkerScheduler = provideWorkers(
 		c.Repos.User,
-		c.Repos.TradingPair,
+		c.Repos.FundWatchlist,
+		c.Repos.Strategy,
 		c.Repos.Order,
 		c.Repos.Position,
-		c.Repos.Journal,
 		c.Repos.MarketData,
-		c.Repos.Regime,
-		c.Repos.Sentiment,
-		c.Repos.OnChain,
-		c.Repos.Derivatives,
-		c.Repos.Macro,
 		c.Repos.ExchangeAccount,
 		c.Business.RiskEngine,
 		c.Adapters.ExchangeFactory,
@@ -473,55 +449,14 @@ func (c *Container) MustInitBackground() {
 		c.Log,
 	)
 
-	c.Background.AnalyticsSvc = consumers.NewAnalyticsConsumer(
-		c.Adapters.AnalyticsConsumer,
-		c.Log,
-	)
-
-	// AI Usage Consumer - uses AIUsageService (Clean Architecture)
-	c.Background.AIUsageSvc = consumers.NewAIUsageConsumer(
-		c.Adapters.AIUsageConsumer,
-		c.Services.AIUsage,
-		c.Log,
-	)
-
-	// Opportunity Consumer - uses TradingPairRepo (for GetActiveBySymbol) and UserService
+	// Opportunity Consumer - uses Strategy repo for target_allocations filtering
 	c.Background.OpportunitySvc = consumers.NewOpportunityConsumer(
 		c.Adapters.OpportunityConsumer,
-		c.Repos.TradingPair,
-		c.Services.DomainUser, // Domain service for consumers (lightweight CRUD, no side effects)
+		c.Repos.Strategy, // Will check target_allocations
+		c.Services.DomainUser,
 		c.Business.WorkflowFactory,
 		c.Services.ADKSession,
 		c.Config.Workers.MarketScannerMaxConcurrency,
-		c.Log,
-	)
-
-	// Position guardian
-	criticalHandler := positionservice.NewCriticalEventHandler(c.Repos.Position, c.Log)
-
-	var agentHandler *positionservice.AgentEventHandler
-	positionManagerAgent, agentErr := c.Business.AgentFactory.CreateAgentForUser(
-		agents.AgentPositionManager,
-		c.Business.DefaultProvider,
-		c.Business.DefaultModel,
-	)
-	if agentErr != nil {
-		c.Log.Warnf("PositionManager agent creation failed, agent handler disabled: %v", agentErr)
-	} else {
-		agentHandler = positionservice.NewAgentEventHandler(
-			c.Repos.Position,
-			positionManagerAgent,
-			c.Services.ADKSession,
-			c.Log,
-			30*time.Second,
-		)
-		c.Log.Info("✓ Agent event handler initialized with PositionManager agent")
-	}
-
-	c.Background.PositionGuardianSvc = consumers.NewPositionGuardianConsumer(
-		c.Adapters.PositionGuardianConsumer,
-		criticalHandler,
-		agentHandler,
 		c.Log,
 	)
 
@@ -589,6 +524,7 @@ func provideKafkaConsumer(cfg *config.Config, topic string, log *logger.Logger) 
 func provideToolRegistry(
 	marketDataRepo market_data.Repository,
 	orderRepo order.Repository,
+	orderService *order.Service,
 	positionRepo position.Repository,
 	exchangeAccountRepo exchange_account.Repository,
 	memoryRepo memory.Repository,
@@ -606,6 +542,7 @@ func provideToolRegistry(
 	deps := shared.Deps{
 		MarketDataRepo:      marketDataRepo,
 		OrderRepo:           orderRepo,
+		OrderService:        orderService,
 		PositionRepo:        positionRepo,
 		ExchangeAccountRepo: exchangeAccountRepo,
 		MemoryRepo:          memoryRepo,
@@ -632,7 +569,7 @@ func provideAgents(
 	riskEngine *riskservice.RiskEngine,
 	kafkaProducer *kafka.Producer,
 	aiUsageRepo *chrepo.AIUsageRepository,
-	reasoningRepo *pgrepo.ReasoningRepository,
+	statsRepo *chrepo.StatsRepository,
 	log *logger.Logger,
 ) (*agents.Factory, *agents.Registry, string, string, error) {
 	log.Info("Initializing agents...")
@@ -689,7 +626,7 @@ func provideAgents(
 			EventPublisher: eventPublisher,
 			CostCheckFunc:  costCheckFunc,
 			RiskEngine:     riskEngine,
-			ReasoningRepo:  reasoningRepo,
+			StatsRepo:      statsRepo, // stats.Repository interface
 		},
 	})
 	if err != nil {

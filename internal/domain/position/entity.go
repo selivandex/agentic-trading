@@ -9,10 +9,10 @@ import (
 
 // Position represents an open trading position
 type Position struct {
-	ID                uuid.UUID `db:"id"`
-	UserID            uuid.UUID `db:"user_id"`
-	TradingPairID     uuid.UUID `db:"trading_pair_id"`
-	ExchangeAccountID uuid.UUID `db:"exchange_account_id"`
+	ID                uuid.UUID  `db:"id"`
+	UserID            uuid.UUID  `db:"user_id"`
+	StrategyID        *uuid.UUID `db:"strategy_id"` // Link to user_strategies table
+	ExchangeAccountID uuid.UUID  `db:"exchange_account_id"`
 
 	Symbol     string       `db:"symbol"`
 	MarketType string       `db:"market_type"`
@@ -43,8 +43,7 @@ type Position struct {
 	TakeProfitOrderID *uuid.UUID `db:"take_profit_order_id"`
 
 	// Metadata
-	OpenReasoning string     `db:"open_reasoning"`
-	StrategyID    *uuid.UUID `db:"strategy_id"` // Link to user_strategies table
+	OpenReasoning string `db:"open_reasoning"`
 
 	Status    PositionStatus `db:"status"`
 	OpenedAt  time.Time      `db:"opened_at"`

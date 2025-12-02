@@ -15,7 +15,7 @@ import (
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/agents/callbacks"
 	"prometheus/internal/agents/schemas"
-	"prometheus/internal/domain/reasoning"
+	"prometheus/internal/domain/stats"
 	"prometheus/internal/events"
 	"prometheus/internal/tools"
 	"prometheus/pkg/errors"
@@ -48,8 +48,7 @@ type CallbackDeps struct {
 	EventPublisher *events.WorkerPublisher // Publishes events to Kafka
 	CostCheckFunc  callbacks.CostCheckFunc // Function to check daily cost limits
 	RiskEngine     interface{}
-	StatsRepo      interface{}
-	ReasoningRepo  reasoning.Repository // Repository for saving structured reasoning traces
+	StatsRepo      stats.Repository // Tool usage stats repository
 }
 
 // Factory creates configured ADK agents.
@@ -215,20 +214,15 @@ func (f *Factory) CreateAgent(cfg AgentConfig) (agent.Agent, error) {
 
 // getSchemaForAgent returns input/output schemas for specific agent types
 func getSchemaForAgent(agentType AgentType) (input, output *genai.Schema) {
+	// MVP: Use schemas for structured outputs (CoT + validation)
 	switch agentType {
-	case AgentPortfolioManager:
-		return nil, schemas.PortfolioManagerOutputSchema
 	case AgentOpportunitySynthesizer:
 		return nil, schemas.OpportunitySynthesizerOutputSchema
-	case AgentPreTradeReviewer:
-		return nil, schemas.PreTradeReviewerOutputSchema
-	case AgentPerformanceCommittee:
-		return nil, schemas.PerformanceCommitteeOutputSchema
-	// Phase 3: Research Committee agents
-	case AgentTechnicalAnalyst, AgentStructuralAnalyst, AgentFlowAnalyst, AgentMacroAnalyst:
-		return nil, schemas.AnalystReportSchema
-	case AgentHeadOfResearch:
-		return nil, schemas.HeadOfResearchOutputSchema
+	case AgentPortfolioManager:
+		return nil, schemas.PortfolioManagerOutputSchema
+	case AgentPortfolioArchitect:
+		// Free-form output for now (complex portfolio design)
+		return nil, nil
 	default:
 		return nil, nil
 	}
@@ -267,12 +261,7 @@ func (f *Factory) buildAgentCallbacks(agentType string) agentCallbacksSet {
 		before = append(before, callbacks.ValidationBeforeCallback(agentType))
 
 		// Metrics
-		after = append(after, callbacks.MetricsAfterCallback(nil)) // TODO: pass stats repo
-
-		// Structured reasoning log (saves to DB for audit)
-		if f.callbackDeps.ReasoningRepo != nil {
-			after = append(after, callbacks.SaveStructuredReasoningCallback(f.callbackDeps.ReasoningRepo))
-		}
+		after = append(after, callbacks.MetricsAfterCallback(nil))
 	}
 
 	return agentCallbacksSet{Before: before, After: after}
@@ -300,6 +289,9 @@ func (f *Factory) buildModelCallbacks() modelCallbacksSet {
 			after = append(after, callbacks.TokenCountingCallback(f.callbackDeps.EventPublisher))
 		}
 
+		// CoT reasoning logging (lightweight, no DB - logs thinking tokens and outputs)
+		after = append(after, callbacks.ReasoningLogCallback())
+
 		// Rate limiting
 		before = append(before, callbacks.RateLimitCallback())
 	}
@@ -313,9 +305,17 @@ func (f *Factory) buildToolCallbacks() toolCallbacksSet {
 	var after []llmagent.AfterToolCallback
 
 	if f.callbackDeps != nil {
+		// Record tool start time for duration tracking
+		before = append(before, callbacks.RecordToolStartTimeBeforeToolCallback())
+
 		// Risk validation - now uses Registry metadata instead of hardcoding tool names
 		if f.toolRegistry != nil {
 			before = append(before, callbacks.RiskValidationBeforeToolCallback(f.toolRegistry, f.callbackDeps.RiskEngine))
+		}
+
+		// Stats tracking (tool usage to ClickHouse)
+		if f.callbackDeps.StatsRepo != nil {
+			after = append(after, callbacks.StatsTrackingAfterToolCallback(f.callbackDeps.StatsRepo))
 		}
 
 		// Audit logging

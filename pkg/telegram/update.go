@@ -85,7 +85,7 @@ func (m *Message) ParseCommand() {
 
 	// First part is command (may contain @botname)
 	commandPart := parts[0]
-	
+
 	// Remove @botname if present
 	if atIndex := indexOf(commandPart, '@'); atIndex != -1 {
 		commandPart = commandPart[:atIndex]
@@ -104,7 +104,7 @@ func (m *Message) ParseCommand() {
 func splitWhitespace(s string) []string {
 	var result []string
 	var current string
-	
+
 	for _, ch := range s {
 		if ch == ' ' || ch == '\t' || ch == '\n' {
 			if current != "" {
@@ -115,11 +115,11 @@ func splitWhitespace(s string) []string {
 			current += string(ch)
 		}
 	}
-	
+
 	if current != "" {
 		result = append(result, current)
 	}
-	
+
 	return result
 }
 
@@ -136,11 +136,11 @@ func joinFrom(parts []string, start int, sep string) string {
 	if start >= len(parts) {
 		return ""
 	}
-	
+
 	result := parts[start]
 	for i := start + 1; i < len(parts); i++ {
 		result += sep + parts[i]
 	}
-	
+
 	return result
 }

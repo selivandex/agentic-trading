@@ -19,29 +19,23 @@ import (
 	"prometheus/internal/api"
 	"prometheus/internal/api/health"
 	"prometheus/internal/consumers"
-	"prometheus/internal/domain/derivatives"
 	"prometheus/internal/domain/exchange_account"
-	"prometheus/internal/domain/journal"
+	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/limit_profile"
-	"prometheus/internal/domain/macro"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
-	"prometheus/internal/domain/onchain"
 	"prometheus/internal/domain/order"
 	"prometheus/internal/domain/position"
 	"prometheus/internal/domain/regime"
 	domainRisk "prometheus/internal/domain/risk"
-	"prometheus/internal/domain/sentiment"
 	domainsession "prometheus/internal/domain/session"
+	"prometheus/internal/domain/stats"
 	strategyDomain "prometheus/internal/domain/strategy"
-	"prometheus/internal/domain/trading_pair"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
 	chrepo "prometheus/internal/repository/clickhouse"
-	pgrepo "prometheus/internal/repository/postgres"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	exchangeservice "prometheus/internal/services/exchange"
-	limitsservice "prometheus/internal/services/limits"
 	marketdatasvc "prometheus/internal/services/market_data"
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
@@ -99,23 +93,18 @@ type Container struct {
 type Repositories struct {
 	User                user.Repository
 	ExchangeAccount     exchange_account.Repository
-	TradingPair         trading_pair.Repository
+	FundWatchlist       fundwatchlist.Repository
 	Order               order.Repository
 	Position            position.Repository
 	Memory              memory.Repository
-	Journal             journal.Repository
 	Risk                domainRisk.Repository
 	Strategy            strategyDomain.Repository
 	StrategyTransaction strategyDomain.TransactionRepository
 	Session             domainsession.Repository
-	Reasoning           *pgrepo.ReasoningRepository
 	LimitProfile        limit_profile.Repository // User tier/subscription limits
 	MarketData          market_data.Repository
-	Regime              regime.Repository
-	Sentiment           sentiment.Repository
-	OnChain             onchain.Repository
-	Derivatives         derivatives.Repository
-	Macro               macro.Repository
+	Stats               stats.Repository  // Tool usage stats
+	Regime              regime.Repository // ML regime states
 	AIUsage             *chrepo.AIUsageRepository
 }
 
@@ -126,16 +115,13 @@ type Services struct {
 	DomainUser         *user.Service              // Domain user service (for consumers - pure CRUD)
 	ExchangeAccount    *exchange_account.Service  // Exchange account domain service
 	Exchange           *exchangeservice.Service   // Exchange account management service
-	TradingPair        *trading_pair.Service      // Trading pair business logic
 	Order              *order.Service             // Order domain service
 	Position           *position.Service          // Position domain service
 	PositionManagement *positionservice.Service   // Position management service for WebSocket updates
 	Strategy           *strategyservice.Service   // Strategy service for portfolio management
 	Memory             *memory.Service            // Memory domain service
-	Journal            *journal.Service           // Journal domain service
 	Session            *domainsession.Service     // Session domain service
 	ADKSession         session.Service            // ADK interface
-	Limits             *limitsservice.Service     // Limit validation service (tiers, quotas)
 	MarketData         *marketdatasvc.Service     // Market data service (abstraction over ClickHouse)
 	AIUsage            *aiusagesvc.Service        // AI usage tracking service (abstraction over batch writer)
 	Onboarding         *onboardingservice.Service // Onboarding orchestrator (portfolio initialization)
@@ -147,10 +133,7 @@ type Adapters struct {
 	KafkaProducer                *kafka.Producer
 	NotificationConsumer         *kafka.Consumer
 	RiskConsumer                 *kafka.Consumer
-	AnalyticsConsumer            *kafka.Consumer
 	OpportunityConsumer          *kafka.Consumer
-	AIUsageConsumer              *kafka.Consumer
-	PositionGuardianConsumer     *kafka.Consumer
 	TelegramNotificationConsumer *kafka.Consumer
 	SystemEventsConsumer         *kafka.Consumer
 
@@ -199,10 +182,7 @@ type Background struct {
 	// Event consumers
 	TelegramNotificationSvc *consumers.TelegramNotificationConsumer // Telegram notifications (uses new framework)
 	RiskSvc                 *consumers.RiskConsumer
-	AnalyticsSvc            *consumers.AnalyticsConsumer
 	OpportunitySvc          *consumers.OpportunityConsumer
-	AIUsageSvc              *consumers.AIUsageConsumer
-	PositionGuardianSvc     *consumers.PositionGuardianConsumer
 	SystemEventsSvc         *consumers.SystemEventsConsumer // System events (portfolio init, worker failures)
 
 	// WebSocket consumer service (unified for market data + user data)
@@ -299,16 +279,13 @@ func (c *Container) startConsumers() error {
 		svc  interface{ Start(context.Context) error }
 	}{
 		{"risk", c.Background.RiskSvc},
-		{"analytics", c.Background.AnalyticsSvc},
 		{"opportunity", c.Background.OpportunitySvc},
-		{"ai_usage", c.Background.AIUsageSvc},
-		{"position_guardian", c.Background.PositionGuardianSvc},
 		{"system_events", c.Background.SystemEventsSvc},
 		{"telegram_notifications", c.Background.TelegramNotificationSvc},
 	}
 
 	// Add unified WebSocket consumer (handles all stream types)
-	consumerNames := []string{"risk", "analytics", "opportunity", "ai_usage", "position_guardian", "system_events"}
+	consumerNames := []string{"risk", "opportunity", "system_events", "telegram_notifications"}
 
 	if c.Background.WebSocketSvc != nil {
 		consumers = append(consumers, struct {
@@ -370,14 +347,14 @@ func (c *Container) Shutdown() {
 		c.Adapters.MarketDataManager,
 		c.Adapters.UserDataManager,
 		c.Adapters.KafkaProducer,
-		c.Adapters.NotificationConsumer,
-		c.Adapters.RiskConsumer,
-		c.Adapters.AnalyticsConsumer,
-		c.Adapters.OpportunityConsumer,
-		c.Adapters.AIUsageConsumer,
-		c.Adapters.PositionGuardianConsumer,
-		c.Adapters.TelegramNotificationConsumer,
-		c.Adapters.WebSocketConsumer,
+		c.Adapters.NotificationConsumer,         // Keep for compatibility
+		c.Adapters.RiskConsumer,                 // MVP consumer
+		nil,                                     // analyticsConsumer - removed
+		c.Adapters.OpportunityConsumer,          // MVP consumer
+		nil,                                     // aiUsageConsumer - removed
+		nil,                                     // positionGuardianConsumer - removed
+		c.Adapters.TelegramNotificationConsumer, // MVP consumer
+		c.Adapters.WebSocketConsumer,            // MVP consumer (unified)
 		c.PG,
 		c.CH,
 		c.Redis,

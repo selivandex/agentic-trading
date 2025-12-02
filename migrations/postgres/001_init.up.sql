@@ -67,46 +67,98 @@ CREATE INDEX idx_exchange_accounts_active ON exchange_accounts(is_active) WHERE 
 CREATE INDEX idx_exchange_accounts_listen_key_expires ON exchange_accounts(listen_key_expires_at) 
     WHERE listen_key_expires_at IS NOT NULL AND is_active = true;
 
--- Trading Pairs table
-CREATE TABLE trading_pairs (
+-- Fund Watchlist table (global symbols monitored by the fund)
+CREATE TABLE fund_watchlist (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    exchange_account_id UUID NOT NULL REFERENCES exchange_accounts(id) ON DELETE CASCADE,
-    symbol VARCHAR(50) NOT NULL,
+    symbol VARCHAR(50) NOT NULL UNIQUE,
     market_type market_type NOT NULL,
-
-    -- Budget & Risk
-    budget DECIMAL(20,8) NOT NULL,
-    max_position_size DECIMAL(20,8),
-    max_leverage INTEGER DEFAULT 1,
-    stop_loss_percent DECIMAL(5,2) DEFAULT 2.0,
-    take_profit_percent DECIMAL(5,2) DEFAULT 4.0,
-
-    -- Strategy
-    ai_provider VARCHAR(50) DEFAULT 'claude',
-    strategy_mode strategy_mode DEFAULT 'signals',
-    timeframes TEXT[] DEFAULT '{"1h","4h","1d"}',
-
+    
+    -- Metadata
+    category VARCHAR(50),  -- "major", "defi", "layer1", etc
+    tier INTEGER DEFAULT 3,  -- 1=BTC/ETH, 2=top20, 3=top100
+    
     -- State
     is_active BOOLEAN DEFAULT true,
     is_paused BOOLEAN DEFAULT false,
     paused_reason TEXT,
-
+    
+    -- Analytics
+    last_analyzed_at TIMESTAMPTZ,
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-    CONSTRAINT unique_pair_per_account UNIQUE(exchange_account_id, symbol, market_type)
+    
+    CONSTRAINT unique_symbol_market UNIQUE(symbol, market_type)
 );
 
-CREATE INDEX idx_trading_pairs_user ON trading_pairs(user_id);
-CREATE INDEX idx_trading_pairs_active ON trading_pairs(is_active, is_paused);
-CREATE INDEX idx_trading_pairs_exchange_account ON trading_pairs(exchange_account_id);
+CREATE INDEX idx_fund_watchlist_active ON fund_watchlist(is_active, is_paused);
+CREATE INDEX idx_fund_watchlist_symbol ON fund_watchlist(symbol);
+
+-- Insert default watchlist
+INSERT INTO fund_watchlist (symbol, market_type, category, tier) VALUES
+    ('BTC/USDT', 'spot', 'major', 1),
+    ('ETH/USDT', 'spot', 'major', 1),
+    ('BNB/USDT', 'spot', 'exchange', 2),
+    ('SOL/USDT', 'spot', 'layer1', 2),
+    ('XRP/USDT', 'spot', 'major', 2),
+    ('ADA/USDT', 'spot', 'layer1', 2),
+    ('AVAX/USDT', 'spot', 'layer1', 2),
+    ('DOT/USDT', 'spot', 'layer0', 2),
+    ('MATIC/USDT', 'spot', 'layer2', 2),
+    ('LINK/USDT', 'spot', 'oracle', 2);
+
+-- User Strategies table (portfolio management)
+CREATE TABLE user_strategies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Strategy metadata
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    status strategy_status NOT NULL DEFAULT 'active',
+    
+    -- Capital allocation
+    allocated_capital DECIMAL(20, 8) NOT NULL,
+    current_equity DECIMAL(20, 8) NOT NULL,
+    cash_reserve DECIMAL(20, 8) NOT NULL DEFAULT 0,
+    
+    -- Strategy configuration
+    market_type market_type NOT NULL DEFAULT 'spot',
+    risk_tolerance risk_tolerance NOT NULL,
+    rebalance_frequency rebalance_frequency,
+    target_allocations JSONB NOT NULL,
+    
+    -- Performance metrics
+    total_pnl DECIMAL(20, 8) DEFAULT 0,
+    total_pnl_percent DECIMAL(10, 4) DEFAULT 0,
+    sharpe_ratio DECIMAL(10, 4),
+    max_drawdown DECIMAL(10, 4),
+    win_rate DECIMAL(10, 4),
+    
+    -- Timestamps
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_at TIMESTAMP,
+    last_rebalanced_at TIMESTAMP,
+    
+    -- Reasoning (for explainability)
+    reasoning_log JSONB,
+    
+    -- Constraints
+    CONSTRAINT positive_capital CHECK (allocated_capital > 0),
+    CONSTRAINT valid_equity CHECK (current_equity >= 0),
+    CONSTRAINT valid_cash CHECK (cash_reserve >= 0)
+);
+
+CREATE INDEX idx_user_strategies_user_id ON user_strategies(user_id);
+CREATE INDEX idx_user_strategies_status ON user_strategies(status);
+CREATE INDEX idx_user_strategies_created_at ON user_strategies(created_at DESC);
 
 -- Orders table
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id),
-    trading_pair_id UUID REFERENCES trading_pairs(id),
+    strategy_id UUID REFERENCES user_strategies(id) ON DELETE SET NULL,
     exchange_account_id UUID NOT NULL REFERENCES exchange_accounts(id),
 
     exchange_order_id VARCHAR(255),
@@ -140,14 +192,14 @@ CREATE TABLE orders (
 CREATE INDEX idx_orders_user ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_exchange ON orders(exchange_order_id);
-CREATE INDEX idx_orders_trading_pair ON orders(trading_pair_id);
+CREATE INDEX idx_orders_symbol ON orders(symbol);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
 
 -- Positions table
 CREATE TABLE positions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id),
-    trading_pair_id UUID REFERENCES trading_pairs(id),
+    strategy_id UUID REFERENCES user_strategies(id) ON DELETE SET NULL,
     exchange_account_id UUID NOT NULL REFERENCES exchange_accounts(id),
 
     symbol VARCHAR(50) NOT NULL,
@@ -184,7 +236,7 @@ CREATE TABLE positions (
 CREATE INDEX idx_positions_user ON positions(user_id);
 CREATE INDEX idx_positions_status ON positions(status);
 CREATE INDEX idx_positions_symbol ON positions(symbol);
-CREATE INDEX idx_positions_trading_pair ON positions(trading_pair_id);
+CREATE INDEX idx_positions_strategy ON positions(strategy_id);
 
 -- Agent Memory tables moved to 005_agent_memories.up.sql (unified structure)
 
@@ -300,9 +352,6 @@ CREATE TRIGGER users_updated_at BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER exchange_accounts_updated_at BEFORE UPDATE ON exchange_accounts
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER trading_pairs_updated_at BEFORE UPDATE ON trading_pairs
 FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER orders_updated_at BEFORE UPDATE ON orders

@@ -40,6 +40,10 @@ func (m *mockRepository) GetActiveByUserID(ctx context.Context, userID uuid.UUID
 	return nil, nil
 }
 
+func (m *mockRepository) GetAllActive(ctx context.Context) ([]*strategy.Strategy, error) {
+	return nil, nil
+}
+
 func (m *mockRepository) Update(ctx context.Context, s *strategy.Strategy) error {
 	return nil
 }
@@ -280,11 +284,11 @@ func TestUpdateEquity(t *testing.T) {
 
 	// Verify calculations
 	expectedEquity := decimal.NewFromInt(500).Add(decimal.NewFromInt(600)) // cash + positions = 1100
-	assert.Equal(t, expectedEquity, testStrategy.CurrentEquity)
+	assert.True(t, expectedEquity.Equal(testStrategy.CurrentEquity), "CurrentEquity should be 1100")
 
 	expectedPnL := decimal.NewFromInt(100) // 1100 - 1000 = 100
-	assert.Equal(t, expectedPnL, testStrategy.TotalPnL)
+	assert.True(t, expectedPnL.Equal(testStrategy.TotalPnL), "TotalPnL should be 100")
 
 	expectedPnLPercent := decimal.NewFromInt(10) // (1100/1000 - 1) * 100 = 10%
-	assert.Equal(t, expectedPnLPercent, testStrategy.TotalPnLPercent)
+	assert.True(t, expectedPnLPercent.Equal(testStrategy.TotalPnLPercent), "TotalPnLPercent should be 10")
 }

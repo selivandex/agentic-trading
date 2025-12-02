@@ -32,7 +32,7 @@ func (s *Service) Place(ctx context.Context, input PlaceParams) (*Order, error) 
 	order := &Order{
 		ID:                uuid.New(),
 		UserID:            input.UserID,
-		TradingPairID:     input.TradingPairID,
+		StrategyID:        input.StrategyID,
 		ExchangeAccountID: input.ExchangeAccountID,
 		Symbol:            input.Symbol,
 		MarketType:        input.MarketType,
@@ -132,7 +132,7 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 // PlaceParams captures the required data to create an order.
 type PlaceParams struct {
 	UserID            uuid.UUID
-	TradingPairID     uuid.UUID
+	StrategyID        *uuid.UUID // Optional: link to strategy
 	ExchangeAccountID uuid.UUID
 	Symbol            string
 	MarketType        string
@@ -148,9 +148,6 @@ type PlaceParams struct {
 
 func (p PlaceParams) validate() error {
 	if p.UserID == uuid.Nil {
-		return errors.ErrInvalidInput
-	}
-	if p.TradingPairID == uuid.Nil {
 		return errors.ErrInvalidInput
 	}
 	if p.ExchangeAccountID == uuid.Nil {

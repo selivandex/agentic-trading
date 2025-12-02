@@ -32,7 +32,6 @@ func TestWorkflowTemplate_MarketResearchInput(t *testing.T) {
 		"binance",
 		"MISSION",
 		"ANALYSIS DIMENSIONS",
-		"STRUCTURED OUTPUT REQUIREMENT",
 		"SYNTHESIS REQUIREMENTS",
 		"QUALITY PRINCIPLES",
 	}
@@ -104,20 +103,21 @@ func TestAgentTemplates_RenderWithoutMissingValues(t *testing.T) {
 	type testTool struct {
 		Name        string
 		Description string
+		Requirement string
 	}
 
 	toolset := []testTool{
-		{Name: "save_analysis", Description: "Persist findings for other agents"},
+		{
+			Name:        "save_analysis",
+			Description: "Persist findings for other agents",
+			Requirement: "Required for sharing findings",
+		},
 	}
 
 	templates := []string{
 		"agents/opportunity_synthesizer",
-		"agents/strategy_planner",
-		"agents/risk_manager",
-		"agents/executor",
-		"agents/position_manager",
-		"agents/self_evaluator",
 		"agents/portfolio_architect",
+		"agents/portfolio_manager",
 	}
 
 	for _, templateID := range templates {
@@ -129,6 +129,23 @@ func TestAgentTemplates_RenderWithoutMissingValues(t *testing.T) {
 					"AgentName":           "TestAgent",
 					"AgentType":           "test_agent",
 					"HasSaveAnalysisTool": hasTool,
+					"Capital":             "10000",
+					"RiskProfile":         "moderate",
+					"PreferredAssets":     "BTC, ETH",
+					"TimeHorizon":         "medium-term",
+					"MarketRegime":        "trending",
+					"ClientCapital":       "10000",
+					"CurrentPositions":    "None",
+					"AvailableCapital":    "10000",
+					"Opportunity":         "BTCUSDT Long",
+					"Symbol":              "BTCUSDT",
+					"Direction":           "LONG",
+					"EntryPrice":          "50000",
+					"StopLoss":            "48000",
+					"TakeProfit":          "54000",
+					"Confidence":          "75",
+					"ResearchReasoning":   "Strong uptrend confirmed by multiple indicators",
+					"MaxPositionSize":     "20",
 				}
 
 				output, err := registry.Render(templateID, data)

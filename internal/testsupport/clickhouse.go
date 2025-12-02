@@ -324,6 +324,7 @@ func NewTickerFixture() *TickerFixture {
 			WeightedAvgPrice:   49800.0,
 			TradeCount:         50000,
 			EventTime:          now,
+			CollectedAt:        now,
 		},
 	}
 }
@@ -395,12 +396,13 @@ type TradeFixture struct {
 
 // NewTradeFixture creates a default trade for testing
 func NewTradeFixture() *TradeFixture {
+	now := time.Now().Truncate(time.Millisecond)
 	return &TradeFixture{
 		trade: market_data.Trade{
 			Exchange:     "binance",
 			Symbol:       "BTC/USDT",
 			MarketType:   "spot",
-			Timestamp:    time.Now().Truncate(time.Millisecond),
+			Timestamp:    now,
 			TradeID:      12345,
 			AggTradeID:   12345,
 			Price:        50000.0,
@@ -408,7 +410,8 @@ func NewTradeFixture() *TradeFixture {
 			FirstTradeID: 12345,
 			LastTradeID:  12345,
 			IsBuyerMaker: false, // Default to buy trade (taker is buyer)
-			EventTime:    time.Now().Truncate(time.Millisecond),
+			EventTime:    now,
+			CollectedAt:  now,
 		},
 	}
 }
@@ -490,6 +493,80 @@ func (f *TradeFixture) BuildMany(count int) []market_data.Trade {
 	}
 
 	return trades
+}
+
+// OrderBookSnapshotFixture provides builder pattern for creating test order book snapshots
+type OrderBookSnapshotFixture struct {
+	snapshot market_data.OrderBookSnapshot
+}
+
+// NewOrderBookSnapshotFixture creates a default order book snapshot for testing
+func NewOrderBookSnapshotFixture() *OrderBookSnapshotFixture {
+	now := time.Now().Truncate(time.Second)
+	return &OrderBookSnapshotFixture{
+		snapshot: market_data.OrderBookSnapshot{
+			Exchange:    "binance",
+			Symbol:      "BTC/USDT",
+			MarketType:  "spot",
+			Timestamp:   now,
+			Bids:        `[[50000.0, 1.0]]`,
+			Asks:        `[[50100.0, 1.0]]`,
+			BidDepth:    1.0,
+			AskDepth:    1.0,
+			EventTime:   now,
+			CollectedAt: now,
+		},
+	}
+}
+
+// WithExchange sets the exchange
+func (f *OrderBookSnapshotFixture) WithExchange(exchange string) *OrderBookSnapshotFixture {
+	f.snapshot.Exchange = exchange
+	return f
+}
+
+// WithSymbol sets the symbol
+func (f *OrderBookSnapshotFixture) WithSymbol(symbol string) *OrderBookSnapshotFixture {
+	f.snapshot.Symbol = symbol
+	return f
+}
+
+// WithMarketType sets the market type
+func (f *OrderBookSnapshotFixture) WithMarketType(marketType string) *OrderBookSnapshotFixture {
+	f.snapshot.MarketType = marketType
+	return f
+}
+
+// WithTimestamp sets the timestamp
+func (f *OrderBookSnapshotFixture) WithTimestamp(t time.Time) *OrderBookSnapshotFixture {
+	f.snapshot.Timestamp = t
+	f.snapshot.EventTime = t
+	f.snapshot.CollectedAt = t
+	return f
+}
+
+// WithBids sets the bids JSON
+func (f *OrderBookSnapshotFixture) WithBids(bids string) *OrderBookSnapshotFixture {
+	f.snapshot.Bids = bids
+	return f
+}
+
+// WithAsks sets the asks JSON
+func (f *OrderBookSnapshotFixture) WithAsks(asks string) *OrderBookSnapshotFixture {
+	f.snapshot.Asks = asks
+	return f
+}
+
+// WithDepth sets the bid and ask depth
+func (f *OrderBookSnapshotFixture) WithDepth(bidDepth, askDepth float64) *OrderBookSnapshotFixture {
+	f.snapshot.BidDepth = bidDepth
+	f.snapshot.AskDepth = askDepth
+	return f
+}
+
+// Build returns the constructed order book snapshot
+func (f *OrderBookSnapshotFixture) Build() market_data.OrderBookSnapshot {
+	return f.snapshot
 }
 
 // MarkPriceFixture provides builder pattern for creating test mark prices
@@ -575,77 +652,6 @@ func (f *MarkPriceFixture) BuildMany(count int) []market_data.MarkPrice {
 	}
 
 	return markPrices
-}
-
-// OrderBookSnapshotFixture provides builder pattern for creating test orderbook snapshots
-type OrderBookSnapshotFixture struct {
-	snapshot market_data.OrderBookSnapshot
-}
-
-// NewOrderBookSnapshotFixture creates a default orderbook snapshot for testing
-func NewOrderBookSnapshotFixture() *OrderBookSnapshotFixture {
-	return &OrderBookSnapshotFixture{
-		snapshot: market_data.OrderBookSnapshot{
-			Exchange:   "binance",
-			Symbol:     "BTC/USDT",
-			MarketType: "spot",
-			Timestamp:  time.Now().Truncate(time.Second),
-			Bids:       `[[49990.0, 1.5], [49980.0, 2.0], [49970.0, 3.5]]`,
-			Asks:       `[[50010.0, 1.2], [50020.0, 2.5], [50030.0, 3.0]]`,
-			BidDepth:   7.0, // Total bid volume
-			AskDepth:   6.7, // Total ask volume
-			EventTime:  time.Now().Truncate(time.Second),
-		},
-	}
-}
-
-// WithExchange sets the exchange
-func (f *OrderBookSnapshotFixture) WithExchange(exchange string) *OrderBookSnapshotFixture {
-	f.snapshot.Exchange = exchange
-	return f
-}
-
-// WithSymbol sets the symbol
-func (f *OrderBookSnapshotFixture) WithSymbol(symbol string) *OrderBookSnapshotFixture {
-	f.snapshot.Symbol = symbol
-	return f
-}
-
-// WithMarketType sets the market type
-func (f *OrderBookSnapshotFixture) WithMarketType(marketType string) *OrderBookSnapshotFixture {
-	f.snapshot.MarketType = marketType
-	return f
-}
-
-// WithTimestamp sets the timestamp
-func (f *OrderBookSnapshotFixture) WithTimestamp(t time.Time) *OrderBookSnapshotFixture {
-	f.snapshot.Timestamp = t
-	f.snapshot.EventTime = t
-	return f
-}
-
-// WithBids sets the bids JSON array
-func (f *OrderBookSnapshotFixture) WithBids(bids string) *OrderBookSnapshotFixture {
-	f.snapshot.Bids = bids
-	return f
-}
-
-// WithAsks sets the asks JSON array
-func (f *OrderBookSnapshotFixture) WithAsks(asks string) *OrderBookSnapshotFixture {
-	f.snapshot.Asks = asks
-	return f
-}
-
-// WithDepth sets the total bid and ask depth
-func (f *OrderBookSnapshotFixture) WithDepth(bidDepth, askDepth float64) *OrderBookSnapshotFixture {
-	f.snapshot.BidDepth = bidDepth
-	f.snapshot.AskDepth = askDepth
-	return f
-}
-
-// Build returns the constructed orderbook snapshot
-func (f *OrderBookSnapshotFixture) Build() market_data.OrderBookSnapshot {
-	return f.snapshot
 }
 
 // LiquidationFixture provides builder pattern for creating test liquidations

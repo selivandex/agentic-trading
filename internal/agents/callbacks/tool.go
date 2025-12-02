@@ -95,7 +95,7 @@ func AuditLogAfterToolCallback() llmagent.AfterToolCallback {
 	}
 }
 
-// StatsTrackingAfterToolCallback records detailed tool usage metrics to ClickHouse
+// StatsTrackingAfterToolCallback records tool usage to ClickHouse for analytics
 func StatsTrackingAfterToolCallback(statsRepo stats.Repository) llmagent.AfterToolCallback {
 	return func(ctx tool.Context, t tool.Tool, args, result map[string]any, err error) (map[string]any, error) {
 		if statsRepo == nil {
@@ -103,6 +103,7 @@ func StatsTrackingAfterToolCallback(statsRepo stats.Repository) llmagent.AfterTo
 		}
 
 		toolName := t.Name()
+		log := logger.Get().With("component", "tool_stats", "tool", toolName)
 
 		// Get start time from temporary state
 		startTimeVal, stateErr := ctx.ReadonlyState().Get("_temp_tool_start_time")
@@ -118,15 +119,14 @@ func StatsTrackingAfterToolCallback(statsRepo stats.Repository) llmagent.AfterTo
 
 		duration := time.Since(startTime)
 
-		// Extract metadata from context/state
+		// Extract metadata from context
 		userIDStr := ctx.UserID()
 		sessionID := ctx.SessionID()
 
 		// Parse user ID
 		userID, parseErr := uuid.Parse(userIDStr)
 		if parseErr != nil {
-			logger.Get().With("tool", toolName).
-				Warnf("Failed to parse user_id: %v", parseErr)
+			log.Warnw("Failed to parse user_id", "error", parseErr)
 			return result, err // Skip stats on parse error
 		}
 
@@ -152,16 +152,23 @@ func StatsTrackingAfterToolCallback(statsRepo stats.Repository) llmagent.AfterTo
 		// Record asynchronously to avoid blocking tool execution
 		go func() {
 			if insertErr := statsRepo.InsertToolUsage(context.Background(), usage); insertErr != nil {
-				logger.Get().With("tool", toolName).
-					Warnf("Failed to record tool stats: %v", insertErr)
+				log.Warnw("Failed to record tool stats", "error", insertErr)
 			}
 		}()
+
+		// Also log for immediate visibility
+		log.Infow("Tool executed",
+			"user_id", userID,
+			"session_id", sessionID,
+			"success", err == nil,
+			"duration_ms", duration.Milliseconds(),
+		)
 
 		return result, err
 	}
 }
 
-// RecordToolStartTimeBeforeToolCallback records execution start time for stats tracking
+// RecordToolStartTimeBeforeToolCallback records execution start time for duration tracking
 func RecordToolStartTimeBeforeToolCallback() llmagent.BeforeToolCallback {
 	return func(ctx tool.Context, t tool.Tool, args map[string]any) (map[string]any, error) {
 		// Store start time in temporary state

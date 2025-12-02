@@ -28,29 +28,29 @@ func NewPositionRepository(db *sqlx.DB) *PositionRepository {
 func (r *PositionRepository) Create(ctx context.Context, p *position.Position) error {
 	query := `
 		INSERT INTO positions (
-			id, user_id, trading_pair_id, exchange_account_id,
+			id, user_id, strategy_id, exchange_account_id,
 			symbol, market_type, side,
 			size, entry_price, current_price, liquidation_price,
 			leverage, margin_mode,
 			unrealized_pnl, unrealized_pnl_pct, realized_pnl,
 			stop_loss_price, take_profit_price, trailing_stop_pct,
 			stop_loss_order_id, take_profit_order_id,
-			open_reasoning, strategy_id,
+			open_reasoning,
 			status, opened_at, closed_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
-		p.ID, p.UserID, p.TradingPairID, p.ExchangeAccountID,
+		p.ID, p.UserID, p.StrategyID, p.ExchangeAccountID,
 		p.Symbol, p.MarketType, p.Side,
 		p.Size, p.EntryPrice, p.CurrentPrice, p.LiquidationPrice,
 		p.Leverage, p.MarginMode,
 		p.UnrealizedPnL, p.UnrealizedPnLPct, p.RealizedPnL,
 		p.StopLossPrice, p.TakeProfitPrice, p.TrailingStopPct,
 		p.StopLossOrderID, p.TakeProfitOrderID,
-		p.OpenReasoning, p.StrategyID,
+		p.OpenReasoning,
 		p.Status, p.OpenedAt, p.ClosedAt, p.UpdatedAt,
 	)
 
@@ -81,23 +81,6 @@ func (r *PositionRepository) GetOpenByUser(ctx context.Context, userID uuid.UUID
 		ORDER BY opened_at DESC`
 
 	err := r.db.SelectContext(ctx, &positions, query, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return positions, nil
-}
-
-// GetByTradingPair retrieves all positions for a trading pair
-func (r *PositionRepository) GetByTradingPair(ctx context.Context, tradingPairID uuid.UUID) ([]*position.Position, error) {
-	var positions []*position.Position
-
-	query := `
-		SELECT * FROM positions
-		WHERE trading_pair_id = $1
-		ORDER BY opened_at DESC`
-
-	err := r.db.SelectContext(ctx, &positions, query, tradingPairID)
 	if err != nil {
 		return nil, err
 	}

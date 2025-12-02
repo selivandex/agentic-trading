@@ -1,247 +1,61 @@
 package callbacks
 
 import (
-	"context"
-	"encoding/json"
-	"time"
-
-	"github.com/google/uuid"
 	"google.golang.org/adk/agent"
-	"google.golang.org/genai"
+	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/model"
 
-	"prometheus/internal/domain/reasoning"
 	"prometheus/pkg/logger"
 )
 
-// SaveStructuredReasoningCallback creates a callback that parses structured agent output
-// and saves reasoning trace to the database for audit and debugging.
-func SaveStructuredReasoningCallback(reasoningRepo reasoning.Repository) agent.AfterAgentCallback {
-	return func(ctx agent.CallbackContext) (*genai.Content, error) {
-		log := logger.Get().With(
-			"component", "reasoning_callback",
-			"agent", ctx.AgentName(),
-			"session", ctx.SessionID(),
-		)
-
-		// Get agent output from session state using OutputKey
-		// OutputKey is configured in agent setup (e.g., "opportunity_synthesizer_output")
-		outputKey := ctx.AgentName() + "_output"
-		outputVal, err := ctx.ReadonlyState().Get(outputKey)
-		if err != nil {
-			// No output in state - agent might not have OutputKey configured
-			// This is normal for agents without OutputKey
-			log.Debug("No output found in state", "output_key", outputKey)
-			return nil, nil
+// ReasoningLogCallback logs agent's chain-of-thought reasoning to logger
+// This is a lightweight version that doesn't save to DB
+func ReasoningLogCallback() llmagent.AfterModelCallback {
+	return func(ctx agent.CallbackContext, resp *model.LLMResponse, respErr error) (*model.LLMResponse, error) {
+		if respErr != nil || resp == nil {
+			return resp, respErr
 		}
 
-		// Parse output to string and structured format
-		var outputText string
-		var structuredOutput map[string]interface{}
+		log := logger.Get().With("component", "agent_reasoning")
 
-		switch val := outputVal.(type) {
-		case string:
-			outputText = val
-			// Try to parse as JSON
-			if err := json.Unmarshal([]byte(val), &structuredOutput); err != nil {
-				// Not JSON - save as raw output
-				log.Debug("Agent output is plain text, saving as raw")
-				return saveRawOutput(ctx, reasoningRepo, outputText)
-			}
-		case map[string]interface{}:
-			structuredOutput = val
-			// Convert to string for storage
-			jsonBytes, _ := json.Marshal(val)
-			outputText = string(jsonBytes)
-		default:
-			log.Debugf("Unexpected output type in state: %T", val)
-			return nil, nil
+		// Get agent name from context
+		agentName := ctx.AgentName()
+
+		// Log token usage (tracks CoT via token counts)
+		if resp.UsageMetadata != nil {
+			log.Debugw("Agent tokens",
+				"agent", agentName,
+				"input_tokens", resp.UsageMetadata.PromptTokenCount,
+				"output_tokens", resp.UsageMetadata.CandidatesTokenCount,
+				"total_tokens", resp.UsageMetadata.TotalTokenCount,
+			)
 		}
 
-		if outputText == "" {
-			log.Debug("Empty output from agent")
-			return nil, nil
-		}
+		// Log response content parts (includes thinking and function calls)
+		if resp.Content != nil && len(resp.Content.Parts) > 0 {
+			for _, part := range resp.Content.Parts {
+				// Log function calls
+				if part.FunctionCall != nil {
+					log.Infow("Agent invoking tool",
+						"agent", agentName,
+						"tool", part.FunctionCall.Name,
+					)
+				}
 
-		// Extract reasoning steps and final output
-		// Supports multiple output formats:
-		// - OpportunitySynthesizer: synthesis_steps + decision + conflicts
-		// - Analyst agents: reasoning_trace + final_analysis + tool_calls_summary
-		// - Legacy: reasoning_steps (fallback)
-		reasoningSteps, hasSteps := structuredOutput["synthesis_steps"]
-		if !hasSteps {
-			reasoningSteps, hasSteps = structuredOutput["reasoning_trace"]
-		}
-		if !hasSteps {
-			reasoningSteps, hasSteps = structuredOutput["reasoning_steps"]
-		}
-
-		var finalOutput interface{}
-		if decision, ok := structuredOutput["decision"]; ok {
-			finalOutput = decision
-		} else if analysis, ok := structuredOutput["final_analysis"]; ok {
-			finalOutput = analysis
-		} else {
-			// No specific final output field, use entire output
-			finalOutput = structuredOutput
-		}
-
-		// Extract additional metadata (tool calls, conflicts, etc.)
-		metadata := make(map[string]interface{})
-		if toolCalls, ok := structuredOutput["tool_calls_summary"]; ok {
-			metadata["tool_calls_summary"] = toolCalls
-		}
-		if conflicts, ok := structuredOutput["conflicts"]; ok {
-			metadata["conflicts"] = conflicts
-		}
-
-		// Marshal to JSONB for storage
-		reasoningStepsJSON, err := json.Marshal(reasoningSteps)
-		if err != nil {
-			log.Warnf("Failed to marshal reasoning steps: %v", err)
-			return saveRawOutput(ctx, reasoningRepo, outputText)
-		}
-
-		finalOutputJSON, err := json.Marshal(finalOutput)
-		if err != nil {
-			log.Warnf("Failed to marshal final output: %v", err)
-			return saveRawOutput(ctx, reasoningRepo, outputText)
-		}
-
-		// Get agent type from temp state (set by ValidationBeforeCallback)
-		agentTypeVal, _ := ctx.ReadonlyState().Get("_agent_type")
-		agentType, _ := agentTypeVal.(string)
-		if agentType == "" {
-			agentType = ctx.AgentName() // Fallback to agent name
-		}
-
-		// Parse session ID as UUID (ADK session IDs are UUIDs)
-		var sessionUUID uuid.UUID
-		if ctx.SessionID() != "" {
-			parsed, err := uuid.Parse(ctx.SessionID())
-			if err != nil {
-				log.Warnf("Failed to parse session ID as UUID: %v", err)
-				sessionUUID = uuid.New() // Generate new UUID as fallback
-			} else {
-				sessionUUID = parsed
-			}
-		} else {
-			sessionUUID = uuid.New()
-		}
-
-		// Parse user ID if available
-		var userUUID *uuid.UUID
-		if ctx.UserID() != "" {
-			parsed, err := uuid.Parse(ctx.UserID())
-			if err == nil {
-				userUUID = &parsed
+				// Log reasoning text (CoT) - truncate if too long
+				if part.Text != "" {
+					textPreview := part.Text
+					if len(textPreview) > 1000 {
+						textPreview = textPreview[:1000] + "..."
+					}
+					log.Debugw("Agent thinking (CoT)",
+						"agent", agentName,
+						"text", textPreview,
+					)
+				}
 			}
 		}
 
-		// Create reasoning log entry
-		entry := &reasoning.LogEntry{
-			ID:             uuid.New(),
-			UserID:         userUUID,
-			AgentID:        ctx.AgentName(),
-			AgentType:      agentType,
-			SessionID:      sessionUUID.String(),
-			ReasoningSteps: reasoningStepsJSON,
-			Decision:       finalOutputJSON,
-			CreatedAt:      time.Now(),
-		}
-
-		// Get metadata from temp state (tokens, cost, duration)
-		if startTimeVal, err := ctx.ReadonlyState().Get("_temp_start_time"); err == nil {
-			if startTime, ok := startTimeVal.(time.Time); ok {
-				duration := time.Since(startTime)
-				entry.DurationMs = int(duration.Milliseconds())
-			}
-		}
-
-		// Save to database (async-safe - don't block agent execution)
-		go func() {
-			saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			if err := reasoningRepo.Create(saveCtx, entry); err != nil {
-				log.Errorf("Failed to save reasoning log: %v", err)
-			} else {
-				log.Infof("Reasoning log saved: session=%s agent=%s", entry.SessionID, entry.AgentType)
-			}
-		}()
-
-		return nil, nil // Non-blocking callback
+		return resp, nil
 	}
-}
-
-// saveRawOutput saves raw text output as fallback when structured parsing fails
-func saveRawOutput(ctx agent.CallbackContext, repo reasoning.Repository, rawOutput string) (*genai.Content, error) {
-	log := logger.Get().With("component", "reasoning_callback")
-
-	// Wrap raw output in minimal structure
-	rawSteps := []map[string]interface{}{
-		{
-			"step":      1,
-			"action":    "raw_output",
-			"content":   rawOutput,
-			"timestamp": time.Now().Format(time.RFC3339),
-			"note":      "Agent output was not structured JSON - saved as raw text",
-		},
-	}
-
-	reasoningStepsJSON, _ := json.Marshal(rawSteps)
-	finalOutputJSON := []byte(rawOutput)
-
-	// Get agent type
-	agentTypeVal, _ := ctx.ReadonlyState().Get("_agent_type")
-	agentType, _ := agentTypeVal.(string)
-	if agentType == "" {
-		agentType = ctx.AgentName()
-	}
-
-	// Parse session ID
-	var sessionUUID uuid.UUID
-	if ctx.SessionID() != "" {
-		parsed, err := uuid.Parse(ctx.SessionID())
-		if err != nil {
-			sessionUUID = uuid.New()
-		} else {
-			sessionUUID = parsed
-		}
-	} else {
-		sessionUUID = uuid.New()
-	}
-
-	// Parse user ID if available
-	var userUUID *uuid.UUID
-	if ctx.UserID() != "" {
-		parsed, err := uuid.Parse(ctx.UserID())
-		if err == nil {
-			userUUID = &parsed
-		}
-	}
-
-	entry := &reasoning.LogEntry{
-		ID:             uuid.New(),
-		UserID:         userUUID,
-		AgentID:        ctx.AgentName(),
-		AgentType:      agentType,
-		SessionID:      sessionUUID.String(),
-		ReasoningSteps: reasoningStepsJSON,
-		Decision:       finalOutputJSON,
-		CreatedAt:      time.Now(),
-	}
-
-	// Save async
-	go func() {
-		saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := repo.Create(saveCtx, entry); err != nil {
-			log.Errorf("Failed to save raw reasoning log: %v", err)
-		} else {
-			log.Debugf("Raw reasoning log saved: session=%s", entry.SessionID)
-		}
-	}()
-
-	return nil, nil
 }

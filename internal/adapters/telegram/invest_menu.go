@@ -232,14 +232,14 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 	amount, err := parseAmount(text)
 	if err != nil {
 		// Return error - framework will handle sending error message
-		return fmt.Errorf("❌ Invalid amount. Please enter a valid number.\n\nExample: 1000")
+		return errors.New("❌ Invalid amount. Please enter a valid number.\n\nExample: 1000")
 	}
 
 	// Get user to validate against their limits
 	usr, err := ims.userService.GetByTelegramID(ctx, telegramID)
 	if err != nil {
 		ims.log.Errorw("Failed to get user for validation", "error", err, "telegram_id", telegramID)
-		return fmt.Errorf("❌ Failed to process your request. Please try /cancel and start over.")
+		return errors.New("❌ Failed to process your request. Please try /cancel and start over.")
 	}
 
 	// Validate investment amount against user limits and profile
@@ -247,7 +247,7 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 		validation, err := ims.investmentValidator.ValidateInvestment(ctx, usr, amount)
 		if err != nil {
 			ims.log.Errorw("Investment validation error", "error", err, "user_id", usr.ID, "amount", amount)
-			return fmt.Errorf("❌ Failed to validate investment. Please try a different amount.")
+			return errors.New("❌ Failed to validate investment. Please try a different amount.")
 		}
 
 		if !validation.Allowed {
@@ -264,7 +264,7 @@ func (ims *InvestMenuService) HandleMessage(ctx context.Context, userID interfac
 			}
 			errorMsg += "\n\nPlease enter a different amount:"
 
-			return fmt.Errorf(errorMsg)
+			return errors.New(errorMsg)
 		}
 
 		ims.log.Debugw("Investment validation passed",
@@ -318,7 +318,7 @@ func (ims *InvestMenuService) buildExchangeSelectionScreen() *telegram.Screen {
 		Items: func(ctx context.Context, session telegram.Session) ([]telegram.ListItem, error) {
 			userIDStr, ok := session.GetString("user_id")
 			if !ok {
-				return nil, fmt.Errorf("user_id not found in session")
+				return nil, errors.New("user_id not found in session")
 			}
 
 			userID, err := uuid.Parse(userIDStr)
@@ -434,7 +434,7 @@ func (ims *InvestMenuService) finalizeInvestment(ctx context.Context, session te
 	case int:
 		amount = float64(v)
 	default:
-		return fmt.Errorf("invalid amount type in session")
+		return errors.New("invalid amount type in session")
 	}
 
 	userID, _ := uuid.Parse(userIDStr)
@@ -464,7 +464,7 @@ func (ims *InvestMenuService) finalizeInvestment(ctx context.Context, session te
 			marketType,
 		); err != nil {
 			ims.log.Errorw("Failed to publish portfolio job", "error", err)
-			return fmt.Errorf("failed to start portfolio creation")
+			return errors.New("failed to start portfolio creation")
 		}
 
 		marketTypeEmoji := "📊"

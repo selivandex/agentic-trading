@@ -15,6 +15,7 @@ import (
 // TradingPlan represents an approved trading plan ready for execution.
 type TradingPlan struct {
 	UserID     uuid.UUID
+	StrategyID *uuid.UUID // Optional: link to strategy
 	Symbol     string
 	Side       order.OrderSide
 	Amount     decimal.Decimal
@@ -89,8 +90,8 @@ func (s *ExecutionService) Execute(ctx context.Context, plan TradingPlan) (*Exec
 	// TODO: Add venue selection, slicing, TWAP logic in future iterations
 	orderParams := order.PlaceParams{
 		UserID:            plan.UserID,
-		TradingPairID:     uuid.Nil, // TODO: Resolve from symbol
-		ExchangeAccountID: uuid.Nil, // TODO: Resolve from user + exchange
+		StrategyID:        plan.StrategyID, // From trading plan
+		ExchangeAccountID: uuid.Nil,        // TODO: Resolve from user + exchange
 		Symbol:            plan.Symbol,
 		MarketType:        "spot", // TODO: Parse from symbol or plan
 		Side:              plan.Side,

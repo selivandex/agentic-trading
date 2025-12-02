@@ -28,12 +28,13 @@ func TestPositionRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	pos := &position.Position{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		Symbol:            "BTC/USDT",
 		MarketType:        "spot",
@@ -79,12 +80,13 @@ func TestPositionRepository_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	pos := &position.Position{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		Symbol:            "ETH/USDT",
 		MarketType:        "futures",
@@ -132,7 +134,8 @@ func TestPositionRepository_GetOpenByUser(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	// Create mix of open and closed positions
 	symbols := []string{"BTC/USDT", "ETH/USDT", "SOL/USDT"}
@@ -146,7 +149,7 @@ func TestPositionRepository_GetOpenByUser(t *testing.T) {
 		pos := &position.Position{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID,
 			ExchangeAccountID: exchangeAccountID,
 			Symbol:            symbol,
 			MarketType:        "spot",
@@ -192,12 +195,13 @@ func TestPositionRepository_UpdatePnL(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	pos := &position.Position{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		Symbol:            "BTC/USDT",
 		MarketType:        "spot",
@@ -257,12 +261,13 @@ func TestPositionRepository_Close(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	pos := &position.Position{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		Symbol:            "ETH/USDT",
 		MarketType:        "spot",
@@ -307,7 +312,8 @@ func TestPositionRepository_UpdatePnLBatch(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	// Create multiple open positions
 	positionIDs := make([]uuid.UUID, 3)
@@ -315,7 +321,7 @@ func TestPositionRepository_UpdatePnLBatch(t *testing.T) {
 		pos := &position.Position{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID,
 			ExchangeAccountID: exchangeAccountID,
 			Symbol:            "BTC/USDT",
 			MarketType:        "spot",
@@ -381,14 +387,15 @@ func TestPositionRepository_GetByTradingPair(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	// Create positions for same trading pair
 	for i := 0; i < 3; i++ {
 		pos := &position.Position{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID,
 			ExchangeAccountID: exchangeAccountID,
 			Symbol:            "BTC/USDT",
 			MarketType:        "spot",
@@ -404,14 +411,14 @@ func TestPositionRepository_GetByTradingPair(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Test GetByTradingPair
-	positions, err := repo.GetByTradingPair(ctx, tradingPairID)
+	// Test GetByStrategy
+	positions, err := repo.GetByStrategy(ctx, strategyID)
 	require.NoError(t, err)
-	assert.Len(t, positions, 3, "Should return all positions for trading pair")
+	assert.Len(t, positions, 3, "Should return all positions for strategy")
 
-	// Verify all belong to same trading pair
+	// Verify all belong to same strategy
 	for _, pos := range positions {
-		assert.Equal(t, tradingPairID, pos.TradingPairID)
+		assert.Equal(t, &strategyID, pos.StrategyID)
 	}
 }
 
@@ -427,13 +434,14 @@ func TestPositionRepository_ShortPosition(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	// Create short position with leverage
 	pos := &position.Position{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		Symbol:            "BTC/USDT",
 		MarketType:        "futures",
@@ -490,18 +498,19 @@ func TestPositionRepository_StopLossTakeProfit(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	// Create SL/TP orders first
-	stopLossOrderID := fixtures.CreateOrder(userID, tradingPairID, exchangeAccountID,
+	stopLossOrderID := fixtures.CreateOrder(userID, strategyID, exchangeAccountID,
 		WithOrderSide("sell"), WithOrderStatus("open"))
-	takeProfitOrderID := fixtures.CreateOrder(userID, tradingPairID, exchangeAccountID,
+	takeProfitOrderID := fixtures.CreateOrder(userID, strategyID, exchangeAccountID,
 		WithOrderSide("sell"), WithOrderStatus("open"))
 
 	pos := &position.Position{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID,
 		ExchangeAccountID: exchangeAccountID,
 		Symbol:            "ETH/USDT",
 		MarketType:        "futures",
@@ -548,7 +557,8 @@ func TestPositionRepository_GetClosedInRange(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID for tests
 
 	now := time.Now()
 	yesterday := now.Add(-24 * time.Hour)
@@ -561,7 +571,7 @@ func TestPositionRepository_GetClosedInRange(t *testing.T) {
 		pos := &position.Position{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID,
 			ExchangeAccountID: exchangeAccountID,
 			Symbol:            "BTC/USDT",
 			MarketType:        "spot",

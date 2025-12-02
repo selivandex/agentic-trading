@@ -13,8 +13,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_exchange_id ON orders (exchange_order_id)
 WHERE
     exchange_order_id IS NOT NULL;
 
--- Index for querying orders by trading pair
-CREATE INDEX IF NOT EXISTS idx_orders_trading_pair ON orders (trading_pair_id, created_at DESC);
+-- Index for querying orders by symbol
+CREATE INDEX IF NOT EXISTS idx_orders_symbol_time ON orders (symbol, created_at DESC);
 
 -- ==================================================
 -- Positions table indexes
@@ -29,8 +29,8 @@ CREATE INDEX IF NOT EXISTS idx_positions_symbol_open ON positions (symbol, statu
 WHERE
     status = 'open';
 
--- Index for querying positions by trading pair
-CREATE INDEX IF NOT EXISTS idx_positions_trading_pair ON positions (trading_pair_id, opened_at DESC);
+-- Index for querying positions by symbol and time
+CREATE INDEX IF NOT EXISTS idx_positions_symbol_time ON positions (symbol, opened_at DESC);
 
 -- ==================================================
 -- Memories table indexes (pgvector semantic search)
@@ -89,17 +89,9 @@ WHERE
     acknowledged = false;
 
 -- ==================================================
--- Trading pairs indexes
+-- Trading pairs indexes (table removed - trading_pairs no longer used)
 -- ==================================================
--- Index for active trading pairs by user
-CREATE INDEX IF NOT EXISTS idx_trading_pairs_user_active ON trading_pairs (user_id, is_active)
-WHERE
-    is_active = true;
-
--- Index for non-paused trading pairs
-CREATE INDEX IF NOT EXISTS idx_trading_pairs_not_paused ON trading_pairs (user_id, is_paused)
-WHERE
-    is_paused = false;
+-- Indexes removed as trading_pairs table was deprecated
 
 -- ==================================================
 -- Exchange accounts indexes
@@ -110,15 +102,6 @@ WHERE
     is_active = true;
 
 -- ==================================================
--- Agent reasoning logs indexes (for debugging/analysis)
+-- Agent reasoning logs indexes (table removed - agent_reasoning_logs no longer used)
 -- ==================================================
--- Index for querying recent reasoning by user
-CREATE INDEX IF NOT EXISTS idx_reasoning_user_time ON agent_reasoning_logs (user_id, created_at DESC);
-
--- Index for querying by agent type
-CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON agent_reasoning_logs (agent_type, created_at DESC);
-
--- Index for expensive reasoning (high token usage)
-CREATE INDEX IF NOT EXISTS idx_reasoning_cost ON agent_reasoning_logs (tokens_used DESC, cost_usd DESC)
-WHERE
-    tokens_used > 10000;
+-- Indexes removed as agent_reasoning_logs table was deprecated

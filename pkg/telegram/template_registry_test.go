@@ -131,11 +131,11 @@ Percent: {{percent 0.15}}
 	tests := []struct {
 		want string
 	}{
-		{want: "$1500.50"},     // money helper
-		{want: "*Hello*"},      // bold helper
-		{want: "`BTC`"},        // code helper
-		{want: "✅"},            // checkmark helper
-		{want: "15.0%"},        // percent helper
+		{want: "$1500.50"}, // money helper
+		{want: "*Hello*"},  // bold helper
+		{want: "`BTC`"},    // code helper
+		{want: "✅"},        // checkmark helper
+		{want: "15.0%"},    // percent helper
 	}
 
 	for _, tt := range tests {
@@ -206,4 +206,3 @@ func TestTemplateRegistry_List(t *testing.T) {
 func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
-

@@ -56,19 +56,21 @@ type Ticker struct {
 	WeightedAvgPrice   float64   `ch:"weighted_avg_price"`
 	TradeCount         uint64    `ch:"trade_count"`
 	EventTime          time.Time `ch:"event_time"`
+	CollectedAt        time.Time `ch:"collected_at"` // When we collected this data
 }
 
 // OrderBookSnapshot represents order book state at a point in time
 type OrderBookSnapshot struct {
-	Exchange   string    `ch:"exchange"`
-	Symbol     string    `ch:"symbol"`
-	MarketType string    `ch:"market_type"` // spot or futures
-	Timestamp  time.Time `ch:"timestamp"`
-	Bids       string    `ch:"bids"`      // JSON array
-	Asks       string    `ch:"asks"`      // JSON array
-	BidDepth   float64   `ch:"bid_depth"` // Total bid volume
-	AskDepth   float64   `ch:"ask_depth"` // Total ask volume
-	EventTime  time.Time `ch:"event_time"`
+	Exchange    string    `ch:"exchange"`
+	Symbol      string    `ch:"symbol"`
+	MarketType  string    `ch:"market_type"` // spot or futures
+	Timestamp   time.Time `ch:"timestamp"`
+	Bids        string    `ch:"bids"`      // JSON array
+	Asks        string    `ch:"asks"`      // JSON array
+	BidDepth    float64   `ch:"bid_depth"` // Total bid volume
+	AskDepth    float64   `ch:"ask_depth"` // Total ask volume
+	EventTime   time.Time `ch:"event_time"`
+	CollectedAt time.Time `ch:"collected_at"` // When we collected this data
 }
 
 // Trade represents aggregated trade (tape/time & sales)
@@ -86,6 +88,7 @@ type Trade struct {
 	LastTradeID  int64     `ch:"last_trade_id"`
 	IsBuyerMaker bool      `ch:"is_buyer_maker"` // true if seller was the maker
 	EventTime    time.Time `ch:"event_time"`
+	CollectedAt  time.Time `ch:"collected_at"` // When we collected this data
 }
 
 // Side returns the side of the trade ("buy" or "sell" from taker perspective)

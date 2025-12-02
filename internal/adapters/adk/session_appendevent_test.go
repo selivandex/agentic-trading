@@ -2,6 +2,7 @@ package adk_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -48,8 +49,9 @@ func TestADKSessionService_AppendEvent(t *testing.T) {
 		adkSession.ID(),
 	)
 
-	// Step 2: Create event
+	// Step 2: Create event with unique ID
 	adkEvent := &session.Event{
+		ID:        fmt.Sprintf("event_%d", time.Now().UnixNano()),
 		Timestamp: time.Now(),
 		Branch:    "main",
 		Author:    "user",
@@ -104,6 +106,7 @@ func TestADKSessionService_MultipleEvents(t *testing.T) {
 	// Append multiple events
 	for i := 0; i < 5; i++ {
 		adkEvent := &session.Event{
+			ID:        fmt.Sprintf("event_%d_%d", time.Now().UnixNano(), i),
 			Timestamp: time.Now().Add(time.Duration(i) * time.Second),
 			Branch:    "main",
 			Author:    "agent",

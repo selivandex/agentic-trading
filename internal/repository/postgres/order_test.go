@@ -28,12 +28,13 @@ func TestOrderRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "BINANCE_12345",
 		Symbol:            "BTC/USDT",
@@ -79,14 +80,15 @@ func TestOrderRepository_CreateBatch(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	// Create batch of orders
 	orders := []*order.Order{
 		{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID, //      tradingPairID,
 			ExchangeAccountID: exchangeAccountID,
 			ExchangeOrderID:   "BATCH_1",
 			Symbol:            "BTC/USDT",
@@ -107,7 +109,7 @@ func TestOrderRepository_CreateBatch(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID, //      tradingPairID,
 			ExchangeAccountID: exchangeAccountID,
 			ExchangeOrderID:   "BATCH_2",
 			Symbol:            "ETH/USDT",
@@ -128,7 +130,7 @@ func TestOrderRepository_CreateBatch(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID, //      tradingPairID,
 			ExchangeAccountID: exchangeAccountID,
 			ExchangeOrderID:   "BATCH_3",
 			Symbol:            "SOL/USDT",
@@ -172,12 +174,13 @@ func TestOrderRepository_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "TEST_ORDER",
 		Symbol:            "BTC/USDT",
@@ -227,14 +230,15 @@ func TestOrderRepository_GetByExchangeOrderID(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	exchangeOrderID := "EXCHANGE_ORDER_" + uuid.New().String()[:8]
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   exchangeOrderID,
 		Symbol:            "ETH/USDT",
@@ -274,7 +278,8 @@ func TestOrderRepository_GetOpenByUser(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	// Create mix of open and filled orders
 	statuses := []order.OrderStatus{
@@ -289,7 +294,7 @@ func TestOrderRepository_GetOpenByUser(t *testing.T) {
 		o := &order.Order{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID, //      tradingPairID,
 			ExchangeAccountID: exchangeAccountID,
 			ExchangeOrderID:   "ORDER_" + string(rune(i+'0')),
 			Symbol:            "BTC/USDT",
@@ -337,12 +342,13 @@ func TestOrderRepository_UpdateStatus(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "UPDATE_TEST",
 		Symbol:            "BTC/USDT",
@@ -400,7 +406,8 @@ func TestOrderRepository_UpdateStatusBatch(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	// Create multiple open orders
 	orderIDs := make([]uuid.UUID, 3)
@@ -408,7 +415,7 @@ func TestOrderRepository_UpdateStatusBatch(t *testing.T) {
 		o := &order.Order{
 			ID:                uuid.New(),
 			UserID:            userID,
-			TradingPairID:     tradingPairID,
+			StrategyID:        &strategyID, //      tradingPairID,
 			ExchangeAccountID: exchangeAccountID,
 			ExchangeOrderID:   "BATCH_UPDATE_" + string(rune(i+'0')),
 			Symbol:            "BTC/USDT",
@@ -476,12 +483,13 @@ func TestOrderRepository_Cancel(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	o := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "CANCEL_TEST",
 		Symbol:            "BTC/USDT",
@@ -524,13 +532,14 @@ func TestOrderRepository_ParentChildOrders(t *testing.T) {
 	ctx := context.Background()
 
 	fixtures := NewTestFixtures(t, testDB.DB())
-	userID, exchangeAccountID, tradingPairID := fixtures.WithFullStack()
+	userID, exchangeAccountID, _ := fixtures.WithFullStack()
+	strategyID := uuid.New() // Mock strategy ID
 
 	// Create parent order (main position)
 	parentOrder := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "PARENT_ORDER",
 		Symbol:            "BTC/USDT",
@@ -556,7 +565,7 @@ func TestOrderRepository_ParentChildOrders(t *testing.T) {
 	childOrder := &order.Order{
 		ID:                uuid.New(),
 		UserID:            userID,
-		TradingPairID:     tradingPairID,
+		StrategyID:        &strategyID, //      tradingPairID,
 		ExchangeAccountID: exchangeAccountID,
 		ExchangeOrderID:   "CHILD_SL_ORDER",
 		Symbol:            "BTC/USDT",

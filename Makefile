@@ -184,15 +184,10 @@ db-create: db-pg-create db-ch-create
 	@echo "✓ All databases created"
 
 db-drop:
-	@echo "⚠️  WARNING: This will DROP all databases!"
-	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
-	if [ "$$confirm" = "yes" ]; then \
-		$(MAKE) db-pg-drop; \
-		$(MAKE) db-ch-drop; \
-		echo "✓ All databases dropped"; \
-	else \
-		echo "Cancelled."; \
-	fi
+	@echo "⚠️  WARNING: Dropping all databases..."
+	@$(MAKE) db-pg-drop
+	@$(MAKE) db-ch-drop
+	@echo "✓ All databases dropped"
 
 db-reset: db-drop db-create migrate-up
 	@echo "✓ Databases reset complete"
@@ -227,26 +222,21 @@ test-db-drop:
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
-	@echo "⚠️  WARNING: This will DROP all test databases!"
-	@read -p "Are you sure? Type 'yes' to confirm: " confirm; \
-	if [ "$$confirm" = "yes" ]; then \
-		set -a; . ./.env.test; set +a; \
-		$(MAKE) db-pg-drop \
-			DB_PG_HOST=$$POSTGRES_HOST \
-			DB_PG_PORT=$$POSTGRES_PORT \
-			DB_PG_USER=$$POSTGRES_USER \
-			DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
-			DB_PG_NAME=$$POSTGRES_DB; \
-		$(MAKE) db-ch-drop \
-			DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
-			DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
-			DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
-			DB_CH_PASSWORD=$${CLICKHOUSE_PASSWORD:-$(CLICKHOUSE_PASSWORD)} \
-			DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}; \
-		echo "✓ All test databases dropped"; \
-	else \
-		echo "Cancelled."; \
-	fi
+	@echo "⚠️  WARNING: Dropping all test databases..."
+	@set -a; . ./.env.test; set +a; \
+	$(MAKE) db-pg-drop \
+		DB_PG_HOST=$$POSTGRES_HOST \
+		DB_PG_PORT=$$POSTGRES_PORT \
+		DB_PG_USER=$$POSTGRES_USER \
+		DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
+		DB_PG_NAME=$$POSTGRES_DB; \
+	$(MAKE) db-ch-drop \
+		DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
+		DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
+		DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
+		DB_CH_PASSWORD=$${CLICKHOUSE_PASSWORD:-$(CLICKHOUSE_PASSWORD)} \
+		DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}
+	@echo "✓ All test databases dropped"
 
 test-db-reset:
 	@if [ ! -f .env.test ]; then \
