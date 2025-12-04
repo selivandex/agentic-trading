@@ -1,0 +1,22 @@
+# Custom scalar types
+
+"""
+UUID scalar type represents a universally unique identifier
+"""
+scalar UUID
+
+"""
+Time scalar type represents a timestamp in RFC3339 format
+"""
+scalar Time
+
+"""
+Decimal scalar type represents a high-precision decimal number
+"""
+scalar Decimal
+
+"""
+JSONObject scalar type represents an arbitrary JSON object
+"""
+scalar JSONObject
+

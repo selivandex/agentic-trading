@@ -36,6 +36,7 @@ import (
 	chrepo "prometheus/internal/repository/clickhouse"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	exchangeservice "prometheus/internal/services/exchange"
+	fundwatchlistsvc "prometheus/internal/services/fund_watchlist"
 	marketdatasvc "prometheus/internal/services/market_data"
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
@@ -119,6 +120,7 @@ type Services struct {
 	Position           *position.Service          // Position domain service
 	PositionManagement *positionservice.Service   // Position management service for WebSocket updates
 	Strategy           *strategyservice.Service   // Strategy service for portfolio management
+	FundWatchlist      *fundwatchlistsvc.Service  // Fund watchlist service (globally monitored symbols)
 	Memory             *memory.Service            // Memory domain service
 	Session            *domainsession.Service     // Session domain service
 	ADKSession         session.Service            // ADK interface

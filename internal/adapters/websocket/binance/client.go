@@ -40,6 +40,7 @@ type Client struct {
 	messagesSent     atomic.Int64
 	errorCount       atomic.Int64
 	reconnectCount   atomic.Int32
+	recentErrors     atomic.Int32 // Track recent errors for health check
 
 	logger *logger.Logger
 }
@@ -240,6 +241,7 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 	}
 
 	c.connected.Store(true)
+	c.recentErrors.Store(0) // Reset error counter on successful connection
 	c.statsMu.Lock()
 	c.stats.ConnectedSince = time.Now()
 	c.stats.ActiveStreams = len(config.Streams)
@@ -252,6 +254,7 @@ func (c *Client) Connect(ctx context.Context, config websocket.ConnectionConfig)
 func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -279,6 +282,11 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 
 		if c.handler == nil {
 			return
+		}
+
+		// Reset recent errors counter on successful message (connection is healthy)
+		if c.recentErrors.Load() > 0 {
+			c.recentErrors.Store(0)
 		}
 
 		// Convert Binance event to our generic format
@@ -319,6 +327,7 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -427,6 +436,7 @@ func (c *Client) convertSpotKlineEvent(event *binance.WsKlineEvent) *websocket.K
 func (c *Client) connectMarkPriceStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -504,6 +514,7 @@ func (c *Client) convertMarkPriceEvent(event *futures.WsMarkPriceEvent) *websock
 func (c *Client) connectLiquidationStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -594,6 +605,7 @@ func (c *Client) convertLiquidationEvent(event *futures.WsLiquidationOrderEvent)
 func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -661,6 +673,7 @@ func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 func (c *Client) connectSpotTickerStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -772,6 +785,7 @@ func (c *Client) convertSpotTickerEvent(event binance.WsMarketStatEvent) *websoc
 func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -835,6 +849,7 @@ func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 func (c *Client) connectSpotTradeStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -932,6 +947,7 @@ func (c *Client) convertSpotTradeEvent(event *binance.WsAggTradeEvent) *websocke
 func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -1003,6 +1019,7 @@ func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 func (c *Client) connectSpotDepthStreams(symbols []string) error {
 	errHandler := func(err error) {
 		c.errorCount.Add(1)
+		c.recentErrors.Add(1)
 		c.statsMu.Lock()
 		c.stats.LastError = err
 		c.statsMu.Unlock()
@@ -1229,8 +1246,22 @@ func (c *Client) Stop(ctx context.Context) error {
 }
 
 // IsConnected returns connection status
+// Returns false if too many recent errors occurred
 func (c *Client) IsConnected() bool {
-	return c.connected.Load()
+	if !c.connected.Load() {
+		return false
+	}
+
+	// If we have more than 5 recent errors, consider connection unhealthy
+	recentErrors := c.recentErrors.Load()
+	if recentErrors > 5 {
+		c.logger.Warnw("Connection considered unhealthy due to recent errors",
+			"recent_errors", recentErrors,
+		)
+		return false
+	}
+
+	return true
 }
 
 // GetStats returns current statistics

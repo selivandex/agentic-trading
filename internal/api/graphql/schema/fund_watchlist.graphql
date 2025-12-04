@@ -1,0 +1,75 @@
+# Fund Watchlist types and operations
+
+type FundWatchlist {
+  id: UUID!
+  symbol: String!
+  marketType: String!
+  
+  # Metadata
+  category: String!
+  tier: Int!
+  
+  # State
+  isActive: Boolean!
+  isPaused: Boolean!
+  pausedReason: String
+  
+  # Analytics
+  lastAnalyzedAt: Time
+  
+  # Timestamps
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+input CreateFundWatchlistInput {
+  symbol: String!
+  marketType: String!
+  category: String!
+  tier: Int!
+}
+
+input UpdateFundWatchlistInput {
+  category: String
+  tier: Int
+  isActive: Boolean
+  isPaused: Boolean
+  pausedReason: String
+}
+
+# Queries
+extend type Query {
+  # Get watchlist item by ID
+  fundWatchlist(id: UUID!): FundWatchlist
+  
+  # Get watchlist item by symbol
+  fundWatchlistBySymbol(symbol: String!, marketType: String!): FundWatchlist
+  
+  # Get all watchlist items
+  fundWatchlists(
+    limit: Int
+    offset: Int
+    isActive: Boolean
+    category: String
+    tier: Int
+  ): [FundWatchlist!]!
+  
+  # Get monitored symbols (active and not paused)
+  monitoredSymbols(marketType: String): [FundWatchlist!]!
+}
+
+# Mutations
+extend type Mutation {
+  # Add symbol to watchlist
+  createFundWatchlist(input: CreateFundWatchlistInput!): FundWatchlist!
+  
+  # Update watchlist item
+  updateFundWatchlist(id: UUID!, input: UpdateFundWatchlistInput!): FundWatchlist!
+  
+  # Remove from watchlist
+  deleteFundWatchlist(id: UUID!): Boolean!
+  
+  # Pause/unpause monitoring
+  toggleFundWatchlistPause(id: UUID!, isPaused: Boolean!, reason: String): FundWatchlist!
+}
+

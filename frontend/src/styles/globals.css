@@ -1,0 +1,128 @@
+/** @format */
+
+@import "tailwindcss";
+@import "./theme.css";
+@import "./typography.css";
+@import "reactflow/dist/style.css";
+
+/* Custom variants */
+@custom-variant dark (:is(.dark, .dark *));
+@custom-variant label (& [data-label]);
+@custom-variant focus-input-within (&:has(input:focus));
+
+@utility scrollbar-hide {
+  /* For Webkit-based browsers (Chrome, Safari and Opera) */
+  &::-webkit-scrollbar {
+    display: none;
+    -webkit-appearance: none;
+  }
+
+  /* For IE, Edge and Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+@utility transition-inherit-all {
+  transition-property: inherit;
+  transition-duration: inherit;
+  transition-timing-function: inherit;
+}
+
+html,
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-variant-ligatures: contextual;
+  font-variant-ligatures: contextual;
+  -webkit-font-kerning: normal;
+  font-kerning: normal;
+}
+
+/* Hide the default expand arrow on Safari.  */
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Hide default arrows from number inputs. */
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Hide the default clear button (X) from search inputs. */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* React Flow Components - Dark Mode Support */
+
+/* Controls */
+.react-flow__controls {
+  background-color: var(--color-bg-primary) !important;
+  border-color: var(--color-border-secondary) !important;
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.08) !important;
+}
+
+.react-flow__controls-button {
+  background-color: var(--color-bg-primary) !important;
+  border-color: var(--color-border-secondary) !important;
+  color: var(--color-fg-secondary) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--color-bg-secondary) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: var(--color-fg-secondary) !important;
+}
+
+.react-flow__controls-button:hover svg {
+  fill: var(--color-fg-primary) !important;
+}
+
+/* MiniMap */
+.react-flow__minimap {
+  background-color: var(--color-minimap-bg) !important;
+  border-color: var(--color-border-secondary) !important;
+}
+
+/* Background */
+.react-flow__background {
+  background-color: var(--color-bg-secondary) !important;
+}
+
+/* Attribution */
+.react-flow__attribution {
+  background-color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-border-secondary) !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+
+.react-flow__attribution a {
+  color: var(--color-fg-tertiary) !important;
+  text-decoration: none !important;
+}
+
+.react-flow__attribution a:hover {
+  color: var(--color-fg-primary) !important;
+}
+
+/* Dark mode specific overrides */
+@media (prefers-color-scheme: dark) {
+  .react-flow__controls {
+    box-shadow: 0 0 2px 1px rgba(255, 255, 255, 0.08) !important;
+  }
+}

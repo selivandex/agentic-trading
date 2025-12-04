@@ -1,4 +1,4 @@
-.PHONY: help docker-up docker-down docker-logs clean deps proto-gen
+.PHONY: help docker-up docker-down docker-logs clean deps proto-gen g-gen
 .PHONY: db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create
 .PHONY: db-pg-create db-pg-drop migrate-pg-up migrate-pg-down migrate-pg-status
 .PHONY: db-ch-create db-ch-drop migrate-ch-up migrate-ch-down migrate-ch-status
@@ -82,6 +82,7 @@ help:
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make deps               - Install dependencies"
 	@echo "  make proto-gen          - Generate protobuf code"
+	@echo "  make g-gen              - Generate GraphQL code"
 	@echo "  make setup              - Full setup (deps + docker + db + migrations)"
 	@echo ""
 	@echo "🚀 Server Control:"
@@ -376,6 +377,12 @@ proto-gen:
 	protoc --go_out=. --go_opt=paths=source_relative \
 		internal/events/proto/events.proto
 	@echo "✓ Protobuf code generated"
+
+# GraphQL code generation
+g-gen:
+	@echo "Generating GraphQL code..."
+	go run github.com/99designs/gqlgen generate
+	@echo "✓ GraphQL code generated"
 
 # Clean
 clean:

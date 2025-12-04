@@ -1,0 +1,28 @@
+# @format
+$schema: https://the-guild.dev/graphql/codegen/config.schema.json
+
+overwrite: true
+schema: ../app/graphql/schema.graphql
+documents:
+  - "src/**/*.ts"
+  - "src/**/*.tsx"
+  - "!src/**/*.generated.{ts,tsx}"
+  - "!src/shared/api/generated/**/*"
+  - "!**/*.md"
+  - "!**/docs/**"
+  - "!**/README.md"
+generates:
+  src/shared/api/generated/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      reactApolloVersion: 3
+      exportFragmentSpreadSubTypes: true
+      withHooks: true
+      withComponent: false
+      scalars:
+        ISO8601DateTime: string
+        JSON: Record<string, unknown>
+allowPartialOutputs: true

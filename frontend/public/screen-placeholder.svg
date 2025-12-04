@@ -1,0 +1,18 @@
+<svg width="180" height="390" viewBox="0 0 180 390" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with gray-200 -->
+  <rect width="180" height="390" fill="#E5E7EB"/>
+  
+  <!-- Screen icon in center -->
+  <g transform="translate(90, 195)">
+    <!-- Device outline -->
+    <rect x="-30" y="-50" width="60" height="100" rx="6" fill="#D1D5DB" stroke="#9CA3AF" stroke-width="2"/>
+    <!-- Screen area -->
+    <rect x="-25" y="-42" width="50" height="75" rx="2" fill="#F3F4F6"/>
+    <!-- Bottom button -->
+    <circle cx="0" cy="40" r="3" fill="#9CA3AF"/>
+  </g>
+  
+  <!-- Label at bottom -->
+  <text x="90" y="370" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#9CA3AF" text-anchor="middle" opacity="0.7">Screen</text>
+</svg>
+

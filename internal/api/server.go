@@ -15,10 +15,12 @@ import (
 
 // ServerConfig contains configuration for HTTP server
 type ServerConfig struct {
-	Port            int
-	ServiceName     string
-	Version         string
-	TelegramWebhook *telegram.WebhookHandler // Optional Telegram webhook handler (from pkg/telegram)
+	Port              int
+	ServiceName       string
+	Version           string
+	TelegramWebhook   *telegram.WebhookHandler // Optional Telegram webhook handler (from pkg/telegram)
+	GraphQLHandler    http.Handler             // Optional GraphQL handler
+	PlaygroundHandler http.Handler             // Optional GraphQL Playground handler
 }
 
 // Server wraps HTTP server with lifecycle management
@@ -44,6 +46,16 @@ func NewServer(cfg ServerConfig, healthHandler *health.Handler, log *logger.Logg
 		mux.HandleFunc("/telegram/webhook", cfg.TelegramWebhook.ServeHTTP)
 		mux.HandleFunc("/telegram/health", cfg.TelegramWebhook.HealthCheck)
 		log.Info("✓ Telegram webhook registered at /telegram/webhook")
+	}
+
+	// GraphQL endpoints (if configured)
+	if cfg.GraphQLHandler != nil {
+		mux.Handle("/graphql", cfg.GraphQLHandler)
+		log.Info("✓ GraphQL API registered at /graphql")
+	}
+	if cfg.PlaygroundHandler != nil {
+		mux.Handle("/playground", cfg.PlaygroundHandler)
+		log.Info("✓ GraphQL Playground registered at /playground")
 	}
 
 	// Root endpoint (service info)

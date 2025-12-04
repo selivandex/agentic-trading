@@ -178,7 +178,7 @@ func (m *MarketDataManager) performHealthCheck(ctx context.Context) {
 				"consecutive_failures", failures,
 			)
 		} else {
-			m.logger.Debugw("Market Data WebSocket disconnected, attempting reconnect",
+			m.logger.Infow("🔄 Market Data WebSocket disconnected, attempting reconnect",
 				"consecutive_failures", failures,
 			)
 		}
@@ -204,7 +204,7 @@ func (m *MarketDataManager) performHealthCheck(ctx context.Context) {
 		// Connection is healthy
 		m.mu.Lock()
 		if m.consecutiveFailures > 0 {
-			m.logger.Debugw("Market Data WebSocket connection healthy",
+			m.logger.Infow("✅ Market Data WebSocket connection recovered",
 				"consecutive_failures_cleared", m.consecutiveFailures,
 			)
 			m.consecutiveFailures = 0
@@ -215,7 +215,7 @@ func (m *MarketDataManager) performHealthCheck(ctx context.Context) {
 
 // reconnect stops the current connection and establishes a new one
 func (m *MarketDataManager) reconnect(ctx context.Context) error {
-	m.logger.Debugw("Stopping old connection before reconnect...")
+	m.logger.Infow("🔧 Reconnecting Market Data WebSocket...")
 
 	// Stop old connection
 	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -278,5 +278,3 @@ func (m *MarketDataManager) getTotalReconnects() int {
 	defer m.statsMu.RUnlock()
 	return m.totalReconnects
 }
-
-

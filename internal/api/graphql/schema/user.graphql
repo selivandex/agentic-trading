@@ -1,0 +1,77 @@
+# @format
+
+# User types and operations
+
+type User {
+  id: UUID!
+  telegramID: String!
+  telegramUsername: String!
+  firstName: String!
+  lastName: String!
+  languageCode: String!
+  isActive: Boolean!
+  isPremium: Boolean!
+  limitProfileID: UUID
+  settings: Settings!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Settings {
+  defaultAIProvider: String!
+  defaultAIModel: String!
+  riskLevel: String!
+  maxPositions: Int!
+  maxPortfolioRisk: Float!
+  maxDailyDrawdown: Float!
+  maxConsecutiveLoss: Int!
+  notificationsOn: Boolean!
+  dailyReportTime: String!
+  timezone: String!
+  circuitBreakerOn: Boolean!
+  maxPositionSizeUSD: Float!
+  maxTotalExposureUSD: Float!
+  minPositionSizeUSD: Float!
+  maxLeverageMultiple: Float!
+  allowedExchanges: [String!]!
+}
+
+input UpdateUserSettingsInput {
+  defaultAIProvider: String
+  defaultAIModel: String
+  riskLevel: String
+  maxPositions: Int
+  maxPortfolioRisk: Float
+  maxDailyDrawdown: Float
+  maxConsecutiveLoss: Int
+  notificationsOn: Boolean
+  dailyReportTime: String
+  timezone: String
+  circuitBreakerOn: Boolean
+  maxPositionSizeUSD: Float
+  maxTotalExposureUSD: Float
+  minPositionSizeUSD: Float
+  maxLeverageMultiple: Float
+  allowedExchanges: [String!]
+}
+
+# Queries
+extend type Query {
+  # Get user by ID
+  user(id: UUID!): User
+
+  # Get user by telegram ID
+  userByTelegramID(telegramID: String!): User
+
+  # Get all users (admin only)
+  users(limit: Int, offset: Int): [User!]!
+}
+
+# Mutations
+extend type Mutation {
+  # Update user settings
+  updateUserSettings(userID: UUID!, input: UpdateUserSettingsInput!): User!
+
+  # Activate/deactivate user
+  setUserActive(userID: UUID!, isActive: Boolean!): User!
+}

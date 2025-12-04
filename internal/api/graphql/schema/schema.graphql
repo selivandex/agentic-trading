@@ -1,0 +1,17 @@
+# Root schema definition
+
+type Query {
+  # Health check
+  health: String!
+}
+
+type Mutation {
+  # Placeholder mutation
+  _empty: String
+}
+
+type Subscription {
+  # Placeholder subscription
+  _empty: String
+}
+

@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"prometheus/internal/agents"
 	"prometheus/internal/agents/workflows"
 	"prometheus/internal/api"
+	graphql "prometheus/internal/api/graphql"
 	"prometheus/internal/api/health"
 	tgapi "prometheus/internal/api/telegram"
 	"prometheus/internal/consumers"
@@ -42,6 +44,7 @@ import (
 	"prometheus/internal/repository/redis"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	"prometheus/internal/services/exchange"
+	fundwatchlistsvc "prometheus/internal/services/fund_watchlist"
 	marketdatasvc "prometheus/internal/services/market_data"
 	"prometheus/internal/services/menu_session"
 	onboardingservice "prometheus/internal/services/onboarding"
@@ -232,6 +235,11 @@ func (c *Container) MustInitServices() {
 		dbAdapter,
 		c.Log,
 	)
+
+	// Fund Watchlist Service (globally monitored symbols)
+	// Note: Using fundwatchlist repo (not fund_watchlist) - see domain/fundwatchlist
+	c.Services.FundWatchlist = fundwatchlistsvc.NewService(c.Repos.FundWatchlist, c.Log)
+
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)
 
@@ -388,12 +396,15 @@ func (c *Container) MustInitApplication() {
 	notificationService := provideTelegramNotificationService(bot, templateAdapter, c.Log)
 	c.Application.TelegramNotificationService = notificationService
 
-	// HTTP server
+	// HTTP server (with GraphQL)
 	c.Application.HTTPServer = provideHTTPServer(
 		c.Config,
 		c.Application.HealthHandler,
 		c.Application.TelegramBot,
 		c.Application.TelegramHandler,
+		c.Services.User,
+		c.Services.Strategy,
+		c.Services.FundWatchlist,
 		c.Log,
 	)
 
@@ -680,6 +691,9 @@ func provideHTTPServer(
 	healthHandler *health.Handler,
 	telegramBot tg.Bot,
 	telegramHandler *telegram.Handler,
+	userService *userservice.Service,
+	strategyService *strategyservice.Service,
+	fundWatchlistService *fundwatchlistsvc.Service,
 	log *logger.Logger,
 ) *api.Server {
 	var webhookHandler *tg.WebhookHandler
@@ -692,11 +706,21 @@ func provideHTTPServer(
 		log.Info("✓ Telegram polling mode enabled")
 	}
 
+	// GraphQL handlers (only in development for now)
+	var graphqlHandler, playgroundHandler http.Handler
+	if cfg.App.Env != "production" {
+		graphqlHandler = graphql.Handler(userService, strategyService, fundWatchlistService)
+		playgroundHandler = graphql.PlaygroundHandler()
+		log.Info("✓ GraphQL API enabled (development mode)")
+	}
+
 	return api.NewServer(api.ServerConfig{
-		Port:            cfg.HTTP.Port,
-		ServiceName:     cfg.App.Name,
-		Version:         cfg.App.Version,
-		TelegramWebhook: webhookHandler,
+		Port:              cfg.HTTP.Port,
+		ServiceName:       cfg.App.Name,
+		Version:           cfg.App.Version,
+		TelegramWebhook:   webhookHandler,
+		GraphQLHandler:    graphqlHandler,
+		PlaygroundHandler: playgroundHandler,
 	}, healthHandler, log)
 }
 
