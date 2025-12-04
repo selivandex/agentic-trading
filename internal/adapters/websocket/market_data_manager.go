@@ -278,3 +278,4 @@ func (m *MarketDataManager) getTotalReconnects() int {
 	defer m.statsMu.RUnlock()
 	return m.totalReconnects
 }
+

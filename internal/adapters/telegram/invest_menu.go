@@ -417,7 +417,7 @@ func (ims *InvestMenuService) buildEnterAmountScreen() *telegram.Screen {
 	)
 }
 
-// finalizeInvestment creates strategy and publishes portfolio initialization job
+// finalizeInvestment publishes portfolio initialization job (strategy will be created by onboarding service)
 func (ims *InvestMenuService) finalizeInvestment(ctx context.Context, session telegram.Session) error {
 	// Get parameters from session
 	userIDStr, _ := session.GetString("user_id")
@@ -451,12 +451,12 @@ func (ims *InvestMenuService) finalizeInvestment(ctx context.Context, session te
 			accountIDForJob = accountID.String()
 		}
 
-		strategyID := uuid.New()
-
+		// Don't pre-create strategy ID - let onboarding service create it
+		// This ensures proper validation and transaction handling
 		if err := ims.jobPublisher.PublishPortfolioInitializationJob(
 			ctx,
 			userID.String(),
-			strategyID.String(),
+			"", // Empty strategy_id -> onboarding service will create it
 			telegramID,
 			amount,
 			accountIDForJob,
@@ -467,22 +467,15 @@ func (ims *InvestMenuService) finalizeInvestment(ctx context.Context, session te
 			return errors.New("failed to start portfolio creation")
 		}
 
-		marketTypeEmoji := "📊"
-		if marketType == "futures" {
-			marketTypeEmoji = "⚡"
-		}
-
-		successMsg := fmt.Sprintf(
-			"⏳ Creating your %s %s portfolio in the background...\n\n"+
-				"💰 Amount: $%.2f\n"+
-				"🎯 Risk: %s\n\n"+
-				"You'll be notified when ready (1-2 min)",
-			marketTypeEmoji, marketType, amount, riskProfile,
+		// User will be notified via Kafka events:
+		// 1. InvestmentAcceptedEvent - sent immediately by onboarding service
+		// 2. PortfolioCreatedEvent - sent after successful portfolio creation
+		ims.log.Infow("Portfolio job published",
+			"user_id", userID,
+			"amount", amount,
+			"risk_profile", riskProfile,
+			"market_type", marketType,
 		)
-
-		// Need to store bot reference - will add to MenuNavigator
-		ims.log.Infow("Portfolio job published", "strategy_id", strategyID, "amount", amount)
-		_ = successMsg // TODO: send via bot
 	}
 
 	return nil

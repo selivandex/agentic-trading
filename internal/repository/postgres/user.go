@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 
 	"github.com/google/uuid"
@@ -63,6 +64,9 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User,
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.FirstName, &u.LastName,
 		&u.LanguageCode, &u.IsActive, &u.IsPremium, &u.LimitProfileID, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
 	)
+	if err == sql.ErrNoRows {
+		return nil, errors.Wrap(errors.ErrNotFound, "user not found")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +99,9 @@ func (r *UserRepository) GetByTelegramID(ctx context.Context, telegramID int64) 
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.FirstName, &u.LastName,
 		&u.LanguageCode, &u.IsActive, &u.IsPremium, &u.LimitProfileID, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
 	)
+	if err == sql.ErrNoRows {
+		return nil, errors.Wrap(errors.ErrNotFound, "user not found")
+	}
 	if err != nil {
 		return nil, err
 	}

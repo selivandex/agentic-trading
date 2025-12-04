@@ -11,6 +11,7 @@ import (
 
 	"prometheus/internal/domain/user"
 	"prometheus/internal/testsupport"
+	"prometheus/pkg/errors"
 )
 
 func TestUserRepository_Create(t *testing.T) {
@@ -88,9 +89,10 @@ func TestUserRepository_GetByID(t *testing.T) {
 	assert.Equal(t, u.TelegramID, retrieved.TelegramID)
 	assert.Equal(t, u.IsPremium, retrieved.IsPremium)
 
-	// Test non-existent ID
+	// Test non-existent ID - should return ErrNotFound
 	_, err = repo.GetByID(ctx, uuid.New())
 	assert.Error(t, err, "Should return error for non-existent ID")
+	assert.ErrorIs(t, err, errors.ErrNotFound, "Should return ErrNotFound for non-existent ID")
 }
 
 func TestUserRepository_GetByTelegramID(t *testing.T) {
@@ -129,9 +131,10 @@ func TestUserRepository_GetByTelegramID(t *testing.T) {
 	assert.Equal(t, u.TelegramID, retrieved.TelegramID)
 	assert.Equal(t, "ru", retrieved.LanguageCode)
 
-	// Test non-existent Telegram ID
+	// Test non-existent Telegram ID - should return ErrNotFound (critical for get-or-create logic)
 	_, err = repo.GetByTelegramID(ctx, 999999999)
 	assert.Error(t, err, "Should return error for non-existent Telegram ID")
+	assert.ErrorIs(t, err, errors.ErrNotFound, "Should return ErrNotFound for non-existent Telegram ID")
 }
 
 func TestUserRepository_Update(t *testing.T) {
@@ -263,9 +266,10 @@ func TestUserRepository_Delete(t *testing.T) {
 	err = repo.Delete(ctx, u.ID)
 	require.NoError(t, err)
 
-	// Verify user is deleted
+	// Verify user is deleted - should return ErrNotFound
 	_, err = repo.GetByID(ctx, u.ID)
 	assert.Error(t, err, "Should return error after deletion")
+	assert.ErrorIs(t, err, errors.ErrNotFound, "Should return ErrNotFound after deletion")
 }
 
 func TestUserRepository_SettingsJSONB(t *testing.T) {

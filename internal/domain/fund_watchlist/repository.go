@@ -17,3 +17,4 @@ type Repository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	IsActive(ctx context.Context, symbol, marketType string) (bool, error)
 }
+

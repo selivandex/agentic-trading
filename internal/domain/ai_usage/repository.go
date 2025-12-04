@@ -25,3 +25,4 @@ type Repository interface {
 	// GetModelCosts returns costs grouped by model for a time range
 	GetModelCosts(ctx context.Context, provider string, from, to time.Time) (map[string]float64, error)
 }
+

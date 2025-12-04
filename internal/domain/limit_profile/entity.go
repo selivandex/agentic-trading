@@ -92,14 +92,14 @@ func (lp *LimitProfile) SetLimits(limits *Limits) error {
 // FreeTierLimits returns default limits for free tier users
 func FreeTierLimits() Limits {
 	return Limits{
-		ExchangesCount:         1,        // 1 exchange only
-		ActivePositions:        2,        // Max 2 positions
-		DailyTradesCount:       5,        // 5 trades per day
-		MonthlyTradesCount:     50,       // 50 trades per month
-		TradingPairsCount:      5,        // Watch 5 pairs
-		MonthlyAIRequests:      100,      // 100 AI requests/month
-		MaxAgentsCount:         2,        // 2 simple agents
-		AdvancedAgentsAccess:   false,    // No premium agents
+		ExchangesCount:         1,     // 1 exchange only
+		ActivePositions:        2,     // Max 2 positions
+		DailyTradesCount:       5,     // 5 trades per day
+		MonthlyTradesCount:     50,    // 50 trades per month
+		TradingPairsCount:      5,     // Watch 5 pairs
+		MonthlyAIRequests:      100,   // 100 AI requests/month
+		MaxAgentsCount:         2,     // 2 simple agents
+		AdvancedAgentsAccess:   false, // No premium agents
 		CustomAgentsAllowed:    false,
 		MaxAgentMemoryMB:       50,     // 50MB memory
 		MaxPromptTokens:        10000,  // Basic tokens

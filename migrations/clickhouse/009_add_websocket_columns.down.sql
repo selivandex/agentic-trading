@@ -10,3 +10,4 @@ ALTER TABLE ohlcv
     DROP COLUMN IF EXISTS event_time;
 
 
+

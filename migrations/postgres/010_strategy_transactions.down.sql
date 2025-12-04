@@ -13,3 +13,4 @@ DROP TABLE IF EXISTS strategy_transactions;
 DROP TYPE IF EXISTS strategy_transaction_type;
 
 
+

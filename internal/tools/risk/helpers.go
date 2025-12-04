@@ -31,3 +31,4 @@ func parseUUIDArg(raw interface{}, name string) (uuid.UUID, error) {
 func toUUID(raw interface{}) (uuid.UUID, error) {
 	return parseUUIDArg(raw, "id")
 }
+

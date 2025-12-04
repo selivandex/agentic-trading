@@ -49,7 +49,7 @@ func TestUniqueTelegramID_InValidRange(t *testing.T) {
 
 func TestUniqueTelegramID_GeneratesUnique(t *testing.T) {
 	seen := make(map[int64]bool)
-	
+
 	for i := 0; i < 1000; i++ {
 		id := UniqueTelegramID()
 		assert.False(t, seen[id], "Telegram ID should be unique: %d", id)
@@ -114,7 +114,7 @@ func TestUniqueEventID_GeneratesUnique(t *testing.T) {
 func TestConcurrentSequenceGeneration(t *testing.T) {
 	const goroutines = 100
 	const iterations = 100
-	
+
 	seen := sync.Map{}
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
@@ -136,7 +136,7 @@ func TestConcurrentSequenceGeneration(t *testing.T) {
 func TestConcurrentUniqueNames(t *testing.T) {
 	const goroutines = 50
 	const iterations = 50
-	
+
 	seen := sync.Map{}
 	var wg sync.WaitGroup
 	wg.Add(goroutines)

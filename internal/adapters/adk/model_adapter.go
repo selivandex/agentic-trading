@@ -53,10 +53,23 @@ func (m *ModelAdapter) nonStreamingGenerateContent(
 	req *model.LLMRequest,
 ) iter.Seq2[*model.LLMResponse, error] {
 	return func(yield func(*model.LLMResponse, error) bool) {
-		// Convert ADK request to our ChatRequest
-		chatReq := m.convertToChatRequest(req)
+	// Convert ADK request to our ChatRequest
+	chatReq := m.convertToChatRequest(req)
 
-		m.log.Debug("Calling LLM (non-streaming)", "messages", len(chatReq.Messages), "tools", len(chatReq.Tools))
+	m.log.Debugw("Calling LLM (non-streaming)",
+		"messages_count", len(chatReq.Messages),
+		"tools_count", len(chatReq.Tools),
+		"request_contents", len(req.Contents),
+	)
+
+	// Validate messages not empty (DeepSeek requirement)
+	if len(chatReq.Messages) == 0 {
+		m.log.Errorw("Empty messages array - DeepSeek API will reject this",
+			"request_contents", len(req.Contents),
+		)
+		yield(nil, errors.New("empty input messages - check that workflow is receiving valid input"))
+		return
+	}
 
 		// Call our provider
 		resp, err := m.provider.Chat(ctx, chatReq)

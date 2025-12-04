@@ -87,12 +87,28 @@ func (tnc *TelegramNotificationConsumer) Start(ctx context.Context) error {
 func (tnc *TelegramNotificationConsumer) handleMessage(ctx context.Context, msg kafkago.Message) error {
 	tnc.log.Debugw("Processing notification event", "topic", msg.Topic)
 
+	// Validate message size
+	if len(msg.Value) == 0 {
+		tnc.log.Debugw("Empty message, skipping")
+		return nil
+	}
+
 	// For telegram_notifications topic, we need to peek at BaseEvent.Type to route
 	// First, try to unmarshal as BaseEvent to get the type
 	var baseEvent eventspb.BaseEvent
 	if err := proto.Unmarshal(msg.Value, &baseEvent); err != nil {
-		tnc.log.Errorw("Failed to unmarshal base event", "error", err)
-		return errors.Wrap(err, "unmarshal base event")
+		// Log raw message details for debugging (first 100 bytes)
+		preview := msg.Value
+		if len(preview) > 100 {
+			preview = preview[:100]
+		}
+		tnc.log.Errorw("Failed to unmarshal base event",
+			"error", err,
+			"message_size", len(msg.Value),
+			"message_preview", string(preview),
+		)
+		// Skip malformed messages - don't retry
+		return nil
 	}
 
 	eventType := baseEvent.Type

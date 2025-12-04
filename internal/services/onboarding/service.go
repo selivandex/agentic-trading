@@ -175,6 +175,21 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 		return errors.Wrap(err, "failed to build architect prompt")
 	}
 
+	// Log prompt details for debugging
+	if input != nil && len(input.Parts) > 0 {
+		s.log.Debugw("Portfolio architect prompt created",
+			"user_id", onboardingSession.UserID,
+			"role", input.Role,
+			"parts_count", len(input.Parts),
+			"first_part_length", len(input.Parts[0].Text),
+		)
+	} else {
+		s.log.Warnw("Portfolio architect prompt is empty!",
+			"user_id", onboardingSession.UserID,
+			"input_nil", input == nil,
+		)
+	}
+
 	// Run workflow
 	userID := onboardingSession.UserID.String()
 	appName := fmt.Sprintf("prometheus_onboarding_%s", onboardingSession.UserID.String())

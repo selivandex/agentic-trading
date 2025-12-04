@@ -918,3 +918,4 @@ This database architecture supports a **fully autonomous AI-driven hedge fund** 
 - ✅ Advanced analytics
 
 The design follows **Clean Architecture** principles with strict separation of concerns, enabling easy testing, maintenance, and scalability.
+

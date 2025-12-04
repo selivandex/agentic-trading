@@ -33,3 +33,4 @@ type FundWatchlist struct {
 func (f *FundWatchlist) IsMonitored() bool {
 	return f.IsActive && !f.IsPaused
 }
+
