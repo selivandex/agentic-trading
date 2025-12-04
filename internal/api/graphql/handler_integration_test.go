@@ -354,8 +354,8 @@ func TestGraphQLHandler_MeQuery_Integration(t *testing.T) {
 
 		meData := response.Data["me"].(map[string]interface{})
 		assert.Equal(t, testUser.ID.String(), meData["id"])
-		assert.Equal(t, "existing@example.com", meData["email"])
-		assert.Equal(t, "Existing", meData["firstName"])
+		assert.Equal(t, *testUser.Email, meData["email"])
+		assert.Equal(t, testUser.FirstName, meData["firstName"])
 		assert.Equal(t, true, meData["isActive"])
 	})
 
@@ -440,7 +440,7 @@ func TestGraphQLHandler_FullAuthFlow_Integration(t *testing.T) {
 
 	// Full flow test: Register → Login → Me query
 	t.Run("Complete auth flow: register, login, me query", func(t *testing.T) {
-		email := "integration@test.com"
+		email := fmt.Sprintf("flow-%s@test.com", uuid.New().String()[:8])
 		password := "testpass123"
 
 		// Step 1: Register
@@ -667,7 +667,7 @@ func TestGraphQLHandler_ConcurrentRequests_Integration(t *testing.T) {
 					Query: registerMutation,
 					Variables: map[string]interface{}{
 						"input": map[string]interface{}{
-							"email":     fmt.Sprintf("user%d@test.com", index),
+							"email":     fmt.Sprintf("user%d-%s@test.com", index, uuid.New().String()[:8]),
 							"password":  "password123",
 							"firstName": "User",
 							"lastName":  fmt.Sprintf("%d", index),

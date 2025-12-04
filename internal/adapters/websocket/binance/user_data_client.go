@@ -533,7 +533,7 @@ func (c *UserDataClient) GetStats() websocket.UserDataStats {
 	stats.BalanceUpdates = c.balanceUpdates.Load()
 	stats.MarginCalls = c.marginCalls.Load()
 	stats.ErrorCount = c.errorCount.Load()
-	
+
 	// Include reconnect stats
 	reconnectStats := c.reconnectMgr.GetStats()
 	stats.ReconnectCount = reconnectStats.TotalReconnects
