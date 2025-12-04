@@ -4,8 +4,9 @@
 
 type User {
   id: UUID!
-  telegramID: String!
-  telegramUsername: String!
+  telegramID: String
+  telegramUsername: String
+  email: String
   firstName: String!
   lastName: String!
   languageCode: String!

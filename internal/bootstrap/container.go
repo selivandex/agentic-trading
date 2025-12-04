@@ -35,8 +35,9 @@ import (
 	"prometheus/internal/events"
 	chrepo "prometheus/internal/repository/clickhouse"
 	aiusagesvc "prometheus/internal/services/ai_usage"
+	authservice "prometheus/internal/services/auth"
 	exchangeservice "prometheus/internal/services/exchange"
-	fundwatchlistsvc "prometheus/internal/services/fund_watchlist"
+	fundwatchlistsvc "prometheus/internal/services/fundwatchlist"
 	marketdatasvc "prometheus/internal/services/market_data"
 	onboardingservice "prometheus/internal/services/onboarding"
 	positionservice "prometheus/internal/services/position"
@@ -112,6 +113,7 @@ type Repositories struct {
 // Services groups all domain services
 type Services struct {
 	// Application services (Clean Architecture: Application Layer)
+	Auth               *authservice.Service       // Authentication service (JWT, email/password)
 	User               *userservice.Service       // User application service (coordinates domain + side effects)
 	DomainUser         *user.Service              // Domain user service (for consumers - pure CRUD)
 	ExchangeAccount    *exchange_account.Service  // Exchange account domain service

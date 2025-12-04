@@ -43,8 +43,9 @@ import (
 	pgrepo "prometheus/internal/repository/postgres"
 	"prometheus/internal/repository/redis"
 	aiusagesvc "prometheus/internal/services/ai_usage"
+	authservice "prometheus/internal/services/auth"
 	"prometheus/internal/services/exchange"
-	fundwatchlistsvc "prometheus/internal/services/fund_watchlist"
+	fundwatchlistsvc "prometheus/internal/services/fundwatchlist"
 	marketdatasvc "prometheus/internal/services/market_data"
 	"prometheus/internal/services/menu_session"
 	onboardingservice "prometheus/internal/services/onboarding"
@@ -54,6 +55,7 @@ import (
 	userservice "prometheus/internal/services/user"
 	"prometheus/internal/tools"
 	"prometheus/internal/tools/shared"
+	"prometheus/pkg/auth"
 	"prometheus/pkg/crypto"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -220,6 +222,11 @@ func (c *Container) MustInitServices() {
 
 	// Application user service (wraps domain service + adds side effects)
 	c.Services.User = userservice.NewService(c.Services.DomainUser, c.Log)
+
+	// Auth service (JWT authentication)
+	jwtService := auth.NewJWTService(c.Config.JWT.Secret, c.Config.JWT.Issuer, c.Config.JWT.TTL)
+	c.Services.Auth = authservice.NewService(c.Repos.User, jwtService, c.Log)
+
 	c.Services.ExchangeAccount = exchange_account.NewService(c.Repos.ExchangeAccount)
 	c.Services.Order = order.NewService(c.Repos.Order)
 	c.Services.Position = position.NewService(c.Repos.Position)
@@ -402,6 +409,7 @@ func (c *Container) MustInitApplication() {
 		c.Application.HealthHandler,
 		c.Application.TelegramBot,
 		c.Application.TelegramHandler,
+		c.Services.Auth,
 		c.Services.User,
 		c.Services.Strategy,
 		c.Services.FundWatchlist,
@@ -691,6 +699,7 @@ func provideHTTPServer(
 	healthHandler *health.Handler,
 	telegramBot tg.Bot,
 	telegramHandler *telegram.Handler,
+	authService *authservice.Service,
 	userService *userservice.Service,
 	strategyService *strategyservice.Service,
 	fundWatchlistService *fundwatchlistsvc.Service,
@@ -709,7 +718,7 @@ func provideHTTPServer(
 	// GraphQL handlers (only in development for now)
 	var graphqlHandler, playgroundHandler http.Handler
 	if cfg.App.Env != "production" {
-		graphqlHandler = graphql.Handler(userService, strategyService, fundWatchlistService)
+		graphqlHandler = graphql.Handler(authService, userService, strategyService, fundWatchlistService, log)
 		playgroundHandler = graphql.PlaygroundHandler()
 		log.Info("✓ GraphQL API enabled (development mode)")
 	}

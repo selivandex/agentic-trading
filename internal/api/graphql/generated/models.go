@@ -4,9 +4,15 @@ package generated
 
 import (
 	"prometheus/internal/domain/strategy"
+	"prometheus/internal/domain/user"
 
 	"github.com/shopspring/decimal"
 )
+
+type AuthResponse struct {
+	Token string     `json:"token"`
+	User  *user.User `json:"user"`
+}
 
 type CreateFundWatchlistInput struct {
 	Symbol     string `json:"symbol"`
@@ -25,10 +31,22 @@ type CreateStrategyInput struct {
 	TargetAllocations  map[string]any              `json:"targetAllocations,omitempty"`
 }
 
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type Mutation struct {
 }
 
 type Query struct {
+}
+
+type RegisterInput struct {
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
 type Subscription struct {

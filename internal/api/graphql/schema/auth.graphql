@@ -1,0 +1,38 @@
+# @format
+
+# Authentication types and operations
+
+type AuthResponse {
+  token: String!
+  user: User!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  firstName: String!
+  lastName: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+# Queries
+extend type Query {
+  # Get current authenticated user from JWT token in cookie
+  me: User
+}
+
+# Mutations
+extend type Mutation {
+  # Register new user with email/password
+  register(input: RegisterInput!): AuthResponse!
+
+  # Login with email/password
+  login(input: LoginInput!): AuthResponse!
+
+  # Logout (clears cookie on client side)
+  logout: Boolean!
+}

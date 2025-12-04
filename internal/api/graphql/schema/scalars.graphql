@@ -1,3 +1,5 @@
+# @format
+
 # Custom scalar types
 
 """
@@ -19,4 +21,3 @@ scalar Decimal
 JSONObject scalar type represents an arbitrary JSON object
 """
 scalar JSONObject
-

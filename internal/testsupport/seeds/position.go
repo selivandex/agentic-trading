@@ -257,5 +257,3 @@ func (b *PositionBuilder) MustInsert() *position.Position {
 	}
 	return entity
 }
-
-

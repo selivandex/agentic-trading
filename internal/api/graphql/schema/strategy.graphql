@@ -1,3 +1,5 @@
+# @format
+
 # Strategy types and operations
 
 enum StrategyStatus {
@@ -28,36 +30,36 @@ type Strategy {
   id: UUID!
   userID: UUID!
   user: User
-  
+
   # Strategy metadata
   name: String!
   description: String!
   status: StrategyStatus!
-  
+
   # Capital allocation
   allocatedCapital: Decimal!
   currentEquity: Decimal!
   cashReserve: Decimal!
-  
+
   # Configuration
   marketType: MarketType!
   riskTolerance: RiskTolerance!
   rebalanceFrequency: RebalanceFrequency!
   targetAllocations: JSONObject
-  
+
   # Performance metrics
   totalPnL: Decimal!
   totalPnLPercent: Decimal!
   sharpeRatio: Decimal
   maxDrawdown: Decimal
   winRate: Decimal
-  
+
   # Timestamps
   createdAt: Time!
   updatedAt: Time!
   closedAt: Time
   lastRebalancedAt: Time
-  
+
   # Reasoning log
   reasoningLog: JSONObject
 }
@@ -84,10 +86,10 @@ input UpdateStrategyInput {
 extend type Query {
   # Get strategy by ID
   strategy(id: UUID!): Strategy
-  
+
   # Get all strategies for a user
   userStrategies(userID: UUID!, status: StrategyStatus): [Strategy!]!
-  
+
   # Get all strategies (admin only)
   strategies(limit: Int, offset: Int, status: StrategyStatus): [Strategy!]!
 }
@@ -96,17 +98,16 @@ extend type Query {
 extend type Mutation {
   # Create new strategy
   createStrategy(userID: UUID!, input: CreateStrategyInput!): Strategy!
-  
+
   # Update strategy
   updateStrategy(id: UUID!, input: UpdateStrategyInput!): Strategy!
-  
+
   # Pause strategy
   pauseStrategy(id: UUID!): Strategy!
-  
+
   # Resume strategy
   resumeStrategy(id: UUID!): Strategy!
-  
+
   # Close strategy
   closeStrategy(id: UUID!): Strategy!
 }
-

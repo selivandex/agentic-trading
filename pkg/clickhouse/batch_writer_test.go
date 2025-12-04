@@ -188,5 +188,3 @@ func TestBatchWriter_ConcurrentAdds(t *testing.T) {
 
 	assert.Equal(t, 50, totalItems, "All 50 items should be flushed")
 }
-
-

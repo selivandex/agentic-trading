@@ -39,5 +39,3 @@ func (a *TxAdapter) Commit() error {
 func (a *TxAdapter) Rollback() error {
 	return a.tx.Rollback()
 }
-
-

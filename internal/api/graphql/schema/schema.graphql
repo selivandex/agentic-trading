@@ -1,3 +1,5 @@
+# @format
+
 # Root schema definition
 
 type Query {
@@ -14,4 +16,3 @@ type Subscription {
   # Placeholder subscription
   _empty: String
 }
-

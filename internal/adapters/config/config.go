@@ -15,6 +15,7 @@ import (
 type Config struct {
 	App           AppConfig
 	HTTP          HTTPConfig
+	JWT           JWTConfig
 	Postgres      PostgresConfig
 	ClickHouse    ClickHouseConfig
 	Redis         RedisConfig
@@ -39,6 +40,12 @@ type AppConfig struct {
 
 type HTTPConfig struct {
 	Port int `envconfig:"HTTP_PORT" default:"8080"`
+}
+
+type JWTConfig struct {
+	Secret string        `envconfig:"JWT_SECRET" required:"true"`
+	Issuer string        `envconfig:"JWT_ISSUER" default:"prometheus"`
+	TTL    time.Duration `envconfig:"JWT_TTL" default:"8760h"` // 1 year (365*24h)
 }
 
 type PostgresConfig struct {
