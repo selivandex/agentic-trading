@@ -103,3 +103,4 @@ func (s *Service) Resume(ctx context.Context, symbol, marketType string) error {
 	return nil
 }
 
+

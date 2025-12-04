@@ -4,3 +4,4 @@ DROP INDEX IF EXISTS idx_trading_pairs_strategy;
 ALTER TABLE trading_pairs
 DROP COLUMN IF EXISTS strategy_id;
 
+

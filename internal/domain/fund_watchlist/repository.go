@@ -18,3 +18,4 @@ type Repository interface {
 	IsActive(ctx context.Context, symbol, marketType string) (bool, error)
 }
 
+

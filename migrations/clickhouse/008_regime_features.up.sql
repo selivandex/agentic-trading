@@ -66,3 +66,4 @@ GROUP BY symbol, hour;
 
 
 
+

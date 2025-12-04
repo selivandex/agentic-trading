@@ -26,3 +26,4 @@ func (a *LimitProfileAdapter) GetByName(ctx context.Context, name string) (Limit
 	return LimitProfileInfo{ID: id}, nil
 }
 
+

@@ -161,3 +161,4 @@ func (b *UserBuilder) MustInsert() *user.User {
 	return entity
 }
 
+

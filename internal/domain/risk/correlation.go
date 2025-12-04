@@ -20,3 +20,4 @@ type CorrelationService interface {
 	GetBTCCorrelation(ctx context.Context, symbol string) (decimal.Decimal, error)
 }
 
+
