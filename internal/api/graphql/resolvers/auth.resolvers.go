@@ -29,11 +29,7 @@ func (r *mutationResolver) Register(ctx context.Context, input generated.Registe
 		return nil, fmt.Errorf("registration failed: %w", err)
 	}
 
-	// Set HTTP-only cookie with JWT token
-	if err := middleware.SetAuthCookie(ctx, result.Token); err != nil {
-		return nil, fmt.Errorf("failed to set auth cookie: %w", err)
-	}
-
+	// Return token in response (Next.js will save it to session)
 	return &generated.AuthResponse{
 		Token: result.Token,
 		User:  result.User,
@@ -53,11 +49,7 @@ func (r *mutationResolver) Login(ctx context.Context, input generated.LoginInput
 		return nil, fmt.Errorf("login failed: %w", err)
 	}
 
-	// Set HTTP-only cookie with JWT token
-	if err := middleware.SetAuthCookie(ctx, result.Token); err != nil {
-		return nil, fmt.Errorf("failed to set auth cookie: %w", err)
-	}
-
+	// Return token in response (Next.js will save it to session)
 	return &generated.AuthResponse{
 		Token: result.Token,
 		User:  result.User,
@@ -66,10 +58,7 @@ func (r *mutationResolver) Login(ctx context.Context, input generated.LoginInput
 
 // Logout is the resolver for the logout field.
 func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
-	// Clear auth cookie
-	if err := middleware.ClearAuthCookie(ctx); err != nil {
-		return false, err
-	}
+	// Just return success - Next.js will clear its session
 	return true, nil
 }
 

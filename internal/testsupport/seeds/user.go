@@ -22,7 +22,7 @@ type UserBuilder struct {
 func NewUserBuilder(db DBTX, ctx context.Context) *UserBuilder {
 	now := time.Now()
 	telegramID := testsupport.UniqueTelegramID()
-	
+
 	return &UserBuilder{
 		db:  db,
 		ctx: ctx,

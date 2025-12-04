@@ -39,13 +39,12 @@ func Handler(
 	// Create GraphQL server with options
 	srv := handler.NewDefaultServer(schema)
 
-	// Wrap with auth middleware (extracts JWT from HTTP-only cookie)
+	// Wrap with auth middleware (extracts JWT from Cookie header set by Next.js)
 	authMiddleware := middleware.NewAuthMiddleware(authSvc, log)
 
-	// Chain middlewares: ResponseWriter → Auth → GraphQL
-	return middleware.ResponseWriterMiddleware(
-		authMiddleware.Handler(srv),
-	)
+	// Apply auth middleware
+	// Next.js will manage session cookies and send them in Cookie header
+	return authMiddleware.Handler(srv)
 }
 
 // PlaygroundHandler creates GraphQL playground handler for development

@@ -121,7 +121,7 @@ func TestGraphQLHandler_RegisterAndLogin_Integration(t *testing.T) {
 	t.Run("Register creates user and returns token with cookie", func(t *testing.T) {
 		// Use unique email for this test run
 		testEmail := fmt.Sprintf("test-%s@example.com", uuid.New().String()[:8])
-		
+
 		registerMutation := `
 			mutation Register($input: RegisterInput!) {
 				register(input: $input) {
@@ -175,19 +175,8 @@ func TestGraphQLHandler_RegisterAndLogin_Integration(t *testing.T) {
 		assert.Equal(t, "John", userData["firstName"])
 		assert.Equal(t, "Doe", userData["lastName"])
 
-		// Check cookie was set
-		cookies := recorder.Result().Cookies()
-		var authCookie *http.Cookie
-		for _, c := range cookies {
-			if c.Name == "auth_token" {
-				authCookie = c
-				break
-			}
-		}
-		require.NotNil(t, authCookie, "auth_token cookie should be set")
-		assert.Equal(t, token, authCookie.Value)
-		assert.True(t, authCookie.HttpOnly, "cookie should be HTTP-only")
-		assert.Equal(t, "/", authCookie.Path)
+		// Backend returns token in JSON (Next.js will save to session)
+		// No Set-Cookie header from backend
 	})
 
 	// Test 2: Login with credentials from test 1
@@ -195,7 +184,7 @@ func TestGraphQLHandler_RegisterAndLogin_Integration(t *testing.T) {
 		// First register a user
 		testEmail := fmt.Sprintf("login-%s@example.com", uuid.New().String()[:8])
 		registerAndGetEmail(t, setup.handler, testEmail, "password123")
-		
+
 		loginMutation := `
 			mutation Login($input: LoginInput!) {
 				login(input: $input) {
@@ -484,19 +473,11 @@ func TestGraphQLHandler_FullAuthFlow_Integration(t *testing.T) {
 		assert.Empty(t, registerResponse.Errors, "Register should succeed")
 
 		registerData := registerResponse.Data["register"].(map[string]interface{})
-		_ = registerData["token"].(string) // Token returned in response
+		registerToken := registerData["token"].(string)
 		userID := registerData["user"].(map[string]interface{})["id"].(string)
 
-		// Extract cookie from register response
-		cookies := recorder.Result().Cookies()
-		var authCookie *http.Cookie
-		for _, c := range cookies {
-			if c.Name == "auth_token" {
-				authCookie = c
-				break
-			}
-		}
-		require.NotNil(t, authCookie, "Register should set auth cookie")
+		// Backend returns token in JSON (Next.js manages session)
+		assert.NotEmpty(t, registerToken)
 
 		// Step 2: Login with same credentials
 		loginMutation := `
@@ -539,17 +520,6 @@ func TestGraphQLHandler_FullAuthFlow_Integration(t *testing.T) {
 		loginToken := loginData["token"].(string)
 		assert.NotEmpty(t, loginToken)
 
-		// Get cookie from login
-		cookies = recorder.Result().Cookies()
-		var loginCookie *http.Cookie
-		for _, c := range cookies {
-			if c.Name == "auth_token" {
-				loginCookie = c
-				break
-			}
-		}
-		require.NotNil(t, loginCookie, "Login should set auth cookie")
-
 		// Step 3: Use cookie to query /me
 		meQuery := `
 			query {
@@ -569,7 +539,11 @@ func TestGraphQLHandler_FullAuthFlow_Integration(t *testing.T) {
 		bodyBytes, _ = json.Marshal(meReq)
 		req = httptest.NewRequest("POST", "/graphql", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(loginCookie) // Use cookie from login
+		// Simulate Next.js sending token in Cookie header
+		req.AddCookie(&http.Cookie{
+			Name:  "auth_token",
+			Value: loginToken,
+		})
 
 		recorder = httptest.NewRecorder()
 		setup.handler.ServeHTTP(recorder, req)
@@ -600,7 +574,6 @@ func TestGraphQLHandler_FullAuthFlow_Integration(t *testing.T) {
 		bodyBytes, _ = json.Marshal(logoutReq)
 		req = httptest.NewRequest("POST", "/graphql", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(loginCookie)
 
 		recorder = httptest.NewRecorder()
 		setup.handler.ServeHTTP(recorder, req)
@@ -611,24 +584,16 @@ func TestGraphQLHandler_FullAuthFlow_Integration(t *testing.T) {
 		err = json.Unmarshal(recorder.Body.Bytes(), &logoutResponse)
 		require.NoError(t, err)
 		assert.Empty(t, logoutResponse.Errors)
+		assert.Equal(t, true, logoutResponse.Data["logout"])
 
-		// Check cookie was cleared
-		cookies = recorder.Result().Cookies()
-		var clearedCookie *http.Cookie
-		for _, c := range cookies {
-			if c.Name == "auth_token" {
-				clearedCookie = c
-				break
-			}
-		}
-		require.NotNil(t, clearedCookie, "Logout should clear cookie")
-		assert.Equal(t, -1, clearedCookie.MaxAge, "Cookie should be marked for deletion")
+		// Backend just returns true - Next.js will clear session
+		// No Set-Cookie header from backend
 
-		// Step 5: Try to use /me after logout (should fail)
+		// Step 5: Try to use /me without token (simulating cleared session)
 		bodyBytes, _ = json.Marshal(meReq)
 		req = httptest.NewRequest("POST", "/graphql", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(clearedCookie) // Empty cookie
+		// No cookie - Next.js cleared session
 
 		recorder = httptest.NewRecorder()
 		setup.handler.ServeHTTP(recorder, req)
