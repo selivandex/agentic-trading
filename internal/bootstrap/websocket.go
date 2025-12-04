@@ -165,8 +165,8 @@ func (c *Container) MustInitMarketDataManager() {
 
 	// Create Market Data Manager for Binance client
 	managerConfig := websocket.MarketDataManagerConfig{
-		HealthCheckInterval:    5 * time.Second, // Check connection health every 5 seconds
-		MaxConsecutiveFailures: 3,               // Log warning after 3 consecutive failures
+		HealthCheckInterval: 3 * time.Second, // Check connection health every 3 seconds
+		// ReconnectConfig uses defaults from NewMarketDataManager (exponential backoff, circuit breaker, etc.)
 	}
 
 	manager := websocket.NewMarketDataManager(

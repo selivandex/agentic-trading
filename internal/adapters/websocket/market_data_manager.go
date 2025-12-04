@@ -8,6 +8,7 @@ import (
 	"prometheus/internal/metrics"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	"prometheus/pkg/reconnect"
 )
 
 // MarketDataManager manages Market Data WebSocket connections with health monitoring and auto-reconnect
@@ -17,13 +18,14 @@ type MarketDataManager struct {
 	config ConnectionConfig
 	logger *logger.Logger
 
+	// Reconnection management
+	reconnectMgr *reconnect.Manager
+
 	// Health monitoring
-	mu                     sync.RWMutex
-	connected              bool
-	lastHealthCheck        time.Time
-	consecutiveFailures    int
-	healthCheckInterval    time.Duration
-	maxConsecutiveFailures int
+	mu                  sync.RWMutex
+	connected           bool
+	lastHealthCheck     time.Time
+	healthCheckInterval time.Duration
 
 	// Control channels
 	stopChan chan struct{}
@@ -36,8 +38,8 @@ type MarketDataManager struct {
 
 // MarketDataManagerConfig configures the MarketDataManager
 type MarketDataManagerConfig struct {
-	HealthCheckInterval    time.Duration // How often to check connection health
-	MaxConsecutiveFailures int           // Max failures before logging warning
+	HealthCheckInterval time.Duration    // How often to check connection health (default: 15s)
+	ReconnectConfig     reconnect.Config // Reconnection settings
 }
 
 // NewMarketDataManager creates a new Market Data WebSocket manager
@@ -48,20 +50,32 @@ func NewMarketDataManager(
 	log *logger.Logger,
 ) *MarketDataManager {
 	if managerConfig.HealthCheckInterval == 0 {
-		managerConfig.HealthCheckInterval = 60 * time.Second
-	}
-	if managerConfig.MaxConsecutiveFailures == 0 {
-		managerConfig.MaxConsecutiveFailures = 3
+		managerConfig.HealthCheckInterval = 3 * time.Second
 	}
 
+	// Create reconnect manager with defaults if not provided
+	if managerConfig.ReconnectConfig.MinBackoff == 0 {
+		managerConfig.ReconnectConfig = reconnect.Config{
+			MinBackoff:          2 * time.Second,
+			MaxBackoff:          2 * time.Minute,
+			BackoffMultiplier:   2.0,
+			MaxRetries:          5,
+			HealthCheckInterval: managerConfig.HealthCheckInterval,
+			HeartbeatTimeout:    45 * time.Second,
+			CircuitResetAfter:   3 * time.Minute,
+		}
+	}
+
+	reconnectMgr := reconnect.NewManager(managerConfig.ReconnectConfig, log)
+
 	return &MarketDataManager{
-		client:                 client,
-		config:                 config,
-		logger:                 log,
-		stopChan:               make(chan struct{}),
-		doneChan:               make(chan struct{}),
-		healthCheckInterval:    managerConfig.HealthCheckInterval,
-		maxConsecutiveFailures: managerConfig.MaxConsecutiveFailures,
+		client:              client,
+		config:              config,
+		logger:              log,
+		reconnectMgr:        reconnectMgr,
+		stopChan:            make(chan struct{}),
+		doneChan:            make(chan struct{}),
+		healthCheckInterval: managerConfig.HealthCheckInterval,
 	}
 }
 
@@ -101,8 +115,10 @@ func (m *MarketDataManager) connect(ctx context.Context) error {
 
 	m.mu.Lock()
 	m.connected = true
-	m.consecutiveFailures = 0
 	m.mu.Unlock()
+
+	// Record successful connection
+	m.reconnectMgr.RecordSuccess()
 
 	m.logger.Infow("✅ Market Data WebSocket connected",
 		"streams", len(m.config.Streams),
@@ -166,28 +182,22 @@ func (m *MarketDataManager) performHealthCheck(ctx context.Context) {
 	m.mu.Unlock()
 
 	isConnected := m.client.IsConnected()
+	isHealthy := m.reconnectMgr.IsHealthy()
 
-	if !isConnected {
-		m.mu.Lock()
-		m.consecutiveFailures++
-		failures := m.consecutiveFailures
-		m.mu.Unlock()
+	if !isConnected || !isHealthy {
+		stats := m.reconnectMgr.GetStats()
 
-		if failures >= m.maxConsecutiveFailures {
-			m.logger.Warnw("⚠️ Market Data WebSocket disconnected, attempting reconnect",
-				"consecutive_failures", failures,
-			)
-		} else {
-			m.logger.Infow("🔄 Market Data WebSocket disconnected, attempting reconnect",
-				"consecutive_failures", failures,
-			)
-		}
+		m.logger.Warnw("🔄 Market Data WebSocket unhealthy, attempting reconnect",
+			"connected", isConnected,
+			"healthy", isHealthy,
+			"time_since_last_message", stats.TimeSinceLastMessage,
+			"consecutive_failures", stats.ConsecutiveFailures,
+		)
 
-		// Attempt reconnect
-		if err := m.reconnect(ctx); err != nil {
+		// Attempt reconnect with backoff using reconnect manager
+		if err := m.reconnectMgr.ReconnectWithBackoff(ctx, m.reconnectFunc); err != nil {
 			m.logger.Errorw("Failed to reconnect Market Data WebSocket",
 				"error", err,
-				"consecutive_failures", failures,
 			)
 
 			// Update metrics
@@ -200,22 +210,13 @@ func (m *MarketDataManager) performHealthCheck(ctx context.Context) {
 			// Update metrics
 			metrics.MarketDataReconnects.WithLabelValues("success").Inc()
 		}
-	} else {
-		// Connection is healthy
-		m.mu.Lock()
-		if m.consecutiveFailures > 0 {
-			m.logger.Infow("✅ Market Data WebSocket connection recovered",
-				"consecutive_failures_cleared", m.consecutiveFailures,
-			)
-			m.consecutiveFailures = 0
-		}
-		m.mu.Unlock()
 	}
 }
 
-// reconnect stops the current connection and establishes a new one
-func (m *MarketDataManager) reconnect(ctx context.Context) error {
-	m.logger.Infow("🔧 Reconnecting Market Data WebSocket...")
+// reconnectFunc is the function passed to reconnect manager
+// It stops the old connection and establishes a new one
+func (m *MarketDataManager) reconnectFunc(ctx context.Context) error {
+	m.logger.Infow("🔧 Executing Market Data WebSocket reconnect...")
 
 	// Stop old connection
 	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -230,8 +231,8 @@ func (m *MarketDataManager) reconnect(ctx context.Context) error {
 	m.connected = false
 	m.mu.Unlock()
 
-	// Wait a bit before reconnecting
-	time.Sleep(2 * time.Second)
+	// Small delay to allow cleanup
+	time.Sleep(500 * time.Millisecond)
 
 	// Reconnect
 	if err := m.connect(ctx); err != nil {
@@ -261,14 +262,21 @@ func (m *MarketDataManager) GetStats() map[string]interface{} {
 	m.mu.RLock()
 	connected := m.connected
 	lastCheck := m.lastHealthCheck
-	failures := m.consecutiveFailures
 	m.mu.RUnlock()
 
+	// Get reconnect stats
+	reconnectStats := m.reconnectMgr.GetStats()
+
 	return map[string]interface{}{
-		"connected":            connected,
-		"total_reconnects":     totalReconnects,
-		"last_health_check":    lastCheck,
-		"consecutive_failures": failures,
+		"connected":               connected,
+		"total_reconnects":        totalReconnects,
+		"last_health_check":       lastCheck,
+		"consecutive_failures":    reconnectStats.ConsecutiveFailures,
+		"circuit_open":            reconnectStats.CircuitOpen,
+		"last_message_time":       reconnectStats.LastMessageTime,
+		"time_since_last_message": reconnectStats.TimeSinceLastMessage,
+		"is_healthy":              reconnectStats.IsHealthy,
+		"current_backoff":         reconnectStats.CurrentBackoff,
 	}
 }
 

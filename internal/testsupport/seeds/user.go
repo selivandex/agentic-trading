@@ -21,12 +21,14 @@ type UserBuilder struct {
 // NewUserBuilder creates a new UserBuilder with sensible defaults
 func NewUserBuilder(db DBTX, ctx context.Context) *UserBuilder {
 	now := time.Now()
+	telegramID := testsupport.UniqueTelegramID()
+	
 	return &UserBuilder{
 		db:  db,
 		ctx: ctx,
 		entity: &user.User{
 			ID:               uuid.New(),
-			TelegramID:       testsupport.UniqueTelegramID(),
+			TelegramID:       &telegramID,
 			TelegramUsername: testsupport.UniqueUsername(),
 			FirstName:        "Test",
 			LastName:         "User",
@@ -49,7 +51,7 @@ func (b *UserBuilder) WithID(id uuid.UUID) *UserBuilder {
 
 // WithTelegramID sets the Telegram ID
 func (b *UserBuilder) WithTelegramID(id int64) *UserBuilder {
-	b.entity.TelegramID = id
+	b.entity.TelegramID = &id
 	return b
 }
 

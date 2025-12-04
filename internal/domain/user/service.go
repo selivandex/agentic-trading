@@ -44,7 +44,8 @@ func (s *Service) Create(ctx context.Context, user *User) error {
 	if user.ID == uuid.Nil {
 		user.ID = uuid.New()
 	}
-	if user.TelegramID == 0 {
+	// User must have either Telegram ID or Email
+	if (user.TelegramID == nil || *user.TelegramID == 0) && (user.Email == nil || *user.Email == "") {
 		return errors.ErrInvalidInput
 	}
 	if user.Settings.RiskLevel == "" {
@@ -141,9 +142,10 @@ func (s *Service) GetOrCreateByTelegramID(ctx context.Context, telegramID int64,
 		"username", username,
 	)
 
+	tid := telegramID // Create pointer
 	newUser := &User{
 		ID:               uuid.New(),
-		TelegramID:       telegramID,
+		TelegramID:       &tid,
 		TelegramUsername: username,
 		FirstName:        firstName,
 		LastName:         lastName,

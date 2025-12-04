@@ -9,7 +9,7 @@ import (
 // User represents a system user (Telegram user or Email/Password user)
 type User struct {
 	ID               uuid.UUID  `db:"id"`
-	TelegramID       int64      `db:"telegram_id"`       // Nullable for email-based users
+	TelegramID       *int64     `db:"telegram_id"`       // Nullable for email-based users
 	TelegramUsername string     `db:"telegram_username"` // Empty for email-based users
 	Email            *string    `db:"email"`             // Nullable for Telegram-only users
 	PasswordHash     *string    `db:"password_hash"`     // Nullable for Telegram-only users

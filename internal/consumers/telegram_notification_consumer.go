@@ -325,7 +325,11 @@ func (tnc *TelegramNotificationConsumer) getChatID(ctx context.Context, userIDSt
 		return 0, errors.New("notifications disabled")
 	}
 
-	return usr.TelegramID, nil
+	if usr.TelegramID == nil {
+		return 0, errors.New("user registered via email, no telegram ID")
+	}
+
+	return *usr.TelegramID, nil
 }
 
 // parseUserID parses user ID string to UUID

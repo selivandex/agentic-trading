@@ -127,7 +127,11 @@ func (s *Service) GetUserChatID(ctx context.Context, userIDStr string) (int64, e
 		return 0, errors.New("notifications disabled")
 	}
 
-	return usr.TelegramID, nil
+	if usr.TelegramID == nil {
+		return 0, errors.New("user registered via email, no telegram ID")
+	}
+
+	return *usr.TelegramID, nil
 }
 
 // IsUserActiveWithCircuitBreaker checks if user is active and has circuit breaker enabled

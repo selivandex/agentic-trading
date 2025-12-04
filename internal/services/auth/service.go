@@ -92,7 +92,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthRespo
 		IsActive:         true,
 		IsPremium:        false,
 		Settings:         user.DefaultSettings(),
-		TelegramID:       0, // No telegram for email users
+		TelegramID:       nil, // NULL for email-based users
 		TelegramUsername: "",
 	}
 

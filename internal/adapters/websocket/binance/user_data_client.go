@@ -13,6 +13,7 @@ import (
 	"prometheus/internal/adapters/websocket"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	"prometheus/pkg/reconnect"
 )
 
 // UserDataClient implements websocket.UserDataStreamer for Binance Futures
@@ -43,6 +44,9 @@ type UserDataClient struct {
 	renewTicker *time.Ticker
 	renewStop   chan struct{}
 
+	// Reconnection management
+	reconnectMgr *reconnect.Manager
+
 	// Statistics
 	stats            websocket.UserDataStats
 	statsMu          sync.RWMutex
@@ -65,6 +69,17 @@ func NewUserDataClient(
 	useTestnet bool,
 	log *logger.Logger,
 ) *UserDataClient {
+	// Create reconnect manager with settings optimized for user data streams
+	reconnectMgr := reconnect.NewManager(reconnect.Config{
+		MinBackoff:          2 * time.Second,
+		MaxBackoff:          2 * time.Minute,
+		BackoffMultiplier:   2.0,
+		MaxRetries:          5,
+		HealthCheckInterval: 3 * time.Second,
+		HeartbeatTimeout:    90 * time.Second, // User data streams can be quiet, use longer timeout
+		CircuitResetAfter:   3 * time.Minute,
+	}, log)
+
 	return &UserDataClient{
 		accountID:        accountID,
 		userID:           userID,
@@ -72,6 +87,7 @@ func NewUserDataClient(
 		handler:          handler,
 		useTestnet:       useTestnet,
 		listenKeyService: NewListenKeyService(useTestnet, log),
+		reconnectMgr:     reconnectMgr,
 		logger:           log,
 	}
 }
@@ -180,6 +196,7 @@ func (c *UserDataClient) Connect(ctx context.Context, listenKey, apiKey, secret 
 	// Handler for all User Data events
 	handler := func(event *futures.WsUserDataEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -496,7 +513,12 @@ func (c *UserDataClient) Stop(ctx context.Context) error {
 
 // IsConnected returns connection status
 func (c *UserDataClient) IsConnected() bool {
-	return c.connected.Load()
+	if !c.connected.Load() {
+		return false
+	}
+
+	// Check heartbeat health
+	return c.reconnectMgr.IsHealthy()
 }
 
 // GetStats returns current statistics
@@ -511,7 +533,10 @@ func (c *UserDataClient) GetStats() websocket.UserDataStats {
 	stats.BalanceUpdates = c.balanceUpdates.Load()
 	stats.MarginCalls = c.marginCalls.Load()
 	stats.ErrorCount = c.errorCount.Load()
-	stats.ReconnectCount = int(c.reconnectCount.Load())
+	
+	// Include reconnect stats
+	reconnectStats := c.reconnectMgr.GetStats()
+	stats.ReconnectCount = reconnectStats.TotalReconnects
 
 	return stats
 }

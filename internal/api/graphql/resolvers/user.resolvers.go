@@ -114,10 +114,10 @@ func (r *queryResolver) Users(ctx context.Context, limit *int, offset *int) ([]*
 
 // TelegramID is the resolver for the telegramID field.
 func (r *userResolver) TelegramID(ctx context.Context, obj *user.User) (*string, error) {
-	if obj.TelegramID == 0 {
+	if obj.TelegramID == nil || *obj.TelegramID == 0 {
 		return nil, nil
 	}
-	tid := fmt.Sprintf("%d", obj.TelegramID)
+	tid := fmt.Sprintf("%d", *obj.TelegramID)
 	return &tid, nil
 }
 

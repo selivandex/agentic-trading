@@ -13,6 +13,7 @@ import (
 	"prometheus/internal/adapters/websocket"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
+	"prometheus/pkg/reconnect"
 )
 
 // Client implements websocket.Client for Binance (Spot + Futures)
@@ -33,6 +34,9 @@ type Client struct {
 	stopChannels []chan struct{}
 	doneChannels []chan struct{}
 
+	// Reconnection management
+	reconnectMgr *reconnect.Manager
+
 	// Statistics
 	stats            websocket.Stats
 	statsMu          sync.RWMutex
@@ -48,13 +52,25 @@ type Client struct {
 // NewClient creates a new Binance WebSocket client
 // apiKey and secretKey are optional - only needed for private streams (user data, orders)
 func NewClient(exchange string, handler websocket.EventHandler, apiKey, secretKey string, useTestnet bool, log *logger.Logger) *Client {
+	// Create reconnect manager with aggressive settings
+	reconnectMgr := reconnect.NewManager(reconnect.Config{
+		MinBackoff:          2 * time.Second,
+		MaxBackoff:          2 * time.Minute,
+		BackoffMultiplier:   2.0,
+		MaxRetries:          5,
+		HealthCheckInterval: 3 * time.Second,
+		HeartbeatTimeout:    45 * time.Second, // Binance sends messages every ~3s, 45s is safe
+		CircuitResetAfter:   3 * time.Minute,
+	}, log)
+
 	return &Client{
-		exchange:   exchange,
-		handler:    handler,
-		apiKey:     apiKey,
-		secretKey:  secretKey,
-		useTestnet: useTestnet,
-		logger:     log,
+		exchange:     exchange,
+		handler:      handler,
+		apiKey:       apiKey,
+		secretKey:    secretKey,
+		useTestnet:   useTestnet,
+		reconnectMgr: reconnectMgr,
+		logger:       log,
 	}
 }
 
@@ -272,6 +288,9 @@ func (c *Client) connectFuturesKlineStreams(symbolIntervals map[string][]string)
 	klineHandler := func(event *futures.WsKlineEvent) {
 		c.messagesReceived.Add(1)
 
+		// Record message for heartbeat monitoring
+		c.reconnectMgr.RecordMessageReceived()
+
 		// Check if we're shutting down - don't process events during shutdown
 		if c.stopping.Load() {
 			c.logger.Debugw("Ignoring event during shutdown",
@@ -344,6 +363,7 @@ func (c *Client) connectSpotKlineStreams(symbolIntervals map[string][]string) er
 
 	klineHandler := func(event *binance.WsKlineEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			c.logger.Debugw("Ignoring spot kline event during shutdown",
@@ -453,6 +473,7 @@ func (c *Client) connectMarkPriceStreams(symbols []string) error {
 
 	markPriceHandler := func(event *futures.WsMarkPriceEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -531,6 +552,7 @@ func (c *Client) connectLiquidationStreams(symbols []string) error {
 
 	liquidationHandler := func(event *futures.WsLiquidationOrderEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -622,6 +644,7 @@ func (c *Client) connectFuturesTickerStreams(symbols []string) error {
 
 	tickerHandler := func(events futures.WsAllMarketTickerEvent) {
 		c.messagesReceived.Add(int64(len(events)))
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -690,6 +713,7 @@ func (c *Client) connectSpotTickerStreams(symbols []string) error {
 
 	tickerHandler := binance.WsAllMarketsStatHandler(func(event binance.WsAllMarketsStatEvent) {
 		c.messagesReceived.Add(int64(len(event)))
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -802,6 +826,7 @@ func (c *Client) connectFuturesTradeStreams(symbols []string) error {
 
 	aggTradeHandler := func(event *futures.WsAggTradeEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -866,6 +891,7 @@ func (c *Client) connectSpotTradeStreams(symbols []string) error {
 
 	tradeHandler := func(event *binance.WsAggTradeEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -964,6 +990,7 @@ func (c *Client) connectFuturesDepthStreams(symbols []string) error {
 
 	depthHandler := func(event *futures.WsDepthEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -1036,6 +1063,7 @@ func (c *Client) connectSpotDepthStreams(symbols []string) error {
 
 	depthHandler := func(event *binance.WsPartialDepthEvent) {
 		c.messagesReceived.Add(1)
+		c.reconnectMgr.RecordMessageReceived()
 
 		if c.stopping.Load() {
 			return
@@ -1246,9 +1274,14 @@ func (c *Client) Stop(ctx context.Context) error {
 }
 
 // IsConnected returns connection status
-// Returns false if too many recent errors occurred
+// Returns false if too many recent errors occurred or heartbeat timeout
 func (c *Client) IsConnected() bool {
 	if !c.connected.Load() {
+		return false
+	}
+
+	// Check heartbeat health
+	if !c.reconnectMgr.IsHealthy() {
 		return false
 	}
 
@@ -1273,7 +1306,10 @@ func (c *Client) GetStats() websocket.Stats {
 	stats.MessagesReceived = c.messagesReceived.Load()
 	stats.MessagesSent = c.messagesSent.Load()
 	stats.ErrorCount = c.errorCount.Load()
-	stats.ReconnectCount = int(c.reconnectCount.Load())
+
+	// Include reconnect stats
+	reconnectStats := c.reconnectMgr.GetStats()
+	stats.ReconnectCount = reconnectStats.TotalReconnects
 
 	return stats
 }
