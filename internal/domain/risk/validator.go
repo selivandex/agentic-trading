@@ -157,3 +157,4 @@ func (v *PositionValidator) Validate(params *TradeParams) *ValidationResult {
 
 	return result
 }
+

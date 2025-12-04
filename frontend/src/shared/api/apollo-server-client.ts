@@ -24,7 +24,7 @@ import { createApolloCache } from "./apollo-cache-config";
 
 // Backend GraphQL endpoint - direct connection (no proxy)
 const BACKEND_GRAPHQL_URL =
-  process.env.BACKEND_GRAPHQL_URL || "http://api.lvh.me:3000/graphql";
+  process.env.BACKEND_GRAPHQL_URL || "http://localhost:8080/graphql";
 
 // Simple HTTP link - no batching for server-side requests
 const httpLink = createHttpLink({
@@ -33,21 +33,13 @@ const httpLink = createHttpLink({
 });
 
 // Auth link for server-side requests
-// Expects accessToken, organizationId, projectId to be passed via context
-const authLink = setContext(async (_, { headers, accessToken, organizationId, projectId, ...context }) => {
+// Expects accessToken to be passed via context
+const authLink = setContext(async (_, { headers, accessToken, ...context }) => {
   const contextHeaders: Record<string, string> = {};
 
-  // If accessToken is provided, add it as Cookie header
+  // If accessToken is provided, add it as Authorization Bearer header
   if (accessToken) {
-    contextHeaders["Cookie"] = `flowly_access_token=${accessToken}`;
-  }
-
-  // Add organization/project headers if provided
-  if (organizationId) {
-    contextHeaders["X-Flowly-Organization"] = organizationId;
-  }
-  if (projectId) {
-    contextHeaders["X-Flowly-Project"] = projectId;
+    contextHeaders["Authorization"] = `Bearer ${accessToken}`;
   }
 
   // Support for additional headers passed via context (takes precedence)
@@ -146,8 +138,6 @@ export const createServerApolloClient = () => {
  * const user = await serverQuery({
  *   query: GetCurrentUserDocument,
  *   accessToken: token.accessToken,
- *   organizationId: 'my-org',
- *   projectId: 'my-project',
  * });
  * ```
  */
@@ -155,14 +145,10 @@ export const serverQuery = async <TData = unknown, TVariables extends OperationV
   query,
   variables,
   accessToken,
-  organizationId,
-  projectId,
 }: {
   query: Parameters<ReturnType<typeof createServerApolloClient>["query"]>[0]["query"];
   variables?: TVariables;
   accessToken?: string;
-  organizationId?: string;
-  projectId?: string;
 }) => {
   const client = createServerApolloClient();
 
@@ -171,8 +157,6 @@ export const serverQuery = async <TData = unknown, TVariables extends OperationV
     variables,
     context: {
       accessToken,
-      organizationId,
-      projectId,
     },
   });
 
@@ -185,7 +169,7 @@ export const serverQuery = async <TData = unknown, TVariables extends OperationV
  * @example
  * ```ts
  * const result = await serverMutation({
- *   mutation: SignInDocument,
+ *   mutation: LoginDocument,
  *   variables: { email, password },
  * });
  * ```
@@ -194,14 +178,10 @@ export const serverMutation = async <TData = unknown, TVariables extends Operati
   mutation,
   variables,
   accessToken,
-  organizationId,
-  projectId,
 }: {
   mutation: Parameters<ReturnType<typeof createServerApolloClient>["mutate"]>[0]["mutation"];
   variables?: TVariables;
   accessToken?: string;
-  organizationId?: string;
-  projectId?: string;
 }) => {
   const client = createServerApolloClient();
 
@@ -210,11 +190,8 @@ export const serverMutation = async <TData = unknown, TVariables extends Operati
     variables,
     context: {
       accessToken,
-      organizationId,
-      projectId,
     },
   });
 
   return data;
 };
-

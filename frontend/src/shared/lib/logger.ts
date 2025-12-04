@@ -36,7 +36,7 @@ import { createConsola } from "consola";
 // Create consola instance with app-specific configuration
 const consolaInstance = createConsola({
   defaults: {
-    tag: "Flowly",
+    tag: "Prometheus",
   },
   // Levels: 0 = silent, 1 = fatal, 2 = error, 3 = warn, 4 = log/info, 5 = debug/verbose
   level: process.env.NODE_ENV === "development" ? 5 : 3,

@@ -3,61 +3,42 @@
 "use client";
 
 import { type ReactNode } from "react";
-import {
-  AppContextProvider,
-  type OrganizationDTO,
-  type ProjectDTO,
-} from "./app-context";
+import { AppContextProvider } from "./app-context";
 import { ApolloContextSetter } from "@/shared/api";
+import type { User } from "@/entities/user";
 
 /**
- * Project Provider
+ * App Provider (simplified)
  *
- * Provides organization and project context to all child components.
- * Organization and project data can be loaded client-side via useProjectContext().
- *
- * Sets Apollo Client context headers automatically for all GraphQL queries:
- * - X-Flowly-Organization: organization.slug
- * - X-Flowly-Project: project.slug
- *
- * All GraphQL queries/mutations automatically include these headers without manual passing.
- *
- * Accepts null values during initial loading - components can check for null and show loading state.
+ * Provides app context to all child components.
+ * Simplified for trading platform - no organizations/projects.
  *
  * @example
  * ```tsx
  * // In layout.tsx
- * const { organization, project } = useProjectContext(orgId, projectId);
- *
- * return (
- *   <ProjectProvider organization={organization} project={project}>
- *     {children}
- *   </ProjectProvider>
- * );
+ * <AppProvider user={session.user}>
+ *   {children}
+ * </AppProvider>
  * ```
  */
 
-interface ProjectProviderProps {
+interface AppProviderProps {
   children: ReactNode;
-  organization: OrganizationDTO | null;
-  project: ProjectDTO | null;
-  projects?: ProjectDTO[];
+  user?: User | null;
 }
 
-export const ProjectProvider = ({
+export const AppProvider = ({
   children,
-  organization,
-  project,
-  projects = [],
-}: ProjectProviderProps) => {
+  user = null,
+}: AppProviderProps) => {
   return (
-    <ApolloContextSetter
-      organizationId={organization?.slug ?? ""}
-      projectId={project?.slug ?? ""}
-    >
-      <AppContextProvider organization={organization} project={project} projects={projects}>
+    <ApolloContextSetter>
+      <AppContextProvider user={user}>
         {children}
       </AppContextProvider>
     </ApolloContextSetter>
   );
 };
+
+// Export for backward compatibility
+export { AppProvider as ProjectProvider };

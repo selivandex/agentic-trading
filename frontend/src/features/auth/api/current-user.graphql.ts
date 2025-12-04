@@ -1,50 +1,18 @@
 /** @format */
 
 import { gql } from "@apollo/client";
+import { USER_FRAGMENT } from "@/entities/user";
 
 /**
- * Current User GraphQL Queries
+ * Current User GraphQL Query
  */
 
-// Get current user query with organizations and projects
+// Get current authenticated user
 export const GET_CURRENT_USER_QUERY = gql`
+  ${USER_FRAGMENT}
   query GetCurrentUser {
-    currentUser {
-      id
-      email
-      firstName
-      lastName
-      confirmedAt
-      createdAt
-      memberships {
-        edges {
-          node {
-            id
-            active
-            role {
-              id
-              key
-              name
-            }
-            organization {
-              id
-              name
-              slug
-              status
-              projects {
-                edges {
-                  node {
-                    id
-                    name
-                    slug
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+    me {
+      ...UserFields
     }
   }
 `;
-

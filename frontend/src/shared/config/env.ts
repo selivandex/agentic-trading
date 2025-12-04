@@ -35,7 +35,7 @@ export const env = {
   // --------------------------
   /** Backend GraphQL API URL (server-side only) */
   backendGraphQLUrl:
-    process.env.BACKEND_GRAPHQL_URL || "http://api.lvh.me:3000/graphql",
+    process.env.BACKEND_GRAPHQL_URL || "http://localhost:8080/graphql",
 
   // --------------------------
   // Authentication
@@ -43,7 +43,7 @@ export const env = {
   /** NextAuth secret for JWT signing */
   nextAuthSecret: process.env.NEXTAUTH_SECRET,
   /** NextAuth URL (base URL of the application) */
-  nextAuthUrl: process.env.NEXTAUTH_URL || "http://localhost:3001",
+  nextAuthUrl: process.env.NEXTAUTH_URL || "http://localhost:8888",
 
   // --------------------------
   // Environment Detection

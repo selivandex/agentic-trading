@@ -262,3 +262,4 @@ func (b *StrategyBuilder) MustInsert() *strategy.Strategy {
 	}
 	return entity
 }
+

@@ -1,0 +1,134 @@
+/** @format */
+
+import { gql } from "@apollo/client";
+import { USER_FRAGMENT } from "@/entities/user";
+
+/**
+ * Strategy GraphQL Queries and Mutations
+ */
+
+// Fragment for Strategy fields
+export const STRATEGY_FRAGMENT = gql`
+  fragment StrategyFields on Strategy {
+    id
+    userID
+    name
+    description
+    status
+    allocatedCapital
+    currentEquity
+    cashReserve
+    marketType
+    riskTolerance
+    rebalanceFrequency
+    targetAllocations
+    totalPnL
+    totalPnLPercent
+    sharpeRatio
+    maxDrawdown
+    winRate
+    createdAt
+    updatedAt
+    closedAt
+    lastRebalancedAt
+    reasoningLog
+  }
+`;
+
+// Fragment with user relation
+export const STRATEGY_WITH_USER_FRAGMENT = gql`
+  ${STRATEGY_FRAGMENT}
+  ${USER_FRAGMENT}
+  fragment StrategyWithUserFields on Strategy {
+    ...StrategyFields
+    user {
+      ...UserFields
+    }
+  }
+`;
+
+// Get strategy by ID
+export const GET_STRATEGY_QUERY = gql`
+  ${STRATEGY_WITH_USER_FRAGMENT}
+  query GetStrategy($id: UUID!) {
+    strategy(id: $id) {
+      ...StrategyWithUserFields
+    }
+  }
+`;
+
+// Get user strategies
+export const GET_USER_STRATEGIES_QUERY = gql`
+  ${STRATEGY_FRAGMENT}
+  query GetUserStrategies($userID: UUID!, $status: StrategyStatus) {
+    userStrategies(userID: $userID, status: $status) {
+      ...StrategyFields
+    }
+  }
+`;
+
+// Get all strategies (admin)
+export const GET_ALL_STRATEGIES_QUERY = gql`
+  ${STRATEGY_WITH_USER_FRAGMENT}
+  query GetAllStrategies(
+    $limit: Int
+    $offset: Int
+    $status: StrategyStatus
+  ) {
+    strategies(limit: $limit, offset: $offset, status: $status) {
+      ...StrategyWithUserFields
+    }
+  }
+`;
+
+// Create strategy
+export const CREATE_STRATEGY_MUTATION = gql`
+  ${STRATEGY_FRAGMENT}
+  mutation CreateStrategy($userID: UUID!, $input: CreateStrategyInput!) {
+    createStrategy(userID: $userID, input: $input) {
+      ...StrategyFields
+    }
+  }
+`;
+
+// Update strategy
+export const UPDATE_STRATEGY_MUTATION = gql`
+  ${STRATEGY_FRAGMENT}
+  mutation UpdateStrategy($id: UUID!, $input: UpdateStrategyInput!) {
+    updateStrategy(id: $id, input: $input) {
+      ...StrategyFields
+    }
+  }
+`;
+
+// Pause strategy
+export const PAUSE_STRATEGY_MUTATION = gql`
+  ${STRATEGY_FRAGMENT}
+  mutation PauseStrategy($id: UUID!) {
+    pauseStrategy(id: $id) {
+      ...StrategyFields
+    }
+  }
+`;
+
+// Resume strategy
+export const RESUME_STRATEGY_MUTATION = gql`
+  ${STRATEGY_FRAGMENT}
+  mutation ResumeStrategy($id: UUID!) {
+    resumeStrategy(id: $id) {
+      ...StrategyFields
+    }
+  }
+`;
+
+// Close strategy
+export const CLOSE_STRATEGY_MUTATION = gql`
+  ${STRATEGY_FRAGMENT}
+  mutation CloseStrategy($id: UUID!) {
+    closeStrategy(id: $id) {
+      ...StrategyFields
+    }
+  }
+`;
+
+

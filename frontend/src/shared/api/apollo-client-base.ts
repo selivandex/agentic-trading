@@ -53,12 +53,12 @@ const batchHttpLink = new BatchHttpLink({
   //       uri,
   //       body: JSON.parse(options?.body as string || "[]"),
   //     });
-  //     
+  //
   //     const response = await fetch(uri, options);
   //     const data = await response.clone().json();
-  //     
+  //
   //     console.log("🟢 Batch response:", data);
-  //     
+  //
   //     return response;
   //   },
   // }),
@@ -88,11 +88,10 @@ const authLink = setContext((operation, { headers, ...context }) => {
   // These are set by RouteParamsProvider in project layout
   if (typeof window !== "undefined") {
     const { organizationId, projectId } = getCurrentRouteParams();
-    
+
     // Add headers if both params are present
     if (organizationId && projectId) {
-      contextHeaders["X-Flowly-Organization"] = organizationId;
-      contextHeaders["X-Flowly-Project"] = projectId;
+      // Organization/Project headers not needed for trading platform
 
       // Debug: Log headers in development
       if (process.env.NODE_ENV === "development") {
@@ -288,13 +287,13 @@ const retryLink = new RetryLink({
 // Automatic Persisted Queries (APQ) - DISABLED
 // APQ requires server-side support which Rails GraphQL API doesn't have
 // Enabling APQ without server support causes "No query string was present" errors
-// 
+//
 // To enable APQ in the future:
 // 1. Add APQ support to Rails GraphQL (apollo-link-persisted-queries gem)
 // 2. Uncomment the code below
 // 3. Ensure useGETForHashedQueries is false (BatchHttpLink doesn't support GET)
 //
-// const persistedQueriesLink = isCryptoAvailable() 
+// const persistedQueriesLink = isCryptoAvailable()
 //   ? createPersistedQueryLink({
 //       sha256,
 //       useGETForHashedQueries: false,
@@ -305,13 +304,13 @@ const persistedQueriesLink = null; // APQ disabled - server doesn't support it
 
 /**
  * Create Apollo Client instance
- * 
+ *
  * Creates cache with localStorage persistence for instant UI.
  * Cache is automatically saved after each operation.
  */
 const createApolloClient = () => {
   // Initialize cache with localStorage persistence
-  const cache = typeof window !== "undefined" 
+  const cache = typeof window !== "undefined"
     ? initializeCache()
     : createApolloCache();
 
@@ -377,17 +376,17 @@ const createApolloClient = () => {
     // Apollo doesn't have a direct "watch" API, so we use a simple approach:
     // Save on every request completion (debounced to avoid performance issues)
     const saveToStorage = () => debouncedSave();
-    
+
     // Hook into cache writes by wrapping query/mutate methods
     const originalQuery = client.query.bind(client);
     const originalMutate = client.mutate.bind(client);
-    
+
     client.query = async (options) => {
       const result = await originalQuery(options);
       saveToStorage();
       return result;
     };
-    
+
     client.mutate = async (options) => {
       const result = await originalMutate(options);
       saveToStorage();
@@ -403,10 +402,10 @@ let apolloClientInstance: ApolloClient<NormalizedCacheObject> | null = null;
 
 /**
  * Get or create Apollo Client instance (CLIENT-SIDE ONLY)
- * 
+ *
  * Lazy initialization pattern - creates client on first access.
  * Returns singleton instance.
- * 
+ *
  * WARNING: Do NOT use this on server-side (JWT callbacks, Server Components).
  * Use `apollo-server-client.ts` instead for server-side operations.
  */
@@ -429,16 +428,16 @@ export const apolloClientBase = apolloClientInstance!;
  */
 export const clearCache = async () => {
   const client = getApolloClient();
-  
+
   // Clear localStorage first (cache data + version)
   if (typeof window !== "undefined") {
     localStorage.removeItem("apollo-cache-persist");
     localStorage.removeItem("apollo-cache-version");
   }
-  
+
   // Then clear in-memory cache
   await client.clearStore();
-  
+
   if (process.env.NODE_ENV === "development") {
     console.log("✅ Apollo cache cleared (memory + localStorage + version)");
   }
@@ -451,10 +450,9 @@ export const clearCache = async () => {
 export const initializeApolloClient = () => {
   if (typeof window !== "undefined") {
     apolloClientInstance = createApolloClient();
-    
+
     if (process.env.NODE_ENV === "development") {
       console.log("✅ Apollo Client initialized (in-memory cache)");
     }
   }
 };
-

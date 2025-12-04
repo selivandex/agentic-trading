@@ -19,3 +19,4 @@ type CorrelationService interface {
 	// Useful as BTC is the primary market driver for crypto
 	GetBTCCorrelation(ctx context.Context, symbol string) (decimal.Decimal, error)
 }
+

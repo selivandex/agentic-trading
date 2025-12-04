@@ -1,6 +1,6 @@
 /**
  * Next-Auth Configuration
- * 
+ *
  * Integrates with Rails GraphQL API for authentication.
  * Uses Credentials provider to call signIn/signUp mutations.
  * Uses shared Apollo Client with direct backend URL override.
@@ -10,7 +10,7 @@ import NextAuth from "next-auth";
 import type { NextAuthConfig, Session } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { createServerApolloClient } from "@/shared/api/apollo-server-client";
-import { SignInDocument, GetCurrentUserDocument } from "@/shared/api/generated/graphql";
+import { LoginDocument, GetCurrentUserDocument } from "@/shared/api/generated/graphql";
 import { ApolloError } from "@apollo/client";
 
 export const authConfig: NextAuthConfig = {
@@ -23,41 +23,51 @@ export const authConfig: NextAuthConfig = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.error("[Auth] Missing credentials");
           return null;
         }
 
         try {
           // Create server-side Apollo Client for auth mutation
           const client = createServerApolloClient();
-          
-          const { data } = await client.mutate({
-            mutation: SignInDocument,
+
+          console.log("[Auth] Attempting login for:", credentials.email);
+
+          const { data, errors } = await client.mutate({
+            mutation: LoginDocument,
             variables: {
               email: credentials.email as string,
               password: credentials.password as string,
             },
           });
 
-          if (!data?.signIn?.user) {
+          if (errors && errors.length > 0) {
+            console.error("[Auth] GraphQL errors:", errors);
             return null;
           }
 
-          const user = data.signIn.user;
+          console.log("[Auth] Login response data:", JSON.stringify(data, null, 2));
+
+          if (!data?.login?.user) {
+            console.error("[Auth] No user in response");
+            return null;
+          }
+
+          const user = data.login.user;
 
           // Return user object for Next-Auth session
           return {
             id: user.id,
-            email: user.email,
+            email: user.email || "",
             name: user.firstName
-              ? `${user.firstName} ${user.lastName || ""}`.trim()
-              : user.email,
+              ? `${user.firstName} ${user.lastName}`.trim()
+              : user.email || "User",
             image: null,
             // Store access token in session (will be used for cookie)
-            accessToken: data.signIn.accessToken,
-            expiresIn: data.signIn.expiresIn,
+            accessToken: data.login.token,
           };
         } catch (error) {
-          console.error("Auth error:", error);
+          console.error("[Auth] Exception during login:", error);
           return null;
         }
       },
@@ -86,9 +96,9 @@ export const authConfig: NextAuthConfig = {
 
       // Fetch full user data from GraphQL (with memberships)
       // Refresh every 5 minutes or on update trigger
-      const shouldFetch = 
-        !token.fullUser || 
-        !token.lastFetch || 
+      const shouldFetch =
+        !token.fullUser ||
+        !token.lastFetch ||
         Date.now() - token.lastFetch > 5 * 60 * 1000 ||
         trigger === "update";
 
@@ -96,7 +106,7 @@ export const authConfig: NextAuthConfig = {
         try {
           // Create server-side Apollo Client for fetching user data
           const client = createServerApolloClient();
-          
+
           const { data, errors } = await client.query({
             query: GetCurrentUserDocument,
             context: {
@@ -107,8 +117,8 @@ export const authConfig: NextAuthConfig = {
 
           // Check for authentication errors (401 Unauthorized)
           if (errors && errors.length > 0) {
-            const hasAuthError = errors.some(error => 
-              error.extensions?.code === 'UNAUTHENTICATED' || 
+            const hasAuthError = errors.some(error =>
+              error.extensions?.code === 'UNAUTHENTICATED' ||
               error.extensions?.code === 'UNAUTHORIZED'
             );
 
@@ -120,9 +130,8 @@ export const authConfig: NextAuthConfig = {
             }
           }
 
-          if (data?.currentUser) {
-            // Keep Relay connection format (edges/nodes)
-            token.fullUser = data.currentUser;
+          if (data?.me) {
+            token.fullUser = data.me;
             token.lastFetch = Date.now();
           }
         } catch (error) {
@@ -161,10 +170,38 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 365 * 24 * 60 * 60, // 1 year (same as Rails JWT)
+    maxAge: 365 * 24 * 60 * 60, // 1 year
+  },
+  cookies: {
+    sessionToken: {
+      name: "prometheus.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    callbackUrl: {
+      name: "prometheus.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name: "prometheus.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
 };
 
 // Export Next-Auth instance
 export const { handlers, auth, signIn: nextAuthSignIn, signOut: nextAuthSignOut } = NextAuth(authConfig);
-

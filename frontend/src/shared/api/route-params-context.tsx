@@ -2,7 +2,7 @@
  * Route Parameters Context for Apollo Client
  *
  * Provides organization_id and project_id from URL route params to Apollo Client.
- * Used by apollo-client-base.ts to add X-Flowly-Organization and X-Flowly-Project headers.
+ * Used by apollo-client-base.ts for route parameter context.
  *
  * This is part of shared/api layer as it's specifically for Apollo Client header injection.
  *

@@ -5,3 +5,4 @@ ALTER TABLE positions
 DROP COLUMN IF EXISTS strategy_id;
 
 
+

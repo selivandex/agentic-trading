@@ -1,6 +1,6 @@
 /**
  * Next-Auth API Route Handler with Sign Out Middleware
- * 
+ *
  * Handles all authentication routes:
  * - /api/auth/signin
  * - /api/auth/signout (+ calls Rails to invalidate token)
@@ -15,11 +15,9 @@ import { getToken } from "next-auth/jwt";
 import { createServerApolloClient } from "@/shared/api/apollo-server-client";
 import { gql } from "@apollo/client";
 
-const SIGN_OUT_MUTATION = gql`
-  mutation SignOut {
-    logout {
-      signedOut
-    }
+const LOGOUT_MUTATION = gql`
+  mutation Logout {
+    logout
   }
 `;
 
@@ -31,15 +29,15 @@ export const { GET } = handlers;
  */
 export async function POST(request: NextRequest) {
   const url = new URL(request.url);
-  
+
   // Check if this is a signout request
   if (url.pathname.includes("/signout")) {
     try {
       // Extract Rails JWT from NextAuth session (server-side)
       // This is the same way /api/graphql proxy extracts the token
-      const token = await getToken({ 
+      const token = await getToken({
         req: request,
-        secret: process.env.NEXTAUTH_SECRET 
+        secret: process.env.NEXTAUTH_SECRET
       });
       const railsAccessToken = token?.accessToken as string | undefined;
 
@@ -48,9 +46,9 @@ export async function POST(request: NextRequest) {
         try {
           // Create server-side Apollo Client for signOut mutation
           const client = createServerApolloClient();
-          
+
           await client.mutate({
-            mutation: SIGN_OUT_MUTATION,
+            mutation: LOGOUT_MUTATION,
             context: {
               accessToken: railsAccessToken, // Pass JWT token
             },
@@ -70,4 +68,3 @@ export async function POST(request: NextRequest) {
   // Continue with Next-Auth handler (clears session, redirects, etc.)
   return handlers.POST(request);
 }
-

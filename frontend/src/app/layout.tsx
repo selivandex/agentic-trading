@@ -23,8 +23,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flowly - Workflow Builder",
-  description: "Visual workflow builder for creating automation scenarios",
+  title: "Prometheus Trading - AI-Powered Trading Platform",
+  description: "Autonomous AI-driven hedge fund operating 24/7 at scale",
 };
 
 export default function RootLayout({

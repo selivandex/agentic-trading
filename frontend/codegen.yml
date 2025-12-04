@@ -2,7 +2,7 @@
 $schema: https://the-guild.dev/graphql/codegen/config.schema.json
 
 overwrite: true
-schema: ../app/graphql/schema.graphql
+schema: ../internal/api/graphql/schema/**/*.graphql
 documents:
   - "src/**/*.ts"
   - "src/**/*.tsx"
@@ -23,6 +23,8 @@ generates:
       withHooks: true
       withComponent: false
       scalars:
-        ISO8601DateTime: string
-        JSON: Record<string, unknown>
+        UUID: string
+        Time: string
+        Decimal: string
+        JSONObject: Record<string, unknown>
 allowPartialOutputs: true
