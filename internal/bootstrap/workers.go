@@ -6,6 +6,7 @@ import (
 	"google.golang.org/adk/session"
 
 	"prometheus/internal/adapters/config"
+	"prometheus/internal/adapters/exchangefactory"
 	"prometheus/internal/adapters/exchanges"
 	"prometheus/internal/adapters/kafka"
 	"prometheus/internal/agents"
@@ -48,6 +49,7 @@ func provideWorkers(
 	defaultModel string,
 	cfg *config.Config,
 	log *logger.Logger,
+	userExchangeFactory *exchangefactory.UserExchangeFactory,
 ) *workers.Scheduler {
 	log.Info("Initializing MVP workers...")
 
@@ -120,6 +122,16 @@ func provideWorkers(
 		true,
 	)
 	scheduler.RegisterWorker(pnlCalculator)
+
+	// Order Executor - executes pending orders on exchanges
+	orderExecutor := trading.NewOrderExecutor(
+		orderRepo,
+		exchangeAccountRepo,
+		userExchangeFactory,
+		5*time.Second, // Poll every 5 seconds for pending orders
+		true,          // Enabled
+	)
+	scheduler.RegisterWorker(orderExecutor)
 
 	log.Infow("✓ MVP workers initialized", "count", len(scheduler.GetWorkers()))
 

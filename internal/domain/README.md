@@ -7,6 +7,7 @@ Business entities, repository interfaces, and domain services following DDD prin
 ## Architecture
 
 Each bounded context has:
+
 - `entity.go` — domain entities with business logic
 - `repository.go` — repository interface (data access contract)
 - `service.go` — domain service (optional, for complex operations)
@@ -15,20 +16,20 @@ Implementations live in `internal/repository/<store>/` (postgres, clickhouse).
 
 ## Bounded Contexts
 
-| Context | Purpose | Storage |
-|---------|---------|---------|
-| **user** | User accounts, profiles | Postgres |
-| **exchange_account** | Exchange credentials (encrypted) | Postgres |
-| **trading_pair** | Trading pairs, configs | Postgres |
-| **order** | Order lifecycle, history | Postgres |
-| **position** | Position tracking | Postgres |
-| **memory** | Agent memory with embeddings | Postgres (pgvector) |
-| **journal** | Agent reasoning logs | Postgres |
-| **risk** | Risk limits, rules | Postgres |
-| **market_data** | OHLCV, tickers | ClickHouse |
-| **sentiment** | News, sentiment scores | ClickHouse |
-| **regime** | Market regime detection | ClickHouse |
-| **stats** | Performance metrics | ClickHouse |
+| Context              | Purpose                          | Storage             |
+| -------------------- | -------------------------------- | ------------------- |
+| **user**             | User accounts, profiles          | Postgres            |
+| **exchange_account** | Exchange credentials (encrypted) | Postgres            |
+| **trading_pair**     | Trading pairs, configs           | Postgres            |
+| **order**            | Order lifecycle, history         | Postgres            |
+| **position**         | Position tracking                | Postgres            |
+| **memory**           | Agent memory with embeddings     | Postgres (pgvector) |
+| **journal**          | Agent reasoning logs             | Postgres            |
+| **risk**             | Risk limits, rules               | Postgres            |
+| **market_data**      | OHLCV, tickers                   | ClickHouse          |
+| **sentiment**        | News, sentiment scores           | ClickHouse          |
+| **regime**           | Market regime detection          | ClickHouse          |
+| **stats**            | Performance metrics              | ClickHouse          |
 
 ## Adding New Domain
 
@@ -100,6 +101,7 @@ Services handle transactions when operations span multiple repos. Use `BeginTx(c
 ## Best Practices
 
 **DO:**
+
 - Keep entities rich with behavior
 - Define clear aggregate boundaries
 - Use value objects for complex types
@@ -108,6 +110,7 @@ Services handle transactions when operations span multiple repos. Use `BeginTx(c
 - Document business rules in comments
 
 **DON'T:**
+
 - Put business logic in repos (only data access)
 - Expose database details in domain
 - Use database types in entities (use primitives)
@@ -128,10 +131,3 @@ Services handle transactions when operations span multiple repos. Use `BeginTx(c
 - Migrations: `migrations/postgres/`, `migrations/clickhouse/`
 - Crypto helpers: `pkg/crypto/`
 - Error types: `pkg/errors/`
-
-
-
-
-
-
-

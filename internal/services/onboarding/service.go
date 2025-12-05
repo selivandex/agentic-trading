@@ -16,6 +16,7 @@ import (
 	telegram "prometheus/internal/adapters/telegram"
 	"prometheus/internal/agents/workflows"
 	"prometheus/internal/domain/exchange_account"
+	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
 	strategyservice "prometheus/internal/services/strategy"
@@ -31,6 +32,7 @@ type Service struct {
 	templates             *templates.Registry
 	userRepo              user.Repository
 	exchAcctRepo          exchange_account.Repository
+	fundWatchlistRepo     fundwatchlist.Repository
 	strategyService       *strategyservice.Service
 	notificationPublisher NotificationPublisher
 	log                   *logger.Logger
@@ -49,6 +51,7 @@ func NewService(
 	tmpl *templates.Registry,
 	userRepo user.Repository,
 	exchAcctRepo exchange_account.Repository,
+	fundWatchlistRepo fundwatchlist.Repository,
 	strategyService *strategyservice.Service,
 	notificationPublisher NotificationPublisher,
 	log *logger.Logger,
@@ -63,6 +66,7 @@ func NewService(
 		templates:             tmpl,
 		userRepo:              userRepo,
 		exchAcctRepo:          exchAcctRepo,
+		fundWatchlistRepo:     fundWatchlistRepo,
 		strategyService:       strategyService,
 		notificationPublisher: notificationPublisher,
 		log:                   log.With("component", "onboarding_orchestrator"),
@@ -279,40 +283,47 @@ func (s *Service) StartOnboarding(ctx context.Context, onboardingSession *telegr
 
 // buildArchitectPrompt creates the input prompt for PortfolioArchitect agent
 func (s *Service) buildArchitectPrompt(onboardingSession *telegram.OnboardingSession, exchangeName string) (*genai.Content, error) {
+	// Get active symbols from FundWatchlist
+	ctx := context.Background()
+	fundSymbols, err := s.fundWatchlistRepo.GetActive(ctx)
+	if err != nil {
+		s.log.Warnw("Failed to get fund watchlist symbols, using fallback", "error", err)
+		fundSymbols = []*fundwatchlist.Watchlist{} // Use empty list, prompt will handle it
+	}
+
+	// Build symbols list for prompt
+	symbolsList := make([]string, 0, len(fundSymbols))
+	for _, sym := range fundSymbols {
+		symbolsList = append(symbolsList, sym.Symbol)
+	}
+
+	// If no symbols, use default MVP symbols
+	if len(symbolsList) == 0 {
+		s.log.Warn("FundWatchlist is empty, using default MVP symbols")
+		symbolsList = []string{"BTC/USDT", "ETH/USDT", "SOL/USDT"}
+	}
+
+	s.log.Infow("Building PortfolioArchitect prompt",
+		"user_id", onboardingSession.UserID,
+		"capital", onboardingSession.Capital,
+		"risk_profile", onboardingSession.RiskProfile,
+		"available_symbols", symbolsList,
+	)
+
 	// Prepare data for template
 	data := map[string]interface{}{
-		"Capital":     onboardingSession.Capital,
-		"RiskProfile": onboardingSession.RiskProfile,
-		"Exchange":    exchangeName,
-		"UserID":      onboardingSession.UserID.String(),
-		"Timestamp":   time.Now().Format(time.RFC3339),
+		"Capital":          onboardingSession.Capital,
+		"RiskProfile":      onboardingSession.RiskProfile,
+		"Exchange":         exchangeName,
+		"UserID":           onboardingSession.UserID.String(),
+		"Timestamp":        time.Now().Format(time.RFC3339),
+		"AvailableSymbols": symbolsList,
 	}
 
 	// Render template
 	promptText, err := s.templates.Render("prompts/workflows/portfolio_initialization_input", data)
 	if err != nil {
-		// Fallback to simple prompt if template not found
-		s.log.Warnw("Template not found, using fallback prompt", "error", err)
-		promptText = fmt.Sprintf(`Design initial portfolio allocation for a new client.
-
-Client Profile:
-- Capital: $%.2f
-- Risk Profile: %s
-- Exchange: %s
-
-Your Task:
-1. Call analysis tools to assess current market conditions
-2. Design diversified portfolio allocation based on risk profile
-3. Calculate position sizes for each asset
-4. Validate each position via pre_trade_check tool
-5. Execute portfolio via execute_trade or place_order tool
-6. Save portfolio strategy to memory
-
-Use tools systematically. Be thorough but decisive.`,
-			onboardingSession.Capital,
-			onboardingSession.RiskProfile,
-			exchangeName,
-		)
+		return nil, errors.Wrap(err, "failed to render portfolio initialization template")
 	}
 
 	return &genai.Content{

@@ -20,10 +20,10 @@ import { useMe, UserCard, formatUserDisplayName } from "@/entities/user";
 
 function UserProfile() {
   const { data, loading } = useMe();
-  
+
   if (loading) return <div>Loading...</div>;
   if (!data?.me) return <div>Not authenticated</div>;
-  
+
   return <UserCard user={data.me} showEmail showStatus />;
 }
 ```
@@ -49,5 +49,3 @@ function UserProfile() {
 - `formatUserDisplayName(user)` - Format display name with fallbacks
 - `getUserInitials(user)` - Get user initials for avatar
 - `formatRiskLevel(riskLevel)` - Format risk level display name
-
-

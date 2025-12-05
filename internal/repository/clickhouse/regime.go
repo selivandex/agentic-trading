@@ -56,7 +56,7 @@ func (r *RegimeRepository) Store(ctx context.Context, reg *regime.MarketRegime) 
 // GetLatest retrieves the latest regime for a symbol
 func (r *RegimeRepository) GetLatest(ctx context.Context, symbol string) (*regime.MarketRegime, error) {
 	query := `
-		SELECT 
+		SELECT
 			symbol, timestamp, regime, confidence, volatility, trend,
 			atr_14, adx, bb_width, volume_24h, volume_change
 		FROM market_regimes
@@ -98,7 +98,7 @@ func (r *RegimeRepository) GetLatest(ctx context.Context, symbol string) (*regim
 // GetHistory retrieves regime history for a symbol since a given time
 func (r *RegimeRepository) GetHistory(ctx context.Context, symbol string, since time.Time) ([]regime.MarketRegime, error) {
 	query := `
-		SELECT 
+		SELECT
 			symbol, timestamp, regime, confidence, volatility, trend,
 			atr_14, adx, bb_width, volume_24h, volume_change
 		FROM market_regimes
@@ -203,7 +203,7 @@ func (r *RegimeRepository) StoreFeatures(ctx context.Context, features *regime.F
 // GetLatestFeatures retrieves the latest extracted features for a symbol
 func (r *RegimeRepository) GetLatestFeatures(ctx context.Context, symbol string) (*regime.Features, error) {
 	query := `
-		SELECT 
+		SELECT
 			symbol, timestamp,
 			atr_14, atr_pct, bb_width, historical_vol,
 			adx, ema_9, ema_21, ema_55, ema_200, ema_alignment, higher_highs_count, lower_lows_count,
@@ -251,7 +251,7 @@ func (r *RegimeRepository) GetLatestFeatures(ctx context.Context, symbol string)
 // GetFeaturesHistory retrieves historical features for a symbol
 func (r *RegimeRepository) GetFeaturesHistory(ctx context.Context, symbol string, since time.Time, limit int) ([]regime.Features, error) {
 	query := `
-		SELECT 
+		SELECT
 			symbol, timestamp,
 			atr_14, atr_pct, bb_width, historical_vol,
 			adx, ema_9, ema_21, ema_55, ema_200, ema_alignment, higher_highs_count, lower_lows_count,

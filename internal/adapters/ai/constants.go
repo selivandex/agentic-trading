@@ -35,3 +35,16 @@ func AllProviderNames() []ProviderName {
 		ProviderNameDeepSeek,
 	}
 }
+
+type ProviderModelName string
+
+// Model name constants
+const (
+	ModelClaude45Sonnet ProviderModelName = "claude-sonnet-4-5-20250929"
+
+	// OpenAI models
+	ModelGPT51 ProviderModelName = "gpt-5.1-2025-11-13"
+
+	ModelDeepSeekReasoner ProviderModelName = "deepseek-reasoner"
+	ModelDeepSeekChat     ProviderModelName = "deepseek-chat"
+)

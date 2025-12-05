@@ -1059,7 +1059,9 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../schema/auth.graphql", Input: `# Authentication types and operations
+	{Name: "../schema/auth.graphql", Input: `# @format
+
+# Authentication types and operations
 
 type AuthResponse {
   token: String!
@@ -1088,34 +1090,35 @@ extend type Query {
 extend type Mutation {
   # Register new user with email/password
   register(input: RegisterInput!): AuthResponse!
-  
+
   # Login with email/password
   login(input: LoginInput!): AuthResponse!
-  
+
   # Logout (clears cookie on client side)
   logout: Boolean!
 }
-
 `, BuiltIn: false},
-	{Name: "../schema/fund_watchlist.graphql", Input: `# Fund Watchlist types and operations
+	{Name: "../schema/fund_watchlist.graphql", Input: `# @format
+
+# Fund Watchlist types and operations
 
 type FundWatchlist {
   id: UUID!
   symbol: String!
   marketType: String!
-  
+
   # Metadata
   category: String!
   tier: Int!
-  
+
   # State
   isActive: Boolean!
   isPaused: Boolean!
   pausedReason: String
-  
+
   # Analytics
   lastAnalyzedAt: Time
-  
+
   # Timestamps
   createdAt: Time!
   updatedAt: Time!
@@ -1140,10 +1143,10 @@ input UpdateFundWatchlistInput {
 extend type Query {
   # Get watchlist item by ID
   fundWatchlist(id: UUID!): FundWatchlist
-  
+
   # Get watchlist item by symbol
   fundWatchlistBySymbol(symbol: String!, marketType: String!): FundWatchlist
-  
+
   # Get all watchlist items
   fundWatchlists(
     limit: Int
@@ -1152,7 +1155,7 @@ extend type Query {
     category: String
     tier: Int
   ): [FundWatchlist!]!
-  
+
   # Get monitored symbols (active and not paused)
   monitoredSymbols(marketType: String): [FundWatchlist!]!
 }
@@ -1161,19 +1164,27 @@ extend type Query {
 extend type Mutation {
   # Add symbol to watchlist
   createFundWatchlist(input: CreateFundWatchlistInput!): FundWatchlist!
-  
+
   # Update watchlist item
-  updateFundWatchlist(id: UUID!, input: UpdateFundWatchlistInput!): FundWatchlist!
-  
+  updateFundWatchlist(
+    id: UUID!
+    input: UpdateFundWatchlistInput!
+  ): FundWatchlist!
+
   # Remove from watchlist
   deleteFundWatchlist(id: UUID!): Boolean!
-  
-  # Pause/unpause monitoring
-  toggleFundWatchlistPause(id: UUID!, isPaused: Boolean!, reason: String): FundWatchlist!
-}
 
+  # Pause/unpause monitoring
+  toggleFundWatchlistPause(
+    id: UUID!
+    isPaused: Boolean!
+    reason: String
+  ): FundWatchlist!
+}
 `, BuiltIn: false},
-	{Name: "../schema/scalars.graphql", Input: `# Custom scalar types
+	{Name: "../schema/scalars.graphql", Input: `# @format
+
+# Custom scalar types
 
 """
 UUID scalar type represents a universally unique identifier
@@ -1194,9 +1205,10 @@ scalar Decimal
 JSONObject scalar type represents an arbitrary JSON object
 """
 scalar JSONObject
-
 `, BuiltIn: false},
-	{Name: "../schema/schema.graphql", Input: `# Root schema definition
+	{Name: "../schema/schema.graphql", Input: `# @format
+
+# Root schema definition
 
 type Query {
   # Health check
@@ -1212,9 +1224,10 @@ type Subscription {
   # Placeholder subscription
   _empty: String
 }
-
 `, BuiltIn: false},
-	{Name: "../schema/strategy.graphql", Input: `# Strategy types and operations
+	{Name: "../schema/strategy.graphql", Input: `# @format
+
+# Strategy types and operations
 
 enum StrategyStatus {
   ACTIVE
@@ -1244,36 +1257,36 @@ type Strategy {
   id: UUID!
   userID: UUID!
   user: User
-  
+
   # Strategy metadata
   name: String!
   description: String!
   status: StrategyStatus!
-  
+
   # Capital allocation
   allocatedCapital: Decimal!
   currentEquity: Decimal!
   cashReserve: Decimal!
-  
+
   # Configuration
   marketType: MarketType!
   riskTolerance: RiskTolerance!
   rebalanceFrequency: RebalanceFrequency!
   targetAllocations: JSONObject
-  
+
   # Performance metrics
   totalPnL: Decimal!
   totalPnLPercent: Decimal!
   sharpeRatio: Decimal
   maxDrawdown: Decimal
   winRate: Decimal
-  
+
   # Timestamps
   createdAt: Time!
   updatedAt: Time!
   closedAt: Time
   lastRebalancedAt: Time
-  
+
   # Reasoning log
   reasoningLog: JSONObject
 }
@@ -1300,10 +1313,10 @@ input UpdateStrategyInput {
 extend type Query {
   # Get strategy by ID
   strategy(id: UUID!): Strategy
-  
+
   # Get all strategies for a user
   userStrategies(userID: UUID!, status: StrategyStatus): [Strategy!]!
-  
+
   # Get all strategies (admin only)
   strategies(limit: Int, offset: Int, status: StrategyStatus): [Strategy!]!
 }
@@ -1312,20 +1325,19 @@ extend type Query {
 extend type Mutation {
   # Create new strategy
   createStrategy(userID: UUID!, input: CreateStrategyInput!): Strategy!
-  
+
   # Update strategy
   updateStrategy(id: UUID!, input: UpdateStrategyInput!): Strategy!
-  
+
   # Pause strategy
   pauseStrategy(id: UUID!): Strategy!
-  
+
   # Resume strategy
   resumeStrategy(id: UUID!): Strategy!
-  
+
   # Close strategy
   closeStrategy(id: UUID!): Strategy!
 }
-
 `, BuiltIn: false},
 	{Name: "../schema/user.graphql", Input: `# @format
 

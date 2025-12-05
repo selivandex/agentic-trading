@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -82,6 +83,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthRespo
 
 	// Create user
 	hashString := string(passwordHash)
+	now := time.Now().UTC()
 	usr := &user.User{
 		ID:               uuid.New(),
 		Email:            &input.Email,
@@ -94,6 +96,8 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthRespo
 		Settings:         user.DefaultSettings(),
 		TelegramID:       nil, // NULL for email-based users
 		TelegramUsername: "",
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	if err := s.userRepo.Create(ctx, usr); err != nil {

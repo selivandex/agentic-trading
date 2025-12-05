@@ -24,7 +24,7 @@ func NewSaveMemoryTool(deps shared.Deps) tool.Tool {
 
 WHEN TO SAVE:
 - Discovered patterns (with success rates/data)
-- Lessons learned from mistakes  
+- Lessons learned from mistakes
 - Validated strategies with R:R ratios
 - Market regime changes
 

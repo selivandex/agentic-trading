@@ -59,11 +59,11 @@ else
     ./bin/prometheus > logs/test_run.log 2>&1 &
     PROMETHEUS_PID=$!
     echo "Prometheus started with PID: $PROMETHEUS_PID"
-    
+
     # Wait for startup
     echo "Waiting for system to initialize (30 seconds)..."
     sleep 30
-    
+
     # Check if still running
     if ! kill -0 $PROMETHEUS_PID 2>/dev/null; then
         echo -e "${RED}✗${NC} Prometheus failed to start. Check logs/test_run.log"
@@ -158,8 +158,3 @@ echo "3. Wait for portfolio creation (1-2 minutes)"
 echo "4. Check /status and /portfolio"
 echo ""
 echo "Cleanup: Run 'make clean-test-data' to remove test user"
-
-
-
-
-

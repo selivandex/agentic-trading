@@ -21,6 +21,15 @@ func (p *ClaudeProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 		return nil, errors.Wrap(errors.ErrInvalidInput, "claude API key not configured")
 	}
 
+	// Wait for rate limiter
+	if err := p.rateLimiter.Wait(ctx); err != nil {
+		return nil, &RateLimitError{
+			Provider: ProviderNameAnthropic,
+			Limit:    p.rateLimiter.Limit(),
+			Err:      err,
+		}
+	}
+
 	// Convert to Claude API format
 	claudeReq := p.convertToClaude(req)
 

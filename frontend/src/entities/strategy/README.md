@@ -20,9 +20,9 @@ import { useUserStrategies, StrategyCard } from "@/entities/strategy";
 
 function StrategiesList({ userID }: { userID: string }) {
   const { data, loading } = useUserStrategies(userID, "ACTIVE");
-  
+
   if (loading) return <div>Loading...</div>;
-  
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {data?.userStrategies.map((strategy) => (
@@ -62,5 +62,3 @@ function StrategiesList({ userID }: { userID: string }) {
 - `formatPercentage(value, decimals?)` - Format percentage value
 - `getPnLColorClass(value)` - Get color class for P&L
 - `calculateROI(strategy)` - Calculate strategy ROI
-
-

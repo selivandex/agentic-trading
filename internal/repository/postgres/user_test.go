@@ -14,6 +14,11 @@ import (
 	"prometheus/pkg/errors"
 )
 
+// ptr returns a pointer to the given int64 value
+func ptr(v int64) *int64 {
+	return &v
+}
+
 func TestUserRepository_Create(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
@@ -28,7 +33,7 @@ func TestUserRepository_Create(t *testing.T) {
 	// Create test user with default settings
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramID:       ptr(testsupport.UniqueTelegramID()),
 		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Test",
 		LastName:         "User",
@@ -67,7 +72,7 @@ func TestUserRepository_GetByID(t *testing.T) {
 	// Create test user
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramID:       ptr(testsupport.UniqueTelegramID()),
 		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "GetByID",
 		LastName:         "Test",
@@ -109,7 +114,7 @@ func TestUserRepository_GetByTelegramID(t *testing.T) {
 	// Create test user
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramID:       ptr(testsupport.UniqueTelegramID()),
 		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Telegram",
 		LastName:         "Test",
@@ -125,7 +130,7 @@ func TestUserRepository_GetByTelegramID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test GetByTelegramID - critical for Telegram bot
-	retrieved, err := repo.GetByTelegramID(ctx, u.TelegramID)
+	retrieved, err := repo.GetByTelegramID(ctx, *u.TelegramID)
 	require.NoError(t, err)
 	assert.Equal(t, u.ID, retrieved.ID)
 	assert.Equal(t, u.TelegramID, retrieved.TelegramID)
@@ -151,7 +156,7 @@ func TestUserRepository_Update(t *testing.T) {
 	// Create initial user
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramID:       ptr(testsupport.UniqueTelegramID()),
 		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Update",
 		LastName:         "Test",
@@ -203,7 +208,7 @@ func TestUserRepository_List(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		u := &user.User{
 			ID:               uuid.New(),
-			TelegramID:       testsupport.UniqueTelegramID(),
+			TelegramID:       ptr(testsupport.UniqueTelegramID()),
 			TelegramUsername: testsupport.UniqueUsername(),
 			FirstName:        "User",
 			LastName:         string(rune(i + '0')),
@@ -243,7 +248,7 @@ func TestUserRepository_Delete(t *testing.T) {
 	// Create user to delete
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramID:       ptr(testsupport.UniqueTelegramID()),
 		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "Delete",
 		LastName:         "Test",
@@ -305,7 +310,7 @@ func TestUserRepository_SettingsJSONB(t *testing.T) {
 
 	u := &user.User{
 		ID:               uuid.New(),
-		TelegramID:       testsupport.UniqueTelegramID(),
+		TelegramID:       ptr(testsupport.UniqueTelegramID()),
 		TelegramUsername: testsupport.UniqueUsername(),
 		FirstName:        "JSONB",
 		LastName:         "Test",

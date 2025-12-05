@@ -171,7 +171,11 @@ type userResolver struct{ *Resolver }
 //    it when you're done.
 //  - You have helper methods in this file. Move them out to keep these resolver files clean.
 /*
-	func (r *userResolver) Email(ctx context.Context, obj *user.User) (*string, error) {
+	func (r *userResolver) Settings(ctx context.Context, obj *user.User) (*user.Settings, error) {
+	// Return user settings directly from domain model
+	return &obj.Settings, nil
+}
+func (r *userResolver) Email(ctx context.Context, obj *user.User) (*string, error) {
 	return obj.Email, nil
 }
 */

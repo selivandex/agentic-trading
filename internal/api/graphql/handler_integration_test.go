@@ -192,6 +192,8 @@ func TestGraphQLHandler_RegisterAndLogin_Integration(t *testing.T) {
 					user {
 						id
 						email
+						createdAt
+						updatedAt
 					}
 				}
 			}
@@ -238,7 +240,11 @@ func TestGraphQLHandler_RegisterAndLogin_Integration(t *testing.T) {
 			mutation Login($input: LoginInput!) {
 				login(input: $input) {
 					token
-					user { id }
+					user {
+						id
+						createdAt
+						updatedAt
+					}
 				}
 			}
 		`

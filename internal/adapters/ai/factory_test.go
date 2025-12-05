@@ -8,7 +8,7 @@ import (
 
 func TestBuildRegistryReturnsErrorWhenNoKeys(t *testing.T) {
 	cfg := config.AIConfig{}
-	if _, err := BuildRegistry(cfg); err == nil {
+	if _, err := BuildRegistry(cfg, nil); err == nil {
 		t.Fatal("expected error when no providers configured")
 	}
 }
@@ -21,7 +21,7 @@ func TestBuildRegistryRegistersProvidedKeys(t *testing.T) {
 		GeminiKey:   "g",
 	}
 
-	registry, err := BuildRegistry(cfg)
+	registry, err := BuildRegistry(cfg, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

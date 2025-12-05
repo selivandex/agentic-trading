@@ -2,7 +2,7 @@
 
 /**
  * Strategy Entity Types
- * 
+ *
  * Trading strategy entity with configuration and performance metrics
  */
 
@@ -87,5 +87,3 @@ export interface UpdateStrategyInput {
   rebalanceFrequency?: RebalanceFrequency;
   targetAllocations?: Record<string, unknown>;
 }
-
-

@@ -580,7 +580,7 @@ func (c *client) doRequest(ctx context.Context, method, path string, params url.
 		recv := strconv.FormatInt(c.cfg.RecvWindow.Milliseconds(), 10)
 		signature := c.sign(ts, recv, bodyString)
 
-		if params != nil && len(params) > 0 && method != http.MethodGet {
+		if len(params) > 0 && method != http.MethodGet {
 			req.URL.RawQuery = params.Encode()
 		}
 

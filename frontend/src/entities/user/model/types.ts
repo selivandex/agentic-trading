@@ -2,7 +2,7 @@
 
 /**
  * User Entity Types
- * 
+ *
  * Core user entity with settings and profile information
  */
 
@@ -65,5 +65,3 @@ export interface UpdateUserSettingsInput {
   maxLeverageMultiple?: number;
   allowedExchanges?: string[];
 }
-
-

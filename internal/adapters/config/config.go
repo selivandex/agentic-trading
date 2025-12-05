@@ -96,6 +96,66 @@ type TelegramConfig struct {
 	Debug      bool    `envconfig:"TELEGRAM_DEBUG" default:"false"`
 }
 
+// ProviderRateLimitConfig contains rate limiting configuration for a single AI provider.
+type ProviderRateLimitConfig struct {
+	Enabled      bool    `envconfig:"ENABLED" default:"true"`      // Enable rate limiting for this provider
+	ReqPerMinute float64 `envconfig:"REQ_PER_MINUTE" default:"60"` // Maximum requests per minute
+	Burst        int     `envconfig:"BURST" default:"10"`          // Burst size (max concurrent requests)
+}
+
+// GetRateLimitConfig returns rate limit config with defaults for a specific provider.
+func (c AIConfig) GetRateLimitConfig(provider string) ProviderRateLimitConfig {
+	// Global override
+	if !c.RateLimitEnabled {
+		return ProviderRateLimitConfig{Enabled: false}
+	}
+
+	switch provider {
+	case "claude", "anthropic":
+		// Apply defaults if not configured
+		cfg := c.Claude
+		if cfg.ReqPerMinute == 0 {
+			cfg.ReqPerMinute = 50 // Claude free tier
+		}
+		if cfg.Burst == 0 {
+			cfg.Burst = 10
+		}
+		return cfg
+	case "openai":
+		cfg := c.OpenAI
+		if cfg.ReqPerMinute == 0 {
+			cfg.ReqPerMinute = 500 // OpenAI Tier 1
+		}
+		if cfg.Burst == 0 {
+			cfg.Burst = 50
+		}
+		return cfg
+	case "deepseek":
+		cfg := c.DeepSeek
+		// DeepSeek has no rate limits by default
+		if cfg.ReqPerMinute == 0 && cfg.Enabled {
+			cfg.Enabled = false
+		}
+		return cfg
+	case "gemini", "google":
+		cfg := c.Gemini
+		if cfg.ReqPerMinute == 0 {
+			cfg.ReqPerMinute = 60 // Gemini free tier
+		}
+		if cfg.Burst == 0 {
+			cfg.Burst = 10
+		}
+		return cfg
+	default:
+		// Unknown provider - use safe defaults
+		return ProviderRateLimitConfig{
+			Enabled:      true,
+			ReqPerMinute: 60,
+			Burst:        10,
+		}
+	}
+}
+
 type AIConfig struct {
 	ClaudeKey           string `envconfig:"CLAUDE_API_KEY"`
 	OpenAIKey           string `envconfig:"OPENAI_API_KEY"`
@@ -105,6 +165,13 @@ type AIConfig struct {
 	DefaultModel        string `envconfig:"DEFAULT_AI_MODEL" default:""`                // Default model (auto-selected if empty)
 	MaxDailyCostPerUser string `envconfig:"AI_MAX_DAILY_COST_PER_USER" default:"10.00"` // Max daily AI spending per user (USD)
 	MaxCostPerExecution string `envconfig:"AI_MAX_COST_PER_EXECUTION" default:"1.00"`   // Max cost per single agent execution (USD)
+
+	// Rate limiting configuration per provider
+	RateLimitEnabled bool                    `envconfig:"AI_RATE_LIMIT_ENABLED" default:"true"` // Enable rate limiting globally
+	Claude           ProviderRateLimitConfig `envconfig:"AI_CLAUDE"`                            // Claude rate limits (50 req/min free tier)
+	OpenAI           ProviderRateLimitConfig `envconfig:"AI_OPENAI"`                            // OpenAI rate limits (500 req/min Tier 1)
+	DeepSeek         ProviderRateLimitConfig `envconfig:"AI_DEEPSEEK"`                          // DeepSeek rate limits (no limits by default)
+	Gemini           ProviderRateLimitConfig `envconfig:"AI_GEMINI"`                            // Gemini rate limits (60 req/min free tier)
 }
 
 // AgentsConfig contains configuration for agent execution

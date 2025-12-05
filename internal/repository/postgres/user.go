@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -26,6 +27,15 @@ func NewUserRepository(db DBTX) *UserRepository {
 
 // Create inserts a new user
 func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
+	// Ensure timestamps exist to satisfy NOT NULL constraints downstream
+	now := time.Now().UTC()
+	if u.CreatedAt.IsZero() {
+		u.CreatedAt = now
+	}
+	if u.UpdatedAt.IsZero() {
+		u.UpdatedAt = now
+	}
+
 	// Marshal settings to JSON
 	settingsJSON, err := json.Marshal(u.Settings)
 	if err != nil {
@@ -80,6 +90,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*user.User,
 		u.Settings = user.DefaultSettings()
 	}
 
+	normalizeUserTimestamps(&u)
+
 	return &u, nil
 }
 
@@ -115,6 +127,8 @@ func (r *UserRepository) GetByTelegramID(ctx context.Context, telegramID int64) 
 		u.Settings = user.DefaultSettings()
 	}
 
+	normalizeUserTimestamps(&u)
+
 	return &u, nil
 }
 
@@ -149,6 +163,8 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*user.Us
 	} else {
 		u.Settings = user.DefaultSettings()
 	}
+
+	normalizeUserTimestamps(&u)
 
 	return &u, nil
 }
@@ -229,8 +245,41 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.U
 			u.Settings = user.DefaultSettings()
 		}
 
+		normalizeUserTimestamps(&u)
+
 		users = append(users, &u)
 	}
 
 	return users, rows.Err()
+}
+
+// normalizeUserTimestamps guarantees CreatedAt/UpdatedAt are non-zero for downstream consumers (GraphQL non-null fields).
+func normalizeUserTimestamps(u *user.User) {
+	if u == nil {
+		return
+	}
+
+	defaultTime := time.Unix(0, 0).UTC()
+
+	if u.CreatedAt.IsZero() && u.UpdatedAt.IsZero() {
+		u.CreatedAt = defaultTime
+		u.UpdatedAt = defaultTime
+		return
+	}
+
+	if u.CreatedAt.IsZero() {
+		if u.UpdatedAt.IsZero() {
+			u.CreatedAt = defaultTime
+		} else {
+			u.CreatedAt = u.UpdatedAt
+		}
+	}
+
+	if u.UpdatedAt.IsZero() {
+		if u.CreatedAt.IsZero() {
+			u.UpdatedAt = defaultTime
+		} else {
+			u.UpdatedAt = u.CreatedAt
+		}
+	}
 }

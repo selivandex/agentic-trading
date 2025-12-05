@@ -10,14 +10,23 @@ import (
 
 // DeepSeekProvider implements DeepSeek metadata.
 type DeepSeekProvider struct {
-	apiKey  string
-	timeout time.Duration
-	models  []ModelInfo
+	apiKey      string
+	timeout     time.Duration
+	models      []ModelInfo
+	rateLimiter RateLimiter
 }
 
 // NewDeepSeekProvider creates a new DeepSeek provider.
-func NewDeepSeekProvider(apiKey string, timeout time.Duration) *DeepSeekProvider {
-	return &DeepSeekProvider{apiKey: apiKey, timeout: timeout, models: deepSeekModels()}
+func NewDeepSeekProvider(apiKey string, timeout time.Duration, rateLimiter RateLimiter) *DeepSeekProvider {
+	if rateLimiter == nil {
+		rateLimiter = NewNoOpLimiter()
+	}
+	return &DeepSeekProvider{
+		apiKey:      apiKey,
+		timeout:     timeout,
+		models:      deepSeekModels(),
+		rateLimiter: rateLimiter,
+	}
 }
 
 // Name returns provider name.

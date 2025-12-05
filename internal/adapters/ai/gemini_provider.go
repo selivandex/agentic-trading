@@ -10,14 +10,23 @@ import (
 
 // GeminiProvider implements Google Gemini metadata.
 type GeminiProvider struct {
-	apiKey  string
-	timeout time.Duration
-	models  []ModelInfo
+	apiKey      string
+	timeout     time.Duration
+	models      []ModelInfo
+	rateLimiter RateLimiter
 }
 
 // NewGeminiProvider creates a new Gemini provider.
-func NewGeminiProvider(apiKey string, timeout time.Duration) *GeminiProvider {
-	return &GeminiProvider{apiKey: apiKey, timeout: timeout, models: geminiModels()}
+func NewGeminiProvider(apiKey string, timeout time.Duration, rateLimiter RateLimiter) *GeminiProvider {
+	if rateLimiter == nil {
+		rateLimiter = NewNoOpLimiter()
+	}
+	return &GeminiProvider{
+		apiKey:      apiKey,
+		timeout:     timeout,
+		models:      geminiModels(),
+		rateLimiter: rateLimiter,
+	}
 }
 
 // Name returns provider name.

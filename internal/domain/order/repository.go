@@ -15,6 +15,8 @@ type Repository interface {
 	GetByExchangeOrderID(ctx context.Context, exchangeOrderID string) (*Order, error)
 	GetOpenByUser(ctx context.Context, userID uuid.UUID) ([]*Order, error)
 	GetByStrategy(ctx context.Context, strategyID uuid.UUID) ([]*Order, error)
+	GetPending(ctx context.Context, limit int) ([]*Order, error)
+	GetPendingByUser(ctx context.Context, userID uuid.UUID) ([]*Order, error)
 	Update(ctx context.Context, order *Order) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status OrderStatus, filledAmount, avgPrice decimal.Decimal) error
 	Cancel(ctx context.Context, id uuid.UUID) error

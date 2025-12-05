@@ -10,14 +10,23 @@ import (
 
 // ClaudeProvider implements the Anthropic Claude integration metadata.
 type ClaudeProvider struct {
-	apiKey  string
-	timeout time.Duration
-	models  []ModelInfo
+	apiKey      string
+	timeout     time.Duration
+	models      []ModelInfo
+	rateLimiter RateLimiter
 }
 
 // NewClaudeProvider creates a new Claude provider.
-func NewClaudeProvider(apiKey string, timeout time.Duration) *ClaudeProvider {
-	return &ClaudeProvider{apiKey: apiKey, timeout: timeout, models: claudeModels()}
+func NewClaudeProvider(apiKey string, timeout time.Duration, rateLimiter RateLimiter) *ClaudeProvider {
+	if rateLimiter == nil {
+		rateLimiter = NewNoOpLimiter()
+	}
+	return &ClaudeProvider{
+		apiKey:      apiKey,
+		timeout:     timeout,
+		models:      claudeModels(),
+		rateLimiter: rateLimiter,
+	}
 }
 
 // Name returns provider name.

@@ -27,6 +27,7 @@ import (
 	"prometheus/internal/api/health"
 	tgapi "prometheus/internal/api/telegram"
 	"prometheus/internal/consumers"
+	"prometheus/internal/domain/agent"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/limit_profile"
 	"prometheus/internal/domain/market_data"
@@ -42,6 +43,7 @@ import (
 	chrepo "prometheus/internal/repository/clickhouse"
 	pgrepo "prometheus/internal/repository/postgres"
 	"prometheus/internal/repository/redis"
+	agentservice "prometheus/internal/services/agent"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	authservice "prometheus/internal/services/auth"
 	"prometheus/internal/services/exchange"
@@ -131,6 +133,9 @@ func (c *Container) MustInitInfrastructure() {
 
 // MustInitRepositories initializes all domain repositories
 func (c *Container) MustInitRepositories() {
+	// Agent repository first - needed for agent definitions before business logic
+	c.Repos.Agent = pgrepo.NewAgentRepository(c.PG.DB())
+
 	c.Repos.User = pgrepo.NewUserRepository(c.PG.DB())
 	c.Repos.ExchangeAccount = pgrepo.NewExchangeAccountRepository(c.PG.DB())
 	c.Repos.FundWatchlist = pgrepo.NewFundWatchlistRepository(c.PG.DB())
@@ -183,6 +188,7 @@ func (c *Container) MustInitAdapters() {
 
 	// Exchanges
 	c.Adapters.ExchangeFactory = exchangefactory.NewFactory()
+	c.Adapters.UserExchangeFactory = exchangefactory.NewUserExchangeFactory(c.Adapters.Encryptor)
 	c.Adapters.MarketDataFactory = exchangefactory.NewMarketDataFactory(c.Config.MarketData)
 	c.Log.Info("✓ Exchange factory initialized")
 
@@ -208,6 +214,15 @@ func (c *Container) MustInitAdapters() {
 
 // MustInitServices initializes domain services
 func (c *Container) MustInitServices() {
+	// Agent services (domain first, then application)
+	c.Services.DomainAgent = agent.NewService(c.Repos.Agent)
+	c.Services.Agent = agentservice.NewService(c.Services.DomainAgent, templates.Get())
+
+	// Ensure system agents exist in DB (FindOrCreate from templates)
+	if err := c.Services.Agent.EnsureSystemAgents(c.Context); err != nil {
+		c.Log.Fatalf("Failed to ensure system agents: %v", err)
+	}
+
 	// Create limit profile adapter for domain service
 	limitProfileAdapter := user.NewLimitProfileAdapter(func(ctx context.Context, name string) (uuid.UUID, error) {
 		profile, err := c.Repos.LimitProfile.GetByName(ctx, name)
@@ -351,6 +366,7 @@ func (c *Container) MustInitBusiness() {
 		templates.Get(),
 		c.Repos.User,
 		c.Repos.ExchangeAccount,
+		c.Repos.FundWatchlist,
 		c.Services.Strategy,
 		onboardingNotificationPublisher,
 		c.Log,
@@ -452,6 +468,7 @@ func (c *Container) MustInitBackground() {
 		c.Business.DefaultModel,
 		c.Config,
 		c.Log,
+		c.Adapters.UserExchangeFactory,
 	)
 
 	// Telegram Notification Consumer (uses new framework)
@@ -593,7 +610,8 @@ func provideAgents(
 ) (*agents.Factory, *agents.Registry, string, string, error) {
 	log.Info("Initializing agents...")
 
-	aiRegistry, err := ai.BuildRegistry(cfg.AI)
+	// Build AI registry with Redis-based distributed rate limiting
+	aiRegistry, err := ai.BuildRegistry(cfg.AI, redisClient.Client())
 	if err != nil {
 		return nil, nil, "", "", errors.Wrap(err, "build AI registry")
 	}

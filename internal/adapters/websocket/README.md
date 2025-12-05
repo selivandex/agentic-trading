@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # WebSocket Adapter
 
 Real-time market data streaming from crypto exchanges via WebSocket connections.
@@ -15,6 +17,7 @@ Exchange WebSocket → Client → KafkaEventHandler → WebSocketPublisher → K
 ### 1. Abstraction Layer (`types.go`)
 
 Generic types for all exchanges:
+
 - `Client` interface
 - `StreamConfig` - stream configuration
 - `KlineEvent`, `TickerEvent`, `DepthEvent`, etc. - generic event types
@@ -30,6 +33,7 @@ Generic types for all exchanges:
 - Graceful shutdown with context cancellation
 
 **Features:**
+
 - Multiple symbols simultaneously
 - Multiple timeframes per symbol
 - Efficient combined stream (single connection)
@@ -38,6 +42,7 @@ Generic types for all exchanges:
 ### 3. Event Publishing (`kafka_handler.go`)
 
 Implements `EventHandler` interface and publishes to Kafka via protobuf:
+
 - Converts exchange-specific events to protobuf
 - Publishes to topic-specific Kafka topics
 - Structured logging
@@ -45,6 +50,7 @@ Implements `EventHandler` interface and publishes to Kafka via protobuf:
 ### 4. Kafka Topics
 
 All WebSocket events are published to Kafka using protobuf:
+
 - `websocket.kline` - Candlestick data
 - `websocket.ticker` - 24hr ticker statistics
 - `websocket.depth` - Order book snapshots
@@ -107,11 +113,13 @@ func (c *BybitClient) Start(ctx context.Context) error {
 ### Adding a New Stream Type
 
 1. Add stream type constant in `types.go`:
+
 ```go
 const StreamTypeLiquidations StreamType = "liquidations"
 ```
 
 2. Add event type:
+
 ```go
 type LiquidationEvent struct {
     Exchange string
@@ -128,6 +136,7 @@ type LiquidationEvent struct {
 ## Supported Timeframes
 
 All Binance futures timeframes:
+
 - `1m`, `3m`, `5m`, `15m`, `30m`
 - `1h`, `2h`, `4h`, `6h`, `8h`, `12h`
 - `1d`, `3d`, `1w`, `1M`
@@ -163,6 +172,7 @@ c.stopWebSocketClients()     // Graceful shutdown
 ```
 
 All components support graceful shutdown:
+
 - Context cancellation propagates to all goroutines
 - Current messages are processed before stopping
 - Connections closed cleanly
@@ -200,8 +210,3 @@ TODO: Export to Prometheus metrics.
 - [ ] More exchanges (Bybit, OKX, etc.)
 - [ ] Metrics export (Prometheus)
 - [ ] Connection pooling for multiple streams
-
-
-
-
-

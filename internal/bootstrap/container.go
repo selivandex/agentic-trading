@@ -9,6 +9,7 @@ import (
 	chclient "prometheus/internal/adapters/clickhouse"
 	"prometheus/internal/adapters/config"
 	"prometheus/internal/adapters/embeddings"
+	"prometheus/internal/adapters/exchangefactory"
 	"prometheus/internal/adapters/exchanges"
 	"prometheus/internal/adapters/kafka"
 	pgclient "prometheus/internal/adapters/postgres"
@@ -19,6 +20,7 @@ import (
 	"prometheus/internal/api"
 	"prometheus/internal/api/health"
 	"prometheus/internal/consumers"
+	"prometheus/internal/domain/agent"
 	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/limit_profile"
@@ -33,6 +35,7 @@ import (
 	strategyDomain "prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
 	"prometheus/internal/events"
+	agentservice "prometheus/internal/services/agent"
 	chrepo "prometheus/internal/repository/clickhouse"
 	aiusagesvc "prometheus/internal/services/ai_usage"
 	authservice "prometheus/internal/services/auth"
@@ -93,6 +96,7 @@ type Container struct {
 
 // Repositories groups all domain repositories
 type Repositories struct {
+	Agent               agent.Repository // Agent definitions with prompts
 	User                user.Repository
 	ExchangeAccount     exchange_account.Repository
 	FundWatchlist       fundwatchlist.Repository
@@ -113,9 +117,11 @@ type Repositories struct {
 // Services groups all domain services
 type Services struct {
 	// Application services (Clean Architecture: Application Layer)
+	Agent              *agentservice.Service      // Agent management (prompts, templates)
 	Auth               *authservice.Service       // Authentication service (JWT, email/password)
 	User               *userservice.Service       // User application service (coordinates domain + side effects)
 	DomainUser         *user.Service              // Domain user service (for consumers - pure CRUD)
+	DomainAgent        *agent.Service             // Domain agent service (CRUD)
 	ExchangeAccount    *exchange_account.Service  // Exchange account domain service
 	Exchange           *exchangeservice.Service   // Exchange account management service
 	Order              *order.Service             // Order domain service
@@ -145,9 +151,10 @@ type Adapters struct {
 	WebSocketConsumer *kafka.Consumer
 
 	// Crypto & Exchanges
-	Encryptor         *crypto.Encryptor
-	ExchangeFactory   exchanges.Factory
-	MarketDataFactory exchanges.CentralFactory
+	Encryptor           *crypto.Encryptor
+	ExchangeFactory     exchanges.Factory                    // Generic factory interface
+	UserExchangeFactory *exchangefactory.UserExchangeFactory // Concrete user exchange factory
+	MarketDataFactory   exchanges.CentralFactory
 
 	// AI & Embeddings
 	EmbeddingProvider embeddings.Provider
@@ -267,10 +274,11 @@ func (c *Container) Start() error {
 		}
 	}()
 
-	// Start workers (optional - currently commented out in original)
-	// if err := c.Background.WorkerScheduler.Start(c.Context); err != nil {
-	// 	return fmt.Errorf("failed to start workers: %w", err)
-	// }
+	// Start workers
+	if err := c.Background.WorkerScheduler.Start(c.Context); err != nil {
+		return errors.Wrap(err, "failed to start workers")
+	}
+	c.Log.Info("✓ Workers started")
 
 	c.Log.Info("✓ All systems operational")
 	return nil

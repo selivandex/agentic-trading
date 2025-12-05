@@ -80,7 +80,7 @@ func (pm *PositionMonitor) Run(ctx context.Context) error {
 		return nil
 	}
 
-	pm.Log().Debug("Monitoring positions for users", "user_count", len(activeUsers))
+	pm.Log().Debugw("Monitoring positions for users", "user_count", len(activeUsers))
 
 	// Monitor positions for each user
 	successCount := 0
@@ -89,19 +89,19 @@ func (pm *PositionMonitor) Run(ctx context.Context) error {
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-			pm.Log().Info("Position monitoring interrupted by shutdown",
-				"users_processed", successCount,
-				"users_remaining", len(activeUsers)-successCount-errorCount,
-			)
+		pm.Log().Infow("Position monitoring interrupted by shutdown",
+			"users_processed", successCount,
+			"users_remaining", len(activeUsers)-successCount-errorCount,
+		)
 			return ctx.Err()
 		default:
 		}
 
 		if err := pm.monitorUserPositions(ctx, usr.ID); err != nil {
-			pm.Log().Error("Failed to monitor user positions",
-				"user_id", usr.ID,
-				"error", err,
-			)
+		pm.Log().Errorw("Failed to monitor user positions",
+			"user_id", usr.ID,
+			"error", err,
+		)
 			errorCount++
 			// Continue with other users
 			continue
@@ -109,7 +109,7 @@ func (pm *PositionMonitor) Run(ctx context.Context) error {
 		successCount++
 	}
 
-	pm.Log().Info("Position monitor: iteration complete",
+	pm.Log().Infow("Position monitor: iteration complete",
 		"users_processed", successCount,
 		"errors", errorCount,
 	)
@@ -129,7 +129,7 @@ func (pm *PositionMonitor) monitorUserPositions(ctx context.Context, userID uuid
 		return nil // No positions to monitor
 	}
 
-	pm.Log().Debug("Monitoring positions", "user_id", userID, "count", len(positions))
+	pm.Log().Debugw("Monitoring positions", "user_id", userID, "count", len(positions))
 
 	// Group positions by exchange account
 	positionsByAccount := make(map[uuid.UUID][]*position.Position)
@@ -142,16 +142,16 @@ func (pm *PositionMonitor) monitorUserPositions(ctx context.Context, userID uuid
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-			pm.Log().Debug("Position monitoring for user interrupted by shutdown", "user_id", userID)
+			pm.Log().Debugw("Position monitoring for user interrupted by shutdown", "user_id", userID)
 			return ctx.Err()
 		default:
 		}
 
 		if err := pm.monitorAccountPositions(ctx, accountID, accountPositions); err != nil {
-			pm.Log().Error("Failed to monitor positions for account",
-				"account_id", accountID,
-				"error", err,
-			)
+		pm.Log().Errorw("Failed to monitor positions for account",
+			"account_id", accountID,
+			"error", err,
+		)
 			// Continue with other accounts even if one fails
 		}
 	}
@@ -178,17 +178,17 @@ func (pm *PositionMonitor) monitorAccountPositions(ctx context.Context, accountI
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-			pm.Log().Debug("Position monitoring for account interrupted by shutdown", "account_id", accountID)
+			pm.Log().Debugw("Position monitoring for account interrupted by shutdown", "account_id", accountID)
 			return ctx.Err()
 		default:
 		}
 
 		if err := pm.updatePosition(ctx, exchangeClient, pos); err != nil {
-			pm.Log().Error("Failed to update position",
-				"position_id", pos.ID,
-				"symbol", pos.Symbol,
-				"error", err,
-			)
+		pm.Log().Errorw("Failed to update position",
+			"position_id", pos.ID,
+			"symbol", pos.Symbol,
+			"error", err,
+		)
 			// Continue with other positions
 			continue
 		}
@@ -240,10 +240,10 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 	// Check position triggers and generate events (stop/target approaching, profit milestones, time decay)
 	if pm.eventGenerator != nil {
 		if err := pm.eventGenerator.CheckPositionTriggers(ctx, pos, currentPrice, exchangeName); err != nil {
-			pm.Log().Error("Failed to check position triggers",
-				"position_id", pos.ID,
-				"error", err,
-			)
+		pm.Log().Errorw("Failed to check position triggers",
+			"position_id", pos.ID,
+			"error", err,
+		)
 		}
 	}
 
@@ -279,7 +279,7 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 	// Send PnL update event (for monitoring/analytics)
 	pm.sendPnLUpdateEvent(ctx, pos, currentPrice, unrealizedPnL, unrealizedPnLPct)
 
-	pm.Log().Debug("Position updated",
+	pm.Log().Debugw("Position updated",
 		"position_id", pos.ID,
 		"symbol", pos.Symbol,
 		"current_price", currentPrice,
@@ -320,9 +320,9 @@ func (pm *PositionMonitor) handleStopLossHit(ctx context.Context, pos *position.
 		pnlPercent,
 		0, // duration will be 0 if CreatedAt field doesn't exist
 	); err != nil {
-		pm.Log().Error("Failed to publish stop loss event", "error", err)
+		pm.Log().Errorw("Failed to publish stop loss event", "error", err)
 	} else {
-		pm.Log().Info("Stop loss hit",
+		pm.Log().Infow("Stop loss hit",
 			"position_id", pos.ID,
 			"symbol", pos.Symbol,
 			"stop_loss_price", pos.StopLossPrice,
@@ -361,9 +361,9 @@ func (pm *PositionMonitor) handleTakeProfitHit(ctx context.Context, pos *positio
 		pnlPercent,
 		0,
 	); err != nil {
-		pm.Log().Error("Failed to publish take profit event", "error", err)
+		pm.Log().Errorw("Failed to publish take profit event", "error", err)
 	} else {
-		pm.Log().Info("Take profit hit",
+		pm.Log().Infow("Take profit hit",
 			"position_id", pos.ID,
 			"symbol", pos.Symbol,
 			"take_profit_price", pos.TakeProfitPrice,
@@ -391,7 +391,7 @@ func (pm *PositionMonitor) sendPnLUpdateEvent(ctx context.Context, pos *position
 			currentPriceFloat,
 			entryPriceFloat,
 		); err != nil {
-			pm.Log().Error("Failed to publish PnL update event", "error", err)
+			pm.Log().Errorw("Failed to publish PnL update event", "error", err)
 		}
 	}
 }

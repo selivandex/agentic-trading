@@ -49,11 +49,30 @@ func (r *mutationResolver) Login(ctx context.Context, input generated.LoginInput
 		return nil, fmt.Errorf("login failed: %w", err)
 	}
 
+	// DEBUG: Log what we're returning
+	if r.Log != nil {
+		r.Log.Infow("Login resolver returning",
+			"token_len", len(result.Token),
+			"user_id", result.User.ID,
+			"user_email", result.User.Email,
+			"user_first_name", result.User.FirstName,
+		)
+	}
+
 	// Return token in response (Next.js will save it to session)
-	return &generated.AuthResponse{
+	response := &generated.AuthResponse{
 		Token: result.Token,
 		User:  result.User,
-	}, nil
+	}
+
+	if r.Log != nil {
+		r.Log.Infow("AuthResponse created",
+			"token_len", len(response.Token),
+			"user_not_nil", response.User != nil,
+		)
+	}
+
+	return response, nil
 }
 
 // Logout is the resolver for the logout field.

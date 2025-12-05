@@ -50,7 +50,7 @@ func (r *ExchangeAccountRepository) Create(ctx context.Context, account *exchang
 	query := `
 		INSERT INTO exchange_accounts (
 			id, user_id, exchange, label, api_key_encrypted, secret_encrypted,
-			passphrase, is_testnet, permissions, is_active, 
+			passphrase, is_testnet, permissions, is_active,
 			listen_key_encrypted, listen_key_expires_at,
 			created_at, updated_at
 		) VALUES (
@@ -72,13 +72,13 @@ func (r *ExchangeAccountRepository) Create(ctx context.Context, account *exchang
 // GetByID retrieves an exchange account by ID
 func (r *ExchangeAccountRepository) GetByID(ctx context.Context, id uuid.UUID) (*exchange_account.ExchangeAccount, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
 			is_active, last_sync_at, created_at, updated_at,
 			listen_key_encrypted, listen_key_expires_at
-		FROM exchange_accounts 
+		FROM exchange_accounts
 		WHERE id = $1`
 
 	row := r.db.QueryRowContext(ctx, query, id)
@@ -96,14 +96,14 @@ func (r *ExchangeAccountRepository) GetByID(ctx context.Context, id uuid.UUID) (
 // GetByUser retrieves all exchange accounts for a user
 func (r *ExchangeAccountRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
 			is_active, last_sync_at, created_at, updated_at,
 			listen_key_encrypted, listen_key_expires_at
-		FROM exchange_accounts 
-		WHERE user_id = $1 
+		FROM exchange_accounts
+		WHERE user_id = $1
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -131,14 +131,14 @@ func (r *ExchangeAccountRepository) GetByUser(ctx context.Context, userID uuid.U
 // GetActiveByUser retrieves active exchange accounts for a user
 func (r *ExchangeAccountRepository) GetActiveByUser(ctx context.Context, userID uuid.UUID) ([]*exchange_account.ExchangeAccount, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
 			is_active, last_sync_at, created_at, updated_at,
 			listen_key_encrypted, listen_key_expires_at
-		FROM exchange_accounts 
-		WHERE user_id = $1 AND is_active = true 
+		FROM exchange_accounts
+		WHERE user_id = $1 AND is_active = true
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -167,14 +167,14 @@ func (r *ExchangeAccountRepository) GetActiveByUser(ctx context.Context, userID 
 // Used by UserDataManager for hot reload and reconciliation
 func (r *ExchangeAccountRepository) GetAllActive(ctx context.Context) ([]*exchange_account.ExchangeAccount, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, exchange, label,
 			api_key_encrypted, secret_encrypted,
 			passphrase, is_testnet, permissions,
 			is_active, last_sync_at, created_at, updated_at,
 			listen_key_encrypted, listen_key_expires_at
-		FROM exchange_accounts 
-		WHERE is_active = true 
+		FROM exchange_accounts
+		WHERE is_active = true
 		ORDER BY user_id, created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query)

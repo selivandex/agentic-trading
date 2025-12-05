@@ -20,9 +20,9 @@ import { useMonitoredSymbols, WatchlistItemCard } from "@/entities/fund-watchlis
 
 function WatchlistGrid() {
   const { data, loading } = useMonitoredSymbols("FUTURES");
-  
+
   if (loading) return <div>Loading...</div>;
-  
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {data?.monitoredSymbols.map((item) => (
@@ -58,5 +58,3 @@ function WatchlistGrid() {
 - `getWatchlistStatusText(item)` - Get status text
 - `formatMarketType(marketType)` - Format market type
 - `formatCategory(category)` - Format category
-
-

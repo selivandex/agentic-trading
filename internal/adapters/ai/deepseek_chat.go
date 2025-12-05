@@ -21,6 +21,15 @@ func (p *DeepSeekProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResp
 		return nil, errors.Wrap(errors.ErrInvalidInput, "deepseek API key not configured")
 	}
 
+	// Wait for rate limiter (will be no-op for DeepSeek by default)
+	if err := p.rateLimiter.Wait(ctx); err != nil {
+		return nil, &RateLimitError{
+			Provider: ProviderNameDeepSeek,
+			Limit:    p.rateLimiter.Limit(),
+			Err:      err,
+		}
+	}
+
 	// Convert to OpenAI-compatible format (DeepSeek uses OpenAI format)
 	openAIReq := p.convertToOpenAI(req)
 

@@ -24,7 +24,7 @@ func (ec *executionContext) _UUID(ctx context.Context, sel ast.SelectionSet, v *
 	return MarshalUUID(*v)
 }
 
-func (ec *executionContext) unmarshalInputUUID(ctx context.Context, v interface{}) (uuid.UUID, error) {
+func (ec *executionContext) unmarshalInputUUID(ctx context.Context, v any) (uuid.UUID, error) {
 	return UnmarshalUUID(v)
 }
 
@@ -36,7 +36,7 @@ func (ec *executionContext) _Time(ctx context.Context, sel ast.SelectionSet, v *
 	return MarshalTime(*v)
 }
 
-func (ec *executionContext) unmarshalInputTime(ctx context.Context, v interface{}) (time.Time, error) {
+func (ec *executionContext) unmarshalInputTime(ctx context.Context, v any) (time.Time, error) {
 	return UnmarshalTime(v)
 }
 
@@ -48,16 +48,16 @@ func (ec *executionContext) _Decimal(ctx context.Context, sel ast.SelectionSet, 
 	return MarshalDecimal(*v)
 }
 
-func (ec *executionContext) unmarshalInputDecimal(ctx context.Context, v interface{}) (decimal.Decimal, error) {
+func (ec *executionContext) unmarshalInputDecimal(ctx context.Context, v any) (decimal.Decimal, error) {
 	return UnmarshalDecimal(v)
 }
 
 // JSONObject Scalars
-func (ec *executionContext) _JSONObject(ctx context.Context, sel ast.SelectionSet, v map[string]interface{}) graphql.Marshaler {
+func (ec *executionContext) _JSONObject(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
 	return MarshalJSONObject(v)
 }
 
-func (ec *executionContext) unmarshalInputJSONObject(ctx context.Context, v interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) unmarshalInputJSONObject(ctx context.Context, v any) (map[string]any, error) {
 	return UnmarshalJSONObject(v)
 }
 
@@ -71,7 +71,7 @@ func MarshalUUID(u uuid.UUID) graphql.Marshaler {
 }
 
 // UnmarshalUUID unmarshals UUID from GraphQL
-func UnmarshalUUID(v interface{}) (uuid.UUID, error) {
+func UnmarshalUUID(v any) (uuid.UUID, error) {
 	switch v := v.(type) {
 	case string:
 		return uuid.Parse(v)
@@ -93,7 +93,7 @@ func MarshalTime(t time.Time) graphql.Marshaler {
 }
 
 // UnmarshalTime unmarshals time.Time from GraphQL
-func UnmarshalTime(v interface{}) (time.Time, error) {
+func UnmarshalTime(v any) (time.Time, error) {
 	switch v := v.(type) {
 	case string:
 		return time.Parse(time.RFC3339, v)
@@ -112,7 +112,7 @@ func MarshalDecimal(d decimal.Decimal) graphql.Marshaler {
 }
 
 // UnmarshalDecimal unmarshals decimal.Decimal from GraphQL
-func UnmarshalDecimal(v interface{}) (decimal.Decimal, error) {
+func UnmarshalDecimal(v any) (decimal.Decimal, error) {
 	switch v := v.(type) {
 	case string:
 		return decimal.NewFromString(v)
@@ -132,7 +132,7 @@ func UnmarshalDecimal(v interface{}) (decimal.Decimal, error) {
 }
 
 // MarshalJSONObject marshals generic JSON object to GraphQL
-func MarshalJSONObject(v interface{}) graphql.Marshaler {
+func MarshalJSONObject(v any) graphql.Marshaler {
 	return graphql.WriterFunc(func(w io.Writer) {
 		data, err := json.Marshal(v)
 		if err != nil {
@@ -144,18 +144,18 @@ func MarshalJSONObject(v interface{}) graphql.Marshaler {
 }
 
 // UnmarshalJSONObject unmarshals generic JSON object from GraphQL
-func UnmarshalJSONObject(v interface{}) (map[string]interface{}, error) {
+func UnmarshalJSONObject(v any) (map[string]any, error) {
 	switch v := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		return v, nil
 	case string:
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(v), &result); err != nil {
 			return nil, err
 		}
 		return result, nil
 	case []byte:
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal(v, &result); err != nil {
 			return nil, err
 		}

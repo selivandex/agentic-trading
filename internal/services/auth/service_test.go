@@ -136,7 +136,11 @@ func TestService_Register(t *testing.T) {
 				mockRepo.On("GetByEmail", mock.Anything, tt.input.Email).Return(nil, pkgerrors.ErrNotFound)
 				// Mock create
 				mockRepo.On("Create", mock.Anything, mock.MatchedBy(func(u *user.User) bool {
-					return u.Email != nil && *u.Email == tt.input.Email && u.PasswordHash != nil
+					return u.Email != nil &&
+						*u.Email == tt.input.Email &&
+						u.PasswordHash != nil &&
+						!u.CreatedAt.IsZero() &&
+						!u.UpdatedAt.IsZero()
 				})).Return(nil)
 			}
 
@@ -181,6 +185,8 @@ func TestService_Login(t *testing.T) {
 				Email:        stringPtr("test@example.com"),
 				PasswordHash: &hashString,
 				IsActive:     true,
+				CreatedAt:    time.Now().UTC(),
+				UpdatedAt:    time.Now().UTC(),
 			},
 			mockErr: nil,
 			wantErr: nil,

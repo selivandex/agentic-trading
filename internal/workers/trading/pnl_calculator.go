@@ -69,7 +69,7 @@ func (pc *PnLCalculator) Run(ctx context.Context) error {
 		return nil
 	}
 
-	pc.Log().Debug("Calculating PnL for users", "user_count", len(activeUsers))
+	pc.Log().Debugw("Calculating PnL for users", "user_count", len(activeUsers))
 
 	// Calculate PnL for each user
 	successCount := 0
@@ -78,19 +78,19 @@ func (pc *PnLCalculator) Run(ctx context.Context) error {
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-			pc.Log().Info("PnL calculation interrupted by shutdown",
-				"users_processed", successCount,
-				"users_remaining", len(activeUsers)-successCount-errorCount,
-			)
+		pc.Log().Infow("PnL calculation interrupted by shutdown",
+			"users_processed", successCount,
+			"users_remaining", len(activeUsers)-successCount-errorCount,
+		)
 			return ctx.Err()
 		default:
 		}
 
 		if err := pc.calculateUserPnL(ctx, usr.ID); err != nil {
-			pc.Log().Error("Failed to calculate user PnL",
-				"user_id", usr.ID,
-				"error", err,
-			)
+		pc.Log().Errorw("Failed to calculate user PnL",
+			"user_id", usr.ID,
+			"error", err,
+		)
 			errorCount++
 			// Continue with other users
 			continue
@@ -98,7 +98,7 @@ func (pc *PnLCalculator) Run(ctx context.Context) error {
 		successCount++
 	}
 
-	pc.Log().Info("PnL calculator: iteration complete",
+	pc.Log().Infow("PnL calculator: iteration complete",
 		"users_processed", successCount,
 		"errors", errorCount,
 	)
@@ -146,7 +146,7 @@ func (pc *PnLCalculator) calculateUserPnL(ctx context.Context, userID uuid.UUID)
 	// Total PnL = realized + unrealized
 	totalPnL := dailyPnL.Add(totalUnrealizedPnL)
 
-	pc.Log().Debug("User PnL calculated",
+	pc.Log().Debugw("User PnL calculated",
 		"user_id", userID,
 		"daily_realized_pnl", dailyPnL,
 		"total_unrealized_pnl", totalUnrealizedPnL,
@@ -200,7 +200,7 @@ func (pc *PnLCalculator) sendPnLUpdateEvent(
 			0,   // losing_trades - TODO: calculate
 			0.0, // win_rate - TODO: calculate
 		); err != nil {
-			pc.Log().Error("Failed to publish PnL update event", "error", err)
+			pc.Log().Errorw("Failed to publish PnL update event", "error", err)
 		}
 	}
 }

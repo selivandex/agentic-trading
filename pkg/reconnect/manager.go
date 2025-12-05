@@ -111,11 +111,12 @@ func (m *Manager) IsHealthy() bool {
 	}
 
 	// Check heartbeat
-	lastMsg := time.Unix(m.lastMessageTime.Load(), 0)
-	if lastMsg.IsZero() {
+	lastMsgUnix := m.lastMessageTime.Load()
+	if lastMsgUnix == 0 {
 		// No messages received yet - consider healthy (just connected)
 		return true
 	}
+	lastMsg := time.Unix(lastMsgUnix, 0)
 
 	timeSinceLastMessage := time.Since(lastMsg)
 	if timeSinceLastMessage > m.heartbeatTimeout {
@@ -238,9 +239,11 @@ func (m *Manager) GetStats() Stats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	lastMsg := time.Unix(m.lastMessageTime.Load(), 0)
+	lastMsgUnix := m.lastMessageTime.Load()
+	var lastMsg time.Time
 	timeSinceLastMessage := time.Duration(0)
-	if !lastMsg.IsZero() {
+	if lastMsgUnix != 0 {
+		lastMsg = time.Unix(lastMsgUnix, 0)
 		timeSinceLastMessage = time.Since(lastMsg)
 	}
 

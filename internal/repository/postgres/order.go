@@ -273,3 +273,39 @@ func (r *OrderRepository) CancelBatch(ctx context.Context, orderIDs []string) er
 	_, err := r.db.ExecContext(ctx, query, orderIDs, order.OrderStatusCanceled)
 	return err
 }
+
+// GetPending retrieves pending orders (not yet submitted to exchange) up to limit
+// Orders are sorted by created_at ASC (FIFO) to ensure fair execution order
+func (r *OrderRepository) GetPending(ctx context.Context, limit int) ([]*order.Order, error) {
+	var orders []*order.Order
+
+	query := `
+		SELECT * FROM orders
+		WHERE status = 'pending'
+		ORDER BY created_at ASC
+		LIMIT $1`
+
+	err := r.db.SelectContext(ctx, &orders, query, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+// GetPendingByUser retrieves all pending orders for a specific user
+func (r *OrderRepository) GetPendingByUser(ctx context.Context, userID uuid.UUID) ([]*order.Order, error) {
+	var orders []*order.Order
+
+	query := `
+		SELECT * FROM orders
+		WHERE user_id = $1 AND status = 'pending'
+		ORDER BY created_at ASC`
+
+	err := r.db.SelectContext(ctx, &orders, query, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}

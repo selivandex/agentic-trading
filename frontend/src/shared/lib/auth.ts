@@ -10,8 +10,8 @@ import NextAuth from "next-auth";
 import type { NextAuthConfig, Session } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { createServerApolloClient } from "@/shared/api/apollo-server-client";
-import { LoginDocument, GetCurrentUserDocument } from "@/shared/api/generated/graphql";
-import { ApolloError } from "@apollo/client";
+import { GetCurrentUserDocument } from "@/shared/api/generated/graphql";
+import { ApolloError, gql } from "@apollo/client";
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -32,14 +32,61 @@ export const authConfig: NextAuthConfig = {
           const client = createServerApolloClient();
 
           console.log("[Auth] Attempting login for:", credentials.email);
+          console.log("[Auth] Apollo client created:", !!client);
 
-          const { data, errors } = await client.mutate({
-            mutation: LoginDocument,
-            variables: {
-              email: credentials.email as string,
-              password: credentials.password as string,
-            },
-          });
+          // Use raw GraphQL string instead of generated document for server-side compatibility
+          const LOGIN_MUTATION = gql`
+            mutation Login($email: String!, $password: String!) {
+              login(input: { email: $email, password: $password }) {
+                token
+                user {
+                  id
+                  email
+                  firstName
+                  lastName
+                  telegramID
+                  telegramUsername
+                  languageCode
+                  isActive
+                  isPremium
+                  createdAt
+                  updatedAt
+                }
+              }
+            }
+          `;
+
+          console.log("[Auth] LOGIN_MUTATION:", LOGIN_MUTATION);
+          console.log("[Auth] LOGIN_MUTATION.loc:", LOGIN_MUTATION.loc);
+          console.log("[Auth] LOGIN_MUTATION.definitions:", LOGIN_MUTATION.definitions);
+
+          const variables = {
+            email: credentials.email as string,
+            password: credentials.password as string,
+          };
+          console.log("[Auth] Variables:", variables);
+
+          let mutateResult;
+          try {
+            mutateResult = await client.mutate({
+              mutation: LOGIN_MUTATION,
+              variables,
+            });
+            console.log("[Auth] Mutate raw result:", mutateResult);
+          } catch (mutateError) {
+            console.error("[Auth] Mutate threw error:", mutateError);
+            console.error("[Auth] Error details:", {
+              message: mutateError instanceof Error ? mutateError.message : String(mutateError),
+              name: mutateError instanceof Error ? mutateError.name : undefined,
+              stack: mutateError instanceof Error ? mutateError.stack : undefined,
+            });
+            throw mutateError;
+          }
+
+          const { data, errors } = mutateResult;
+
+          console.log("[Auth] Mutate completed - data:", data);
+          console.log("[Auth] Mutate completed - errors:", errors);
 
           if (errors && errors.length > 0) {
             console.error("[Auth] GraphQL errors:", errors);
@@ -47,9 +94,18 @@ export const authConfig: NextAuthConfig = {
           }
 
           console.log("[Auth] Login response data:", JSON.stringify(data, null, 2));
+          console.log("[Auth] data?.login:", data?.login);
+          console.log("[Auth] data?.login?.user:", data?.login?.user);
+          console.log("[Auth] data?.login?.token:", data?.login?.token);
 
           if (!data?.login?.user) {
-            console.error("[Auth] No user in response");
+            console.error("[Auth] No user in response", {
+              hasData: !!data,
+              hasLogin: !!data?.login,
+              hasUser: !!data?.login?.user,
+              dataKeys: data ? Object.keys(data) : [],
+              loginKeys: data?.login ? Object.keys(data.login) : []
+            });
             return null;
           }
 

@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # Airflow DAGs for Prometheus ML Pipeline
 
 Automated workflows for ML model training and deployment.
@@ -11,6 +13,7 @@ Automates regime detection model training pipeline.
 **Schedule**: Weekly on Sunday at 2 AM UTC
 
 **Workflow**:
+
 ```
 1. check_data
    └─> Check ClickHouse for labeled samples (min 300)
@@ -35,6 +38,7 @@ Automates regime detection model training pipeline.
 ```
 
 **Requirements**:
+
 - ClickHouse connection configured
 - Python dependencies installed (see scripts/ml/regime/requirements.txt)
 - Write access to models/ directory
@@ -55,6 +59,7 @@ docker-compose up -d
 In Airflow UI (http://localhost:8080):
 
 **ClickHouse Connection:**
+
 - Connection ID: `clickhouse_default`
 - Connection Type: `HTTP`
 - Host: `clickhouse`
@@ -79,6 +84,7 @@ In Airflow UI → DAGs → Toggle `regime_model_training` to ON
 ## Monitoring
 
 View DAG runs in Airflow UI:
+
 - **DAG Runs**: Overall pipeline execution history
 - **Task Instance**: Individual task logs and metrics
 - **Gantt Chart**: Execution timeline
@@ -95,6 +101,7 @@ airflow dags trigger regime_model_training
 ## Notifications
 
 Success notification example:
+
 ```
 🎯 Regime Detection Model Training Complete
 
@@ -108,6 +115,7 @@ Application will use new model on next restart.
 ```
 
 Failure notification example:
+
 ```
 ❌ Regime Detection Model Training Failed
 
@@ -121,21 +129,19 @@ Please label more data and retry.
 ## Troubleshooting
 
 **DAG not running**:
+
 - Check scheduler is running: `airflow scheduler`
 - Verify DAG is enabled in UI
 - Check logs: `airflow tasks test regime_model_training check_data 2024-11-28`
 
 **Training fails**:
+
 - Check Python dependencies: `pip list | grep sklearn`
 - Verify ClickHouse connection: `clickhouse-client --query "SELECT 1"`
 - Check disk space in models/ directory
 
 **Model not deploying**:
+
 - Check accuracy threshold (MIN_ACCURACY variable)
 - Compare with production metrics (models/regime_detector_metrics.json)
 - Review validation logs in Airflow UI
-
-
-
-
-

@@ -318,11 +318,13 @@ WEBSOCKET_WRITE_BUFFER_SIZE=4096                       # Write buffer size in by
 
 **Supported Stream Types**: `kline`, `ticker`, `trade`, `markPrice`, `depth`
 
-**Supported Market Types**: 
+**Supported Market Types**:
+
 - `spot` - Spot markets (no leverage, direct asset ownership)
 - `futures` - Futures/perpetual markets (leverage, funding rates)
 
 **Notes**:
+
 - **Public streams** (klines, ticker, depth, trades) don't require API keys
 - **Private streams** (orders, positions) require `BINANCE_MARKET_DATA_API_KEY` and `BINANCE_MARKET_DATA_SECRET`
 - **markPrice stream** is only available for `futures` market type (includes mark price, index price, funding rate)

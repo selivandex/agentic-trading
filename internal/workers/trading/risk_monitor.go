@@ -68,7 +68,7 @@ func (rm *RiskMonitor) Run(ctx context.Context) error {
 		return nil
 	}
 
-	rm.Log().Debug("Monitoring risk for users", "user_count", len(activeUsers))
+	rm.Log().Debugw("Monitoring risk for users", "user_count", len(activeUsers))
 
 	// Monitor risk for each user
 	successCount := 0
@@ -77,19 +77,19 @@ func (rm *RiskMonitor) Run(ctx context.Context) error {
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-			rm.Log().Info("Risk monitoring interrupted by shutdown",
-				"users_processed", successCount,
-				"users_remaining", len(activeUsers)-successCount-errorCount,
-			)
+		rm.Log().Infow("Risk monitoring interrupted by shutdown",
+			"users_processed", successCount,
+			"users_remaining", len(activeUsers)-successCount-errorCount,
+		)
 			return ctx.Err()
 		default:
 		}
 
 		if err := rm.monitorUser(ctx, usr.ID); err != nil {
-			rm.Log().Error("Failed to monitor user risk",
-				"user_id", usr.ID,
-				"error", err,
-			)
+		rm.Log().Errorw("Failed to monitor user risk",
+			"user_id", usr.ID,
+			"error", err,
+		)
 			errorCount++
 			// Continue with other users
 			continue
@@ -97,7 +97,7 @@ func (rm *RiskMonitor) Run(ctx context.Context) error {
 		successCount++
 	}
 
-	rm.Log().Info("Risk monitor: iteration complete",
+	rm.Log().Infow("Risk monitor: iteration complete",
 		"users_processed", successCount,
 		"errors", errorCount,
 	)
@@ -113,7 +113,7 @@ func (rm *RiskMonitor) monitorUser(ctx context.Context, userID uuid.UUID) error 
 		return errors.Wrap(err, "failed to get user risk state")
 	}
 
-	rm.Log().Debug("Monitoring user risk",
+	rm.Log().Debugw("Monitoring user risk",
 		"user_id", userID,
 		"daily_pnl", state.DailyPnL,
 		"consecutive_losses", state.ConsecutiveLosses,
@@ -158,7 +158,7 @@ func (rm *RiskMonitor) monitorUser(ctx context.Context, userID uuid.UUID) error 
 		rm.sendConsecutiveLossesWarning(ctx, userID, state)
 	}
 
-	rm.Log().Debug("Risk monitoring complete",
+	rm.Log().Debugw("Risk monitoring complete",
 		"user_id", userID,
 		"total_exposure", totalExposure,
 		"total_unrealized_pnl", totalUnrealizedPnL,
@@ -209,9 +209,9 @@ func (rm *RiskMonitor) sendCircuitBreakerAlert(ctx context.Context, userID uuid.
 		maxDrawdown,
 		true, // auto_resume after 24h
 	); err != nil {
-		rm.Log().Error("Failed to publish circuit breaker alert", "error", err)
+		rm.Log().Errorw("Failed to publish circuit breaker alert", "error", err)
 	} else {
-		rm.Log().Warn("Circuit breaker alert sent",
+		rm.Log().Warnw("Circuit breaker alert sent",
 			"user_id", userID,
 			"reason", state.TripReason,
 		)
@@ -235,9 +235,9 @@ func (rm *RiskMonitor) sendDrawdownWarning(ctx context.Context, userID uuid.UUID
 		percentageFloat,
 		dailyPnLFloat,
 	); err != nil {
-		rm.Log().Error("Failed to publish drawdown warning", "error", err)
+		rm.Log().Errorw("Failed to publish drawdown warning", "error", err)
 	} else {
-		rm.Log().Warn("Drawdown warning sent",
+		rm.Log().Warnw("Drawdown warning sent",
 			"user_id", userID,
 			"current_drawdown", currentDrawdown,
 			"percentage", percentage.StringFixed(1)+"%",
@@ -252,9 +252,9 @@ func (rm *RiskMonitor) sendConsecutiveLossesWarning(ctx context.Context, userID 
 		state.ConsecutiveLosses,
 		state.MaxConsecutiveLoss,
 	); err != nil {
-		rm.Log().Error("Failed to publish consecutive losses warning", "error", err)
+		rm.Log().Errorw("Failed to publish consecutive losses warning", "error", err)
 	} else {
-		rm.Log().Warn("Consecutive losses warning sent",
+		rm.Log().Warnw("Consecutive losses warning sent",
 			"user_id", userID,
 			"consecutive_losses", state.ConsecutiveLosses,
 			"max_allowed", state.MaxConsecutiveLoss,

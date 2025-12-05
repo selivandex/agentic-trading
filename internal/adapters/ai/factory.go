@@ -9,29 +9,62 @@ import (
 )
 
 // BuildRegistry initializes a ProviderRegistry with all enabled providers based on configuration.
-func BuildRegistry(cfg config.AIConfig) (*ProviderRegistry, error) {
+// redisClient is optional - if provided, distributed rate limiting will be used (required for multi-pod deployment).
+// If nil, local in-memory rate limiting will be used (suitable for single-pod deployment).
+func BuildRegistry(cfg config.AIConfig, redisClient interface{}) (*ProviderRegistry, error) {
 	registry := NewProviderRegistry()
 
+	// Create rate limiter factory
+	limiterFactory := NewRateLimiterFactory(redisClient)
+
+	// Register Claude provider
 	if cfg.ClaudeKey != "" {
-		if err := registry.Register(NewClaudeProvider(cfg.ClaudeKey, defaultTimeout())); err != nil {
+		rateLimitCfg := cfg.GetRateLimitConfig("claude")
+		limiter := limiterFactory.Create(ProviderNameAnthropic, RateLimitConfig{
+			Enabled:      rateLimitCfg.Enabled,
+			ReqPerMinute: rateLimitCfg.ReqPerMinute,
+			Burst:        rateLimitCfg.Burst,
+		})
+		if err := registry.Register(NewClaudeProvider(cfg.ClaudeKey, defaultTimeout(), limiter)); err != nil {
 			return nil, err
 		}
 	}
 
+	// Register OpenAI provider
 	if cfg.OpenAIKey != "" {
-		if err := registry.Register(NewOpenAIProvider(cfg.OpenAIKey, defaultTimeout())); err != nil {
+		rateLimitCfg := cfg.GetRateLimitConfig("openai")
+		limiter := limiterFactory.Create(ProviderNameOpenAI, RateLimitConfig{
+			Enabled:      rateLimitCfg.Enabled,
+			ReqPerMinute: rateLimitCfg.ReqPerMinute,
+			Burst:        rateLimitCfg.Burst,
+		})
+		if err := registry.Register(NewOpenAIProvider(cfg.OpenAIKey, defaultTimeout(), limiter)); err != nil {
 			return nil, err
 		}
 	}
 
+	// Register DeepSeek provider
 	if cfg.DeepSeekKey != "" {
-		if err := registry.Register(NewDeepSeekProvider(cfg.DeepSeekKey, defaultTimeout())); err != nil {
+		rateLimitCfg := cfg.GetRateLimitConfig("deepseek")
+		limiter := limiterFactory.Create(ProviderNameDeepSeek, RateLimitConfig{
+			Enabled:      rateLimitCfg.Enabled,
+			ReqPerMinute: rateLimitCfg.ReqPerMinute,
+			Burst:        rateLimitCfg.Burst,
+		})
+		if err := registry.Register(NewDeepSeekProvider(cfg.DeepSeekKey, defaultTimeout(), limiter)); err != nil {
 			return nil, err
 		}
 	}
 
+	// Register Gemini provider
 	if cfg.GeminiKey != "" {
-		if err := registry.Register(NewGeminiProvider(cfg.GeminiKey, defaultTimeout())); err != nil {
+		rateLimitCfg := cfg.GetRateLimitConfig("gemini")
+		limiter := limiterFactory.Create(ProviderNameGoogle, RateLimitConfig{
+			Enabled:      rateLimitCfg.Enabled,
+			ReqPerMinute: rateLimitCfg.ReqPerMinute,
+			Burst:        rateLimitCfg.Burst,
+		})
+		if err := registry.Register(NewGeminiProvider(cfg.GeminiKey, defaultTimeout(), limiter)); err != nil {
 			return nil, err
 		}
 	}

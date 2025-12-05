@@ -114,4 +114,3 @@ func TestClassifier_CloseIdempotent(t *testing.T) {
 	classifier.Close()
 	classifier.Close()
 }
-

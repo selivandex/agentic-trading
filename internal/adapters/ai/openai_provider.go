@@ -10,14 +10,23 @@ import (
 
 // OpenAIProvider implements OpenAI metadata.
 type OpenAIProvider struct {
-	apiKey  string
-	timeout time.Duration
-	models  []ModelInfo
+	apiKey      string
+	timeout     time.Duration
+	models      []ModelInfo
+	rateLimiter RateLimiter
 }
 
 // NewOpenAIProvider creates a new OpenAI provider instance.
-func NewOpenAIProvider(apiKey string, timeout time.Duration) *OpenAIProvider {
-	return &OpenAIProvider{apiKey: apiKey, timeout: timeout, models: openAIModels()}
+func NewOpenAIProvider(apiKey string, timeout time.Duration, rateLimiter RateLimiter) *OpenAIProvider {
+	if rateLimiter == nil {
+		rateLimiter = NewNoOpLimiter()
+	}
+	return &OpenAIProvider{
+		apiKey:      apiKey,
+		timeout:     timeout,
+		models:      openAIModels(),
+		rateLimiter: rateLimiter,
+	}
 }
 
 // Name returns provider name.

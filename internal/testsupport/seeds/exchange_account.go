@@ -177,4 +177,3 @@ func (b *ExchangeAccountBuilder) MustInsert() *exchange_account.ExchangeAccount 
 	}
 	return entity
 }
-

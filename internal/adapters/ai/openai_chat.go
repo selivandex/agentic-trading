@@ -21,6 +21,15 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 		return nil, errors.Wrap(errors.ErrInvalidInput, "openai API key not configured")
 	}
 
+	// Wait for rate limiter
+	if err := p.rateLimiter.Wait(ctx); err != nil {
+		return nil, &RateLimitError{
+			Provider: ProviderNameOpenAI,
+			Limit:    p.rateLimiter.Limit(),
+			Err:      err,
+		}
+	}
+
 	// Convert to OpenAI format (reuse DeepSeek types since they're compatible)
 	openAIReq := openAIRequest{
 		Model:       req.Model,

@@ -5,6 +5,7 @@ import (
 	fundWatchlistService "prometheus/internal/services/fundwatchlist"
 	strategyService "prometheus/internal/services/strategy"
 	userService "prometheus/internal/services/user"
+	"prometheus/pkg/logger"
 )
 
 // This file will not be regenerated automatically.
@@ -19,4 +20,5 @@ type Resolver struct {
 	UserService          *userService.Service
 	StrategyService      *strategyService.Service
 	FundWatchlistService *fundWatchlistService.Service
+	Log                  *logger.Logger
 }

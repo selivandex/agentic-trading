@@ -136,4 +136,3 @@ type UserDataStats struct {
 	LastError          error
 	ListenKeyExpiresAt time.Time
 }
-

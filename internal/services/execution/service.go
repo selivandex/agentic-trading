@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"prometheus/internal/domain/exchange_account"
 	"prometheus/internal/domain/order"
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
@@ -63,15 +64,17 @@ type VenueInfo struct {
 
 // ExecutionService handles order execution with venue selection and slicing.
 type ExecutionService struct {
-	orderService *order.Service
-	log          *logger.Logger
+	orderService        *order.Service
+	exchangeAccountRepo exchange_account.Repository
+	log                 *logger.Logger
 }
 
 // NewExecutionService creates a new execution service.
-func NewExecutionService(orderService *order.Service) *ExecutionService {
+func NewExecutionService(orderService *order.Service, exchangeAccountRepo exchange_account.Repository) *ExecutionService {
 	return &ExecutionService{
-		orderService: orderService,
-		log:          logger.Get().With("component", "execution_service"),
+		orderService:        orderService,
+		exchangeAccountRepo: exchangeAccountRepo,
+		log:                 logger.Get().With("component", "execution_service"),
 	}
 }
 
@@ -86,12 +89,42 @@ func (s *ExecutionService) Execute(ctx context.Context, plan TradingPlan) (*Exec
 
 	startTime := time.Now()
 
+	// Resolve exchange account for user
+	// For MVP: use first active exchange account
+	accounts, err := s.exchangeAccountRepo.GetActiveByUser(ctx, plan.UserID)
+	if err != nil {
+		return &ExecutionResult{
+			Status:       "failed",
+			ErrorMessage: "failed to get exchange accounts",
+			Duration:     time.Since(startTime),
+		}, errors.Wrap(err, "failed to get exchange accounts")
+	}
+
+	// GetActiveByUser already filters by IsActive, just take first one
+	var exchangeAccountID uuid.UUID
+	if len(accounts) > 0 {
+		exchangeAccountID = accounts[0].ID
+	}
+
+	if exchangeAccountID == uuid.Nil {
+		return &ExecutionResult{
+			Status:       "failed",
+			ErrorMessage: "no active exchange account found",
+			Duration:     time.Since(startTime),
+		}, errors.New("no active exchange account found")
+	}
+
+	s.log.Debugw("Resolved exchange account for order execution",
+		"user_id", plan.UserID,
+		"exchange_account_id", exchangeAccountID,
+	)
+
 	// For now, use simple execution via order service
 	// TODO: Add venue selection, slicing, TWAP logic in future iterations
 	orderParams := order.PlaceParams{
 		UserID:            plan.UserID,
 		StrategyID:        plan.StrategyID, // From trading plan
-		ExchangeAccountID: uuid.Nil,        // TODO: Resolve from user + exchange
+		ExchangeAccountID: exchangeAccountID,
 		Symbol:            plan.Symbol,
 		MarketType:        "spot", // TODO: Parse from symbol or plan
 		Side:              plan.Side,

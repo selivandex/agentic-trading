@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
@@ -105,7 +104,7 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 		// Critical: ADK workflows can take minutes, check between symbols
 		select {
 		case <-ctx.Done():
-			of.Log().Info("Market research interrupted by shutdown",
+			of.Log().Infow("Market research interrupted by shutdown",
 				"opportunities_found", opportunities,
 				"skipped", skipped,
 				"symbols_remaining", len(of.symbols)-opportunities-skipped-errors,
@@ -120,14 +119,14 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 
 			preScreen, err := of.preScreener.ShouldAnalyze(ctx, of.exchange, symbol)
 			if err != nil {
-				of.Log().Warn("Pre-screening failed, proceeding with analysis",
+				of.Log().Warnw("Pre-screening failed, proceeding with analysis",
 					"symbol", symbol,
 					"error", err,
 				)
 			} else if !preScreen.ShouldAnalyze {
 				of.skippedRuns++
 				skipped++
-				of.Log().Debug("Skipped analysis (pre-screening)",
+				of.Log().Debugw("Skipped analysis (pre-screening)",
 					"symbol", symbol,
 					"reason", preScreen.SkipReason,
 					"confidence", preScreen.Confidence,
@@ -136,7 +135,7 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 				continue
 			} else {
 				of.analyzedRuns++
-				of.Log().Debug("Passed pre-screening",
+				of.Log().Debugw("Passed pre-screening",
 					"symbol", symbol,
 					"metrics", preScreen.Metrics,
 				)
@@ -145,7 +144,7 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 
 		found, err := of.analyzeSymbol(ctx, symbol)
 		if err != nil {
-			of.Log().Error("Failed to analyze symbol",
+			of.Log().Errorw("Failed to analyze symbol",
 				"symbol", symbol,
 				"error", err,
 			)
@@ -164,7 +163,7 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 		skipRate = float64(of.skippedRuns) / float64(of.totalRuns) * 100
 	}
 
-	of.Log().Debug("Market research complete",
+	of.Log().Debugw("Market research complete",
 		"opportunities_published", opportunities,
 		"skipped", skipped,
 		"errors", errors,
@@ -177,10 +176,24 @@ func (of *OpportunityFinder) Run(ctx context.Context) error {
 
 // analyzeSymbol runs the market research workflow for a single symbol
 func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (bool, error) {
-	sessionID := uuid.New().String()
 	userID := "system" // Global analysis (no specific user)
+	appName := "prometheus_market_research"
 
-	of.log.Debug("Starting market research workflow",
+	// Create ADK session before running workflow
+	// Critical: runner.Run() requires existing session in sessionService
+	createResp, err := of.sessionService.Create(ctx, &session.CreateRequest{
+		AppName:   appName,
+		UserID:    userID,
+		SessionID: "", // Empty = auto-generate
+		State:     nil,
+	})
+	if err != nil {
+		return false, errors.Wrap(err, "failed to create ADK session")
+	}
+
+	sessionID := createResp.Session.ID()
+
+	of.log.Debugw("Starting market research workflow",
 		"symbol", symbol,
 		"exchange", of.exchange,
 		"session_id", sessionID,
@@ -208,7 +221,7 @@ func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (
 		// Critical: ADK workflows can take minutes, need to exit gracefully on shutdown
 		select {
 		case <-ctx.Done():
-			of.log.Info("Workflow interrupted by shutdown",
+			of.log.Infow("Workflow interrupted by shutdown",
 				"symbol", symbol,
 				"session_id", sessionID,
 				"opportunity_published", opportunityPublished,
@@ -235,7 +248,7 @@ func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (
 			for _, part := range event.LLMResponse.Content.Parts {
 				if part.FunctionCall != nil && part.FunctionCall.Name == "publish_opportunity" {
 					opportunityPublished = true
-					of.log.Info("Opportunity signal published",
+					of.log.Infow("Opportunity signal published",
 						"symbol", symbol,
 						"session_id", sessionID,
 					)
@@ -245,7 +258,7 @@ func (of *OpportunityFinder) analyzeSymbol(ctx context.Context, symbol string) (
 
 		// Check if workflow is complete
 		if event.TurnComplete && event.IsFinalResponse() {
-			of.log.Debug("Market research workflow complete",
+			of.log.Debugw("Market research workflow complete",
 				"symbol", symbol,
 				"session_id", sessionID,
 				"opportunity_published", opportunityPublished,

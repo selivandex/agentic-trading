@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # GraphQL API
 
 Schema-first GraphQL API implementation using [gqlgen](https://gqlgen.com/).
@@ -17,9 +19,11 @@ Repository Layer (Infrastructure)
 ```
 
 **Key principles:**
+
 - Resolvers use **Services**, not Repositories directly
 - JWT authentication via HTTP-only cookies (1 year TTL)
 - All custom scalars properly marshaled (UUID, Time, Decimal, JSONObject)
+- Request/operation logging with sensitive data sanitization
 
 ## Structure
 
@@ -43,7 +47,9 @@ internal/api/graphql/
 │   └── fund_watchlist.resolvers.go
 ├── middleware/          # HTTP middleware
 │   ├── auth.go          # JWT authentication from cookies
-│   └── auth_test.go
+│   ├── auth_test.go
+│   ├── logging.go       # Request/operation logging
+│   └── logging_test.go
 └── handler.go           # GraphQL HTTP handler setup
 ```
 
@@ -58,6 +64,7 @@ make g-gen
 ```
 
 This will:
+
 1. Read `*.graphql` schemas
 2. Generate Go code in `generated/`
 3. Scaffold missing resolvers in `resolvers/`
@@ -66,10 +73,41 @@ This will:
 
 ### Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `/graphql` | GraphQL API endpoint |
+| Endpoint      | Description                   |
+| ------------- | ----------------------------- |
+| `/graphql`    | GraphQL API endpoint          |
 | `/playground` | GraphQL Playground (dev only) |
+
+### Logging
+
+The GraphQL API includes comprehensive logging at two levels:
+
+**1. HTTP Level Logging:**
+
+- Logs all incoming HTTP requests to `/graphql`
+- Captures: method, path, remote address, user agent, status code, duration
+- Debug level logs for verbose tracking
+
+**2. GraphQL Operation Logging:**
+
+- Logs each GraphQL operation (query/mutation/subscription)
+- Captures: operation name, operation type, user ID, variables, execution time
+- Automatically sanitizes sensitive fields (passwords, tokens, API keys)
+- Logs errors with full error messages
+
+**Sanitized fields:**
+
+- `password`, `token`, `secret`
+- `apiKey`, `apiSecret`
+- `accessToken`, `refreshToken`
+- `privateKey`, `encryptedKey`, `encryptedValue`
+
+**Example log output:**
+
+```
+INFO  GraphQL operation started  operation_name=Login operation_type=mutation variables={"email":"user@example.com","password":"***REDACTED***"}
+INFO  GraphQL operation completed  operation_name=Login operation_type=mutation duration_ms=45 user_id=ca5d77c0-...
+```
 
 ### Authentication
 
@@ -82,6 +120,7 @@ All mutations and protected queries use JWT from HTTP-only cookie:
 5. Middleware extracts token from cookie and validates
 
 **Cookie details:**
+
 - Name: `auth_token`
 - HttpOnly: `true`
 - Secure: `true` (production only)
@@ -94,24 +133,29 @@ All mutations and protected queries use JWT from HTTP-only cookie:
 
 ```graphql
 mutation {
-  register(input: {
-    email: "user@example.com"
-    password: "secure123"
-    firstName: "John"
-    lastName: "Doe"
-  }) {
+  register(
+    input: {
+      email: "user@example.com"
+      password: "secure123"
+      firstName: "John"
+      lastName: "Doe"
+    }
+  ) {
     token
-    user { id email }
+    user {
+      id
+      email
+    }
   }
 }
 
 mutation {
-  login(input: {
-    email: "user@example.com"
-    password: "secure123"
-  }) {
+  login(input: { email: "user@example.com", password: "secure123" }) {
     token
-    user { id email }
+    user {
+      id
+      email
+    }
   }
 }
 
@@ -120,7 +164,10 @@ query {
     id
     email
     firstName
-    settings { riskLevel maxPositions }
+    settings {
+      riskLevel
+      maxPositions
+    }
   }
 }
 ```
@@ -141,12 +188,14 @@ query {
 }
 
 mutation {
-  updateUserSettings(userID: "uuid", input: {
-    riskLevel: "aggressive"
-    maxPositions: 5
-  }) {
+  updateUserSettings(
+    userID: "uuid"
+    input: { riskLevel: "aggressive", maxPositions: 5 }
+  ) {
     id
-    settings { riskLevel }
+    settings {
+      riskLevel
+    }
   }
 }
 ```
@@ -166,14 +215,17 @@ query {
 }
 
 mutation {
-  createStrategy(userID: "uuid", input: {
-    name: "Crypto Portfolio"
-    description: "Long-term crypto holdings"
-    allocatedCapital: "10000.00"
-    marketType: SPOT
-    riskTolerance: MODERATE
-    rebalanceFrequency: WEEKLY
-  }) {
+  createStrategy(
+    userID: "uuid"
+    input: {
+      name: "Crypto Portfolio"
+      description: "Long-term crypto holdings"
+      allocatedCapital: "10000.00"
+      marketType: SPOT
+      riskTolerance: MODERATE
+      rebalanceFrequency: WEEKLY
+    }
+  ) {
     id
     status
   }
@@ -194,12 +246,14 @@ query {
 }
 
 mutation {
-  createFundWatchlist(input: {
-    symbol: "BTC/USDT"
-    marketType: "spot"
-    category: "major"
-    tier: 1
-  }) {
+  createFundWatchlist(
+    input: {
+      symbol: "BTC/USDT"
+      marketType: "spot"
+      category: "major"
+      tier: 1
+    }
+  ) {
     id
     symbol
   }
@@ -250,6 +304,7 @@ make migrate-up
 ```
 
 This adds:
+
 - `email` VARCHAR(255) UNIQUE
 - `password_hash` VARCHAR(255)
 - Makes `telegram_id` nullable
@@ -261,11 +316,11 @@ This adds:
 
 ```typescript
 // In Next.js server action or API route
-const response = await fetch('http://backend:8080/graphql', {
-  method: 'POST',
+const response = await fetch("http://backend:8080/graphql", {
+  method: "POST",
   headers: {
-    'Content-Type': 'application/json',
-    'Cookie': cookies().toString() // Forward cookies from client
+    "Content-Type": "application/json",
+    Cookie: cookies().toString(), // Forward cookies from client
   },
   body: JSON.stringify({
     query: `mutation Login($input: LoginInput!) {
@@ -274,31 +329,32 @@ const response = await fetch('http://backend:8080/graphql', {
         user { id email }
       }
     }`,
-    variables: { input: { email, password } }
-  })
+    variables: { input: { email, password } },
+  }),
 });
 
 // Extract Set-Cookie from response and forward to client
-const setCookie = response.headers.get('set-cookie');
+const setCookie = response.headers.get("set-cookie");
 ```
 
 ### Client-side (Apollo Client)
 
 ```typescript
-import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink } from "@apollo/client";
 
 const client = new ApolloClient({
   link: new HttpLink({
-    uri: '/api/graphql', // Proxy через Next.js API route
-    credentials: 'include' // Include cookies
+    uri: "/api/graphql", // Proxy через Next.js API route
+    credentials: "include", // Include cookies
   }),
-  cache: new InMemoryCache()
+  cache: new InMemoryCache(),
 });
 ```
 
 ## Security Notes
 
 ✅ **What's implemented:**
+
 - Bcrypt password hashing (cost: 10)
 - HTTP-only cookies (XSS protection)
 - SameSite=Strict (CSRF protection)
@@ -308,6 +364,7 @@ const client = new ApolloClient({
 - User deactivation check
 
 ⚠️ **TODO for production:**
+
 - Rate limiting on auth endpoints
 - CORS configuration
 - HTTPS enforcement

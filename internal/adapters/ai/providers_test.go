@@ -12,10 +12,10 @@ func TestProvidersExposeModels(t *testing.T) {
 		name     string
 		provider Provider
 	}{
-		{name: "claude", provider: NewClaudeProvider("key", defaultTimeout())},
-		{name: "openai", provider: NewOpenAIProvider("key", defaultTimeout())},
-		{name: "deepseek", provider: NewDeepSeekProvider("key", defaultTimeout())},
-		{name: "gemini", provider: NewGeminiProvider("key", defaultTimeout())},
+		{name: "claude", provider: NewClaudeProvider("key", defaultTimeout(), nil)},
+		{name: "openai", provider: NewOpenAIProvider("key", defaultTimeout(), nil)},
+		{name: "deepseek", provider: NewDeepSeekProvider("key", defaultTimeout(), nil)},
+		{name: "gemini", provider: NewGeminiProvider("key", defaultTimeout(), nil)},
 	}
 
 	for _, tt := range tests {

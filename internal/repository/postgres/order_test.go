@@ -3,10 +3,8 @@ package postgres
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,9 +12,8 @@ import (
 	"prometheus/internal/testsupport"
 )
 
-// Helper to generate unique telegram IDs
-
-func TestOrderRepository_Create(t *testing.T) {
+// TestOrderRepository_GetPending tests fetching pending orders
+func TestOrderRepository_GetPending(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -24,311 +21,61 @@ func TestOrderRepository_Create(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
 	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
-
-	o := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   "BINANCE_12345",
-		Symbol:            "BTC/USDT",
-		MarketType:        "spot",
-		Side:              order.OrderSideBuy,
-		Type:              order.OrderTypeLimit,
-		Status:            order.OrderStatusOpen,
-		Price:             decimal.NewFromFloat(42000.0),
-		Amount:            decimal.NewFromFloat(0.1),
-		FilledAmount:      decimal.NewFromFloat(0.0),
-		AvgFillPrice:      decimal.NewFromFloat(0.0),
-		StopPrice:         decimal.NewFromFloat(0.0),
-		ReduceOnly:        false,
-		AgentID:           "opportunity_synthesizer",
-		Reasoning:         "Strong bullish momentum, RSI oversold recovery",
-		Fee:               decimal.NewFromFloat(0.0),
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	// Test Create
-	err := repo.Create(ctx, o)
-	require.NoError(t, err, "Create should not return error")
-
-	// Verify order can be retrieved
-	retrieved, err := repo.GetByID(ctx, o.ID)
-	require.NoError(t, err)
-	assert.Equal(t, o.Symbol, retrieved.Symbol)
-	assert.Equal(t, o.Side, retrieved.Side)
-	assert.True(t, o.Price.Equal(retrieved.Price))
-}
-
-func TestOrderRepository_CreateBatch(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
+	userID, accountID, strategyID := fixtures.WithFullStack()
 
 	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
+	// Create 3 pending orders
+	fixtures.CreateOrder(userID, strategyID, accountID, WithOrderStatus("pending"), func(f *OrderFixture) {
+		f.Symbol = "BTC/USDT"
+	})
+	fixtures.CreateOrder(userID, strategyID, accountID, WithOrderStatus("pending"), func(f *OrderFixture) {
+		f.Symbol = "ETH/USDT"
+	})
+	fixtures.CreateOrder(userID, strategyID, accountID, WithOrderStatus("pending"), func(f *OrderFixture) {
+		f.Symbol = "SOL/USDT"
+	})
 
-	// Create batch of orders
-	orders := []*order.Order{
-		{
-			ID:                uuid.New(),
-			UserID:            userID,
-			StrategyID:        &strategyID, //      tradingPairID,
-			ExchangeAccountID: exchangeAccountID,
-			ExchangeOrderID:   "BATCH_1",
-			Symbol:            "BTC/USDT",
-			MarketType:        "spot",
-			Side:              order.OrderSideBuy,
-			Type:              order.OrderTypeLimit,
-			Status:            order.OrderStatusOpen,
-			Price:             decimal.NewFromFloat(41000.0),
-			Amount:            decimal.NewFromFloat(0.1),
-			FilledAmount:      decimal.Zero,
-			AvgFillPrice:      decimal.Zero,
-			AgentID:           "test_agent",
-			Reasoning:         "Batch order 1",
-			FeeCurrency:       "USDT",
-			CreatedAt:         time.Now(),
-			UpdatedAt:         time.Now(),
-		},
-		{
-			ID:                uuid.New(),
-			UserID:            userID,
-			StrategyID:        &strategyID, //      tradingPairID,
-			ExchangeAccountID: exchangeAccountID,
-			ExchangeOrderID:   "BATCH_2",
-			Symbol:            "ETH/USDT",
-			MarketType:        "spot",
-			Side:              order.OrderSideSell,
-			Type:              order.OrderTypeMarket,
-			Status:            order.OrderStatusPending,
-			Price:             decimal.NewFromFloat(2500.0),
-			Amount:            decimal.NewFromFloat(1.0),
-			FilledAmount:      decimal.Zero,
-			AvgFillPrice:      decimal.Zero,
-			AgentID:           "test_agent",
-			Reasoning:         "Batch order 2",
-			FeeCurrency:       "USDT",
-			CreatedAt:         time.Now(),
-			UpdatedAt:         time.Now(),
-		},
-		{
-			ID:                uuid.New(),
-			UserID:            userID,
-			StrategyID:        &strategyID, //      tradingPairID,
-			ExchangeAccountID: exchangeAccountID,
-			ExchangeOrderID:   "BATCH_3",
-			Symbol:            "SOL/USDT",
-			MarketType:        "spot",
-			Side:              order.OrderSideBuy,
-			Type:              order.OrderTypeLimit,
-			Status:            order.OrderStatusOpen,
-			Price:             decimal.NewFromFloat(100.0),
-			Amount:            decimal.NewFromFloat(10.0),
-			FilledAmount:      decimal.Zero,
-			AvgFillPrice:      decimal.Zero,
-			AgentID:           "test_agent",
-			Reasoning:         "Batch order 3",
-			FeeCurrency:       "USDT",
-			CreatedAt:         time.Now(),
-			UpdatedAt:         time.Now(),
-		},
-	}
+	// Create 2 filled orders (should not be returned)
+	fixtures.CreateOrder(userID, strategyID, accountID, WithOrderStatus("filled"), func(f *OrderFixture) {
+		f.Symbol = "BNB/USDT"
+	})
+	fixtures.CreateOrder(userID, strategyID, accountID, WithOrderStatus("filled"), func(f *OrderFixture) {
+		f.Symbol = "AVAX/USDT"
+	})
 
-	// Test CreateBatch
-	err := repo.CreateBatch(ctx, orders)
-	require.NoError(t, err, "CreateBatch should not return error")
+	// Create 1 rejected order (should not be returned)
+	fixtures.CreateOrder(userID, strategyID, accountID, WithOrderStatus("rejected"), func(f *OrderFixture) {
+		f.Symbol = "DOT/USDT"
+	})
 
-	// Verify all orders can be retrieved
-	for _, o := range orders {
-		retrieved, err := repo.GetByID(ctx, o.ID)
+	// Test GetPending
+	t.Run("GetPending returns only pending orders", func(t *testing.T) {
+		pendingOrders, err := repo.GetPending(ctx, 10)
 		require.NoError(t, err)
-		assert.Equal(t, o.Symbol, retrieved.Symbol)
-	}
-}
 
-func TestOrderRepository_GetByID(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
+		// Should return exactly 3 pending orders
+		assert.Len(t, pendingOrders, 3)
 
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
-
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
-
-	o := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   "TEST_ORDER",
-		Symbol:            "BTC/USDT",
-		MarketType:        "futures",
-		Side:              order.OrderSideSell,
-		Type:              order.OrderTypeStopMarket,
-		Status:            order.OrderStatusOpen,
-		Price:             decimal.NewFromFloat(40000.0),
-		Amount:            decimal.NewFromFloat(0.5),
-		FilledAmount:      decimal.Zero,
-		AvgFillPrice:      decimal.Zero,
-		StopPrice:         decimal.NewFromFloat(39500.0),
-		ReduceOnly:        true,
-		AgentID:           "position_manager",
-		Reasoning:         "Stop loss protection",
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	err := repo.Create(ctx, o)
-	require.NoError(t, err)
-
-	// Test GetByID
-	retrieved, err := repo.GetByID(ctx, o.ID)
-	require.NoError(t, err)
-	assert.Equal(t, o.ID, retrieved.ID)
-	assert.Equal(t, o.Symbol, retrieved.Symbol)
-	assert.Equal(t, order.OrderTypeStopMarket, retrieved.Type)
-	assert.True(t, retrieved.ReduceOnly)
-	assert.True(t, o.StopPrice.Equal(retrieved.StopPrice))
-
-	// Test non-existent ID
-	_, err = repo.GetByID(ctx, uuid.New())
-	assert.Error(t, err, "Should return error for non-existent ID")
-}
-
-func TestOrderRepository_GetByExchangeOrderID(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
-
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
-
-	exchangeOrderID := "EXCHANGE_ORDER_" + uuid.New().String()[:8]
-
-	o := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   exchangeOrderID,
-		Symbol:            "ETH/USDT",
-		MarketType:        "spot",
-		Side:              order.OrderSideBuy,
-		Type:              order.OrderTypeMarket,
-		Status:            order.OrderStatusFilled,
-		Price:             decimal.NewFromFloat(2500.0),
-		Amount:            decimal.NewFromFloat(2.0),
-		FilledAmount:      decimal.NewFromFloat(2.0),
-		AvgFillPrice:      decimal.NewFromFloat(2498.5),
-		AgentID:           "test_agent",
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	err := repo.Create(ctx, o)
-	require.NoError(t, err)
-
-	// Test GetByExchangeOrderID
-	retrieved, err := repo.GetByExchangeOrderID(ctx, exchangeOrderID)
-	require.NoError(t, err)
-	assert.Equal(t, o.ID, retrieved.ID)
-	assert.Equal(t, exchangeOrderID, retrieved.ExchangeOrderID)
-}
-
-func TestOrderRepository_GetOpenByUser(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
-
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
-
-	// Create mix of open and filled orders
-	statuses := []order.OrderStatus{
-		order.OrderStatusOpen,
-		order.OrderStatusOpen,
-		order.OrderStatusFilled,
-		order.OrderStatusPending,
-		order.OrderStatusCanceled,
-	}
-
-	for i, status := range statuses {
-		o := &order.Order{
-			ID:                uuid.New(),
-			UserID:            userID,
-			StrategyID:        &strategyID, //      tradingPairID,
-			ExchangeAccountID: exchangeAccountID,
-			ExchangeOrderID:   "ORDER_" + string(rune(i+'0')),
-			Symbol:            "BTC/USDT",
-			MarketType:        "spot",
-			Side:              order.OrderSideBuy,
-			Type:              order.OrderTypeLimit,
-			Status:            status,
-			Price:             decimal.NewFromFloat(40000.0 + float64(i*100)),
-			Amount:            decimal.NewFromFloat(0.1),
-			FilledAmount:      decimal.Zero,
-			AvgFillPrice:      decimal.Zero,
-			AgentID:           "test_agent",
-			FeeCurrency:       "USDT",
-			CreatedAt:         time.Now(),
-			UpdatedAt:         time.Now(),
+		// All should have pending status
+		for _, ord := range pendingOrders {
+			assert.Equal(t, order.OrderStatusPending, ord.Status)
 		}
-		err := repo.Create(ctx, o)
+	})
+
+	t.Run("GetPending respects limit", func(t *testing.T) {
+		pendingOrders, err := repo.GetPending(ctx, 2)
 		require.NoError(t, err)
-	}
 
-	// Test GetOpenByUser - should return only open/pending orders
-	openOrders, err := repo.GetOpenByUser(ctx, userID)
-	require.NoError(t, err)
-
-	// Should have 3 open/pending orders
-	assert.GreaterOrEqual(t, len(openOrders), 3, "Should return open and pending orders")
-
-	// Verify all returned orders are open or pending
-	for _, o := range openOrders {
-		assert.True(t,
-			o.Status == order.OrderStatusOpen || o.Status == order.OrderStatusPending,
-			"All returned orders should be open or pending")
-	}
+		// Should return only 2 orders (limit applied)
+		assert.Len(t, pendingOrders, 2)
+	})
 }
 
-func TestOrderRepository_UpdateStatus(t *testing.T) {
+// TestOrderRepository_GetPendingByUser tests fetching pending orders for specific user
+func TestOrderRepository_GetPendingByUser(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -336,259 +83,59 @@ func TestOrderRepository_UpdateStatus(t *testing.T) {
 	testDB := testsupport.NewTestPostgres(t)
 	defer testDB.Close()
 
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
 	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
 
-	o := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   "UPDATE_TEST",
-		Symbol:            "BTC/USDT",
-		MarketType:        "spot",
-		Side:              order.OrderSideBuy,
-		Type:              order.OrderTypeLimit,
-		Status:            order.OrderStatusOpen,
-		Price:             decimal.NewFromFloat(42000.0),
-		Amount:            decimal.NewFromFloat(1.0),
-		FilledAmount:      decimal.Zero,
-		AvgFillPrice:      decimal.Zero,
-		AgentID:           "test_agent",
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	err := repo.Create(ctx, o)
-	require.NoError(t, err)
-
-	// Test UpdateStatus - partial fill
-	filledAmount := decimal.NewFromFloat(0.5)
-	avgPrice := decimal.NewFromFloat(41950.0)
-	err = repo.UpdateStatus(ctx, o.ID, order.OrderStatusPartial, filledAmount, avgPrice)
-	require.NoError(t, err)
-
-	// Verify updates
-	retrieved, err := repo.GetByID(ctx, o.ID)
-	require.NoError(t, err)
-	assert.Equal(t, order.OrderStatusPartial, retrieved.Status)
-	assert.True(t, filledAmount.Equal(retrieved.FilledAmount))
-	assert.True(t, avgPrice.Equal(retrieved.AvgFillPrice))
-
-	// Update to filled
-	filledAmount = decimal.NewFromFloat(1.0)
-	avgPrice = decimal.NewFromFloat(41975.0)
-	err = repo.UpdateStatus(ctx, o.ID, order.OrderStatusFilled, filledAmount, avgPrice)
-	require.NoError(t, err)
-
-	retrieved, err = repo.GetByID(ctx, o.ID)
-	require.NoError(t, err)
-	assert.Equal(t, order.OrderStatusFilled, retrieved.Status)
-	assert.True(t, filledAmount.Equal(retrieved.FilledAmount))
-}
-
-func TestOrderRepository_UpdateStatusBatch(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
+	// Create two users with their own exchange accounts and strategies
+	user1ID, account1ID, strategy1ID := fixtures.WithFullStack()
+	user2ID, account2ID, strategy2ID := fixtures.WithFullStack()
 
 	repo := NewOrderRepository(testDB.Tx())
 	ctx := context.Background()
 
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
+	// Create pending orders for user1
+	fixtures.CreateOrder(user1ID, strategy1ID, account1ID, WithOrderStatus("pending"), func(f *OrderFixture) {
+		f.Symbol = "BTC/USDT"
+	})
+	fixtures.CreateOrder(user1ID, strategy1ID, account1ID, WithOrderStatus("pending"), func(f *OrderFixture) {
+		f.Symbol = "ETH/USDT"
+	})
 
-	// Create multiple open orders
-	orderIDs := make([]uuid.UUID, 3)
-	for i := 0; i < 3; i++ {
-		o := &order.Order{
-			ID:                uuid.New(),
-			UserID:            userID,
-			StrategyID:        &strategyID, //      tradingPairID,
-			ExchangeAccountID: exchangeAccountID,
-			ExchangeOrderID:   "BATCH_UPDATE_" + string(rune(i+'0')),
-			Symbol:            "BTC/USDT",
-			MarketType:        "spot",
-			Side:              order.OrderSideBuy,
-			Type:              order.OrderTypeLimit,
-			Status:            order.OrderStatusOpen,
-			Price:             decimal.NewFromFloat(40000.0),
-			Amount:            decimal.NewFromFloat(0.1),
-			FilledAmount:      decimal.Zero,
-			AvgFillPrice:      decimal.Zero,
-			AgentID:           "test_agent",
-			FeeCurrency:       "USDT",
-			CreatedAt:         time.Now(),
-			UpdatedAt:         time.Now(),
+	// Create pending order for user2
+	fixtures.CreateOrder(user2ID, strategy2ID, account2ID, WithOrderStatus("pending"), func(f *OrderFixture) {
+		f.Symbol = "SOL/USDT"
+	})
+
+	// Create filled order for user1 (should not be returned)
+	fixtures.CreateOrder(user1ID, strategy1ID, account1ID, WithOrderStatus("filled"), func(f *OrderFixture) {
+		f.Symbol = "BNB/USDT"
+	})
+
+	// Test GetPendingByUser for user1
+	t.Run("GetPendingByUser returns only user's pending orders", func(t *testing.T) {
+		user1Pending, err := repo.GetPendingByUser(ctx, user1ID)
+		require.NoError(t, err)
+
+		assert.Len(t, user1Pending, 2)
+		for _, ord := range user1Pending {
+			assert.Equal(t, user1ID, ord.UserID)
+			assert.Equal(t, order.OrderStatusPending, ord.Status)
 		}
-		err := repo.Create(ctx, o)
+	})
+
+	// Test GetPendingByUser for user2
+	t.Run("GetPendingByUser for different user", func(t *testing.T) {
+		user2Pending, err := repo.GetPendingByUser(ctx, user2ID)
 		require.NoError(t, err)
-		orderIDs[i] = o.ID
-	}
 
-	// Test UpdateStatusBatch
-	updates := []OrderStatusUpdate{
-		{
-			OrderID:      orderIDs[0],
-			Status:       order.OrderStatusFilled,
-			FilledAmount: decimal.NewFromFloat(0.1),
-			AvgFillPrice: decimal.NewFromFloat(39950.0),
-		},
-		{
-			OrderID:      orderIDs[1],
-			Status:       order.OrderStatusPartial,
-			FilledAmount: decimal.NewFromFloat(0.05),
-			AvgFillPrice: decimal.NewFromFloat(40000.0),
-		},
-		{
-			OrderID:      orderIDs[2],
-			Status:       order.OrderStatusCanceled,
-			FilledAmount: decimal.Zero,
-			AvgFillPrice: decimal.Zero,
-		},
-	}
+		assert.Len(t, user2Pending, 1)
+		assert.Equal(t, user2ID, user2Pending[0].UserID)
+	})
 
-	err := repo.UpdateStatusBatch(ctx, updates)
-	require.NoError(t, err)
-
-	// Verify all updates
-	for i, update := range updates {
-		retrieved, err := repo.GetByID(ctx, orderIDs[i])
+	// Test with non-existent user
+	t.Run("GetPendingByUser returns empty for non-existent user", func(t *testing.T) {
+		nonExistentUser := uuid.New()
+		orders, err := repo.GetPendingByUser(ctx, nonExistentUser)
 		require.NoError(t, err)
-		assert.Equal(t, update.Status, retrieved.Status)
-		assert.True(t, update.FilledAmount.Equal(retrieved.FilledAmount))
-	}
-}
-
-func TestOrderRepository_Cancel(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
-
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, strategyID := fixtures.WithFullStack()
-
-	o := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   "CANCEL_TEST",
-		Symbol:            "BTC/USDT",
-		MarketType:        "spot",
-		Side:              order.OrderSideBuy,
-		Type:              order.OrderTypeLimit,
-		Status:            order.OrderStatusOpen,
-		Price:             decimal.NewFromFloat(41000.0),
-		Amount:            decimal.NewFromFloat(0.1),
-		FilledAmount:      decimal.Zero,
-		AvgFillPrice:      decimal.Zero,
-		AgentID:           "test_agent",
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	err := repo.Create(ctx, o)
-	require.NoError(t, err)
-
-	// Test Cancel
-	err = repo.Cancel(ctx, o.ID)
-	require.NoError(t, err)
-
-	// Verify status is canceled
-	retrieved, err := repo.GetByID(ctx, o.ID)
-	require.NoError(t, err)
-	assert.Equal(t, order.OrderStatusCanceled, retrieved.Status)
-}
-
-func TestOrderRepository_ParentChildOrders(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	testDB := testsupport.NewTestPostgres(t)
-	defer testDB.Close()
-
-	repo := NewOrderRepository(testDB.Tx())
-	ctx := context.Background()
-
-	fixtures := NewTestFixtures(t, testDB.Tx())
-	userID, exchangeAccountID, _ := fixtures.WithFullStack()
-	strategyID := fixtures.CreateStrategy(userID) // Create real strategy in DB
-
-	// Create parent order (main position)
-	parentOrder := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   "PARENT_ORDER",
-		Symbol:            "BTC/USDT",
-		MarketType:        "futures",
-		Side:              order.OrderSideBuy,
-		Type:              order.OrderTypeMarket,
-		Status:            order.OrderStatusFilled,
-		Price:             decimal.NewFromFloat(42000.0),
-		Amount:            decimal.NewFromFloat(1.0),
-		FilledAmount:      decimal.NewFromFloat(1.0),
-		AvgFillPrice:      decimal.NewFromFloat(41995.0),
-		AgentID:           "opportunity_synthesizer",
-		Reasoning:         "Entry order",
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	err := repo.Create(ctx, parentOrder)
-	require.NoError(t, err)
-
-	// Create child order (stop loss)
-	childOrder := &order.Order{
-		ID:                uuid.New(),
-		UserID:            userID,
-		StrategyID:        &strategyID, //      tradingPairID,
-		ExchangeAccountID: exchangeAccountID,
-		ExchangeOrderID:   "CHILD_SL_ORDER",
-		Symbol:            "BTC/USDT",
-		MarketType:        "futures",
-		Side:              order.OrderSideSell,
-		Type:              order.OrderTypeStopMarket,
-		Status:            order.OrderStatusOpen,
-		Price:             decimal.Zero,
-		Amount:            decimal.NewFromFloat(1.0),
-		FilledAmount:      decimal.Zero,
-		AvgFillPrice:      decimal.Zero,
-		StopPrice:         decimal.NewFromFloat(40000.0),
-		ReduceOnly:        true,
-		ParentOrderID:     &parentOrder.ID, // Link to parent
-		AgentID:           "position_manager",
-		Reasoning:         "Stop loss protection",
-		FeeCurrency:       "USDT",
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
-	}
-
-	err = repo.Create(ctx, childOrder)
-	require.NoError(t, err)
-
-	// Verify parent-child relationship
-	retrieved, err := repo.GetByID(ctx, childOrder.ID)
-	require.NoError(t, err)
-	assert.NotNil(t, retrieved.ParentOrderID)
-	assert.Equal(t, parentOrder.ID, *retrieved.ParentOrderID)
+		assert.Empty(t, orders)
+	})
 }

@@ -30,6 +30,7 @@ func Handler(
 		UserService:          userSvc,
 		StrategyService:      strategySvc,
 		FundWatchlistService: fundWatchlistSvc,
+		Log:                  log.With("component", "graphql_resolvers"),
 	}
 
 	// Create GraphQL schema
@@ -39,12 +40,20 @@ func Handler(
 	// Create GraphQL server with options
 	srv := handler.NewDefaultServer(schema)
 
+	// Add logging middleware for operation tracking
+	loggingMiddleware := middleware.NewLoggingMiddleware(log)
+	srv.AroundOperations(loggingMiddleware.OperationMiddleware())
+
 	// Wrap with auth middleware (extracts JWT from Cookie header set by Next.js)
 	authMiddleware := middleware.NewAuthMiddleware(authSvc, log)
 
-	// Apply auth middleware
-	// Next.js will manage session cookies and send them in Cookie header
-	return authMiddleware.Handler(srv)
+	// Apply middlewares (order matters: logging -> auth -> handler)
+	// 1. HTTP logging - logs all HTTP requests
+	// 2. Auth - validates JWT and adds user to context
+	// 3. GraphQL handler with operation logging
+	return loggingMiddleware.HTTPLoggingMiddleware(
+		authMiddleware.Handler(srv),
+	)
 }
 
 // PlaygroundHandler creates GraphQL playground handler for development

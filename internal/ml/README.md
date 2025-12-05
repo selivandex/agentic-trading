@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # ML Infrastructure (Phase 4)
 
 Machine Learning infrastructure for Prometheus trading system.
@@ -5,14 +7,16 @@ Machine Learning infrastructure for Prometheus trading system.
 ## Components
 
 ### ONNX Runtime Wrapper
+
 - **File**: `onnx_runtime.go`
 - **Purpose**: Load and run ONNX models in Go
-- **Features**: 
+- **Features**:
   - Dynamic tensor creation
   - Multi-output support (class + probabilities)
   - Automatic cleanup
 
 ### Regime Classifier
+
 - **Package**: `regime/`
 - **Model**: Random Forest / XGBoost (trained offline, exported to ONNX)
 - **Input**: 22 market features (volatility, trend, volume, structure, derivatives)
@@ -67,8 +71,3 @@ go test ./internal/ml/regime/...
 ```
 
 Note: Tests will skip if model file not present.
-
-
-
-
-
