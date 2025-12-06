@@ -29,6 +29,7 @@ import (
 	"prometheus/internal/consumers"
 	"prometheus/internal/domain/agent"
 	"prometheus/internal/domain/exchange_account"
+	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/limit_profile"
 	"prometheus/internal/domain/market_data"
 	"prometheus/internal/domain/memory"
@@ -259,8 +260,9 @@ func (c *Container) MustInitServices() {
 	)
 
 	// Fund Watchlist Service (globally monitored symbols)
-	// Note: Using fundwatchlist repo (not fund_watchlist) - see domain/fundwatchlist
-	c.Services.FundWatchlist = fundwatchlistsvc.NewService(c.Repos.FundWatchlist, c.Log)
+	// Clean Architecture: Domain service + Application service
+	domainFundWatchlistService := fundwatchlist.NewService(c.Repos.FundWatchlist)
+	c.Services.FundWatchlist = fundwatchlistsvc.NewService(domainFundWatchlistService, c.Log)
 
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)

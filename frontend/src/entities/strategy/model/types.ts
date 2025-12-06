@@ -10,27 +10,27 @@ import type { User } from "@/entities/user";
 import type { CrudEntity } from "@/shared/lib/crud";
 
 export enum StrategyStatus {
-  ACTIVE = "ACTIVE",
-  PAUSED = "PAUSED",
-  CLOSED = "CLOSED",
+  ACTIVE = "active",
+  PAUSED = "paused",
+  CLOSED = "closed",
 }
 
 export enum MarketType {
-  SPOT = "SPOT",
-  FUTURES = "FUTURES",
+  SPOT = "spot",
+  FUTURES = "futures",
 }
 
 export enum RiskTolerance {
-  CONSERVATIVE = "CONSERVATIVE",
-  MODERATE = "MODERATE",
-  AGGRESSIVE = "AGGRESSIVE",
+  CONSERVATIVE = "conservative",
+  MODERATE = "moderate",
+  AGGRESSIVE = "aggressive",
 }
 
 export enum RebalanceFrequency {
-  DAILY = "DAILY",
-  WEEKLY = "WEEKLY",
-  MONTHLY = "MONTHLY",
-  NEVER = "NEVER",
+  DAILY = "daily",
+  WEEKLY = "weekly",
+  MONTHLY = "monthly",
+  NEVER = "never",
 }
 
 export interface Strategy extends CrudEntity {

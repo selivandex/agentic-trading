@@ -149,8 +149,8 @@ export interface CrudGraphQLConfig<
     variables: TUpdateVariables;
     dataPath: string;
   };
-  /** Mutation for deleting entity */
-  destroy: {
+  /** Mutation for deleting entity (optional) */
+  destroy?: {
     mutation: DocumentNode;
     variables: TDeleteVariables;
     dataPath: string;
@@ -175,6 +175,60 @@ export interface CrudAction<TEntity extends CrudEntity = CrudEntity> {
   disabled?: (entity: TEntity) => boolean;
   /** Whether action is hidden */
   hidden?: (entity: TEntity) => boolean;
+}
+
+/**
+ * Breadcrumb item configuration
+ */
+export interface CrudBreadcrumbItem<TEntity extends CrudEntity = CrudEntity> {
+  /** Breadcrumb label */
+  label: string | ((entity?: TEntity) => string);
+  /** Breadcrumb href (optional) */
+  href?: string | ((entity?: TEntity) => string);
+  /** Icon component (must be a React component, not JSX) */
+  icon?: React.FC<{ className?: string }>;
+  /** Custom onClick handler (overrides href navigation) */
+  onClick?: (entity?: TEntity) => void;
+}
+
+/**
+ * Resource group configuration for hierarchical organization
+ */
+export interface CrudResourceGroup {
+  /** Group name (e.g., "Content", "Settings") */
+  name: string;
+  /** Group path (e.g., "/content") */
+  path?: string;
+  /** Icon component for the group */
+  icon?: React.FC<{ className?: string }>;
+  /** Parent group (for nested hierarchies) */
+  parent?: CrudResourceGroup;
+}
+
+/**
+ * Breadcrumbs configuration for different CRUD views
+ */
+export interface CrudBreadcrumbsConfig<TEntity extends CrudEntity = CrudEntity> {
+  /** Show breadcrumbs */
+  enabled?: boolean;
+  /** Breadcrumb type style */
+  type?: "text" | "text-line" | "button";
+  /** Divider style */
+  divider?: "chevron" | "slash";
+  /** Maximum visible items before collapsing */
+  maxVisibleItems?: number;
+  /** Auto-generate breadcrumbs from resource group and base path (default: true) */
+  autoGenerate?: boolean;
+  /** Root breadcrumb items (always visible, e.g., Home) */
+  rootItems?: CrudBreadcrumbItem<TEntity>[];
+  /** Breadcrumbs for list view (overrides auto-generated) */
+  list?: CrudBreadcrumbItem<TEntity>[];
+  /** Breadcrumbs for show view (overrides auto-generated, receives entity) */
+  show?: CrudBreadcrumbItem<TEntity>[];
+  /** Breadcrumbs for new form view (overrides auto-generated) */
+  new?: CrudBreadcrumbItem<TEntity>[];
+  /** Breadcrumbs for edit form view (overrides auto-generated, receives entity) */
+  edit?: CrudBreadcrumbItem<TEntity>[];
 }
 
 /**
@@ -206,18 +260,26 @@ export interface CrudConfig<TEntity extends CrudEntity = CrudEntity> {
   resourceName: string;
   /** Resource name (plural) */
   resourceNamePlural: string;
+  /** Base path for navigation (e.g., "/strategies") */
+  basePath?: string;
+  /** Resource group for hierarchical organization (e.g., "Content", "Settings") */
+  resourceGroup?: CrudResourceGroup;
   /** GraphQL operations */
   graphql: CrudGraphQLConfig<TEntity>;
   /** Column definitions for table */
   columns: CrudColumn<TEntity>[];
   /** Form fields for create/edit */
   formFields: CrudFormField<TEntity>[];
-  /** Row actions in table */
+  /** Row actions in table (dropdown menu) */
   actions?: CrudAction<TEntity>[];
+  /** Actions for show page header (buttons next to Edit) */
+  showActions?: CrudAction<TEntity>[];
   /** Bulk actions for selected rows */
   bulkActions?: CrudAction<TEntity>[];
   /** Filters for list view */
   filters?: CrudFilter[];
+  /** Breadcrumbs configuration */
+  breadcrumbs?: CrudBreadcrumbsConfig<TEntity>;
   /** Custom empty state message */
   emptyStateMessage?: string;
   /** Custom error message */
@@ -304,4 +366,12 @@ export interface CrudActions<TEntity extends CrudEntity = CrudEntity> {
   setSearchQuery: (query: string) => void;
   /** Refresh data */
   refresh: () => Promise<void>;
+  /** Update pagination state from query results */
+  updatePaginationState: (pageInfo?: PageInfo, totalCount?: number) => void;
+  /** Navigate to next page (Relay cursor pagination) */
+  goToNextPage?: () => void;
+  /** Navigate to previous page (Relay cursor pagination) */
+  goToPrevPage?: () => void;
+  /** Navigate to first page (Relay cursor pagination) */
+  goToFirstPage?: () => void;
 }

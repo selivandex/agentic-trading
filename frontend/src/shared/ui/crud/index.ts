@@ -1,28 +1,16 @@
 /** @format */
 
-/**
- * CRUD UI Components
- * Generic, reusable CRUD components for Next.js + GraphQL
- *
- * @example
- * ```tsx
- * import { Crud } from '@/shared/ui/crud';
- *
- * const strategiesConfig = {
- *   resourceName: 'Strategy',
- *   resourceNamePlural: 'Strategies',
- *   graphql: { ... },
- *   columns: [ ... ],
- *   formFields: [ ... ],
- * };
- *
- * function StrategiesPage() {
- *   return <Crud config={strategiesConfig} />;
- * }
- * ```
- */
-
 export { Crud } from "./Crud";
-export { CrudTable } from "./CrudTable";
+export { CrudList } from "./CrudList";
 export { CrudForm } from "./CrudForm";
 export { CrudShow } from "./CrudShow";
+
+// Re-export presentation components for custom views
+export * from "./views";
+
+// Re-export breadcrumb types for configuration
+export type {
+  CrudBreadcrumbItem,
+  CrudBreadcrumbsConfig,
+  CrudResourceGroup,
+} from "@/shared/lib/crud/types";

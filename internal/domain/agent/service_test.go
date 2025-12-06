@@ -74,6 +74,11 @@ func (m *MockRepository) ListByCategory(ctx context.Context, category string) ([
 	return args.Get(0).([]*Agent), args.Error(1)
 }
 
+func (m *MockRepository) Delete(ctx context.Context, id int) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func TestService_Create(t *testing.T) {
 	ctx := context.Background()
 

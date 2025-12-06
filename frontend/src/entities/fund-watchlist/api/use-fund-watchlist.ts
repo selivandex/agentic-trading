@@ -10,12 +10,12 @@ import {
   UPDATE_FUND_WATCHLIST_MUTATION,
   DELETE_FUND_WATCHLIST_MUTATION,
   TOGGLE_FUND_WATCHLIST_PAUSE_MUTATION,
-} from "@/entities/fund-watchlist/api/fund-watchlist.graphql";
+} from "@/entities/fund-watchlist";
 import type {
   FundWatchlist,
   CreateFundWatchlistInput,
   UpdateFundWatchlistInput,
-} from "@/entities/fund-watchlist/model/types";
+} from "@/entities/fund-watchlist";
 
 /**
  * Hook to get watchlist item by ID

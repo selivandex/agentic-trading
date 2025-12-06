@@ -158,4 +158,10 @@ extend type Mutation {
 
   # Close strategy
   closeStrategy(id: UUID!): Strategy!
+
+  # Delete strategy (hard delete, only for closed strategies)
+  deleteStrategy(id: UUID!): Boolean!
+
+  # Batch delete strategies (hard delete, only for closed strategies)
+  batchDeleteStrategies(ids: [UUID!]!): Int!
 }

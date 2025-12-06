@@ -6,10 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"prometheus/internal/domain/fundwatchlist"
+	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
 
@@ -18,68 +19,91 @@ func testLogger() *logger.Logger {
 	return &logger.Logger{SugaredLogger: zapLogger.Sugar()}
 }
 
-// MockRepository is a mock for fundwatchlist.Repository
-type MockRepository struct {
-	mock.Mock
+// MockDomainService is a mock for fundwatchlist domain service
+type MockDomainService struct {
+	createFunc       func(context.Context, *fundwatchlist.Watchlist) error
+	getByIDFunc      func(context.Context, uuid.UUID) (*fundwatchlist.Watchlist, error)
+	getBySymbolFunc  func(context.Context, string, string) (*fundwatchlist.Watchlist, error)
+	getActiveFunc    func(context.Context) ([]*fundwatchlist.Watchlist, error)
+	getAllFunc       func(context.Context) ([]*fundwatchlist.Watchlist, error)
+	updateFunc       func(context.Context, *fundwatchlist.Watchlist) error
+	deleteFunc       func(context.Context, uuid.UUID) error
+	isActiveFunc     func(context.Context, string, string) (bool, error)
+	pauseFunc        func(context.Context, string, string, string) error
+	resumeFunc       func(context.Context, string, string) error
 }
 
-func (m *MockRepository) Create(ctx context.Context, entry *fundwatchlist.Watchlist) error {
-	args := m.Called(ctx, entry)
-	return args.Error(0)
-}
-
-func (m *MockRepository) GetByID(ctx context.Context, id uuid.UUID) (*fundwatchlist.Watchlist, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *MockDomainService) Create(ctx context.Context, w *fundwatchlist.Watchlist) error {
+	if m.createFunc != nil {
+		return m.createFunc(ctx, w)
 	}
-	return args.Get(0).(*fundwatchlist.Watchlist), args.Error(1)
+	return nil
 }
 
-func (m *MockRepository) GetBySymbol(ctx context.Context, symbol, marketType string) (*fundwatchlist.Watchlist, error) {
-	args := m.Called(ctx, symbol, marketType)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *MockDomainService) GetByID(ctx context.Context, id uuid.UUID) (*fundwatchlist.Watchlist, error) {
+	if m.getByIDFunc != nil {
+		return m.getByIDFunc(ctx, id)
 	}
-	return args.Get(0).(*fundwatchlist.Watchlist), args.Error(1)
+	return nil, errors.ErrNotFound
 }
 
-func (m *MockRepository) GetActive(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *MockDomainService) GetBySymbol(ctx context.Context, symbol, marketType string) (*fundwatchlist.Watchlist, error) {
+	if m.getBySymbolFunc != nil {
+		return m.getBySymbolFunc(ctx, symbol, marketType)
 	}
-	return args.Get(0).([]*fundwatchlist.Watchlist), args.Error(1)
+	return nil, errors.ErrNotFound
 }
 
-func (m *MockRepository) GetAll(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *MockDomainService) GetActive(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
+	if m.getActiveFunc != nil {
+		return m.getActiveFunc(ctx)
 	}
-	return args.Get(0).([]*fundwatchlist.Watchlist), args.Error(1)
+	return []*fundwatchlist.Watchlist{}, nil
 }
 
-func (m *MockRepository) Update(ctx context.Context, entry *fundwatchlist.Watchlist) error {
-	args := m.Called(ctx, entry)
-	return args.Error(0)
+func (m *MockDomainService) GetAll(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
+	if m.getAllFunc != nil {
+		return m.getAllFunc(ctx)
+	}
+	return []*fundwatchlist.Watchlist{}, nil
 }
 
-func (m *MockRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
+func (m *MockDomainService) Update(ctx context.Context, w *fundwatchlist.Watchlist) error {
+	if m.updateFunc != nil {
+		return m.updateFunc(ctx, w)
+	}
+	return nil
 }
 
-func (m *MockRepository) IsActive(ctx context.Context, symbol, marketType string) (bool, error) {
-	args := m.Called(ctx, symbol, marketType)
-	return args.Bool(0), args.Error(1)
+func (m *MockDomainService) Delete(ctx context.Context, id uuid.UUID) error {
+	if m.deleteFunc != nil {
+		return m.deleteFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *MockDomainService) IsActive(ctx context.Context, symbol, marketType string) (bool, error) {
+	if m.isActiveFunc != nil {
+		return m.isActiveFunc(ctx, symbol, marketType)
+	}
+	return false, nil
+}
+
+func (m *MockDomainService) Pause(ctx context.Context, symbol, marketType, reason string) error {
+	if m.pauseFunc != nil {
+		return m.pauseFunc(ctx, symbol, marketType, reason)
+	}
+	return nil
+}
+
+func (m *MockDomainService) Resume(ctx context.Context, symbol, marketType string) error {
+	if m.resumeFunc != nil {
+		return m.resumeFunc(ctx, symbol, marketType)
+	}
+	return nil
 }
 
 func TestService_GetByID(t *testing.T) {
-	mockRepo := new(MockRepository)
-	log := testLogger()
-	svc := NewService(mockRepo, log)
-
 	id := uuid.New()
 	expected := &fundwatchlist.Watchlist{
 		ID:         id,
@@ -90,20 +114,23 @@ func TestService_GetByID(t *testing.T) {
 		IsActive:   true,
 	}
 
-	mockRepo.On("GetByID", mock.Anything, id).Return(expected, nil)
+	mockDomainSvc := &MockDomainService{
+		getByIDFunc: func(ctx context.Context, reqID uuid.UUID) (*fundwatchlist.Watchlist, error) {
+			assert.Equal(t, id, reqID)
+			return expected, nil
+		},
+	}
+
+	log := testLogger()
+	svc := NewService(mockDomainSvc, log)
 
 	result, err := svc.GetByID(context.Background(), id)
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
-	mockRepo.AssertExpectations(t)
 }
 
 func TestService_GetBySymbol(t *testing.T) {
-	mockRepo := new(MockRepository)
-	log := testLogger()
-	svc := NewService(mockRepo, log)
-
 	symbol := "ETH/USDT"
 	marketType := "spot"
 	expected := &fundwatchlist.Watchlist{
@@ -115,13 +142,21 @@ func TestService_GetBySymbol(t *testing.T) {
 		IsActive:   true,
 	}
 
-	mockRepo.On("GetBySymbol", mock.Anything, symbol, marketType).Return(expected, nil)
+	mockDomainSvc := &MockDomainService{
+		getBySymbolFunc: func(ctx context.Context, sym, mkt string) (*fundwatchlist.Watchlist, error) {
+			assert.Equal(t, symbol, sym)
+			assert.Equal(t, marketType, mkt)
+			return expected, nil
+		},
+	}
+
+	log := testLogger()
+	svc := NewService(mockDomainSvc, log)
 
 	result, err := svc.GetBySymbol(context.Background(), symbol, marketType)
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
-	mockRepo.AssertExpectations(t)
 }
 
 func TestService_GetMonitored(t *testing.T) {
@@ -184,41 +219,47 @@ func TestService_GetMonitored(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockRepository)
-			log := testLogger()
-			svc := NewService(mockRepo, log)
+			mockDomainSvc := &MockDomainService{
+				getActiveFunc: func(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
+					return tt.entries, nil
+				},
+			}
 
-			mockRepo.On("GetActive", mock.Anything).Return(tt.entries, nil)
+			log := testLogger()
+			svc := NewService(mockDomainSvc, log)
 
 			result, err := svc.GetMonitored(context.Background(), tt.marketType)
 
 			assert.NoError(t, err)
 			assert.Len(t, result, tt.expected)
-			mockRepo.AssertExpectations(t)
 		})
 	}
 }
 
-func TestService_Create(t *testing.T) {
-	mockRepo := new(MockRepository)
-	log := testLogger()
-	svc := NewService(mockRepo, log)
+func TestService_CreateWatchlist(t *testing.T) {
+	mockDomainSvc := &MockDomainService{
+		createFunc: func(ctx context.Context, w *fundwatchlist.Watchlist) error {
+			assert.Equal(t, "BTC/USDT", w.Symbol)
+			assert.Equal(t, "spot", w.MarketType)
+			return nil
+		},
+	}
 
-	entry := &fundwatchlist.Watchlist{
-		ID:         uuid.New(),
+	log := testLogger()
+	svc := NewService(mockDomainSvc, log)
+
+	params := CreateWatchlistParams{
 		Symbol:     "BTC/USDT",
 		MarketType: "spot",
 		Category:   "major",
 		Tier:       1,
-		IsActive:   true,
 	}
 
-	mockRepo.On("Create", mock.Anything, entry).Return(nil)
-
-	err := svc.Create(context.Background(), entry)
+	result, err := svc.CreateWatchlist(context.Background(), params)
 
 	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
+	assert.NotNil(t, result)
+	assert.Equal(t, "BTC/USDT", result.Symbol)
 }
 
 func TestService_TogglePause(t *testing.T) {
@@ -241,10 +282,6 @@ func TestService_TogglePause(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockRepository)
-			log := testLogger()
-			svc := NewService(mockRepo, log)
-
 			id := uuid.New()
 			entry := &fundwatchlist.Watchlist{
 				ID:         id,
@@ -254,12 +291,25 @@ func TestService_TogglePause(t *testing.T) {
 				IsPaused:   false,
 			}
 
-			mockRepo.On("GetByID", mock.Anything, id).Return(entry, nil)
-			mockRepo.On("Update", mock.Anything, mock.MatchedBy(func(e *fundwatchlist.Watchlist) bool {
-				return e.IsPaused == tt.isPaused &&
-					((tt.reason == nil && e.PausedReason == nil) ||
-						(tt.reason != nil && e.PausedReason != nil && *e.PausedReason == *tt.reason))
-			})).Return(nil)
+			mockDomainSvc := &MockDomainService{
+				getByIDFunc: func(ctx context.Context, reqID uuid.UUID) (*fundwatchlist.Watchlist, error) {
+					assert.Equal(t, id, reqID)
+					return entry, nil
+				},
+				updateFunc: func(ctx context.Context, w *fundwatchlist.Watchlist) error {
+					assert.Equal(t, tt.isPaused, w.IsPaused)
+					if tt.reason != nil {
+						require.NotNil(t, w.PausedReason)
+						assert.Equal(t, *tt.reason, *w.PausedReason)
+					} else {
+						assert.Nil(t, w.PausedReason)
+					}
+					return nil
+				},
+			}
+
+			log := testLogger()
+			svc := NewService(mockDomainSvc, log)
 
 			result, err := svc.TogglePause(context.Background(), id, tt.isPaused, tt.reason)
 
@@ -269,24 +319,26 @@ func TestService_TogglePause(t *testing.T) {
 				assert.NotNil(t, result.PausedReason)
 				assert.Equal(t, *tt.reason, *result.PausedReason)
 			}
-			mockRepo.AssertExpectations(t)
 		})
 	}
 }
 
-func TestService_Delete(t *testing.T) {
-	mockRepo := new(MockRepository)
-	log := testLogger()
-	svc := NewService(mockRepo, log)
-
+func TestService_DeleteWatchlist(t *testing.T) {
 	id := uuid.New()
 
-	mockRepo.On("Delete", mock.Anything, id).Return(nil)
+	mockDomainSvc := &MockDomainService{
+		deleteFunc: func(ctx context.Context, reqID uuid.UUID) error {
+			assert.Equal(t, id, reqID)
+			return nil
+		},
+	}
 
-	err := svc.Delete(context.Background(), id)
+	log := testLogger()
+	svc := NewService(mockDomainSvc, log)
+
+	err := svc.DeleteWatchlist(context.Background(), id)
 
 	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
 }
 
 // Helper function

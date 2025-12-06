@@ -97,13 +97,18 @@ export function useCrudMutations<TEntity extends CrudEntity = CrudEntity>(
     [config, updateMutation],
   );
 
-  // Delete mutation
+  // Delete mutation (optional)
   const [destroyMutation, destroyState] = useMutation(
-    config.graphql.destroy.mutation,
+    config.graphql.destroy?.mutation || config.graphql.create.mutation // Fallback to avoid error
   );
 
   const destroy = useCallback(
     async (id: string) => {
+      if (!config.graphql.destroy) {
+        toast.error("Delete operation is not configured");
+        throw new Error("Delete not configured");
+      }
+
       try {
         const variables = {
           ...config.graphql.destroy.variables,

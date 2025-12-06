@@ -1,25 +1,24 @@
 // Apollo Client - Client-side only (browser)
-export { 
-  apolloClientBase, 
-  getApolloClient, 
-  clearCache, 
-  initializeApolloClient 
+export {
+  apolloClientBase,
+  getApolloClient,
+  clearCache,
+  initializeApolloClient
 } from "./apollo-client-base";
 
 // Apollo Server Client - Server-side only (JWT callbacks, Server Components, API routes)
-export { 
-  createServerApolloClient, 
-  serverQuery, 
-  serverMutation 
+export {
+  createServerApolloClient,
+  serverQuery,
+  serverMutation
 } from "./apollo-server-client";
 
 // Apollo Provider (wraps app with ApolloProvider)
 export { ApolloProvider } from "./apollo-provider";
 
 // Apollo Context Setter (deprecated - use RouteParamsProvider instead)
-export { 
-  ApolloContextSetter, 
-  setApolloContext 
+export {
+  ApolloContextSetter
 } from "./apollo-context-setter";
 
 // Route Params Context (for Apollo Client headers)
@@ -37,7 +36,8 @@ export { createApolloCache, initializeCache, CACHE_VERSION } from "./apollo-cach
 export * from "./graphql-error-codes";
 
 // Optimistic Updates
-export * from "./optimistic-updates";
+// Disabled - types not generated yet
+// export * from "./optimistic-updates";
 
 // GraphQL Hooks
 export { useGraphQLQuery } from "./use-graphql-query";
@@ -57,4 +57,3 @@ export {
 
 // Generated GraphQL types and hooks
 export * from "./generated/graphql";
-

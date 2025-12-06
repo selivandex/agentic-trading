@@ -129,6 +129,9 @@ extend type Mutation {
   # Remove from watchlist
   deleteFundWatchlist(id: UUID!): Boolean!
 
+  # Batch delete from watchlist
+  batchDeleteFundWatchlists(ids: [UUID!]!): Int!
+
   # Pause/unpause monitoring
   toggleFundWatchlistPause(
     id: UUID!

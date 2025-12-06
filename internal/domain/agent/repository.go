@@ -30,4 +30,7 @@ type Repository interface {
 
 	// ListByCategory retrieves agents by category (expert, coordinator, etc)
 	ListByCategory(ctx context.Context, category string) ([]*Agent, error)
+
+	// Delete deletes an agent by ID
+	Delete(ctx context.Context, id int) error
 }

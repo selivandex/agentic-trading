@@ -33,6 +33,5 @@ export * from "./slideout-menus";
 // Table
 export * from "./table";
 
-
-
-
+// Pagination
+export * from "./pagination";

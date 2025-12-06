@@ -102,3 +102,65 @@ func (s *Service) Resume(ctx context.Context, symbol, marketType string) error {
 
 	return nil
 }
+
+// IsActive checks if a symbol is actively monitored (delegates to repository)
+func (s *Service) IsActive(ctx context.Context, symbol, marketType string) (bool, error) {
+	return s.repo.IsActive(ctx, symbol, marketType)
+}
+
+// GetByID retrieves a watchlist entry by ID
+func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Watchlist, error) {
+	if id == uuid.Nil {
+		return nil, errors.ErrInvalidInput
+	}
+	return s.repo.GetByID(ctx, id)
+}
+
+// GetBySymbol retrieves a watchlist entry by symbol and market type
+func (s *Service) GetBySymbol(ctx context.Context, symbol, marketType string) (*Watchlist, error) {
+	if symbol == "" {
+		return nil, errors.ErrInvalidInput
+	}
+	return s.repo.GetBySymbol(ctx, symbol, marketType)
+}
+
+// GetAll retrieves all watchlist entries
+func (s *Service) GetAll(ctx context.Context) ([]*Watchlist, error) {
+	return s.repo.GetAll(ctx)
+}
+
+// Update updates a watchlist entry
+func (s *Service) Update(ctx context.Context, entry *Watchlist) error {
+	if entry == nil || entry.ID == uuid.Nil {
+		return errors.ErrInvalidInput
+	}
+	if entry.Symbol == "" {
+		return errors.New("symbol is required")
+	}
+
+	if err := s.repo.Update(ctx, entry); err != nil {
+		return errors.Wrap(err, "update fund watchlist entry")
+	}
+
+	s.log.Debugw("Fund watchlist entry updated",
+		"id", entry.ID,
+		"symbol", entry.Symbol,
+	)
+
+	return nil
+}
+
+// Delete deletes a watchlist entry
+func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	if id == uuid.Nil {
+		return errors.ErrInvalidInput
+	}
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return errors.Wrap(err, "delete fund watchlist entry")
+	}
+
+	s.log.Infow("Fund watchlist entry deleted", "id", id)
+
+	return nil
+}

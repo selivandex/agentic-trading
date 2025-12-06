@@ -1,8 +1,8 @@
 /** @format */
 
 import { Avatar } from "@/shared/base";
-import type { User } from "@/entities/user/model/types";
-import { getUserInitials, formatUserDisplayName } from "@/entities/user/lib/formatters";
+import type { User } from "@/entities/user";
+import { getUserInitials, formatUserDisplayName } from "@/entities/user";
 
 interface UserAvatarProps {
   user: User;

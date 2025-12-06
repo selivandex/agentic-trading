@@ -1,6 +1,7 @@
 package resolvers
 
 import (
+	agentService "prometheus/internal/services/agent"
 	authService "prometheus/internal/services/auth"
 	fundWatchlistService "prometheus/internal/services/fundwatchlist"
 	strategyService "prometheus/internal/services/strategy"
@@ -20,5 +21,6 @@ type Resolver struct {
 	UserService          *userService.Service
 	StrategyService      *strategyService.Service
 	FundWatchlistService *fundWatchlistService.Service
+	AgentService         *agentService.Service
 	Log                  *logger.Logger
 }

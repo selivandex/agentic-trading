@@ -90,3 +90,14 @@ func (s *Service) ListByCategory(ctx context.Context, category string) ([]*Agent
 func (s *Service) List(ctx context.Context) ([]*Agent, error) {
 	return s.repo.List(ctx)
 }
+
+// Delete deletes an agent by ID
+func (s *Service) Delete(ctx context.Context, id int) error {
+	if id <= 0 {
+		return errors.ErrInvalidInput
+	}
+
+	// Note: Repository should implement cascading deletion or prevent
+	// deletion if agent is in use
+	return s.repo.Delete(ctx, id)
+}

@@ -31,6 +31,7 @@ autobind:
   - prometheus/internal/domain/user
   - prometheus/internal/domain/strategy
   - prometheus/internal/domain/fundwatchlist
+  - prometheus/internal/domain/agent
 
 # Model mappings - map GraphQL types to Go types
 models:
@@ -87,6 +88,13 @@ models:
       - prometheus/internal/domain/fundwatchlist.Watchlist
     fields:
       marketType:
+        resolver: true
+
+  Agent:
+    model:
+      - prometheus/internal/domain/agent.Agent
+    fields:
+      availableTools:
         resolver: true
 
   Settings:

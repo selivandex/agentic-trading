@@ -3,12 +3,32 @@
 package generated
 
 import (
+	"prometheus/internal/domain/agent"
 	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
+
+// Connection type for Agent collection
+type AgentConnection struct {
+	// A list of edges
+	Edges []*AgentEdge `json:"edges"`
+	// Information to aid in pagination
+	PageInfo *PageInfo `json:"pageInfo"`
+	// Total count of items (if available)
+	TotalCount int `json:"totalCount"`
+}
+
+// Edge type for Agent
+type AgentEdge struct {
+	// The item at the end of the edge
+	Node *agent.Agent `json:"node"`
+	// A cursor for use in pagination
+	Cursor string `json:"cursor"`
+}
 
 type AuthResponse struct {
 	Token string     `json:"token"`
@@ -21,6 +41,23 @@ type BackwardPaginationInput struct {
 	Last int `json:"last"`
 	// Returns the elements in the list that come before the specified cursor
 	Before *string `json:"before,omitempty"`
+}
+
+type CreateAgentInput struct {
+	Identifier     string   `json:"identifier"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Category       string   `json:"category"`
+	SystemPrompt   string   `json:"systemPrompt"`
+	Instructions   *string  `json:"instructions,omitempty"`
+	ModelProvider  string   `json:"modelProvider"`
+	ModelName      string   `json:"modelName"`
+	Temperature    *float64 `json:"temperature,omitempty"`
+	MaxTokens      *int     `json:"maxTokens,omitempty"`
+	AvailableTools []string `json:"availableTools,omitempty"`
+	MaxCostPerRun  *float64 `json:"maxCostPerRun,omitempty"`
+	TimeoutSeconds *int     `json:"timeoutSeconds,omitempty"`
+	IsActive       *bool    `json:"isActive,omitempty"`
 }
 
 type CreateFundWatchlistInput struct {
@@ -38,6 +75,20 @@ type CreateStrategyInput struct {
 	RiskTolerance      strategy.RiskTolerance      `json:"riskTolerance"`
 	RebalanceFrequency strategy.RebalanceFrequency `json:"rebalanceFrequency"`
 	TargetAllocations  map[string]any              `json:"targetAllocations,omitempty"`
+}
+
+type CreateUserInput struct {
+	TelegramID       *string        `json:"telegramID,omitempty"`
+	TelegramUsername *string        `json:"telegramUsername,omitempty"`
+	Email            *string        `json:"email,omitempty"`
+	PasswordHash     *string        `json:"passwordHash,omitempty"`
+	FirstName        string         `json:"firstName"`
+	LastName         string         `json:"lastName"`
+	LanguageCode     string         `json:"languageCode"`
+	IsActive         *bool          `json:"isActive,omitempty"`
+	IsPremium        *bool          `json:"isPremium,omitempty"`
+	LimitProfileID   *uuid.UUID     `json:"limitProfileID,omitempty"`
+	Settings         *SettingsInput `json:"settings,omitempty"`
 }
 
 // Common input arguments for forward pagination
@@ -96,6 +147,25 @@ type RegisterInput struct {
 	LastName  string `json:"lastName"`
 }
 
+type SettingsInput struct {
+	DefaultAIProvider   *string  `json:"defaultAIProvider,omitempty"`
+	DefaultAIModel      *string  `json:"defaultAIModel,omitempty"`
+	RiskLevel           *string  `json:"riskLevel,omitempty"`
+	MaxPositions        *int     `json:"maxPositions,omitempty"`
+	MaxPortfolioRisk    *float64 `json:"maxPortfolioRisk,omitempty"`
+	MaxDailyDrawdown    *float64 `json:"maxDailyDrawdown,omitempty"`
+	MaxConsecutiveLoss  *int     `json:"maxConsecutiveLoss,omitempty"`
+	NotificationsOn     *bool    `json:"notificationsOn,omitempty"`
+	DailyReportTime     *string  `json:"dailyReportTime,omitempty"`
+	Timezone            *string  `json:"timezone,omitempty"`
+	CircuitBreakerOn    *bool    `json:"circuitBreakerOn,omitempty"`
+	MaxPositionSizeUsd  *float64 `json:"maxPositionSizeUSD,omitempty"`
+	MaxTotalExposureUsd *float64 `json:"maxTotalExposureUSD,omitempty"`
+	MinPositionSizeUsd  *float64 `json:"minPositionSizeUSD,omitempty"`
+	MaxLeverageMultiple *float64 `json:"maxLeverageMultiple,omitempty"`
+	AllowedExchanges    []string `json:"allowedExchanges,omitempty"`
+}
+
 // Connection type for Strategy collection
 type StrategyConnection struct {
 	// A list of edges
@@ -117,6 +187,21 @@ type StrategyEdge struct {
 type Subscription struct {
 }
 
+type UpdateAgentInput struct {
+	Name           *string  `json:"name,omitempty"`
+	Description    *string  `json:"description,omitempty"`
+	Category       *string  `json:"category,omitempty"`
+	SystemPrompt   *string  `json:"systemPrompt,omitempty"`
+	Instructions   *string  `json:"instructions,omitempty"`
+	ModelProvider  *string  `json:"modelProvider,omitempty"`
+	ModelName      *string  `json:"modelName,omitempty"`
+	Temperature    *float64 `json:"temperature,omitempty"`
+	MaxTokens      *int     `json:"maxTokens,omitempty"`
+	AvailableTools []string `json:"availableTools,omitempty"`
+	MaxCostPerRun  *float64 `json:"maxCostPerRun,omitempty"`
+	TimeoutSeconds *int     `json:"timeoutSeconds,omitempty"`
+}
+
 type UpdateFundWatchlistInput struct {
 	Category     *string `json:"category,omitempty"`
 	Tier         *int    `json:"tier,omitempty"`
@@ -131,6 +216,17 @@ type UpdateStrategyInput struct {
 	RiskTolerance      *strategy.RiskTolerance      `json:"riskTolerance,omitempty"`
 	RebalanceFrequency *strategy.RebalanceFrequency `json:"rebalanceFrequency,omitempty"`
 	TargetAllocations  map[string]any               `json:"targetAllocations,omitempty"`
+}
+
+type UpdateUserInput struct {
+	TelegramID       *string    `json:"telegramID,omitempty"`
+	TelegramUsername *string    `json:"telegramUsername,omitempty"`
+	Email            *string    `json:"email,omitempty"`
+	FirstName        *string    `json:"firstName,omitempty"`
+	LastName         *string    `json:"lastName,omitempty"`
+	LanguageCode     *string    `json:"languageCode,omitempty"`
+	IsPremium        *bool      `json:"isPremium,omitempty"`
+	LimitProfileID   *uuid.UUID `json:"limitProfileID,omitempty"`
 }
 
 type UpdateUserSettingsInput struct {

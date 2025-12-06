@@ -6,16 +6,16 @@ import type {
   MarketType,
   RiskTolerance,
   RebalanceFrequency,
-} from "@/entities/strategy/model/types";
+} from "@/entities/strategy";
 
 /**
  * Format strategy status for display
  */
 export function formatStrategyStatus(status: StrategyStatus): string {
   const map: Record<StrategyStatus, string> = {
-    ACTIVE: "Active",
-    PAUSED: "Paused",
-    CLOSED: "Closed",
+    active: "Active",
+    paused: "Paused",
+    closed: "Closed",
   };
 
   return map[status] || status;
@@ -28,9 +28,9 @@ export function getStrategyStatusColor(
   status: StrategyStatus
 ): "success" | "warning" | "gray" {
   const colorMap: Record<StrategyStatus, "success" | "warning" | "gray"> = {
-    ACTIVE: "success",
-    PAUSED: "warning",
-    CLOSED: "gray",
+    active: "success",
+    paused: "warning",
+    closed: "gray",
   };
 
   return colorMap[status] || "gray";
@@ -41,8 +41,8 @@ export function getStrategyStatusColor(
  */
 export function formatMarketType(marketType: MarketType): string {
   const map: Record<MarketType, string> = {
-    SPOT: "Spot",
-    FUTURES: "Futures",
+    spot: "Spot",
+    futures: "Futures",
   };
 
   return map[marketType] || marketType;
@@ -53,9 +53,9 @@ export function formatMarketType(marketType: MarketType): string {
  */
 export function formatRiskTolerance(riskTolerance: RiskTolerance): string {
   const map: Record<RiskTolerance, string> = {
-    CONSERVATIVE: "Conservative",
-    MODERATE: "Moderate",
-    AGGRESSIVE: "Aggressive",
+    conservative: "Conservative",
+    moderate: "Moderate",
+    aggressive: "Aggressive",
   };
 
   return map[riskTolerance] || riskTolerance;
@@ -68,10 +68,10 @@ export function formatRebalanceFrequency(
   frequency: RebalanceFrequency
 ): string {
   const map: Record<RebalanceFrequency, string> = {
-    DAILY: "Daily",
-    WEEKLY: "Weekly",
-    MONTHLY: "Monthly",
-    NEVER: "Never",
+    daily: "Daily",
+    weekly: "Weekly",
+    monthly: "Monthly",
+    never: "Never",
   };
 
   return map[frequency] || frequency;

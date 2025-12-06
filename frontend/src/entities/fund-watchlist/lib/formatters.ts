@@ -1,6 +1,6 @@
 /** @format */
 
-import type { FundWatchlist } from "@/entities/fund-watchlist/model/types";
+import type { FundWatchlist } from "@/entities/fund-watchlist";
 
 /**
  * Format tier for display

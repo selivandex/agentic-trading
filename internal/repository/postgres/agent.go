@@ -258,3 +258,24 @@ func (r *AgentRepository) ListByCategory(ctx context.Context, category string) (
 
 	return agents, rows.Err()
 }
+
+// Delete deletes an agent by ID
+func (r *AgentRepository) Delete(ctx context.Context, id int) error {
+	query := `DELETE FROM agents WHERE id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.Wrap(err, "delete agent")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "get rows affected")
+	}
+
+	if rows == 0 {
+		return errors.ErrNotFound
+	}
+
+	return nil
+}

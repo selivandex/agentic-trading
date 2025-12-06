@@ -4,7 +4,8 @@
 
 import { Input } from "@/components/base/input/input";
 import { Select } from "@/components/base/select/select";
-import type { ScenarioDelayUnit } from "@/shared/api/generated/graphql";
+
+type ScenarioDelayUnit = "MINUTES" | "HOURS" | "DAYS";
 
 interface DelayInputProps {
   label: string;

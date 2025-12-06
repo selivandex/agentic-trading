@@ -153,6 +153,281 @@ func (s *Service) ListByCategory(ctx context.Context, category string) ([]*agent
 	return s.domainService.ListByCategory(ctx, category)
 }
 
+// List retrieves all agents
+func (s *Service) List(ctx context.Context) ([]*agent.Agent, error) {
+	return s.domainService.List(ctx)
+}
+
+// GetByID retrieves agent by ID
+func (s *Service) GetByID(ctx context.Context, id int) (*agent.Agent, error) {
+	return s.domainService.GetByID(ctx, id)
+}
+
+// CreateAgentParams contains parameters for creating a new agent
+type CreateAgentParams struct {
+	Identifier     string
+	Name           string
+	Description    string
+	Category       string
+	SystemPrompt   string
+	Instructions   string
+	ModelProvider  ai.ProviderName
+	ModelName      ai.ProviderModelName
+	Temperature    float64
+	MaxTokens      int
+	AvailableTools []string
+	MaxCostPerRun  float64
+	TimeoutSeconds int
+	IsActive       bool
+}
+
+// CreateAgent creates a new agent (admin function)
+func (s *Service) CreateAgent(ctx context.Context, params CreateAgentParams) (*agent.Agent, error) {
+	s.log.Infow("Creating new agent",
+		"identifier", params.Identifier,
+		"name", params.Name,
+	)
+
+	// Validate
+	if params.Identifier == "" {
+		return nil, errors.New("identifier is required")
+	}
+	if params.Name == "" {
+		return nil, errors.New("name is required")
+	}
+
+	// Create agent entity
+	a := &agent.Agent{
+		Identifier:     params.Identifier,
+		Name:           params.Name,
+		Description:    params.Description,
+		Category:       params.Category,
+		SystemPrompt:   params.SystemPrompt,
+		Instructions:   params.Instructions,
+		ModelProvider:  params.ModelProvider,
+		ModelName:      params.ModelName,
+		Temperature:    params.Temperature,
+		MaxTokens:      params.MaxTokens,
+		MaxCostPerRun:  params.MaxCostPerRun,
+		TimeoutSeconds: params.TimeoutSeconds,
+		IsActive:       params.IsActive,
+	}
+
+	// Set available tools
+	if err := a.SetAvailableTools(params.AvailableTools); err != nil {
+		return nil, errors.Wrap(err, "failed to set available tools")
+	}
+
+	// Create via domain service
+	if err := s.domainService.Create(ctx, a); err != nil {
+		return nil, errors.Wrap(err, "failed to create agent")
+	}
+
+	s.log.Infow("Agent created successfully",
+		"agent_id", a.ID,
+		"identifier", a.Identifier,
+	)
+
+	return a, nil
+}
+
+// UpdateAgentParams contains parameters for updating an agent
+type UpdateAgentParams struct {
+	Name           *string
+	Description    *string
+	Category       *string
+	SystemPrompt   *string
+	Instructions   *string
+	ModelProvider  *ai.ProviderName
+	ModelName      *ai.ProviderModelName
+	Temperature    *float64
+	MaxTokens      *int
+	AvailableTools []string // nil means no update, empty array clears tools
+	MaxCostPerRun  *float64
+	TimeoutSeconds *int
+}
+
+// UpdateAgent updates agent configuration (admin function)
+func (s *Service) UpdateAgent(ctx context.Context, id int, params UpdateAgentParams) (*agent.Agent, error) {
+	s.log.Infow("Updating agent", "agent_id", id)
+
+	// Get existing agent via domain service
+	a, err := s.domainService.GetByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get agent")
+	}
+
+	// Apply updates (only non-nil fields)
+	if params.Name != nil {
+		a.Name = *params.Name
+	}
+	if params.Description != nil {
+		a.Description = *params.Description
+	}
+	if params.Category != nil {
+		a.Category = *params.Category
+	}
+	if params.SystemPrompt != nil {
+		a.SystemPrompt = *params.SystemPrompt
+	}
+	if params.Instructions != nil {
+		a.Instructions = *params.Instructions
+	}
+	if params.ModelProvider != nil {
+		a.ModelProvider = *params.ModelProvider
+	}
+	if params.ModelName != nil {
+		a.ModelName = *params.ModelName
+	}
+	if params.Temperature != nil {
+		a.Temperature = *params.Temperature
+	}
+	if params.MaxTokens != nil {
+		a.MaxTokens = *params.MaxTokens
+	}
+	if params.AvailableTools != nil {
+		if err := a.SetAvailableTools(params.AvailableTools); err != nil {
+			return nil, errors.Wrap(err, "failed to set available tools")
+		}
+	}
+	if params.MaxCostPerRun != nil {
+		a.MaxCostPerRun = *params.MaxCostPerRun
+	}
+	if params.TimeoutSeconds != nil {
+		a.TimeoutSeconds = *params.TimeoutSeconds
+	}
+
+	// Update via domain service
+	if err := s.domainService.Update(ctx, a); err != nil {
+		return nil, errors.Wrap(err, "failed to update agent")
+	}
+
+	s.log.Infow("Agent updated successfully",
+		"agent_id", id,
+		"identifier", a.Identifier,
+		"version", a.Version,
+	)
+
+	return a, nil
+}
+
+// DeleteAgent deletes an agent (admin function, hard delete)
+func (s *Service) DeleteAgent(ctx context.Context, id int) error {
+	s.log.Warnw("Deleting agent", "agent_id", id)
+
+	// Get agent to check if it exists
+	a, err := s.domainService.GetByID(ctx, id)
+	if err != nil {
+		return errors.Wrap(err, "failed to get agent")
+	}
+
+	// Use domain service to delete
+	if err := s.domainService.Delete(ctx, id); err != nil {
+		return errors.Wrap(err, "failed to delete agent")
+	}
+
+	s.log.Infow("Agent deleted successfully",
+		"agent_id", id,
+		"identifier", a.Identifier,
+	)
+
+	return nil
+}
+
+// BatchDeleteAgents deletes multiple agents in batch (admin function)
+// Returns the number of successfully deleted agents
+func (s *Service) BatchDeleteAgents(ctx context.Context, ids []int) (int, error) {
+	s.log.Infow("Batch deleting agents",
+		"count", len(ids),
+	)
+
+	if len(ids) == 0 {
+		return 0, errors.ErrInvalidInput
+	}
+
+	deleted := 0
+	var lastErr error
+
+	for _, id := range ids {
+		if err := s.DeleteAgent(ctx, id); err != nil {
+			s.log.Warnw("Failed to delete agent in batch",
+				"agent_id", id,
+				"error", err,
+			)
+			lastErr = err
+			continue
+		}
+		deleted++
+	}
+
+	s.log.Infow("Batch delete completed",
+		"deleted", deleted,
+		"total", len(ids),
+	)
+
+	// Return error only if all deletions failed
+	if deleted == 0 && lastErr != nil {
+		return 0, lastErr
+	}
+
+	return deleted, nil
+}
+
+// SetActive activates or deactivates an agent
+func (s *Service) SetActive(ctx context.Context, id int, isActive bool) (*agent.Agent, error) {
+	s.log.Infow("Setting agent active status",
+		"agent_id", id,
+		"is_active", isActive,
+	)
+
+	// Get agent via domain service
+	a, err := s.domainService.GetByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get agent")
+	}
+
+	a.IsActive = isActive
+
+	// Update via domain service
+	if err := s.domainService.Update(ctx, a); err != nil {
+		return nil, errors.Wrap(err, "failed to update agent active status")
+	}
+
+	s.log.Infow("Agent active status updated",
+		"agent_id", id,
+		"identifier", a.Identifier,
+		"is_active", isActive,
+	)
+
+	return a, nil
+}
+
+// UpdatePromptByID updates agent's system prompt by ID
+func (s *Service) UpdatePromptByID(ctx context.Context, id int, newPrompt string) (*agent.Agent, error) {
+	s.log.Infow("Updating agent prompt", "agent_id", id)
+
+	// Get agent via domain service
+	a, err := s.domainService.GetByID(ctx, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get agent")
+	}
+
+	a.SystemPrompt = newPrompt
+
+	// Update via domain service
+	if err := s.domainService.Update(ctx, a); err != nil {
+		return nil, errors.Wrap(err, "failed to update agent prompt")
+	}
+
+	s.log.Infow("Agent prompt updated",
+		"agent_id", id,
+		"identifier", a.Identifier,
+		"version", a.Version,
+	)
+
+	return a, nil
+}
+
 // loadPromptFromTemplate loads agent prompt from template file
 func (s *Service) loadPromptFromTemplate(identifier string) (string, error) {
 	templatePath := "prompts/agents/" + identifier

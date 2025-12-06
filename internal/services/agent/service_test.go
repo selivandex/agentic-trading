@@ -80,6 +80,10 @@ func (m *mockRepository) List(ctx context.Context) ([]*agent.Agent, error) {
 	return []*agent.Agent{}, nil
 }
 
+func (m *mockRepository) Delete(ctx context.Context, id int) error {
+	return nil
+}
+
 // mockTemplateRegistry implements template rendering
 type mockTemplateRegistry struct {
 	prompts map[string]string

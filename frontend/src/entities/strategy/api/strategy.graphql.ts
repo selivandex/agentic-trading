@@ -176,3 +176,10 @@ export const CLOSE_STRATEGY_MUTATION = gql`
     }
   }
 `;
+
+// Delete strategy (hard delete, only for closed strategies)
+export const DELETE_STRATEGY_MUTATION = gql`
+  mutation DeleteStrategy($id: UUID!) {
+    deleteStrategy(id: $id)
+  }
+`;

@@ -21,12 +21,25 @@ import (
 
 // CreateStrategy is the resolver for the createStrategy field.
 func (r *mutationResolver) CreateStrategy(ctx context.Context, userID uuid.UUID, input generated.CreateStrategyInput) (*strategy.Strategy, error) {
+	// Parse target allocations if provided
+	var targetAllocations []byte
+	if input.TargetAllocations != nil {
+		data, err := json.Marshal(input.TargetAllocations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal target allocations: %w", err)
+		}
+		targetAllocations = data
+	}
+
 	params := strategyService.CreateStrategyParams{
-		UserID:           userID,
-		Name:             input.Name,
-		Description:      input.Description,
-		AllocatedCapital: input.AllocatedCapital,
-		RiskTolerance:    input.RiskTolerance,
+		UserID:             userID,
+		Name:               input.Name,
+		Description:        input.Description,
+		AllocatedCapital:   input.AllocatedCapital,
+		MarketType:         input.MarketType,
+		RiskTolerance:      input.RiskTolerance,
+		RebalanceFrequency: input.RebalanceFrequency,
+		TargetAllocations:  targetAllocations,
 	}
 
 	return r.StrategyService.CreateStrategy(ctx, params)
@@ -34,26 +47,54 @@ func (r *mutationResolver) CreateStrategy(ctx context.Context, userID uuid.UUID,
 
 // UpdateStrategy is the resolver for the updateStrategy field.
 func (r *mutationResolver) UpdateStrategy(ctx context.Context, id uuid.UUID, input generated.UpdateStrategyInput) (*strategy.Strategy, error) {
-	// TODO: implement update strategy
-	return nil, fmt.Errorf("UpdateStrategy not yet implemented")
+	// Parse target allocations if provided
+	var targetAllocations []byte
+	if input.TargetAllocations != nil {
+		data, err := json.Marshal(input.TargetAllocations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal target allocations: %w", err)
+		}
+		targetAllocations = data
+	}
+
+	// Build update params
+	params := strategyService.UpdateStrategyParams{
+		Name:               input.Name,
+		Description:        input.Description,
+		RiskTolerance:      (*strategy.RiskTolerance)(input.RiskTolerance),
+		RebalanceFrequency: (*strategy.RebalanceFrequency)(input.RebalanceFrequency),
+		TargetAllocations:  targetAllocations,
+	}
+
+	return r.StrategyService.UpdateStrategy(ctx, id, params)
 }
 
 // PauseStrategy is the resolver for the pauseStrategy field.
 func (r *mutationResolver) PauseStrategy(ctx context.Context, id uuid.UUID) (*strategy.Strategy, error) {
-	// TODO: implement pause strategy
-	return nil, fmt.Errorf("PauseStrategy not yet implemented")
+	return r.StrategyService.PauseStrategy(ctx, id)
 }
 
 // ResumeStrategy is the resolver for the resumeStrategy field.
 func (r *mutationResolver) ResumeStrategy(ctx context.Context, id uuid.UUID) (*strategy.Strategy, error) {
-	// TODO: implement resume strategy
-	return nil, fmt.Errorf("ResumeStrategy not yet implemented")
+	return r.StrategyService.ResumeStrategy(ctx, id)
 }
 
 // CloseStrategy is the resolver for the closeStrategy field.
 func (r *mutationResolver) CloseStrategy(ctx context.Context, id uuid.UUID) (*strategy.Strategy, error) {
-	// TODO: implement close strategy
-	return nil, fmt.Errorf("CloseStrategy not yet implemented")
+	return r.StrategyService.CloseStrategy(ctx, id)
+}
+
+// DeleteStrategy is the resolver for the deleteStrategy field.
+func (r *mutationResolver) DeleteStrategy(ctx context.Context, id uuid.UUID) (bool, error) {
+	if err := r.StrategyService.DeleteStrategy(ctx, id); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// BatchDeleteStrategies is the resolver for the batchDeleteStrategies field.
+func (r *mutationResolver) BatchDeleteStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.StrategyService.BatchDeleteStrategies(ctx, ids)
 }
 
 // Strategy is the resolver for the strategy field.
@@ -262,3 +303,18 @@ func (r *strategyResolver) ReasoningLog(ctx context.Context, obj *strategy.Strat
 func (r *Resolver) Strategy() generated.StrategyResolver { return &strategyResolver{r} }
 
 type strategyResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *mutationResolver) DeleteManyStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.StrategyService.DeleteManyStrategies(ctx, ids)
+}
+func (r *mutationResolver) DeleteManyStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
+	panic(fmt.Errorf("not implemented: DeleteManyStrategies - deleteManyStrategies"))
+}
+*/

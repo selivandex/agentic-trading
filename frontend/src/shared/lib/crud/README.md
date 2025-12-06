@@ -341,9 +341,15 @@ Main CRUD component that orchestrates all views.
 />
 ```
 
-#### `<CrudTable>`
+#### `<CrudList>`
 
-Table view component (used internally by `<Crud>`).
+List view component with multiple presentation styles (used internally by `<Crud>`).
+
+```tsx
+<CrudList<Strategy> style="table" /> // Table view (default)
+<CrudList<Strategy> style="grid" />  // Grid view (coming soon)
+<CrudList<Strategy> style="cards" /> // Cards view (coming soon)
+```
 
 #### `<CrudForm>`
 
@@ -484,18 +490,30 @@ The CRUD system follows FSD architecture:
 shared/
 ├── lib/
 │   └── crud/
-│       ├── types.ts          # TypeScript types
-│       ├── context.tsx       # React context
-│       ├── use-crud-query.ts # Query hooks
-│       ├── use-crud-mutations.ts # Mutation hooks
-│       ├── utils.ts          # Helper functions
-│       └── index.ts          # Public API
+│       ├── types.ts                  # TypeScript types
+│       ├── context.tsx               # React context
+│       ├── use-crud-query.ts         # Query hooks
+│       ├── use-crud-mutations.ts     # Mutation hooks
+│       ├── use-crud-list.ts          # List logic hook
+│       ├── use-crud-selection.ts     # Selection logic hook
+│       ├── use-crud-batch-actions.ts # Batch actions logic hook
+│       ├── use-crud-handlers.ts      # Action handlers hook
+│       └── index.ts                  # Public API
 └── ui/
     └── crud/
         ├── Crud.tsx          # Main component
-        ├── CrudTable.tsx     # Table view
+        ├── CrudList.tsx      # List container
         ├── CrudForm.tsx      # Form view
         ├── CrudShow.tsx      # Detail view
+        ├── views/            # Presentation components
+        │   ├── CrudTableView.tsx
+        │   ├── CrudBatchActionsToolbar.tsx
+        │   ├── CrudListHeader.tsx
+        │   ├── CrudLoadingState.tsx
+        │   ├── CrudEmptyState.tsx
+        │   ├── CrudErrorState.tsx
+        │   ├── CrudPagination.tsx
+        │   └── index.ts
         └── index.ts          # Public API
 ```
 

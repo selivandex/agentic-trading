@@ -3,14 +3,14 @@
 import { z } from "zod";
 import type { CrudConfig } from "@/shared/lib/crud";
 import { Badge } from "@/components/base/badges/badges";
-import type { Strategy } from "../model/types";
+import type { Strategy } from "@/entities/strategy";
 import {
   GET_ALL_STRATEGIES_QUERY,
   GET_STRATEGY_QUERY,
   CREATE_STRATEGY_MUTATION,
   UPDATE_STRATEGY_MUTATION,
-  CLOSE_STRATEGY_MUTATION,
-} from "../api/strategy.graphql";
+} from "@/entities/strategy";
+import { UserSelectField } from "@/entities/user";
 
 /**
  * CRUD Configuration for Strategy entity
@@ -29,6 +29,9 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
   // Resource names
   resourceName: "Strategy",
   resourceNamePlural: "Strategies",
+
+  // Base path for navigation
+  basePath: "/strategies",
 
   // GraphQL operations
   graphql: {
@@ -53,11 +56,7 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       variables: {},
       dataPath: "updateStrategy",
     },
-    destroy: {
-      mutation: CLOSE_STRATEGY_MUTATION,
-      variables: { id: "" },
-      dataPath: "closeStrategy",
-    },
+    destroy: undefined, // No delete - use Close Strategy action instead
   },
 
   // Table columns
@@ -74,13 +73,13 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       sortable: true,
       render: (strategy) => {
         const colorMap = {
-          ACTIVE: "success" as const,
-          PAUSED: "warning" as const,
-          CLOSED: "gray" as const,
+          active: "success" as const,
+          paused: "warning" as const,
+          closed: "gray" as const,
         };
         return (
           <Badge color={colorMap[strategy.status] ?? "gray"} size="sm">
-            {strategy.status}
+            {strategy.status.charAt(0).toUpperCase() + strategy.status.slice(1)}
           </Badge>
         );
       },
@@ -124,6 +123,15 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
   // Form fields
   formFields: [
     {
+      name: "userID",
+      label: "User",
+      type: "custom",
+      helperText: "Select the user who owns this strategy",
+      validation: z.string().uuid("Please select a user"),
+      render: (props) => <UserSelectField {...props} />,
+      colSpan: 12,
+    },
+    {
       name: "name",
       label: "Strategy Name",
       type: "text",
@@ -140,7 +148,8 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       label: "Description",
       type: "textarea",
       placeholder: "Describe the strategy's goals and approach...",
-      validation: z.string().optional(),
+      helperText: "Optional description of your strategy",
+      validation: z.string().min(1, "Description is required"),
       colSpan: 12,
     },
     {
@@ -152,7 +161,7 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       validation: z
         .number()
         .min(100, "Minimum $100")
-        .max(1000000, "Maximum $1,000,000"),
+        .max(10000000, "Maximum $10,000,000"),
       colSpan: 6,
     },
     {
@@ -160,11 +169,10 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       label: "Market Type",
       type: "select",
       options: [
-        { label: "Crypto", value: "crypto" },
-        { label: "Stocks", value: "stocks" },
-        { label: "Forex", value: "forex" },
+        { label: "Spot", value: "spot" },
+        { label: "Futures", value: "futures" },
       ],
-      validation: z.enum(["crypto", "stocks", "forex"]),
+      validation: z.enum(["spot", "futures"]),
       colSpan: 6,
     },
     {
@@ -187,32 +195,18 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
         { label: "Daily", value: "daily" },
         { label: "Weekly", value: "weekly" },
         { label: "Monthly", value: "monthly" },
+        { label: "Never", value: "never" },
       ],
-      validation: z.enum(["daily", "weekly", "monthly"]),
+      validation: z.enum(["daily", "weekly", "monthly", "never"]),
       colSpan: 6,
     },
   ],
 
-  // Custom actions
-  actions: [
-    {
-      key: "pause",
-      label: "Pause",
-      onClick: async (strategy) => {
-        // This would be implemented in the parent component
-        console.log("Pause strategy:", strategy.id);
-      },
-      hidden: (strategy) => strategy.status !== "ACTIVE",
-    },
-    {
-      key: "resume",
-      label: "Resume",
-      onClick: async (strategy) => {
-        console.log("Resume strategy:", strategy.id);
-      },
-      hidden: (strategy) => strategy.status !== "PAUSED",
-    },
-  ],
+  // Custom actions (overridden in StrategyManager component with real mutations)
+  actions: [],
+
+  // Bulk actions (overridden in StrategyManager component with real mutations)
+  bulkActions: [],
 
   // Feature flags
   enableSelection: true,
@@ -226,29 +220,31 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
 
   // Data transformations
   transformBeforeEdit: (strategy) => ({
+    userID: strategy.userID,
     name: strategy.name,
-    description: strategy.description ?? "",
+    description: strategy.description,
     allocatedCapital: Number(strategy.allocatedCapital),
-    marketType: strategy.marketType,
-    riskTolerance: strategy.riskTolerance,
-    rebalanceFrequency: strategy.rebalanceFrequency,
+    marketType: strategy.marketType || "",
+    riskTolerance: strategy.riskTolerance || "",
+    rebalanceFrequency: strategy.rebalanceFrequency || "",
   }),
 
   transformBeforeCreate: (data) => ({
-    name: data.name,
-    description: data.description || null,
+    userID: data.userID as string,
+    name: data.name as string,
+    description: data.description as string,
     allocatedCapital: String(data.allocatedCapital),
-    marketType: data.marketType,
-    riskTolerance: data.riskTolerance,
-    rebalanceFrequency: data.rebalanceFrequency,
+    marketType: data.marketType as string,
+    riskTolerance: data.riskTolerance as string,
+    rebalanceFrequency: data.rebalanceFrequency as string,
+    targetAllocations: null,
   }),
 
   transformBeforeUpdate: (data) => ({
-    name: data.name,
-    description: data.description || null,
-    allocatedCapital: String(data.allocatedCapital),
-    marketType: data.marketType,
-    riskTolerance: data.riskTolerance,
-    rebalanceFrequency: data.rebalanceFrequency,
+    name: data.name as string,
+    description: data.description as string,
+    riskTolerance: data.riskTolerance as string,
+    rebalanceFrequency: data.rebalanceFrequency as string,
+    targetAllocations: null,
   }),
 };

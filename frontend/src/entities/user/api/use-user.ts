@@ -7,8 +7,8 @@ import {
   GET_USER_BY_TELEGRAM_ID_QUERY,
   UPDATE_USER_SETTINGS_MUTATION,
   SET_USER_ACTIVE_MUTATION,
-} from "@/entities/user/api/user.graphql";
-import type { User, UpdateUserSettingsInput } from "@/entities/user/model/types";
+} from "@/entities/user";
+import type { User, UpdateUserSettingsInput } from "@/entities/user";
 
 /**
  * Hook to get current authenticated user

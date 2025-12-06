@@ -2,17 +2,20 @@
 
 "use client";
 
-import { ArrowLeft, Edit01, Trash01 } from "@untitledui/icons";
-import { Button } from "@/components/base/buttons/button";
-import { Skeleton } from "@/shared/ui/skeleton/skeleton";
+import React from "react";
+import { Button } from "@/shared/base/buttons/button";
 import { useCrudContext } from "@/shared/lib/crud/context";
-import { useCrudShowQuery } from "@/shared/lib/crud/use-crud-query";
-import { useCrudMutations } from "@/shared/lib/crud/use-crud-mutations";
+import { useCrudShow } from "@/shared/lib/crud/use-crud-show";
+import { useCrudFieldFormatter } from "@/shared/lib/crud/use-crud-field-formatter";
+import { useCrudBreadcrumbs } from "@/shared/lib/crud/use-crud-breadcrumbs";
 import type { CrudEntity } from "@/shared/lib/crud/types";
+import { PageHeader, PageHeaderSkeleton } from "@/shared/ui/page-header";
+import { CrudShowContent } from "./views/CrudShowContent";
+import { CrudShowErrorState } from "./views/CrudShowErrorState";
 
 /**
  * CRUD Show Component
- * Displays single entity details
+ * Container that orchestrates show page hooks and presentation components
  */
 export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
   entityId,
@@ -21,51 +24,45 @@ export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
 }) {
   const { config, actions } = useCrudContext<TEntity>();
 
-  // Fetch entity
-  const { entity, loading, error, refetch } = useCrudShowQuery<TEntity>(
-    config,
-    entityId
-  );
+  // Logic hooks
+  const { entity, loading, error, refetch, handleDelete, destroyLoading } =
+    useCrudShow<TEntity>(config, entityId, () => actions.goToIndex());
 
-  // Mutations
-  const { destroy, destroyLoading } = useCrudMutations<TEntity>(config);
+  const { formatFieldValue } = useCrudFieldFormatter();
 
-  // Handle delete
-  const handleDelete = async () => {
-    if (
-      confirm(`Are you sure you want to delete this ${config.resourceName}?`)
-    ) {
-      await destroy(entityId);
-      actions.goToIndex();
-    }
-  };
+  // Breadcrumbs
+  const breadcrumbs = useCrudBreadcrumbs<TEntity>(config, "show", entity ?? undefined);
+
+  const paddingClasses = "px-4 lg:px-8";
+
+  // Get entity title for display
+  const entityTitle = entity
+    ? (entity as { name?: string }).name ??
+      (entity as { title?: string }).title ??
+      `${config.resourceName} #${entity.id}`
+    : config.resourceName;
 
   // Loading state
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-20" />
-            <Skeleton className="h-8 w-48" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-10 w-20" />
-            <Skeleton className="h-10 w-24" />
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-primary p-6 shadow-sm ring-1 ring-secondary">
-          <div className="space-y-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="border-b border-secondary pb-4 last:border-0"
-              >
-                <Skeleton className="mb-2 h-4 w-32" />
-                <Skeleton className="h-6 w-full" />
-              </div>
-            ))}
+      <div className="mx-auto mb-8 flex flex-col gap-5">
+        <PageHeaderSkeleton
+          background="transparent"
+          showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
+          breadcrumbCount={breadcrumbs?.length ?? 0}
+          showTitle
+          actionCount={2}
+        />
+        <div className={paddingClasses}>
+          <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+            <div className="space-y-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-6 w-full bg-gray-100 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -75,143 +72,75 @@ export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
   // Error state
   if (error || !entity) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-lg font-semibold text-primary">
-          Error loading data
-        </h2>
-        <p className="mt-2 text-sm text-secondary">
-          {config.errorMessage ?? error?.message ?? "Entity not found"}
-        </p>
-        <Button onClick={() => refetch()} size="lg" className="mt-4">
-          Try Again
-        </Button>
-      </div>
+      <CrudShowErrorState
+        config={config}
+        error={error}
+        onRetry={() => refetch()}
+      />
     );
   }
 
-  return (
-    <div className="mx-auto max-w-4xl">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+  // Build actions for PageHeader
+  const showActions = config.showActions
+    ? config.showActions
+        .filter((action) => !action.hidden || !action.hidden(entity))
+        .map((action) => (
           <Button
-            color="secondary"
+            key={action.key}
+            color={action.destructive ? "secondary-destructive" : "secondary"}
             size="md"
-            iconLeading={ArrowLeft}
-            onClick={() => actions.goToIndex()}
+            onClick={() => action.onClick(entity)}
+            isDisabled={
+              destroyLoading || (action.disabled && action.disabled(entity))
+            }
           >
-            Back
+            {action.label}
           </Button>
-          <h1 className="text-2xl font-semibold text-primary">
-            {config.resourceName} Details
-          </h1>
-        </div>
+        ))
+    : [];
 
-        <div className="flex items-center gap-3">
+  return (
+    <div className="mx-auto mb-8 flex flex-col gap-5">
+      {/* Page Header with Breadcrumbs, Title, and Actions */}
+      <PageHeader
+        background="transparent"
+        breadcrumbs={breadcrumbs}
+        showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
+        title={entityTitle}
+        backHref={config.basePath}
+        onBackClick={() => actions.goToIndex()}
+      >
+        <PageHeader.Actions>
+          {showActions}
           <Button
             color="secondary"
             size="md"
-            iconLeading={Edit01}
             onClick={() => actions.goToEdit(entityId)}
+            isDisabled={destroyLoading}
           >
             Edit
           </Button>
-          <Button
-            color="secondary-destructive"
-            size="md"
-            iconLeading={Trash01}
-            onClick={handleDelete}
-            isDisabled={destroyLoading}
-          >
-            {destroyLoading ? "Deleting..." : "Delete"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="rounded-xl bg-primary p-6 shadow-sm ring-1 ring-secondary">
-        <div className="space-y-6">
-          {config.formFields.map((field) => {
-            const value = entity[field.name];
-
-            return (
-              <div
-                key={field.name}
-                className="border-b border-secondary pb-4 last:border-0"
-              >
-                <dt className="mb-2 text-sm font-medium text-secondary">
-                  {field.label}
-                </dt>
-                <dd className="text-base text-primary">
-                  {formatFieldValue(value, field.type)}
-                </dd>
-              </div>
-            );
-          })}
-
-          {/* Custom actions */}
-          {config.actions && config.actions.length > 0 && (
-            <div className="mt-6 flex gap-3 border-t border-secondary pt-6">
-              {config.actions
-                .filter((action) => !action.hidden || !action.hidden(entity))
-                .map((action) => (
-                  <Button
-                    key={action.key}
-                    color={
-                      action.destructive ? "secondary-destructive" : "secondary"
-                    }
-                    size="md"
-                    iconLeading={action.icon}
-                    onClick={() => action.onClick(entity)}
-                    isDisabled={
-                      action.disabled ? action.disabled(entity) : false
-                    }
-                  >
-                    {action.label}
-                  </Button>
-                ))}
-            </div>
+          {config.graphql.destroy && (
+            <Button
+              color="secondary-destructive"
+              size="md"
+              onClick={handleDelete}
+              isDisabled={destroyLoading}
+            >
+              {destroyLoading ? "Deleting..." : "Delete"}
+            </Button>
           )}
-        </div>
+        </PageHeader.Actions>
+      </PageHeader>
+
+      <div className={paddingClasses}>
+        {/* Content */}
+        <CrudShowContent
+          config={config}
+          entity={entity}
+          formatFieldValue={formatFieldValue}
+        />
       </div>
     </div>
   );
-}
-
-/**
- * Format field value for display
- */
-function formatFieldValue(value: unknown, fieldType: string): string {
-  if (value == null) {
-    return "—";
-  }
-
-  switch (fieldType) {
-    case "checkbox":
-      return value ? "Yes" : "No";
-
-    case "date":
-      if (typeof value === "string" || value instanceof Date) {
-        return new Date(value).toLocaleDateString();
-      }
-      return String(value);
-
-    case "datetime":
-      if (typeof value === "string" || value instanceof Date) {
-        return new Date(value).toLocaleString();
-      }
-      return String(value);
-
-    case "number":
-      if (typeof value === "number") {
-        return value.toLocaleString();
-      }
-      return String(value);
-
-    default:
-      if (typeof value === "object") {
-        return JSON.stringify(value, null, 2);
-      }
-      return String(value);
-  }
 }

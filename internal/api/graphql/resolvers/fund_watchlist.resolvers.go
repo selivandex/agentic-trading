@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"prometheus/internal/api/graphql/generated"
 	"prometheus/internal/domain/fundwatchlist"
+	fundWatchlistService "prometheus/internal/services/fundwatchlist"
 	"prometheus/pkg/relay"
 
 	"github.com/google/uuid"
@@ -22,60 +23,40 @@ func (r *fundWatchlistResolver) MarketType(ctx context.Context, obj *fundwatchli
 
 // CreateFundWatchlist is the resolver for the createFundWatchlist field.
 func (r *mutationResolver) CreateFundWatchlist(ctx context.Context, input generated.CreateFundWatchlistInput) (*fundwatchlist.Watchlist, error) {
-	entry := &fundwatchlist.Watchlist{
-		ID:         uuid.New(),
+	params := fundWatchlistService.CreateWatchlistParams{
 		Symbol:     input.Symbol,
 		MarketType: input.MarketType,
 		Category:   input.Category,
 		Tier:       input.Tier,
-		IsActive:   true,
-		IsPaused:   false,
 	}
 
-	if err := r.FundWatchlistService.Create(ctx, entry); err != nil {
-		return nil, fmt.Errorf("failed to create fund watchlist: %w", err)
-	}
-
-	return entry, nil
+	return r.FundWatchlistService.CreateWatchlist(ctx, params)
 }
 
 // UpdateFundWatchlist is the resolver for the updateFundWatchlist field.
 func (r *mutationResolver) UpdateFundWatchlist(ctx context.Context, id uuid.UUID, input generated.UpdateFundWatchlistInput) (*fundwatchlist.Watchlist, error) {
-	entry, err := r.FundWatchlistService.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get fund watchlist: %w", err)
+	params := fundWatchlistService.UpdateWatchlistParams{
+		Category:     input.Category,
+		Tier:         input.Tier,
+		IsActive:     input.IsActive,
+		IsPaused:     input.IsPaused,
+		PausedReason: input.PausedReason,
 	}
 
-	// Update fields if provided
-	if input.Category != nil {
-		entry.Category = *input.Category
-	}
-	if input.Tier != nil {
-		entry.Tier = *input.Tier
-	}
-	if input.IsActive != nil {
-		entry.IsActive = *input.IsActive
-	}
-	if input.IsPaused != nil {
-		entry.IsPaused = *input.IsPaused
-	}
-	if input.PausedReason != nil {
-		entry.PausedReason = input.PausedReason
-	}
-
-	if err := r.FundWatchlistService.Update(ctx, entry); err != nil {
-		return nil, fmt.Errorf("failed to update fund watchlist: %w", err)
-	}
-
-	return entry, nil
+	return r.FundWatchlistService.UpdateWatchlist(ctx, id, params)
 }
 
 // DeleteFundWatchlist is the resolver for the deleteFundWatchlist field.
 func (r *mutationResolver) DeleteFundWatchlist(ctx context.Context, id uuid.UUID) (bool, error) {
-	if err := r.FundWatchlistService.Delete(ctx, id); err != nil {
+	if err := r.FundWatchlistService.DeleteWatchlist(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete fund watchlist: %w", err)
 	}
 	return true, nil
+}
+
+// BatchDeleteFundWatchlists is the resolver for the batchDeleteFundWatchlists field.
+func (r *mutationResolver) BatchDeleteFundWatchlists(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.FundWatchlistService.BatchDeleteWatchlists(ctx, ids)
 }
 
 // ToggleFundWatchlistPause is the resolver for the toggleFundWatchlistPause field.
@@ -252,3 +233,18 @@ func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, marketTy
 func (r *Resolver) FundWatchlist() generated.FundWatchlistResolver { return &fundWatchlistResolver{r} }
 
 type fundWatchlistResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *mutationResolver) DeleteManyFundWatchlists(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.FundWatchlistService.DeleteManyWatchlists(ctx, ids)
+}
+func (r *mutationResolver) DeleteManyFundWatchlists(ctx context.Context, ids []uuid.UUID) (int, error) {
+	panic(fmt.Errorf("not implemented: DeleteManyFundWatchlists - deleteManyFundWatchlists"))
+}
+*/

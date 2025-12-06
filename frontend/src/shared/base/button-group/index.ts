@@ -3,11 +3,4 @@
  * Group multiple buttons together
  */
 
-export { ButtonGroup, type ButtonGroupProps } from "./button-group";
-
-
-
-
-
-
-
+export { ButtonGroup, type ButtonGroupProps, ButtonGroupItem } from "./button-group";

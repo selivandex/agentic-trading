@@ -92,7 +92,9 @@ func setupResolverTest(t *testing.T) *testSetup {
 	domainStrategySvc := strategy.NewService(strategyRepo)
 	strategySvc := strategyService.NewService(domainStrategySvc, strategyRepo, nil, nil, log)
 
-	fundSvc := fundService.NewService(fundWatchlistRepo, log)
+	// FundWatchlist domain service
+	domainFundWatchlistSvc := fundwatchlist.NewService(fundWatchlistRepo)
+	fundSvc := fundService.NewService(domainFundWatchlistSvc, log)
 
 	// Create resolver manually (no constructor)
 	resolver := &resolvers.Resolver{
@@ -288,17 +290,23 @@ func TestFundWatchlistsConnection(t *testing.T) {
 	// Create test watchlist items with unique symbols
 	baseSymbols := []string{"BTC", "ETH", "SOL", "AVAX", "DOT"}
 	for i, base := range baseSymbols {
-		entry := &fundwatchlist.Watchlist{
-			ID:         uuid.New(),
-			Symbol:     fmt.Sprintf("%s-%s/USDT", base, uuid.New().String()[:6]),
+		symbol := fmt.Sprintf("%s-%s/USDT", base, uuid.New().String()[:6])
+		_, err := setup.fundWatchlistService.CreateWatchlist(ctx, fundService.CreateWatchlistParams{
+			Symbol:     symbol,
 			MarketType: "spot",
 			Category:   "major",
 			Tier:       i%3 + 1, // Tiers 1, 2, 3
-			IsActive:   true,
-			IsPaused:   i%2 == 0, // Every other paused
-		}
-		err := setup.fundWatchlistService.Create(ctx, entry)
+		})
 		require.NoError(t, err)
+
+		// Pause every other entry
+		if i%2 == 0 {
+			// Get created entry to pause it
+			created, err := setup.fundWatchlistService.GetBySymbol(ctx, symbol, "spot")
+			require.NoError(t, err)
+			_, err = setup.fundWatchlistService.TogglePause(ctx, created.ID, true, nil)
+			require.NoError(t, err)
+		}
 	}
 
 	t.Run("forward pagination - first page", func(t *testing.T) {
@@ -379,17 +387,27 @@ func TestMonitoredSymbolsConnection(t *testing.T) {
 
 	// Create test watchlist items - monitored (active and not paused) with unique symbols
 	for i := 0; i < 8; i++ {
-		entry := &fundwatchlist.Watchlist{
-			ID:         uuid.New(),
-			Symbol:     fmt.Sprintf("COIN%s-%d/USDT", uuid.New().String()[:6], i),
+		symbol := fmt.Sprintf("COIN%s-%d/USDT", uuid.New().String()[:6], i)
+		created, err := setup.fundWatchlistService.CreateWatchlist(ctx, fundService.CreateWatchlistParams{
+			Symbol:     symbol,
 			MarketType: "spot",
 			Category:   "major",
 			Tier:       1,
-			IsActive:   i < 6,  // First 6 are active
-			IsPaused:   i >= 6, // Last 2 are paused
-		}
-		err := setup.fundWatchlistService.Create(ctx, entry)
+		})
 		require.NoError(t, err)
+
+		// Deactivate or pause based on index
+		if i >= 6 {
+			// Last 2 entries: pause them
+			_, err = setup.fundWatchlistService.TogglePause(ctx, created.ID, true, nil)
+			require.NoError(t, err)
+		} else if i == 5 {
+			// One entry: deactivate it
+			_, err = setup.fundWatchlistService.UpdateWatchlist(ctx, created.ID, fundService.UpdateWatchlistParams{
+				IsActive: boolPtr(false),
+			})
+			require.NoError(t, err)
+		}
 	}
 
 	t.Run("forward pagination", func(t *testing.T) {

@@ -4,7 +4,7 @@
 
 import { useQuery } from "@apollo/client";
 import { useMemo } from "react";
-import type { CrudConfig, CrudEntity, CrudState, Connection, PageInfo } from "./types";
+import type { CrudConfig, CrudEntity, CrudState, Connection } from "./types";
 import { get } from "./utils";
 
 /**
@@ -90,7 +90,7 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
     }
   }, [config, state, useConnection]);
 
-  const { data, loading, error, refetch } = useQuery(
+  const { data, loading, error, refetch, fetchMore } = useQuery(
     config.graphql.list.query,
     {
       variables,
@@ -144,6 +144,7 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
     loading,
     error,
     refetch,
+    fetchMore,
   };
 }
 

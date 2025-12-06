@@ -1,6 +1,6 @@
 /** @format */
 
-import type { User } from "@/entities/user/model/types";
+import type { User } from "@/entities/user";
 
 /**
  * Format user full name

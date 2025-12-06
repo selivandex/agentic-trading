@@ -2,8 +2,7 @@
 
 "use client";
 
-import { Crud } from "@/shared/ui/crud";
-import { strategyCrudConfig } from "@/entities/strategy";
+import { StrategyManager } from "@/entities/strategy";
 
 /**
  * Strategies Management Page
@@ -14,11 +13,8 @@ import { strategyCrudConfig } from "@/entities/strategy";
  * - Edit existing strategy
  * - View strategy details
  * - Delete strategy
+ * - Pause/Resume/Close actions
  */
 export default function StrategiesPage() {
-  return (
-    <div className="container mx-auto py-8">
-      <Crud config={strategyCrudConfig} />
-    </div>
-  );
+  return <StrategyManager />;
 }

@@ -14,17 +14,26 @@ Generic CRUD система для Next.js + GraphQL + Apollo Client + FSD ар�
 - ✅ `context.tsx` - React Context + Provider для state management
 - ✅ `use-crud-query.ts` - Hooks для list и show queries
 - ✅ `use-crud-mutations.ts` - Hooks для create, update, delete
-- ✅ `utils.ts` - Helper функции (get nested values)
+- ✅ `use-crud-list.ts` - Hook для list logic (data fetching, pagination)
+- ✅ `use-crud-selection.ts` - Hook для selection logic
+- ✅ `use-crud-batch-actions.ts` - Hook для batch operations
+- ✅ `use-crud-handlers.ts` - Hook для action handlers (sort, search, delete)
 - ✅ `index.ts` - Public API barrel export
 - ✅ `README.md` - Полная документация API
-- ✅ `__tests__/utils.test.ts` - Unit tests
 
 #### UI Components (`shared/ui/crud/`)
 
 - ✅ `Crud.tsx` - Main orchestrator component
-- ✅ `CrudTable.tsx` - List/index view с таблицей
+- ✅ `CrudList.tsx` - List container (orchestrates hooks + views)
 - ✅ `CrudForm.tsx` - Create/edit forms с validation
 - ✅ `CrudShow.tsx` - Detail view
+- ✅ `views/CrudTableView.tsx` - Table presentation component
+- ✅ `views/CrudBatchActionsToolbar.tsx` - Batch actions toolbar
+- ✅ `views/CrudListHeader.tsx` - List header with search
+- ✅ `views/CrudLoadingState.tsx` - Loading skeleton
+- ✅ `views/CrudEmptyState.tsx` - Empty state view
+- ✅ `views/CrudErrorState.tsx` - Error state view
+- ✅ `views/CrudPagination.tsx` - Pagination controls
 - ✅ `index.ts` - Public API barrel export
 
 #### Documentation (`frontend/docs/`)
@@ -39,19 +48,21 @@ Generic CRUD система для Next.js + GraphQL + Apollo Client + FSD ар�
 
 ### 🎯 Features Implemented
 
-#### Table View (Index)
+#### List View (Index)
 
-- ✅ Pagination support
+- ✅ Multiple presentation styles (table, grid, cards - extensible)
+- ✅ Pagination support (Relay cursor-based)
 - ✅ Sorting (column-based)
 - ✅ Search functionality
-- ✅ Row selection (optional)
+- ✅ Row selection with "select all" support
 - ✅ Custom column rendering
 - ✅ Responsive design
 - ✅ Actions dropdown per row
-- ✅ Bulk actions
+- ✅ Batch actions toolbar
 - ✅ Empty state handling
 - ✅ Loading states
 - ✅ Error handling
+- ✅ Clean architecture (logic hooks + presentation components)
 
 #### Forms (Create/Edit)
 
@@ -120,9 +131,27 @@ Generic CRUD система для Next.js + GraphQL + Apollo Client + FSD ар�
         ┌─────────┼─────────┐
         ▼         ▼         ▼
    ┌────────┐ ┌──────┐ ┌──────┐
-   │ Table  │ │ Form │ │ Show │
+   │ List   │ │ Form │ │ Show │
    │ View   │ │ View │ │ View │
    └───┬────┘ └──┬───┘ └──┬───┘
+       │         │        │
+       │ (orchestrates)   │
+       ▼                  │
+   ┌─────────────┐        │
+   │ Logic Hooks │        │
+   │ - useCrudList        │
+   │ - useCrudSelection   │
+   │ - useCrudBatchActions│
+   │ - useCrudHandlers    │
+   └───┬─────────┘        │
+       ▼                  │
+   ┌────────────────────────┐
+   │ Presentation Components│
+   │ - CrudTableView       │
+   │ - CrudBatchToolbar    │
+   │ - CrudListHeader      │
+   │ - States (loading...) │
+   └───────────┬────────────┘
        │         │        │
        ▼         ▼        ▼
    ┌────────────────────────┐
@@ -157,13 +186,19 @@ Generic CRUD система для Next.js + GraphQL + Apollo Client + FSD ар�
 const config: CrudConfig<MyEntity> = {
   resourceName: "Entity",
   resourceNamePlural: "Entities",
-  graphql: { /* operations */ },
-  columns: [ /* column defs */ ],
-  formFields: [ /* field defs */ ],
+  graphql: {
+    /* operations */
+  },
+  columns: [
+    /* column defs */
+  ],
+  formFields: [
+    /* field defs */
+  ],
 };
 
 // 2. Use in page
-<Crud config={config} />
+<Crud config={config} />;
 ```
 
 ### ✅ Quality Checks
@@ -184,11 +219,14 @@ const config: CrudConfig<MyEntity> = {
 1. **Generic-first**: Типы параметризованы через `TEntity extends CrudEntity`
 2. **Declarative config**: Вся логика в конфигурации, не в коде
 3. **Composition over inheritance**: Hooks + Context вместо классов
-4. **Single responsibility**: Каждый компонент делает одну вещь
-5. **DRY principle**: Нет дублирования кода
-6. **Type safety**: Максимальная типизация
-7. **Performance**: Memoization, optimistic updates
-8. **Developer UX**: Минимум кода для использования
+4. **Clean Architecture**: Разделение логики (hooks) и презентации (views)
+5. **No GOD components**: Каждый компонент/hook делает одну вещь
+6. **Single responsibility**: Логика в хуках, UI в презентационных компонентах
+7. **DRY principle**: Нет дублирования кода
+8. **Type safety**: Максимальная типизация
+9. **Performance**: Memoization, optimistic updates
+10. **Extensibility**: Легко добавить новые view styles (grid, cards)
+11. **Developer UX**: Минимум кода для использования
 
 ### 🚀 Next Steps (Optional Enhancements)
 
@@ -215,12 +253,14 @@ const config: CrudConfig<MyEntity> = {
 ```typescript
 // In any entity's lib/crud-config.tsx
 import { CrudConfig } from "@/shared/lib/crud";
-export const entityCrudConfig: CrudConfig<MyEntity> = { /* ... */ };
+export const entityCrudConfig: CrudConfig<MyEntity> = {
+  /* ... */
+};
 
 // In any page
 import { Crud } from "@/shared/ui/crud";
 import { entityCrudConfig } from "@/entities/my-entity";
-<Crud config={entityCrudConfig} />
+<Crud config={entityCrudConfig} />;
 ```
 
 ### ✨ Benefits

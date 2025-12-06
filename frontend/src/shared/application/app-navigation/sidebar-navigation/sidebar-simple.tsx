@@ -17,6 +17,8 @@ interface SidebarNavigationSimpleProps {
   footerItems?: NavItemType[];
   /** Feature card component to display in the sidebar. */
   featureCard?: ReactNode;
+  /** Header component to display at the top of the sidebar (e.g., project selector). */
+  headerSlot?: ReactNode;
   /** Additional CSS classes to apply to the sidebar. */
   className?: string;
   /** Current user data for account card (from Next-Auth session) */
@@ -33,6 +35,7 @@ export const SidebarNavigationSimple = ({
   items,
   footerItems = [],
   featureCard,
+  headerSlot,
   className,
   user,
   currentOrganizationId,
@@ -48,6 +51,9 @@ export const SidebarNavigationSimple = ({
         className
       )}
     >
+      {/* Header slot (e.g., project selector) */}
+      {headerSlot && <div>{headerSlot}</div>}
+
       {/* Navigation items */}
       <nav className="flex-1 overflow-y-auto">
         <NavList activeUrl={pathname} items={items} />

@@ -4,6 +4,7 @@
 
 import type { ReactNode } from "react";
 import { createContext, useContext, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { CrudActions, CrudConfig, CrudEntity, CrudState } from "./types";
 
 /**
@@ -56,13 +57,16 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
   const [currentEntity, setCurrentEntity] = useState<TEntity | null>(null);
   const [selectedEntities, setSelectedEntities] = useState<TEntity[]>([]);
   const [filters, setFilters] = useState<Record<string, unknown>>({});
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(config.defaultPageSize ?? 20);
+  const [page] = useState(1); // Keep for state interface compatibility
+  const [pageSize] = useState(config.defaultPageSize ?? 20);
   const [sort, setSort] = useState<CrudState<TEntity>["sort"]>();
   const [searchQuery, setSearchQuery] = useState<string>();
   const [cursors, setCursors] = useState<CrudState<TEntity>["cursors"]>({});
   const [totalCount, setTotalCount] = useState<number>();
   const [pageInfo, setPageInfo] = useState<CrudState<TEntity>["pageInfo"]>();
+
+  // Next.js router for navigation
+  const router = useRouter();
 
   // State object
   const state = useMemo<CrudState<TEntity>>(
@@ -98,20 +102,34 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
   const actions = useMemo<CrudActions<TEntity>>(
     () => ({
       goToIndex: () => {
-        setMode("index");
-        setCurrentEntity(null);
+        if (config.basePath) {
+          router.push(config.basePath);
+        } else {
+          setMode("index");
+          setCurrentEntity(null);
+        }
       },
-      goToShow: (_id: string) => {
-        setMode("show");
-        // Entity will be loaded by the Show component
+      goToShow: (id: string) => {
+        if (config.basePath) {
+          router.push(`${config.basePath}/${id}`);
+        } else {
+          setMode("show");
+        }
       },
       goToNew: () => {
-        setMode("new");
-        setCurrentEntity(null);
+        if (config.basePath) {
+          router.push(`${config.basePath}/new`);
+        } else {
+          setMode("new");
+          setCurrentEntity(null);
+        }
       },
-      goToEdit: (_id: string) => {
-        setMode("edit");
-        // Entity will be loaded by the Edit component
+      goToEdit: (id: string) => {
+        if (config.basePath) {
+          router.push(`${config.basePath}/${id}/edit`);
+        } else {
+          setMode("edit");
+        }
       },
       create: async (_data: Record<string, unknown>) => {
         // Implemented by useCrudMutations hook
@@ -127,8 +145,21 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
       },
       setSelectedEntities,
       setFilters,
-      setPage,
-      setPageSize,
+      setPage: (_newPage: number) => {
+        // Not used in Relay pagination - use goToNextPage/goToPrevPage instead
+      },
+      setPageSize: (_newPageSize: number) => {
+        // Not implemented yet
+      },
+      goToNextPage: () => {
+        // This will be overridden in CrudList with fetchMore
+      },
+      goToPrevPage: () => {
+        // Not implemented for Load More pattern
+      },
+      goToFirstPage: () => {
+        setCursors({});
+      },
       setSort: (column: string, direction: "asc" | "desc") => {
         setSort({ column, direction });
       },
@@ -140,11 +171,30 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
         newPageInfo?: typeof pageInfo,
         newTotalCount?: number
       ) => {
-        if (newPageInfo) setPageInfo(newPageInfo);
+        if (newPageInfo) {
+          setPageInfo(newPageInfo);
+          // Update cursors for next/prev navigation
+          setCursors({
+            after: newPageInfo.endCursor,
+            before: newPageInfo.startCursor,
+          });
+        }
         if (newTotalCount !== undefined) setTotalCount(newTotalCount);
       },
     }),
-    []
+    [
+      config.basePath,
+      router,
+      setMode,
+      setCurrentEntity,
+      setSelectedEntities,
+      setFilters,
+      setCursors,
+      setSort,
+      setSearchQuery,
+      setPageInfo,
+      setTotalCount,
+    ]
   );
 
   const value = useMemo<CrudContextValue<TEntity>>(

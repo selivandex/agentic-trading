@@ -1,9 +1,9 @@
 /** @format */
 
-import { UserAvatar } from "@/entities/user/ui/UserAvatar";
+import { UserAvatar } from "@/entities/user";
 import { BadgeWithDot } from "@/shared/base";
-import type { User } from "@/entities/user/model/types";
-import { formatUserDisplayName } from "@/entities/user/lib/formatters";
+import type { User } from "@/entities/user";
+import { formatUserDisplayName } from "@/entities/user";
 
 interface UserCardProps {
   user: User;

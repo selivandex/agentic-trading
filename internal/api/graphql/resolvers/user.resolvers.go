@@ -10,86 +10,182 @@ import (
 	"fmt"
 	"prometheus/internal/api/graphql/generated"
 	"prometheus/internal/domain/user"
+	userService "prometheus/internal/services/user"
 	"prometheus/pkg/relay"
 
 	"github.com/google/uuid"
 )
 
+// CreateUser is the resolver for the createUser field.
+func (r *mutationResolver) CreateUser(ctx context.Context, input generated.CreateUserInput) (*user.User, error) {
+	// Parse telegram ID if provided
+	var telegramID *int64
+	if input.TelegramID != nil && *input.TelegramID != "" {
+		var tid int64
+		if _, err := fmt.Sscanf(*input.TelegramID, "%d", &tid); err != nil {
+			return nil, fmt.Errorf("invalid telegram ID: %w", err)
+		}
+		telegramID = &tid
+	}
+
+	// Parse settings if provided
+	var settings *user.Settings
+	if input.Settings != nil {
+		s := user.DefaultSettings()
+		if input.Settings.DefaultAIProvider != nil {
+			s.DefaultAIProvider = *input.Settings.DefaultAIProvider
+		}
+		if input.Settings.DefaultAIModel != nil {
+			s.DefaultAIModel = *input.Settings.DefaultAIModel
+		}
+		if input.Settings.RiskLevel != nil {
+			s.RiskLevel = *input.Settings.RiskLevel
+		}
+		if input.Settings.MaxPositions != nil {
+			s.MaxPositions = *input.Settings.MaxPositions
+		}
+		if input.Settings.MaxPortfolioRisk != nil {
+			s.MaxPortfolioRisk = *input.Settings.MaxPortfolioRisk
+		}
+		if input.Settings.MaxDailyDrawdown != nil {
+			s.MaxDailyDrawdown = *input.Settings.MaxDailyDrawdown
+		}
+		if input.Settings.MaxConsecutiveLoss != nil {
+			s.MaxConsecutiveLoss = *input.Settings.MaxConsecutiveLoss
+		}
+		if input.Settings.NotificationsOn != nil {
+			s.NotificationsOn = *input.Settings.NotificationsOn
+		}
+		if input.Settings.DailyReportTime != nil {
+			s.DailyReportTime = *input.Settings.DailyReportTime
+		}
+		if input.Settings.Timezone != nil {
+			s.Timezone = *input.Settings.Timezone
+		}
+		if input.Settings.CircuitBreakerOn != nil {
+			s.CircuitBreakerOn = *input.Settings.CircuitBreakerOn
+		}
+		if input.Settings.MaxPositionSizeUsd != nil {
+			s.MaxPositionSizeUSD = *input.Settings.MaxPositionSizeUsd
+		}
+		if input.Settings.MaxTotalExposureUsd != nil {
+			s.MaxTotalExposureUSD = *input.Settings.MaxTotalExposureUsd
+		}
+		if input.Settings.MinPositionSizeUsd != nil {
+			s.MinPositionSizeUSD = *input.Settings.MinPositionSizeUsd
+		}
+		if input.Settings.MaxLeverageMultiple != nil {
+			s.MaxLeverageMultiple = *input.Settings.MaxLeverageMultiple
+		}
+		if input.Settings.AllowedExchanges != nil {
+			s.AllowedExchanges = input.Settings.AllowedExchanges
+		}
+		settings = &s
+	}
+
+	// Set defaults
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+	isPremium := false
+	if input.IsPremium != nil {
+		isPremium = *input.IsPremium
+	}
+
+	params := userService.CreateUserParams{
+		TelegramID: telegramID,
+		TelegramUsername: func() string {
+			if input.TelegramUsername == nil {
+				return ""
+			}
+			return *input.TelegramUsername
+		}(),
+		Email:          input.Email,
+		PasswordHash:   input.PasswordHash,
+		FirstName:      input.FirstName,
+		LastName:       input.LastName,
+		LanguageCode:   input.LanguageCode,
+		IsActive:       isActive,
+		IsPremium:      isPremium,
+		LimitProfileID: input.LimitProfileID,
+		Settings:       settings,
+	}
+
+	return r.UserService.CreateUser(ctx, params)
+}
+
+// UpdateUser is the resolver for the updateUser field.
+func (r *mutationResolver) UpdateUser(ctx context.Context, id uuid.UUID, input generated.UpdateUserInput) (*user.User, error) {
+	// Parse telegram ID if provided
+	var telegramID *int64
+	if input.TelegramID != nil && *input.TelegramID != "" {
+		var tid int64
+		if _, err := fmt.Sscanf(*input.TelegramID, "%d", &tid); err != nil {
+			return nil, fmt.Errorf("invalid telegram ID: %w", err)
+		}
+		telegramID = &tid
+	}
+
+	params := userService.UpdateUserParams{
+		TelegramID:       telegramID,
+		TelegramUsername: input.TelegramUsername,
+		Email:            input.Email,
+		FirstName:        input.FirstName,
+		LastName:         input.LastName,
+		LanguageCode:     input.LanguageCode,
+		IsPremium:        input.IsPremium,
+		LimitProfileID:   input.LimitProfileID,
+	}
+
+	return r.UserService.UpdateUser(ctx, id, params)
+}
+
+// DeleteUser is the resolver for the deleteUser field.
+func (r *mutationResolver) DeleteUser(ctx context.Context, id uuid.UUID) (bool, error) {
+	if err := r.UserService.DeleteUser(ctx, id); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// BatchDeleteUsers is the resolver for the batchDeleteUsers field.
+func (r *mutationResolver) BatchDeleteUsers(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.UserService.BatchDeleteUsers(ctx, ids)
+}
+
 // UpdateUserSettings is the resolver for the updateUserSettings field.
 func (r *mutationResolver) UpdateUserSettings(ctx context.Context, userID uuid.UUID, input generated.UpdateUserSettingsInput) (*user.User, error) {
-	// Get existing user via service
-	u, err := r.UserService.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+	params := userService.UpdateSettingsParams{
+		DefaultAIProvider:   input.DefaultAIProvider,
+		DefaultAIModel:      input.DefaultAIModel,
+		RiskLevel:           input.RiskLevel,
+		MaxPositions:        input.MaxPositions,
+		MaxPortfolioRisk:    input.MaxPortfolioRisk,
+		MaxDailyDrawdown:    input.MaxDailyDrawdown,
+		MaxConsecutiveLoss:  input.MaxConsecutiveLoss,
+		NotificationsOn:     input.NotificationsOn,
+		DailyReportTime:     input.DailyReportTime,
+		Timezone:            input.Timezone,
+		CircuitBreakerOn:    input.CircuitBreakerOn,
+		MaxPositionSizeUSD:  input.MaxPositionSizeUsd,
+		MaxTotalExposureUSD: input.MaxTotalExposureUsd,
+		MinPositionSizeUSD:  input.MinPositionSizeUsd,
+		MaxLeverageMultiple: input.MaxLeverageMultiple,
+		AllowedExchanges:    input.AllowedExchanges,
 	}
 
-	// Update settings fields if provided
-	if input.DefaultAIProvider != nil {
-		u.Settings.DefaultAIProvider = *input.DefaultAIProvider
-	}
-	if input.DefaultAIModel != nil {
-		u.Settings.DefaultAIModel = *input.DefaultAIModel
-	}
-	if input.RiskLevel != nil {
-		u.Settings.RiskLevel = *input.RiskLevel
-	}
-	if input.MaxPositions != nil {
-		u.Settings.MaxPositions = *input.MaxPositions
-	}
-	if input.MaxPortfolioRisk != nil {
-		u.Settings.MaxPortfolioRisk = *input.MaxPortfolioRisk
-	}
-	if input.MaxDailyDrawdown != nil {
-		u.Settings.MaxDailyDrawdown = *input.MaxDailyDrawdown
-	}
-	if input.MaxConsecutiveLoss != nil {
-		u.Settings.MaxConsecutiveLoss = *input.MaxConsecutiveLoss
-	}
-	if input.NotificationsOn != nil {
-		u.Settings.NotificationsOn = *input.NotificationsOn
-	}
-	if input.DailyReportTime != nil {
-		u.Settings.DailyReportTime = *input.DailyReportTime
-	}
-	if input.Timezone != nil {
-		u.Settings.Timezone = *input.Timezone
-	}
-	if input.CircuitBreakerOn != nil {
-		u.Settings.CircuitBreakerOn = *input.CircuitBreakerOn
-	}
-	if input.MaxPositionSizeUsd != nil {
-		u.Settings.MaxPositionSizeUSD = *input.MaxPositionSizeUsd
-	}
-	if input.MaxTotalExposureUsd != nil {
-		u.Settings.MaxTotalExposureUSD = *input.MaxTotalExposureUsd
-	}
-	if input.MinPositionSizeUsd != nil {
-		u.Settings.MinPositionSizeUSD = *input.MinPositionSizeUsd
-	}
-	if input.MaxLeverageMultiple != nil {
-		u.Settings.MaxLeverageMultiple = *input.MaxLeverageMultiple
-	}
-	if input.AllowedExchanges != nil {
-		u.Settings.AllowedExchanges = input.AllowedExchanges
-	}
-
-	// Use service to update (with events)
-	if err := r.UserService.Update(ctx, u); err != nil {
-		return nil, fmt.Errorf("failed to update user: %w", err)
-	}
-
-	return u, nil
+	return r.UserService.UpdateSettings(ctx, userID, params)
 }
 
 // SetUserActive is the resolver for the setUserActive field.
 func (r *mutationResolver) SetUserActive(ctx context.Context, userID uuid.UUID, isActive bool) (*user.User, error) {
-	// Use service method (publishes events)
-	if err := r.UserService.SetActive(ctx, userID, isActive); err != nil {
-		return nil, fmt.Errorf("failed to set user active: %w", err)
-	}
+	return r.UserService.SetActive(ctx, userID, isActive)
+}
 
-	// Fetch updated user
-	return r.UserService.GetByID(ctx, userID)
+// SetUserPremium is the resolver for the setUserPremium field.
+func (r *mutationResolver) SetUserPremium(ctx context.Context, userID uuid.UUID, isPremium bool) (*user.User, error) {
+	return r.UserService.SetPremium(ctx, userID, isPremium)
 }
 
 // User is the resolver for the user field.
@@ -228,3 +324,15 @@ func (r *userResolver) LimitProfileID(ctx context.Context, obj *user.User) (*uui
 func (r *Resolver) User() generated.UserResolver { return &userResolver{r} }
 
 type userResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *mutationResolver) DeleteManyUsers(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.UserService.DeleteManyUsers(ctx, ids)
+}
+*/

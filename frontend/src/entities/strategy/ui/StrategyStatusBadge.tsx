@@ -1,11 +1,11 @@
 /** @format */
 
 import { BadgeWithDot } from "@/shared/base";
-import type { StrategyStatus } from "@/entities/strategy/model/types";
+import type { StrategyStatus } from "@/entities/strategy";
 import {
   formatStrategyStatus,
   getStrategyStatusColor,
-} from "@/entities/strategy/lib/formatters";
+} from "@/entities/strategy";
 
 interface StrategyStatusBadgeProps {
   status: StrategyStatus;

@@ -4,7 +4,7 @@
 
 import { CrudProvider } from "@/shared/lib/crud/context";
 import type { CrudConfig, CrudEntity } from "@/shared/lib/crud/types";
-import { CrudTable } from "./CrudTable";
+import { CrudList } from "./CrudList";
 import { CrudForm } from "./CrudForm";
 import { CrudShow } from "./CrudShow";
 
@@ -18,12 +18,15 @@ export interface CrudProps<TEntity extends CrudEntity = CrudEntity> {
   mode?: "index" | "show" | "new" | "edit";
   /** Initial entity ID (for show/edit) */
   entityId?: string;
+  /** List view style: table, grid, cards */
+  listStyle?: "table" | "grid" | "cards";
 }
 
 export function Crud<TEntity extends CrudEntity = CrudEntity>({
   config,
   mode = "index",
   entityId,
+  listStyle = "table",
 }: CrudProps<TEntity>) {
   return (
     <CrudProvider
@@ -31,7 +34,7 @@ export function Crud<TEntity extends CrudEntity = CrudEntity>({
       initialMode={mode}
       _initialEntityId={entityId}
     >
-      <CrudRouter entityId={entityId} />
+      <CrudRouter entityId={entityId} listStyle={listStyle} />
     </CrudProvider>
   );
 }
@@ -41,14 +44,16 @@ export function Crud<TEntity extends CrudEntity = CrudEntity>({
  */
 function CrudRouter<TEntity extends CrudEntity = CrudEntity>({
   entityId,
+  listStyle = "table",
 }: {
   entityId?: string;
+  listStyle?: "table" | "grid" | "cards";
 }) {
   const { state } = useCrudContext<TEntity>();
 
   switch (state.mode) {
     case "index":
-      return <CrudTable<TEntity> />;
+      return <CrudList<TEntity> style={listStyle} />;
 
     case "show":
       return entityId ? (

@@ -5,9 +5,9 @@
 import type { ComponentType, FC, HTMLAttributes, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "@untitledui/icons";
-import { Button } from "@/components/base/buttons/button";
-import { Avatar } from "@/components/base/avatar/avatar";
-import { Input } from "@/components/base/input/input";
+import { Button } from "@/shared/base/buttons/button";
+import { Avatar } from "@/shared/base/avatar/avatar";
+import { Input } from "@/shared/base/input/input";
 import { Tabs, TabList, Tab } from "@/shared/ui/tabs/tabs";
 import { Breadcrumbs } from "@/shared/ui/breadcrumbs/breadcrumbs";
 import { Skeleton } from "@/shared/ui/skeleton/skeleton";
@@ -134,7 +134,7 @@ export const PageHeader = ({
         <div className={`max-lg:hidden ${paddingClasses}`}>
           <Breadcrumbs type="button" maxVisibleItems={3}>
             {breadcrumbs.map((item, index) => (
-              <Breadcrumbs.Item key={index} href={item.href}>
+              <Breadcrumbs.Item key={index} href={item.href} icon={item.icon}>
                 {item.label}
               </Breadcrumbs.Item>
             ))}

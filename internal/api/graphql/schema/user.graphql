@@ -72,6 +72,50 @@ type Settings {
   allowedExchanges: [String!]!
 }
 
+input CreateUserInput {
+  telegramID: String
+  telegramUsername: String
+  email: String
+  passwordHash: String
+  firstName: String!
+  lastName: String!
+  languageCode: String!
+  isActive: Boolean
+  isPremium: Boolean
+  limitProfileID: UUID
+  settings: SettingsInput
+}
+
+input UpdateUserInput {
+  telegramID: String
+  telegramUsername: String
+  email: String
+  firstName: String
+  lastName: String
+  languageCode: String
+  isPremium: Boolean
+  limitProfileID: UUID
+}
+
+input SettingsInput {
+  defaultAIProvider: String
+  defaultAIModel: String
+  riskLevel: String
+  maxPositions: Int
+  maxPortfolioRisk: Float
+  maxDailyDrawdown: Float
+  maxConsecutiveLoss: Int
+  notificationsOn: Boolean
+  dailyReportTime: String
+  timezone: String
+  circuitBreakerOn: Boolean
+  maxPositionSizeUSD: Float
+  maxTotalExposureUSD: Float
+  minPositionSizeUSD: Float
+  maxLeverageMultiple: Float
+  allowedExchanges: [String!]
+}
+
 input UpdateUserSettingsInput {
   defaultAIProvider: String
   defaultAIModel: String
@@ -100,7 +144,8 @@ extend type Query {
   userByTelegramID(telegramID: String!): User
 
   # Get all users (admin only, legacy)
-  users(limit: Int, offset: Int): [User!]! @deprecated(reason: "Use usersConnection instead")
+  users(limit: Int, offset: Int): [User!]!
+    @deprecated(reason: "Use usersConnection instead")
 
   # Get all users (admin only, Relay Connection)
   usersConnection(
@@ -113,9 +158,24 @@ extend type Query {
 
 # Mutations
 extend type Mutation {
+  # Create new user (admin only)
+  createUser(input: CreateUserInput!): User!
+
+  # Update user (admin only)
+  updateUser(id: UUID!, input: UpdateUserInput!): User!
+
+  # Delete user (admin only, hard delete)
+  deleteUser(id: UUID!): Boolean!
+
+  # Batch delete users (admin only, hard delete)
+  batchDeleteUsers(ids: [UUID!]!): Int!
+
   # Update user settings
   updateUserSettings(userID: UUID!, input: UpdateUserSettingsInput!): User!
 
   # Activate/deactivate user
   setUserActive(userID: UUID!, isActive: Boolean!): User!
+
+  # Set premium status
+  setUserPremium(userID: UUID!, isPremium: Boolean!): User!
 }

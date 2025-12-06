@@ -1,7 +1,7 @@
 /** @format */
 
 import { BadgeWithDot } from "@/shared/base";
-import type { FundWatchlist } from "@/entities/fund-watchlist/model/types";
+import type { FundWatchlist } from "@/entities/fund-watchlist";
 import {
   formatTier,
   getTierColor,
@@ -9,7 +9,7 @@ import {
   getWatchlistStatusText,
   formatMarketType,
   formatCategory,
-} from "@/entities/fund-watchlist/lib/formatters";
+} from "@/entities/fund-watchlist";
 
 interface WatchlistItemCardProps {
   item: FundWatchlist;
@@ -40,9 +40,7 @@ export function WatchlistItemCard({
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-primary">
-            {item.symbol}
-          </h3>
+          <h3 className="text-lg font-semibold text-primary">{item.symbol}</h3>
           <p className="text-sm text-secondary mt-1">
             {formatMarketType(item.marketType)}
           </p>

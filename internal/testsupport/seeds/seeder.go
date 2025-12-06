@@ -81,3 +81,8 @@ func (s *Seeder) Memory() *MemoryBuilder {
 func (s *Seeder) Agent() *AgentBuilder {
 	return NewAgentBuilder(s.db, s.ctx)
 }
+
+// FundWatchlist starts building a FundWatchlist entity
+func (s *Seeder) FundWatchlist() *FundWatchlistBuilder {
+	return NewFundWatchlistBuilder(s.db, s.ctx)
+}

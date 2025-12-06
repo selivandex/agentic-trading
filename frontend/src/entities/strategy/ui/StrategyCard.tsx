@@ -1,7 +1,7 @@
 /** @format */
 
 import { BadgeWithDot } from "@/shared/base";
-import type { Strategy } from "@/entities/strategy/model/types";
+import type { Strategy } from "@/entities/strategy";
 import {
   formatStrategyStatus,
   getStrategyStatusColor,
@@ -9,7 +9,7 @@ import {
   formatRiskTolerance,
   formatCurrency,
   formatPercentage,
-} from "@/entities/strategy/lib/formatters";
+} from "@/entities/strategy";
 
 interface StrategyCardProps {
   strategy: Strategy;
