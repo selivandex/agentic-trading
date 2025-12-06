@@ -51,6 +51,12 @@ export interface InputBaseProps extends TextFieldProps {
   groupRef?: Ref<HTMLDivElement>;
   /** Icon component to display on the left side of the input. */
   icon?: ComponentType<HTMLAttributes<HTMLOrSVGElement>>;
+  /** Minimum value for number inputs. */
+  min?: number;
+  /** Maximum value for number inputs. */
+  max?: number;
+  /** Step value for number inputs. */
+  step?: number;
 }
 
 export const InputBase = ({

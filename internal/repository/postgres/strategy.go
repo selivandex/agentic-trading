@@ -481,7 +481,7 @@ func (r *StrategyRepository) GetRangeStats(ctx context.Context, userID *uuid.UUI
 			COALESCE(MIN(total_pnl_percent), 0) as min_pnl_percent,
 			COALESCE(MAX(total_pnl_percent), 0) as max_pnl_percent
 		FROM user_strategies
-		WHERE deleted_at IS NULL`
+		WHERE 1=1`
 
 	args := []interface{}{}
 	if userID != nil {

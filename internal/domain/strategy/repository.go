@@ -112,8 +112,8 @@ type TransactionStats struct {
 // RangeStats contains min/max values for numeric fields
 // Used for dynamic filter ranges in the frontend
 type RangeStats struct {
-	MinCapital    decimal.Decimal
-	MaxCapital    decimal.Decimal
-	MinPnLPercent decimal.Decimal
-	MaxPnLPercent decimal.Decimal
+	MinCapital    decimal.Decimal `db:"min_capital"`
+	MaxCapital    decimal.Decimal `db:"max_capital"`
+	MinPnLPercent decimal.Decimal `db:"min_pnl_percent"`
+	MaxPnLPercent decimal.Decimal `db:"max_pnl_percent"`
 }

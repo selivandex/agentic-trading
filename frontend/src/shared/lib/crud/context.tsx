@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import { createContext, useContext, useMemo, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import type { CrudActions, CrudConfig, CrudEntity, CrudState } from "./types";
 
 /**
@@ -53,46 +53,61 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
   _initialEntityId,
 }: CrudProviderProps<TEntity>) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
-  // Initialize state from URL params
+  // Initialize state (will sync from URL in useEffect)
   const [mode, setMode] = useState<CrudState<TEntity>["mode"]>(initialMode);
   const [currentEntity, setCurrentEntity] = useState<TEntity | null>(null);
   const [selectedEntities, setSelectedEntities] = useState<TEntity[]>([]);
-  const [filters, setFiltersState] = useState<Record<string, unknown>>(() => {
-    // Parse filters from URL on mount
-    const filtersParam = searchParams.get("filters");
-    if (filtersParam) {
-      try {
-        return JSON.parse(decodeURIComponent(filtersParam));
-      } catch {
-        return {};
-      }
-    }
-    return {};
-  });
+  const [filters, setFiltersState] = useState<Record<string, unknown>>({});
   const [page] = useState(1);
   const [pageSize] = useState(config.defaultPageSize ?? 20);
-  const [sort, setSort] = useState<CrudState<TEntity>["sort"]>(() => {
-    const sortBy = searchParams.get("sortBy");
-    const sortDirection = searchParams.get("sortDirection");
-    if (sortBy && sortDirection) {
-      return { column: sortBy, direction: sortDirection as "asc" | "desc" };
-    }
-    return undefined;
-  });
-  const [searchQuery, setSearchQuery] = useState<string | undefined>(
-    searchParams.get("search") || undefined
-  );
+  const [sort, setSort] = useState<CrudState<TEntity>["sort"]>();
+  const [searchQuery, setSearchQuery] = useState<string | undefined>();
   const [cursors, setCursors] = useState<CrudState<TEntity>["cursors"]>({});
   const [totalCount, setTotalCount] = useState<number>();
   const [pageInfo, setPageInfo] = useState<CrudState<TEntity>["pageInfo"]>();
-  const [activeTab, setActiveTabState] = useState<string | undefined>(
-    searchParams.get("tab") || undefined
-  );
+  const [activeTab, setActiveTabState] = useState<string | undefined>();
+
+  // Initialize from URL on mount (client-side only)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+
+    // Parse filters from URL
+    const filtersParam = params.get("filters");
+    if (filtersParam) {
+      try {
+        setFiltersState(JSON.parse(decodeURIComponent(filtersParam)));
+      } catch {
+        // Ignore invalid JSON
+      }
+    }
+
+    // Parse search from URL
+    const searchParam = params.get("search");
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+
+    // Parse sort from URL
+    const sortBy = params.get("sortBy");
+    const sortDirection = params.get("sortDirection");
+    if (sortBy && sortDirection) {
+      setSort({ column: sortBy, direction: sortDirection as "asc" | "desc" });
+    }
+
+    // Parse tab from URL
+    const tabParam = params.get("tab");
+    if (tabParam) {
+      setActiveTabState(tabParam);
+    }
+  }, []); // Only on mount
 
   // Update URL when filters/search/sort/tab change
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (mode !== "index") return; // Only sync URL for list view
 
     const params = new URLSearchParams();
@@ -120,11 +135,11 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
 
     // Update URL without causing a full page reload
     const newUrl = params.toString()
-      ? `${window.location.pathname}?${params.toString()}`
-      : window.location.pathname;
+      ? `${pathname}?${params.toString()}`
+      : pathname;
 
     router.replace(newUrl, { scroll: false });
-  }, [filters, searchQuery, sort, activeTab, mode, router]);
+  }, [filters, searchQuery, sort, activeTab, mode, router, pathname]);
 
   // Wrapper for setFilters that updates state
   const setFilters = (newFilters: Record<string, unknown>) => {

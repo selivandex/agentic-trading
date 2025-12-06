@@ -108,6 +108,8 @@ export const GET_USER_STRATEGIES_QUERY = gql`
         }
         defaultValue
         placeholder
+        min
+        max
       }
     }
   }
@@ -162,6 +164,8 @@ export const GET_ALL_STRATEGIES_QUERY = gql`
         }
         defaultValue
         placeholder
+        min
+        max
       }
     }
   }

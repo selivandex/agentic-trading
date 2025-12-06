@@ -157,6 +157,10 @@ export interface FilterMetadata {
   defaultValue?: string;
   /** Placeholder text (optional) */
   placeholder?: string;
+  /** Minimum value for number/number range filters */
+  min?: number;
+  /** Maximum value for number/number range filters */
+  max?: number;
 }
 
 /**

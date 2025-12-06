@@ -2,12 +2,7 @@
 
 "use client";
 
-import type { DateValue } from "react-aria-components";
-import { Input } from "@/components/base/input/input";
-import { Select } from "@/shared/base/select";
-import { Slider } from "@/shared/base/slider";
-import { DateRangePicker } from "@/shared/application/date-picker/date-range-picker";
-import { CrudMultiSelectFilter } from "./CrudMultiSelectFilter";
+import { FILTER_COMPONENTS } from "../filters";
 import type {
   CrudEntity,
   CrudDynamicFiltersConfig,
@@ -28,6 +23,12 @@ interface CrudDynamicFiltersProps<_TEntity extends CrudEntity = CrudEntity> {
 /**
  * CRUD Dynamic Filters Component
  * Displays filters based on metadata from backend
+ *
+ * Architecture:
+ * - Uses registry pattern to map filter types to components
+ * - Each filter type has its own component (SRP)
+ * - Easy to extend with new filter types (OCP)
+ * - No switch statements or complex conditionals (DRY)
  */
 export function CrudDynamicFilters<TEntity extends CrudEntity = CrudEntity>({
   config,
@@ -43,7 +44,7 @@ export function CrudDynamicFilters<TEntity extends CrudEntity = CrudEntity>({
   const renderFilter = (filter: FilterMetadata) => {
     const value = values[filter.id];
 
-    // Allow custom rendering
+    // Allow custom rendering (hook for extensibility)
     if (config.customRenderer) {
       const customRender = config.customRenderer(filter, value, (newValue) =>
         onChange(filter.id, newValue)
@@ -53,134 +54,19 @@ export function CrudDynamicFilters<TEntity extends CrudEntity = CrudEntity>({
       }
     }
 
-    // Default rendering by type
-    switch (filter.type) {
-      case "TEXT":
-        return (
-          <Input
-            type="text"
-            placeholder={filter.placeholder || filter.name}
-            value={String(value || "")}
-            onChange={(newValue) => onChange(filter.id, newValue)}
-            label={filter.name}
-          />
-        );
+    // Get component from registry
+    const FilterComponent = FILTER_COMPONENTS[filter.type];
 
-      case "NUMBER":
-        return (
-          <Input
-            type="number"
-            placeholder={filter.placeholder || filter.name}
-            value={value ? String(value) : ""}
-            onChange={(newValue) =>
-              onChange(filter.id, newValue ? Number(newValue) : null)
-            }
-            label={filter.name}
-          />
-        );
-
-      case "SELECT":
-        return (
-          <Select
-            label={filter.name}
-            placeholder={filter.placeholder || `Select ${filter.name}`}
-            selectedKey={value ? String(value) : undefined}
-            onSelectionChange={(key) => onChange(filter.id, key)}
-          >
-            {filter.options?.map((option) => (
-              <Select.Item key={option.value} id={option.value}>
-                {option.label}
-              </Select.Item>
-            ))}
-          </Select>
-        );
-
-      case "MULTISELECT":
-        return (
-          <CrudMultiSelectFilter
-            filter={filter}
-            value={value}
-            onChange={onChange}
-          />
-        );
-
-      case "BOOLEAN":
-        return (
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-sm text-secondary">
-              <input
-                type="checkbox"
-                checked={Boolean(value)}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onChange(filter.id, e.target.checked)
-                }
-                className="h-4 w-4 rounded border-border-secondary"
-              />
-              {filter.name}
-            </label>
-          </div>
-        );
-
-      case "DATE":
-        return (
-          <Input
-            type="date"
-            label={filter.name}
-            value={value ? String(value) : ""}
-            onChange={(newValue: string) => onChange(filter.id, newValue)}
-            placeholder={filter.placeholder}
-          />
-        );
-
-      case "DATE_RANGE": {
-        const dateRangeValue = value as
-          | { start: DateValue; end: DateValue }
-          | null
-          | undefined;
-        return (
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-secondary">
-              {filter.name}
-            </label>
-            <DateRangePicker
-              value={dateRangeValue ?? null}
-              onChange={(range) => onChange(filter.id, range)}
-              onApply={() => {
-                // Applied when user clicks Apply button
-              }}
-            />
-          </div>
-        );
-      }
-
-      case "NUMBER_RANGE": {
-        // Parse min/max from value or use defaults
-        const rangeValue = value as [number, number] | null | undefined;
-        const currentValues = rangeValue || [0, 100];
-
-        return (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-secondary">
-              {filter.name}
-            </label>
-            <div className="pt-2 pb-6">
-              <Slider
-                value={currentValues}
-                onChange={(newValues) => onChange(filter.id, newValues)}
-                minValue={0}
-                maxValue={100}
-                labelPosition="bottom"
-                labelFormatter={(val) => String(val)}
-                formatOptions={{ style: "decimal" }}
-              />
-            </div>
-          </div>
-        );
-      }
-
-      default:
-        return null;
+    // If filter type is not registered, skip rendering
+    if (!FilterComponent) {
+      console.warn(`Unknown filter type: ${filter.type}`);
+      return null;
     }
+
+    // Render the appropriate filter component
+    return (
+      <FilterComponent filter={filter} value={value} onChange={onChange} />
+    );
   };
 
   return (

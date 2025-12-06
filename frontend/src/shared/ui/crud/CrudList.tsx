@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { TableCard } from "@/components/application/table/table";
 import { Button } from "@/shared/base/buttons/button";
 import { useCrudContext } from "@/shared/lib/crud/context";
@@ -97,6 +97,33 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
     }
   }, [scopes, state.activeTab, config.tabs?.enabled, config.tabs?.defaultScope, actions]);
 
+  // Draft filters (not applied yet) - MUST be before any conditional returns
+  const [draftFilters, setDraftFilters] = useState<Record<string, unknown>>(
+    state.filters
+  );
+
+  // Sync draft filters when state.filters change externally (e.g., from URL)
+  useEffect(() => {
+    setDraftFilters(state.filters);
+  }, [state.filters]);
+
+  // Apply filters handler
+  const handleApplyFilters = useCallback(() => {
+    actions.setFilters(draftFilters);
+  }, [draftFilters, actions]);
+
+  // Clear filters handler
+  const handleClearFilters = useCallback(() => {
+    setDraftFilters({});
+    actions.setFilters({});
+  }, [actions]);
+
+  // Check if there are pending filter changes
+  const hasFilterChanges = useMemo(
+    () => JSON.stringify(draftFilters) !== JSON.stringify(state.filters),
+    [draftFilters, state.filters]
+  );
+
   // Load more handler
   const handleLoadMore = useCallback(async () => {
     if (pageInfo?.endCursor && fetchMore) {
@@ -123,42 +150,18 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
     }
   }, [pageInfo, fetchMore, state.pageSize, config.graphql.list.dataPath]);
 
-  // Error state
-  if (error) {
-    return (
-      <CrudErrorState config={config} error={error} onRetry={() => refetch()} />
-    );
-  }
-
+  // Computed values
   const hasSelection = state.selectedEntities.length > 0;
   const paddingClasses = "px-4 lg:px-8";
   const hasFilters =
     config.dynamicFilters?.enabled && filters && filters.length > 0;
 
-  // Draft filters (not applied yet)
-  const [draftFilters, setDraftFilters] = useState<Record<string, unknown>>(
-    state.filters
-  );
-
-  // Sync draft filters when state.filters change externally (e.g., from URL)
-  useEffect(() => {
-    setDraftFilters(state.filters);
-  }, [state.filters]);
-
-  // Apply filters handler
-  const handleApplyFilters = useCallback(() => {
-    actions.setFilters(draftFilters);
-  }, [draftFilters, actions]);
-
-  // Clear filters handler
-  const handleClearFilters = useCallback(() => {
-    setDraftFilters({});
-    actions.setFilters({});
-  }, [actions]);
-
-  // Check if there are pending filter changes
-  const hasFilterChanges =
-    JSON.stringify(draftFilters) !== JSON.stringify(state.filters);
+  // Error state - after all hooks
+  if (error) {
+    return (
+      <CrudErrorState config={config} error={error} onRetry={() => refetch()} />
+    );
+  }
 
   return (
     <div className="mx-auto mb-8 flex flex-col gap-5">
