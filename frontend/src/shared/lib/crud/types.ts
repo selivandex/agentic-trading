@@ -419,7 +419,7 @@ export interface CrudConfig<TEntity extends CrudEntity = CrudEntity> {
   bulkActions?: CrudAction<TEntity>[];
   /** Filters for list view (DEPRECATED - use dynamicFilters) */
   filters?: CrudFilter[];
-  /** 
+  /**
    * Tabs configuration for list view (optional)
    * Tabs data (labels, counts) come from backend in list query response
    */

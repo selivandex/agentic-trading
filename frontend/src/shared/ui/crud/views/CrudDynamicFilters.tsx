@@ -7,6 +7,7 @@ import { Input } from "@/components/base/input/input";
 import { Select } from "@/shared/base/select";
 import { Slider } from "@/shared/base/slider";
 import { DateRangePicker } from "@/shared/application/date-picker/date-range-picker";
+import { CrudMultiSelectFilter } from "./CrudMultiSelectFilter";
 import type {
   CrudEntity,
   CrudDynamicFiltersConfig,
@@ -95,11 +96,12 @@ export function CrudDynamicFilters<TEntity extends CrudEntity = CrudEntity>({
         );
 
       case "MULTISELECT":
-        // TODO: Implement multiselect (needs different Select API)
         return (
-          <div className="text-sm text-quaternary">
-            Multiselect filter not implemented yet
-          </div>
+          <CrudMultiSelectFilter
+            filter={filter}
+            value={value}
+            onChange={onChange}
+          />
         );
 
       case "BOOLEAN":
@@ -157,22 +159,20 @@ export function CrudDynamicFilters<TEntity extends CrudEntity = CrudEntity>({
         const currentValues = rangeValue || [0, 100];
 
         return (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <label className="block text-sm font-medium text-secondary">
               {filter.name}
             </label>
-            <Slider
-              value={currentValues}
-              onChange={(newValues) => onChange(filter.id, newValues)}
-              minValue={0}
-              maxValue={100}
-              labelPosition="bottom"
-              labelFormatter={(val) => String(val)}
-              formatOptions={{ style: "decimal" }}
-            />
-            <div className="grid grid-cols-2 gap-2 text-xs text-tertiary">
-              <div>Min: {currentValues[0]}</div>
-              <div className="text-right">Max: {currentValues[1]}</div>
+            <div className="pt-2 pb-6">
+              <Slider
+                value={currentValues}
+                onChange={(newValues) => onChange(filter.id, newValues)}
+                minValue={0}
+                maxValue={100}
+                labelPosition="bottom"
+                labelFormatter={(val) => String(val)}
+                formatOptions={{ style: "decimal" }}
+              />
             </div>
           </div>
         );

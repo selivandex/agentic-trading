@@ -97,6 +97,8 @@ type ComplexityRoot struct {
 	Filter struct {
 		DefaultValue     func(childComplexity int) int
 		ID               func(childComplexity int) int
+		Max              func(childComplexity int) int
+		Min              func(childComplexity int) int
 		Name             func(childComplexity int) int
 		Options          func(childComplexity int) int
 		OptionsQuery     func(childComplexity int) int
@@ -569,6 +571,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Filter.ID(childComplexity), true
+	case "Filter.max":
+		if e.complexity.Filter.Max == nil {
+			break
+		}
+
+		return e.complexity.Filter.Max(childComplexity), true
+	case "Filter.min":
+		if e.complexity.Filter.Min == nil {
+			break
+		}
+
+		return e.complexity.Filter.Min(childComplexity), true
 	case "Filter.name":
 		if e.complexity.Filter.Name == nil {
 			break
@@ -2341,6 +2355,18 @@ type Filter {
   Placeholder text (optional)
   """
   placeholder: String
+
+  """
+  Minimum value for NUMBER/NUMBER_RANGE filters (optional)
+  Computed from database for dynamic ranges
+  """
+  min: Float
+
+  """
+  Maximum value for NUMBER/NUMBER_RANGE filters (optional)
+  Computed from database for dynamic ranges
+  """
+  max: Float
 }
 `, BuiltIn: false},
 	{Name: "../schema/scalars.graphql", Input: `# @format
@@ -4647,6 +4673,64 @@ func (ec *executionContext) fieldContext_Filter_placeholder(_ context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Filter_min(ctx context.Context, field graphql.CollectedField, obj *Filter) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Filter_min,
+		func(ctx context.Context) (any, error) {
+			return obj.Min, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Filter_min(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Filter",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Filter_max(ctx context.Context, field graphql.CollectedField, obj *Filter) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Filter_max,
+		func(ctx context.Context) (any, error) {
+			return obj.Max, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Filter_max(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Filter",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FilterOption_value(ctx context.Context, field graphql.CollectedField, obj *FilterOption) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5204,6 +5288,10 @@ func (ec *executionContext) fieldContext_FundWatchlistConnection_filters(_ conte
 				return ec.fieldContext_Filter_defaultValue(ctx, field)
 			case "placeholder":
 				return ec.fieldContext_Filter_placeholder(ctx, field)
+			case "min":
+				return ec.fieldContext_Filter_min(ctx, field)
+			case "max":
+				return ec.fieldContext_Filter_max(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Filter", field.Name)
 		},
@@ -9986,6 +10074,10 @@ func (ec *executionContext) fieldContext_StrategyConnection_filters(_ context.Co
 				return ec.fieldContext_Filter_defaultValue(ctx, field)
 			case "placeholder":
 				return ec.fieldContext_Filter_placeholder(ctx, field)
+			case "min":
+				return ec.fieldContext_Filter_min(ctx, field)
+			case "max":
+				return ec.fieldContext_Filter_max(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Filter", field.Name)
 		},
@@ -13608,6 +13700,10 @@ func (ec *executionContext) _Filter(ctx context.Context, sel ast.SelectionSet, o
 			out.Values[i] = ec._Filter_defaultValue(ctx, field, obj)
 		case "placeholder":
 			out.Values[i] = ec._Filter_placeholder(ctx, field, obj)
+		case "min":
+			out.Values[i] = ec._Filter_min(ctx, field, obj)
+		case "max":
+			out.Values[i] = ec._Filter_max(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

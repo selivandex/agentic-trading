@@ -66,6 +66,10 @@ type Repository interface {
 
 	// GetTotalCurrentEquity returns sum of current equity across all active strategies
 	GetTotalCurrentEquity(ctx context.Context, userID uuid.UUID) (decimal.Decimal, error)
+
+	// GetRangeStats returns min/max values for numeric fields across all strategies
+	// Used for dynamic filter ranges
+	GetRangeStats(ctx context.Context, userID *uuid.UUID) (*RangeStats, error)
 }
 
 // TransactionRepository defines operations for strategy transaction persistence
@@ -103,4 +107,13 @@ type TransactionStats struct {
 	TotalFees        decimal.Decimal
 	TotalPnL         decimal.Decimal // From position closes
 	TransactionCount int
+}
+
+// RangeStats contains min/max values for numeric fields
+// Used for dynamic filter ranges in the frontend
+type RangeStats struct {
+	MinCapital    decimal.Decimal
+	MaxCapital    decimal.Decimal
+	MinPnLPercent decimal.Decimal
+	MaxPnLPercent decimal.Decimal
 }

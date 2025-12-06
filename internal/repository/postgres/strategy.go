@@ -470,3 +470,30 @@ func (r *StrategyRepository) GetTotalCurrentEquity(ctx context.Context, userID u
 
 	return total, nil
 }
+
+// GetRangeStats returns min/max values for numeric fields across strategies
+// If userID is nil, returns stats for all users
+func (r *StrategyRepository) GetRangeStats(ctx context.Context, userID *uuid.UUID) (*strategy.RangeStats, error) {
+	query := `
+		SELECT
+			COALESCE(MIN(allocated_capital), 0) as min_capital,
+			COALESCE(MAX(allocated_capital), 0) as max_capital,
+			COALESCE(MIN(total_pnl_percent), 0) as min_pnl_percent,
+			COALESCE(MAX(total_pnl_percent), 0) as max_pnl_percent
+		FROM user_strategies
+		WHERE deleted_at IS NULL`
+
+	args := []interface{}{}
+	if userID != nil {
+		query += " AND user_id = $1"
+		args = append(args, *userID)
+	}
+
+	var stats strategy.RangeStats
+	err := r.db.GetContext(ctx, &stats, query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get range stats")
+	}
+
+	return &stats, nil
+}

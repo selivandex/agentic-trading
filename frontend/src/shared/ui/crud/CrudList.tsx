@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TableCard } from "@/components/application/table/table";
 import { Button } from "@/shared/base/buttons/button";
 import { useCrudContext } from "@/shared/lib/crud/context";
@@ -90,7 +90,7 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
       const defaultScope = defaultScopeId
         ? scopes.find((s) => s.id === defaultScopeId)
         : scopes[0];
-      
+
       if (defaultScope) {
         actions.setActiveTab(defaultScope.id);
       }
@@ -134,6 +134,31 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
   const paddingClasses = "px-4 lg:px-8";
   const hasFilters =
     config.dynamicFilters?.enabled && filters && filters.length > 0;
+
+  // Draft filters (not applied yet)
+  const [draftFilters, setDraftFilters] = useState<Record<string, unknown>>(
+    state.filters
+  );
+
+  // Sync draft filters when state.filters change externally (e.g., from URL)
+  useEffect(() => {
+    setDraftFilters(state.filters);
+  }, [state.filters]);
+
+  // Apply filters handler
+  const handleApplyFilters = useCallback(() => {
+    actions.setFilters(draftFilters);
+  }, [draftFilters, actions]);
+
+  // Clear filters handler
+  const handleClearFilters = useCallback(() => {
+    setDraftFilters({});
+    actions.setFilters({});
+  }, [actions]);
+
+  // Check if there are pending filter changes
+  const hasFilterChanges =
+    JSON.stringify(draftFilters) !== JSON.stringify(state.filters);
 
   return (
     <div className="mx-auto mb-8 flex flex-col gap-5">
@@ -239,17 +264,39 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
                   <h3 className="mb-4 text-lg font-semibold text-secondary">
                     Filters
                   </h3>
-                  <CrudDynamicFilters
-                    config={config.dynamicFilters!}
-                    filters={filters}
-                    values={state.filters}
-                    onChange={(filterId, value) => {
-                      actions.setFilters({
-                        ...state.filters,
-                        [filterId]: value,
-                      });
-                    }}
-                  />
+                  <div className="space-y-4">
+                    <CrudDynamicFilters
+                      config={config.dynamicFilters!}
+                      filters={filters}
+                      values={draftFilters}
+                      onChange={(filterId, value) => {
+                        setDraftFilters({
+                          ...draftFilters,
+                          [filterId]: value,
+                        });
+                      }}
+                    />
+                    <div className="flex gap-2 border-t border-border-secondary pt-4">
+                      <Button
+                        color="secondary"
+                        size="sm"
+                        onClick={handleClearFilters}
+                        className="flex-1"
+                        disabled={Object.keys(draftFilters).length === 0}
+                      >
+                        Clear
+                      </Button>
+                      <Button
+                        color="primary"
+                        size="sm"
+                        onClick={handleApplyFilters}
+                        className="flex-1"
+                        disabled={!hasFilterChanges}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </aside>

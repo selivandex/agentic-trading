@@ -116,6 +116,12 @@ type Filter struct {
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	// Placeholder text (optional)
 	Placeholder *string `json:"placeholder,omitempty"`
+	// Minimum value for NUMBER/NUMBER_RANGE filters (optional)
+	// Computed from database for dynamic ranges
+	Min *float64 `json:"min,omitempty"`
+	// Maximum value for NUMBER/NUMBER_RANGE filters (optional)
+	// Computed from database for dynamic ranges
+	Max *float64 `json:"max,omitempty"`
 }
 
 // FilterOption represents an option for select/multiselect filters

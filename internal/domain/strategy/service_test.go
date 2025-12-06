@@ -64,6 +64,18 @@ func (m *mockRepository) GetTotalCurrentEquity(ctx context.Context, userID uuid.
 	return decimal.Zero, nil
 }
 
+func (m *mockRepository) GetWithFilter(ctx context.Context, filter strategy.FilterOptions) ([]*strategy.Strategy, error) {
+	return nil, nil
+}
+
+func (m *mockRepository) CountByStatus(ctx context.Context, userID uuid.UUID) (map[strategy.StrategyStatus]int, error) {
+	return nil, nil
+}
+
+func (m *mockRepository) GetRangeStats(ctx context.Context, userID *uuid.UUID) (*strategy.RangeStats, error) {
+	return nil, nil
+}
+
 // TestCreateStrategy_InitializesJSONFields tests that nil JSON fields are initialized correctly
 func TestCreateStrategy_InitializesJSONFields(t *testing.T) {
 	ctx := context.Background()

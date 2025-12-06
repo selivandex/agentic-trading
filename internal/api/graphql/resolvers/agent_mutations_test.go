@@ -9,6 +9,7 @@ import (
 	"prometheus/internal/domain/agent"
 	"prometheus/internal/testsupport/seeds"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -549,10 +550,5 @@ func TestAgentMutationsWorkflow(t *testing.T) {
 
 // Helper to generate random string for unique identifiers
 func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[i%len(charset)]
-	}
-	return string(b)
+	return uuid.New().String()[:length]
 }

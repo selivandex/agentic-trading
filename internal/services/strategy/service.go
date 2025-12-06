@@ -857,3 +857,14 @@ func (s *Service) BatchCloseStrategies(ctx context.Context, strategyIDs []uuid.U
 
 	return closed, nil
 }
+
+// GetRangeStats returns min/max values for numeric fields
+// Used for dynamic filter ranges in the frontend
+func (s *Service) GetRangeStats(ctx context.Context, userID *uuid.UUID) (*strategy.RangeStats, error) {
+	stats, err := s.strategyRepo.GetRangeStats(ctx, userID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get range stats")
+	}
+
+	return stats, nil
+}

@@ -153,4 +153,16 @@ type Filter {
   Placeholder text (optional)
   """
   placeholder: String
+
+  """
+  Minimum value for NUMBER/NUMBER_RANGE filters (optional)
+  Computed from database for dynamic ranges
+  """
+  min: Float
+
+  """
+  Maximum value for NUMBER/NUMBER_RANGE filters (optional)
+  Computed from database for dynamic ranges
+  """
+  max: Float
 }

@@ -19,77 +19,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// buildStrategyConnection is a helper function to build GraphQL connection with scopes and filters
-// This avoids code duplication between UserStrategies and Strategies resolvers
-func buildStrategyConnection(
-	items []*strategy.Strategy,
-	totalCount int,
-	params relay.PaginationParams,
-	offset int,
-	scopeCounts map[string]int,
-) (*generated.StrategyConnection, error) {
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
-
-	// Convert to GraphQL types
-	edges := make([]*generated.StrategyEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.StrategyEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	// Build scopes with counts
-	scopeDefs := getStrategyScopeDefinitions()
-	scopes := make([]*generated.Scope, len(scopeDefs))
-	for i, scopeDef := range scopeDefs {
-		scopes[i] = &generated.Scope{
-			ID:    scopeDef.ID,
-			Name:  scopeDef.Name,
-			Count: scopeCounts[scopeDef.ID],
-		}
-	}
-
-	// Build filters from definitions
-	filterDefs := getStrategyFilterDefinitions()
-	filters := make([]*generated.Filter, len(filterDefs))
-	for i, filterDef := range filterDefs {
-		options := make([]*generated.FilterOption, len(filterDef.Options))
-		for j, opt := range filterDef.Options {
-			options[j] = &generated.FilterOption{
-				Value: opt.Value,
-				Label: opt.Label,
-			}
-		}
-
-		filters[i] = &generated.Filter{
-			ID:           filterDef.ID,
-			Name:         filterDef.Name,
-			Type:         generated.FilterType(filterDef.Type),
-			Options:      options,
-			DefaultValue: filterDef.DefaultValue,
-			Placeholder:  filterDef.Placeholder,
-		}
-	}
-
-	return &generated.StrategyConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-		Scopes:     scopes,
-		Filters:    filters,
-	}, nil
-}
-
 // CreateStrategy is the resolver for the createStrategy field.
 func (r *mutationResolver) CreateStrategy(ctx context.Context, userID uuid.UUID, input generated.CreateStrategyInput) (*strategy.Strategy, error) {
 	// Parse target allocations if provided
@@ -210,6 +139,12 @@ func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, sc
 		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
+	// Get range stats for dynamic filter min/max
+	rangeStats, err := r.StrategyService.GetRangeStats(ctx, &userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get range stats: %w", err)
+	}
+
 	// Apply pagination
 	params := relay.PaginationParams{
 		First:  first,
@@ -240,7 +175,7 @@ func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, sc
 	items := filtered[offset:end]
 
 	// Build connection with scopes and filters using helper
-	return buildStrategyConnection(items, totalCount, params, offset, scopeCounts)
+	return buildStrategyConnection(items, totalCount, params, offset, scopeCounts, rangeStats)
 }
 
 // Strategies is the resolver for the strategies field.
@@ -271,6 +206,12 @@ func (r *queryResolver) Strategies(ctx context.Context, scope *string, status *s
 		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
+	// Get range stats for dynamic filter min/max
+	rangeStats, err := r.StrategyService.GetRangeStats(ctx, &currentUser.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get range stats: %w", err)
+	}
+
 	// Apply pagination
 	params := relay.PaginationParams{
 		First:  first,
@@ -301,7 +242,7 @@ func (r *queryResolver) Strategies(ctx context.Context, scope *string, status *s
 	items := filtered[offset:end]
 
 	// Build connection with scopes and filters using helper
-	return buildStrategyConnection(items, totalCount, params, offset, scopeCounts)
+	return buildStrategyConnection(items, totalCount, params, offset, scopeCounts, rangeStats)
 }
 
 // UserID is the resolver for the userID field.

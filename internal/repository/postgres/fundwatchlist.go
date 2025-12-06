@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -135,8 +136,22 @@ func (r *FundWatchlistRepository) Update(ctx context.Context, entry *fundwatchli
 // Delete deletes a fund watchlist entry
 func (r *FundWatchlistRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM fund_watchlist WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id)
-	return err
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	// Check if any row was actually deleted
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("fund watchlist entry with id %s not found", id)
+	}
+
+	return nil
 }
 
 // IsActive checks if a symbol is actively monitored

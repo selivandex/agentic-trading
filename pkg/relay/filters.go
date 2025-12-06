@@ -31,6 +31,8 @@ type Filter struct {
 	OptionsQueryArgs map[string]interface{} // Args for options query
 	DefaultValue     *string
 	Placeholder      *string
+	Min              *float64 // Minimum value for NUMBER/NUMBER_RANGE filters
+	Max              *float64 // Maximum value for NUMBER/NUMBER_RANGE filters
 }
 
 // FilterDefinition defines a filter with its metadata
@@ -43,6 +45,8 @@ type FilterDefinition struct {
 	OptionsQueryArgs map[string]interface{} // Args for options query
 	DefaultValue     *string
 	Placeholder      *string
+	Min              *float64 // Minimum value for NUMBER/NUMBER_RANGE filters
+	Max              *float64 // Maximum value for NUMBER/NUMBER_RANGE filters
 }
 
 // ApplyFilters is a generic function to apply filters to items
@@ -100,6 +104,8 @@ func GetFilterDefinitions(defs []FilterDefinition) []Filter {
 			OptionsQueryArgs: def.OptionsQueryArgs,
 			DefaultValue:     def.DefaultValue,
 			Placeholder:      def.Placeholder,
+			Min:              def.Min,
+			Max:              def.Max,
 		}
 	}
 	return filters

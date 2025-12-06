@@ -141,14 +141,14 @@ func TestUserStrategiesConnection(t *testing.T) {
 		conn, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,     // scope
-			nil,     // status filter
-			nil,     // search
-			nil,     // filters
+			nil, // scope
+			nil, // status filter
+			nil, // search
+			nil, // filters
 			&first,
-			nil,     // after
-			nil,     // last
-			nil,     // before
+			nil, // after
+			nil, // last
+			nil, // before
 		)
 
 		require.NoError(t, err)
@@ -167,10 +167,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		firstPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,     // scope
-			nil,     // status
-			nil,     // search
-			nil,     // filters
+			nil, // scope
+			nil, // status
+			nil, // search
+			nil, // filters
 			&first,
 			nil,
 			nil,
@@ -182,10 +182,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		secondPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,     // scope
-			nil,     // status
-			nil,     // search
-			nil,     // filters
+			nil, // scope
+			nil, // status
+			nil, // search
+			nil, // filters
 			&first,
 			firstPage.PageInfo.EndCursor,
 			nil,
@@ -213,10 +213,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		thirdPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,     // scope
-			nil,     // status
-			nil,     // search
-			nil,     // filters
+			nil, // scope
+			nil, // status
+			nil, // search
+			nil, // filters
 			&first,
 			secondPage.PageInfo.EndCursor,
 			nil,
@@ -309,8 +309,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		conn, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
-			&search,
+			nil,     // scope
+			nil,     // status
+			&search, // search
+			nil,     // filters
 			&first,
 			nil,
 			nil,
@@ -329,8 +331,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		conn, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			nonExistentUser,
-			nil,
+			nil, // scope
+			nil, // status
 			nil, // search
+			nil, // filters
 			&first,
 			nil,
 			nil,
@@ -351,8 +355,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		_, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
+			nil, // scope
+			nil, // status
 			nil, // search
+			nil, // filters
 			&first,
 			nil,
 			&last,
@@ -400,6 +406,7 @@ func TestFundWatchlistsConnection(t *testing.T) {
 		first := 3
 		conn, err := setup.resolver.Query().FundWatchlistsConnection(
 			ctx,
+			nil, // scope
 			nil, // isActive
 			nil, // category
 			nil, // tier
@@ -423,9 +430,10 @@ func TestFundWatchlistsConnection(t *testing.T) {
 
 		conn, err := setup.resolver.Query().FundWatchlistsConnection(
 			ctx,
-			nil,
-			nil,
-			&tier,
+			nil,   // scope
+			nil,   // isActive
+			nil,   // category
+			&tier, // tier
 			&first,
 			nil,
 			nil,
@@ -444,9 +452,10 @@ func TestFundWatchlistsConnection(t *testing.T) {
 
 		conn, err := setup.resolver.Query().FundWatchlistsConnection(
 			ctx,
-			nil,
-			&category,
-			nil,
+			nil,       // scope
+			nil,       // isActive
+			&category, // category
+			nil,       // tier
 			&first,
 			nil,
 			nil,
@@ -503,7 +512,8 @@ func TestMonitoredSymbolsConnection(t *testing.T) {
 
 		conn, err := setup.resolver.Query().MonitoredSymbolsConnection(
 			ctx,
-			&marketType,
+			nil,         // scope
+			&marketType, // marketType
 			&first,
 			nil,
 			nil,
@@ -530,7 +540,8 @@ func TestMonitoredSymbolsConnection(t *testing.T) {
 		// First page
 		firstPage, err := setup.resolver.Query().MonitoredSymbolsConnection(
 			ctx,
-			&marketType,
+			nil,         // scope
+			&marketType, // marketType
 			&first,
 			nil,
 			nil,
@@ -543,7 +554,8 @@ func TestMonitoredSymbolsConnection(t *testing.T) {
 		// Second page
 		secondPage, err := setup.resolver.Query().MonitoredSymbolsConnection(
 			ctx,
-			&marketType,
+			nil,         // scope
+			&marketType, // marketType
 			&first,
 			firstPage.PageInfo.EndCursor,
 			nil,
@@ -668,8 +680,10 @@ func TestConnectionEdgeCursors(t *testing.T) {
 		firstPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
+			nil, // scope
+			nil, // status
 			nil, // search
+			nil, // filters
 			&first,
 			nil,
 			nil,
@@ -681,8 +695,10 @@ func TestConnectionEdgeCursors(t *testing.T) {
 		secondPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
+			nil, // scope
+			nil, // status
 			nil, // search
+			nil, // filters
 			&first,
 			firstPage.PageInfo.EndCursor,
 			nil,

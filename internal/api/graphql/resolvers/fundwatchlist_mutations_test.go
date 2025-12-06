@@ -518,9 +518,10 @@ func TestFundWatchlistQueriesWithMutations(t *testing.T) {
 
 		conn, err := setup.resolver.Query().FundWatchlistsConnection(
 			ctx,
-			&isActive,
-			nil, // category
-			nil, // tier
+			nil,       // scope
+			&isActive, // isActive
+			nil,       // category
+			nil,       // tier
 			&first,
 			nil,
 			nil,
@@ -541,9 +542,10 @@ func TestFundWatchlistQueriesWithMutations(t *testing.T) {
 
 		conn, err := setup.resolver.Query().FundWatchlistsConnection(
 			ctx,
-			nil,
-			&category,
-			nil,
+			nil,       // scope
+			nil,       // isActive
+			&category, // category
+			nil,       // tier
 			&first,
 			nil,
 			nil,
