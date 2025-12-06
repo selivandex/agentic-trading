@@ -3,7 +3,7 @@
 import { gql } from "@apollo/client";
 
 /**
- * Agent GraphQL Queries and Mutations  
+ * Agent GraphQL Queries and Mutations
  * Auto-generated from table: agents
  */
 
@@ -110,7 +110,7 @@ export const CREATE_AGENT_MUTATION = gql`
 // Update Agent
 export const UPDATE_AGENT_MUTATION = gql`
   ${AGENT_FRAGMENT}
-  mutation UpdateAgent($id: Int!, $input: UpdateAgentInput!) {
+  mutation UpdateAgent($id: UUID!, $input: UpdateAgentInput!) {
     updateAgent(id: $id, input: $input) {
       ...AgentFields
     }
@@ -119,7 +119,34 @@ export const UPDATE_AGENT_MUTATION = gql`
 
 // Delete Agent
 export const DELETE_AGENT_MUTATION = gql`
-  mutation DeleteAgent($id: Int!) {
+  mutation DeleteAgent($id: UUID!) {
     deleteAgent(id: $id)
+  }
+`;
+
+// Batch Delete Agents
+export const BATCH_DELETE_AGENTS_MUTATION = gql`
+  mutation BatchDeleteAgents($ids: [UUID!]!) {
+    batchDeleteAgents(ids: $ids)
+  }
+`;
+
+// Set Agent Active Status
+export const SET_AGENT_ACTIVE_MUTATION = gql`
+  ${AGENT_FRAGMENT}
+  mutation SetAgentActive($id: UUID!, $isActive: Boolean!) {
+    setAgentActive(id: $id, isActive: $isActive) {
+      ...AgentFields
+    }
+  }
+`;
+
+// Update Agent Prompt
+export const UPDATE_AGENT_PROMPT_MUTATION = gql`
+  ${AGENT_FRAGMENT}
+  mutation UpdateAgentPrompt($id: UUID!, $systemPrompt: String!) {
+    updateAgentPrompt(id: $id, systemPrompt: $systemPrompt) {
+      ...AgentFields
+    }
   }
 `;

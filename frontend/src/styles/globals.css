@@ -39,6 +39,18 @@ body {
   font-kerning: normal;
 }
 
+/* Fix React Aria overlays and portals creating blank space */
+body > div:not(#__next) {
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+}
+
+body > div:not(#__next) > * {
+  pointer-events: auto !important;
+}
+
 /* Hide the default expand arrow on Safari.  */
 details summary::-webkit-details-marker {
   display: none;

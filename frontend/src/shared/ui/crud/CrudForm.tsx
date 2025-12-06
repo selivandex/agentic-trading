@@ -133,8 +133,7 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
   // Render loading state
   if (mode === "edit" && entityLoading) {
     return (
-      <div className="flex flex-col h-full">
-        {/* Page Header skeleton */}
+      <>
         <PageHeaderSkeleton
           background="primary"
           showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
@@ -143,30 +142,26 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
           actionCount={0}
         />
 
-        {/* Scrollable content area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className={`${paddingClasses} pb-8`}>
-            <div className="rounded-xl bg-card p-8 shadow-sm">
-              <div className="space-y-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ))}
-              </div>
+        <div className={`${paddingClasses} py-6`}>
+          <div className="rounded-xl bg-card p-8 shadow-sm">
+            <div className="space-y-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Page Footer skeleton */}
         <PageFooterSkeleton background="primary" actionCount={2} />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <>
       {/* Page Header with Breadcrumbs and Title */}
       <PageHeader
         background="primary"
@@ -182,33 +177,30 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
         onSubmit={handleSubmit((data) =>
           onSubmit(data as Record<string, unknown>)
         )}
-        className="flex flex-col flex-1"
       >
-        {/* Scrollable content area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className={`${paddingClasses} pb-8`}>
-            <div className="rounded-xl bg-card p-8 shadow-sm">
-              <div className="space-y-6">
-                {config.formFields
-                  .filter((field) => {
-                    // Evaluate hidden based on mode
-                    const isHidden =
-                      typeof field.hidden === "function"
-                        ? field.hidden(mode)
-                        : field.hidden;
-                    return !isHidden;
-                  })
-                  .map((field) => (
-                    <div key={field.name}>
-                      {renderFormField(field, control, errors, mode)}
-                    </div>
-                  ))}
-              </div>
+        {/* Content area */}
+        <div className={`${paddingClasses} py-6`}>
+          <div className="rounded-xl bg-card p-8 shadow-sm">
+            <div className="space-y-6">
+              {config.formFields
+                .filter((field) => {
+                  // Evaluate hidden based on mode
+                  const isHidden =
+                    typeof field.hidden === "function"
+                      ? field.hidden(mode)
+                      : field.hidden;
+                  return !isHidden;
+                })
+                .map((field) => (
+                  <div key={field.name}>
+                    {renderFormField(field, control, errors, mode)}
+                  </div>
+                ))}
             </div>
           </div>
         </div>
 
-        {/* Page Footer with Action Buttons - stays at bottom */}
+        {/* Page Footer with Action Buttons */}
         <PageFooter
           background="primary"
           actions={
@@ -233,7 +225,7 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
           }
         />
       </form>
-    </div>
+    </>
   );
 }
 

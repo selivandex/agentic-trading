@@ -22,6 +22,7 @@ import { CrudPagination } from "./views/CrudPagination";
 import { CrudDynamicFilters } from "./views/CrudDynamicFilters";
 import { PageHeaderSkeleton } from "@/shared/ui/page-header";
 import { TabsSkeleton } from "@/shared/ui/tabs";
+import { useFilterSidebar } from "@/shared/lib/filter-sidebar-context";
 
 /**
  * CRUD List Component
@@ -96,17 +97,34 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
         actions.setActiveTab(defaultScope.id);
       }
     }
-  }, [scopes, state.activeTab, config.tabs?.enabled, config.tabs?.defaultScope, actions]);
+  }, [
+    scopes,
+    state.activeTab,
+    config.tabs?.enabled,
+    config.tabs?.defaultScope,
+    actions,
+  ]);
+
+  // Filter sidebar context
+  const { setContent } = useFilterSidebar();
 
   // Draft filters (not applied yet) - MUST be before any conditional returns
   const [draftFilters, setDraftFilters] = useState<Record<string, unknown>>(
     state.filters
   );
 
+  // Track the last synced filters to detect external changes
+  const [lastSyncedFilters, setLastSyncedFilters] = useState(
+    JSON.stringify(state.filters)
+  );
+
   // Sync draft filters when state.filters change externally (e.g., from URL)
-  useEffect(() => {
+  // This runs during render phase, not in an effect, which is React-compliant
+  const currentFiltersKey = JSON.stringify(state.filters);
+  if (currentFiltersKey !== lastSyncedFilters) {
     setDraftFilters(state.filters);
-  }, [state.filters]);
+    setLastSyncedFilters(currentFiltersKey);
+  }
 
   // Apply filters handler
   const handleApplyFilters = useCallback(() => {
@@ -157,13 +175,6 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
   const hasFilters =
     config.dynamicFilters?.enabled && filters && filters.length > 0;
 
-  // Error state - after all hooks
-  if (error) {
-    return (
-      <CrudErrorState config={config} error={error} onRetry={() => refetch()} />
-    );
-  }
-
   // Convert scopes to PageHeader tabs format
   const tabItems = useMemo(() => {
     if (!config.tabs?.enabled || !scopes || scopes.length === 0) {
@@ -183,7 +194,7 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
     "button-gray": "button-gray",
     "button-border": "button-border",
     "button-minimal": "button-minimal",
-    "underline": "underline",
+    underline: "underline",
   } as const;
 
   const pageHeaderTabStyle = config.tabs?.type
@@ -194,6 +205,78 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
   const tabsLoading =
     config.tabs?.enabled && loading && (!scopes || scopes.length === 0);
   const showTabsSkeleton = tabsLoading && entities.length > 0;
+
+  // Register filters in sidebar context
+  useEffect(() => {
+    if (hasFilters) {
+      setContent({
+        isVisible: true,
+        component: (
+          <>
+            <h3 className="mb-4 text-lg font-semibold text-secondary">
+              Filters
+            </h3>
+            <div className="space-y-4">
+              <CrudDynamicFilters
+                config={config.dynamicFilters!}
+                filters={filters}
+                values={draftFilters}
+                onChange={(filterId, value) => {
+                  setDraftFilters({
+                    ...draftFilters,
+                    [filterId]: value,
+                  });
+                }}
+              />
+              <div className="flex gap-2 border-t border-border-secondary pt-4">
+                <Button
+                  color="secondary"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="flex-1"
+                  disabled={Object.keys(draftFilters).length === 0}
+                >
+                  Clear
+                </Button>
+                <Button
+                  color="primary"
+                  size="sm"
+                  onClick={handleApplyFilters}
+                  className="flex-1"
+                  disabled={!hasFilterChanges}
+                >
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </>
+        ),
+      });
+    } else {
+      setContent(null);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      setContent(null);
+    };
+  }, [
+    hasFilters,
+    config.dynamicFilters,
+    filters,
+    draftFilters,
+    handleApplyFilters,
+    handleClearFilters,
+    hasFilterChanges,
+    setContent,
+  ]);
+
+  // Error state - after all hooks
+  if (error) {
+    return (
+      <CrudErrorState config={config} error={error} onRetry={() => refetch()} />
+    );
+  }
 
   return (
     <div className="mx-auto mb-8 flex flex-col gap-5">
@@ -235,7 +318,11 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
             tabStyle={pageHeaderTabStyle}
           >
             <PageHeader.Actions>
-              <Button color="primary" size="md" onClick={() => actions.goToNew()}>
+              <Button
+                color="primary"
+                size="md"
+                onClick={() => actions.goToNew()}
+              >
                 New {config.resourceName}
               </Button>
             </PageHeader.Actions>
@@ -263,110 +350,59 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
         </>
       )}
 
-      {/* Main content with optional sidebar */}
+      {/* Main content */}
       <div className={paddingClasses}>
-        <div className={hasFilters ? "flex gap-6" : ""}>
-          {/* Main content area */}
-          <div className={hasFilters ? "flex-1 min-w-0" : "w-full"}>
-            <TableCard.Root>
-              {/* Batch Actions Toolbar */}
-              {hasSelection && (
-                <CrudBatchActionsToolbar
+        <TableCard.Root>
+          {/* Batch Actions Toolbar */}
+          {hasSelection && (
+            <CrudBatchActionsToolbar
+              config={config}
+              selectedCount={state.selectedEntities.length}
+              selectedEntities={state.selectedEntities}
+              onClearSelection={clearSelection}
+              onExecuteAction={executeBatchAction}
+            />
+          )}
+
+          {/* Loading State */}
+          {loading && !entities.length ? (
+            <CrudLoadingState />
+          ) : entities.length === 0 ? (
+            /* Empty State */
+            <CrudEmptyState config={config} onNew={() => actions.goToNew()} />
+          ) : (
+            /* Data View */
+            <>
+              {style === "table" && (
+                <CrudTableView
                   config={config}
-                  selectedCount={state.selectedEntities.length}
-                  selectedEntities={state.selectedEntities}
-                  onClearSelection={clearSelection}
-                  onExecuteAction={executeBatchAction}
+                  state={state}
+                  rows={rows}
+                  columns={columns}
+                  onSelectionChange={handleSelectionChange}
+                  onSortChange={handleSortChange}
+                  onEdit={(id) => actions.goToEdit(id)}
+                  onShow={(id) => actions.goToShow(id)}
+                  onDelete={handleDelete}
+                  destroyLoading={destroyLoading}
                 />
               )}
-
-              {/* Loading State */}
-              {loading && !entities.length ? (
-                <CrudLoadingState />
-              ) : entities.length === 0 ? (
-                /* Empty State */
-                <CrudEmptyState config={config} onNew={() => actions.goToNew()} />
-              ) : (
-                /* Data View */
-                <>
-                  {style === "table" && (
-                    <CrudTableView
-                      config={config}
-                      state={state}
-                      rows={rows}
-                      columns={columns}
-                      onSelectionChange={handleSelectionChange}
-                      onSortChange={handleSortChange}
-                      onEdit={(id) => actions.goToEdit(id)}
-                      onShow={(id) => actions.goToShow(id)}
-                      onDelete={handleDelete}
-                      destroyLoading={destroyLoading}
-                    />
-                  )}
-                  {/* Future: Add grid view (style="grid"), cards view (style="cards"), etc. */}
-                </>
-              )}
-            </TableCard.Root>
-
-            {/* Pagination */}
-            {entities.length > 0 && (
-              <CrudPagination
-                pageInfo={pageInfo}
-                totalCount={totalCount}
-                currentCount={entities.length}
-                pageSize={state.pageSize}
-                loading={loading}
-                onLoadMore={handleLoadMore}
-              />
-            )}
-          </div>
-
-          {/* Right Sidebar - Dynamic Filters */}
-          {hasFilters && (
-            <aside className="w-80 flex-shrink-0">
-              <div className="sticky top-4">
-                <div className="rounded-lg border border-border-secondary bg-primary p-6">
-                  <h3 className="mb-4 text-lg font-semibold text-secondary">
-                    Filters
-                  </h3>
-                  <div className="space-y-4">
-                    <CrudDynamicFilters
-                      config={config.dynamicFilters!}
-                      filters={filters}
-                      values={draftFilters}
-                      onChange={(filterId, value) => {
-                        setDraftFilters({
-                          ...draftFilters,
-                          [filterId]: value,
-                        });
-                      }}
-                    />
-                    <div className="flex gap-2 border-t border-border-secondary pt-4">
-                      <Button
-                        color="secondary"
-                        size="sm"
-                        onClick={handleClearFilters}
-                        className="flex-1"
-                        disabled={Object.keys(draftFilters).length === 0}
-                      >
-                        Clear
-                      </Button>
-                      <Button
-                        color="primary"
-                        size="sm"
-                        onClick={handleApplyFilters}
-                        className="flex-1"
-                        disabled={!hasFilterChanges}
-                      >
-                        Apply
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </aside>
+              {/* Future: Add grid view (style="grid"), cards view (style="cards"), etc. */}
+            </>
           )}
-        </div>
+        </TableCard.Root>
+
+        {/* Pagination */}
+        {entities.length > 0 && (
+          <CrudPagination
+            pageInfo={pageInfo}
+            totalCount={totalCount}
+            currentCount={entities.length}
+            pageSize={state.pageSize}
+            loading={loading}
+            onLoadMore={handleLoadMore}
+          />
+        )}
       </div>
     </div>
   );

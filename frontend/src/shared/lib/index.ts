@@ -15,3 +15,8 @@ export {
   type UserContext,
   type Breadcrumb,
 } from "./error-tracking";
+export {
+  FilterSidebarProvider,
+  useFilterSidebar,
+  type FilterSidebarContent,
+} from "./filter-sidebar-context";

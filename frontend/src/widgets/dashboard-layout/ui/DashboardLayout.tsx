@@ -14,6 +14,8 @@ import { signOut } from "next-auth/react";
 import type { User } from "@/entities/user";
 import type { NavItemType } from "@/components/application/app-navigation/config";
 import { SidebarNavigationSimple } from "@/components/application/app-navigation/sidebar-navigation";
+import { FilterSidebarProvider } from "@/shared/lib/filter-sidebar-context";
+import { FilterSidebar } from "@/shared/ui/filter-sidebar";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -64,15 +66,18 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
   ];
 
   return (
-    <div className="flex h-screen bg-secondary">
-      <SidebarNavigationSimple
-        items={navItems}
-        user={user}
-        currentOrganizationId="default"
-        currentProjectId="default"
-        onSignOut={handleSignOut}
-      />
-      <main className="flex-1 overflow-y-auto">{children}</main>
-    </div>
+    <FilterSidebarProvider>
+      <div className="flex h-screen bg-secondary">
+        <SidebarNavigationSimple
+          items={navItems}
+          user={user}
+          currentOrganizationId="default"
+          currentProjectId="default"
+          onSignOut={handleSignOut}
+        />
+        <FilterSidebar />
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
+    </FilterSidebarProvider>
   );
 }

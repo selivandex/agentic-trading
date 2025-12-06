@@ -107,7 +107,7 @@ export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
     <div className="mx-auto mb-8 flex flex-col gap-5">
       {/* Page Header with Breadcrumbs, Title, and Actions */}
       <PageHeader
-        background="transparent"
+        background="primary"
         breadcrumbs={breadcrumbs}
         showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
         title={entityTitle}

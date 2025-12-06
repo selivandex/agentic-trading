@@ -31,7 +31,7 @@ export function CrudBatchActionsToolbar<TEntity extends CrudEntity>({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-secondary bg-blue-50 px-6 py-4">
+    <div className="flex items-center justify-between gap-4 border-b border-border-secondary bg-utility-brand-50 px-6 py-4 dark:bg-utility-brand-900/20">
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-primary">
           {selectedCount} selected
