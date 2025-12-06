@@ -199,8 +199,8 @@ type ComplexityRoot struct {
 		User                       func(childComplexity int, id uuid.UUID) int
 		UserByTelegramID           func(childComplexity int, telegramID string) int
 		UserStrategies             func(childComplexity int, userID uuid.UUID, scope *string, status *strategy.StrategyStatus, search *string, filters map[string]any, first *int, after *string, last *int, before *string) int
-		Users                      func(childComplexity int, limit *int, offset *int) int
-		UsersConnection            func(childComplexity int, first *int, after *string, last *int, before *string) int
+		Users                      func(childComplexity int, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) int
+		UsersConnection            func(childComplexity int, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) int
 	}
 
 	Scope struct {
@@ -289,7 +289,9 @@ type ComplexityRoot struct {
 
 	UserConnection struct {
 		Edges      func(childComplexity int) int
+		Filters    func(childComplexity int) int
 		PageInfo   func(childComplexity int) int
+		Scopes     func(childComplexity int) int
 		TotalCount func(childComplexity int) int
 	}
 
@@ -360,8 +362,8 @@ type QueryResolver interface {
 	Strategies(ctx context.Context, scope *string, status *strategy.StrategyStatus, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*StrategyConnection, error)
 	User(ctx context.Context, id uuid.UUID) (*user.User, error)
 	UserByTelegramID(ctx context.Context, telegramID string) (*user.User, error)
-	Users(ctx context.Context, limit *int, offset *int) ([]*user.User, error)
-	UsersConnection(ctx context.Context, first *int, after *string, last *int, before *string) (*UserConnection, error)
+	UsersConnection(ctx context.Context, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*UserConnection, error)
+	Users(ctx context.Context, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*UserConnection, error)
 }
 type StrategyResolver interface {
 	UserID(ctx context.Context, obj *strategy.Strategy) (uuid.UUID, error)
@@ -1294,7 +1296,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Users(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.Users(childComplexity, args["scope"].(*string), args["search"].(*string), args["filters"].(map[string]any), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.usersConnection":
 		if e.complexity.Query.UsersConnection == nil {
 			break
@@ -1305,7 +1307,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.UsersConnection(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
+		return e.complexity.Query.UsersConnection(childComplexity, args["scope"].(*string), args["search"].(*string), args["filters"].(map[string]any), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 
 	case "Scope.count":
 		if e.complexity.Scope.Count == nil {
@@ -1698,12 +1700,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.UserConnection.Edges(childComplexity), true
+	case "UserConnection.filters":
+		if e.complexity.UserConnection.Filters == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.Filters(childComplexity), true
 	case "UserConnection.pageInfo":
 		if e.complexity.UserConnection.PageInfo == nil {
 			break
 		}
 
 		return e.complexity.UserConnection.PageInfo(childComplexity), true
+	case "UserConnection.scopes":
+		if e.complexity.UserConnection.Scopes == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.Scopes(childComplexity), true
 	case "UserConnection.totalCount":
 		if e.complexity.UserConnection.TotalCount == nil {
 			break
@@ -2662,6 +2676,16 @@ type UserConnection {
   Total count of items (if available)
   """
   totalCount: Int!
+
+  """
+  Available filter scopes with counts
+  """
+  scopes: [Scope!]!
+
+  """
+  Available dynamic filters
+  """
+  filters: [Filter!]!
 }
 
 type Settings {
@@ -2754,17 +2778,28 @@ extend type Query {
   # Get user by telegram ID
   userByTelegramID(telegramID: String!): User
 
-  # Get all users (admin only, legacy)
-  users(limit: Int, offset: Int): [User!]!
-    @deprecated(reason: "Use usersConnection instead")
-
-  # Get all users (admin only, Relay Connection)
+  # Get all users (admin only, Relay Connection with scopes and filters)
   usersConnection(
+    scope: String
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
     before: String
   ): UserConnection!
+
+  # Legacy alias for usersConnection (deprecated, use usersConnection)
+  users(
+    scope: String
+    search: String
+    filters: JSONObject
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): UserConnection!
+    @deprecated(reason: "Use usersConnection instead")
 }
 
 # Mutations
@@ -3551,42 +3586,82 @@ func (ec *executionContext) field_Query_user_args(ctx context.Context, rawArgs m
 func (ec *executionContext) field_Query_usersConnection_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "scope", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["first"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	args["scope"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "search", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["after"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	args["search"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "filters", ec.unmarshalOJSONObject2map)
 	if err != nil {
 		return nil, err
 	}
-	args["last"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	args["filters"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
 	}
-	args["before"] = arg3
+	args["first"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg6
 	return args, nil
 }
 
 func (ec *executionContext) field_Query_users_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "scope", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["limit"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	args["scope"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "search", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["offset"] = arg1
+	args["search"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "filters", ec.unmarshalOJSONObject2map)
+	if err != nil {
+		return nil, err
+	}
+	args["filters"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg6
 	return args, nil
 }
 
@@ -8436,75 +8511,6 @@ func (ec *executionContext) fieldContext_Query_userByTelegramID(ctx context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_users(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_users,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Users(ctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int))
-		},
-		nil,
-		ec.marshalNUser2ᚕᚖprometheusᚋinternalᚋdomainᚋuserᚐUserᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "telegramID":
-				return ec.fieldContext_User_telegramID(ctx, field)
-			case "telegramUsername":
-				return ec.fieldContext_User_telegramUsername(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "firstName":
-				return ec.fieldContext_User_firstName(ctx, field)
-			case "lastName":
-				return ec.fieldContext_User_lastName(ctx, field)
-			case "languageCode":
-				return ec.fieldContext_User_languageCode(ctx, field)
-			case "isActive":
-				return ec.fieldContext_User_isActive(ctx, field)
-			case "isPremium":
-				return ec.fieldContext_User_isPremium(ctx, field)
-			case "limitProfileID":
-				return ec.fieldContext_User_limitProfileID(ctx, field)
-			case "settings":
-				return ec.fieldContext_User_settings(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_User_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_User_updatedAt(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_users_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_usersConnection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8513,7 +8519,7 @@ func (ec *executionContext) _Query_usersConnection(ctx context.Context, field gr
 		ec.fieldContext_Query_usersConnection,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().UsersConnection(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+			return ec.resolvers.Query().UsersConnection(ctx, fc.Args["scope"].(*string), fc.Args["search"].(*string), fc.Args["filters"].(map[string]any), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
 		},
 		nil,
 		ec.marshalNUserConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserConnection,
@@ -8536,6 +8542,10 @@ func (ec *executionContext) fieldContext_Query_usersConnection(ctx context.Conte
 				return ec.fieldContext_UserConnection_pageInfo(ctx, field)
 			case "totalCount":
 				return ec.fieldContext_UserConnection_totalCount(ctx, field)
+			case "scopes":
+				return ec.fieldContext_UserConnection_scopes(ctx, field)
+			case "filters":
+				return ec.fieldContext_UserConnection_filters(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserConnection", field.Name)
 		},
@@ -8548,6 +8558,59 @@ func (ec *executionContext) fieldContext_Query_usersConnection(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_usersConnection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_users(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_users,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().Users(ctx, fc.Args["scope"].(*string), fc.Args["search"].(*string), fc.Args["filters"].(map[string]any), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+		},
+		nil,
+		ec.marshalNUserConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_UserConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_UserConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_UserConnection_totalCount(ctx, field)
+			case "scopes":
+				return ec.fieldContext_UserConnection_scopes(ctx, field)
+			case "filters":
+				return ec.fieldContext_UserConnection_filters(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_users_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10743,6 +10806,94 @@ func (ec *executionContext) fieldContext_UserConnection_totalCount(_ context.Con
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserConnection_scopes(ctx context.Context, field graphql.CollectedField, obj *UserConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserConnection_scopes,
+		func(ctx context.Context) (any, error) {
+			return obj.Scopes, nil
+		},
+		nil,
+		ec.marshalNScope2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐScopeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserConnection_scopes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Scope_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Scope_name(ctx, field)
+			case "count":
+				return ec.fieldContext_Scope_count(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Scope", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserConnection_filters(ctx context.Context, field graphql.CollectedField, obj *UserConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserConnection_filters,
+		func(ctx context.Context) (any, error) {
+			return obj.Filters, nil
+		},
+		nil,
+		ec.marshalNFilter2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFilterᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserConnection_filters(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Filter_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Filter_name(ctx, field)
+			case "type":
+				return ec.fieldContext_Filter_type(ctx, field)
+			case "options":
+				return ec.fieldContext_Filter_options(ctx, field)
+			case "optionsQuery":
+				return ec.fieldContext_Filter_optionsQuery(ctx, field)
+			case "optionsQueryArgs":
+				return ec.fieldContext_Filter_optionsQueryArgs(ctx, field)
+			case "defaultValue":
+				return ec.fieldContext_Filter_defaultValue(ctx, field)
+			case "placeholder":
+				return ec.fieldContext_Filter_placeholder(ctx, field)
+			case "min":
+				return ec.fieldContext_Filter_min(ctx, field)
+			case "max":
+				return ec.fieldContext_Filter_max(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Filter", field.Name)
 		},
 	}
 	return fc, nil
@@ -14667,7 +14818,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "users":
+		case "usersConnection":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -14676,7 +14827,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_users(ctx, field)
+				res = ec._Query_usersConnection(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -14689,7 +14840,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "usersConnection":
+		case "users":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -14698,7 +14849,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_usersConnection(ctx, field)
+				res = ec._Query_users(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15635,6 +15786,16 @@ func (ec *executionContext) _UserConnection(ctx context.Context, sel ast.Selecti
 			}
 		case "totalCount":
 			out.Values[i] = ec._UserConnection_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "scopes":
+			out.Values[i] = ec._UserConnection_scopes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "filters":
+			out.Values[i] = ec._UserConnection_filters(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -16792,50 +16953,6 @@ func (ec *executionContext) unmarshalNUpdateUserSettingsInput2prometheusᚋinter
 
 func (ec *executionContext) marshalNUser2prometheusᚋinternalᚋdomainᚋuserᚐUser(ctx context.Context, sel ast.SelectionSet, v user.User) graphql.Marshaler {
 	return ec._User(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNUser2ᚕᚖprometheusᚋinternalᚋdomainᚋuserᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []*user.User) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNUser2ᚖprometheusᚋinternalᚋdomainᚋuserᚐUser(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
 }
 
 func (ec *executionContext) marshalNUser2ᚖprometheusᚋinternalᚋdomainᚋuserᚐUser(ctx context.Context, sel ast.SelectionSet, v *user.User) graphql.Marshaler {

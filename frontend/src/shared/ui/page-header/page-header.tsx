@@ -8,7 +8,7 @@ import { ArrowLeft } from "@untitledui/icons";
 import { Button } from "@/shared/base/buttons/button";
 import { Avatar } from "@/shared/base/avatar/avatar";
 import { Input } from "@/shared/base/input/input";
-import { Tabs, TabList, Tab } from "@/shared/ui/tabs/tabs";
+import { Tabs, TabList, Tab, TabsSkeleton } from "@/shared/ui/tabs/tabs";
 import { Breadcrumbs } from "@/shared/ui/breadcrumbs/breadcrumbs";
 import { Skeleton } from "@/shared/ui/skeleton/skeleton";
 import { cx } from "@/utils/cx";
@@ -29,7 +29,7 @@ export interface TabItemData {
   label: string;
   /** Badge to display next to the label */
   badge?: number | string;
-  /** URL href for Link navigation */
+  /** @deprecated Use onTabChange callback for client-side routing instead of href */
   href?: string;
 }
 
@@ -124,7 +124,8 @@ export const PageHeader = ({
   return (
     <div
       className={cx(
-        "relative w-full flex flex-col gap-4 pt-4",
+        "relative w-full flex flex-col gap-4 pt-4 mb-5 border-b border-gray-200",
+        !hasTabs ? "pb-4" : "", // Add padding-bottom when no tabs
         background === "primary" ? "bg-primary" : "bg-transparent",
         className
       )}
@@ -163,12 +164,12 @@ export const PageHeader = ({
           className={`${cx(
             "flex flex-col gap-4",
             //hasTabs ? "border-b border-secondary pb-4" : "",
-            "lg:flex-row"
+            "lg:flex-row lg:items-center lg:justify-between"
           )} ${paddingClasses}`}
         >
           {/* Left side: Avatar + Title/Description or Title/Description only */}
           {(hasAvatar || hasTitle || hasDescription) && (
-            <div className="flex flex-1 items-center gap-3 lg:gap-4">
+            <div className="flex flex-1 items-center gap-3 lg:gap-4 min-w-0">
               {hasAvatar && (
                 <Avatar
                   size="xl"
@@ -178,7 +179,7 @@ export const PageHeader = ({
                 />
               )}
               {(hasTitle || hasDescription) && (
-                <div>
+                <div className="min-w-0 flex-1">
                   {hasTitle && (
                     <h1 className="font-semibold text-primary text-lg">
                       {title}
@@ -196,13 +197,13 @@ export const PageHeader = ({
 
           {/* Right side: Actions + Search */}
           {(hasActions || hasSearch) && (
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
               {/* Legacy actions prop (deprecated) */}
               {actions && (
-                <div className="flex items-start gap-3">{actions}</div>
+                <div className="flex items-center gap-3">{actions}</div>
               )}
               {/* Compound component actions */}
-              {actionsFromChildren && actionsFromChildren.props.children}
+              {actionsFromChildren}
               {hasSearch && (
                 <Input
                   shortcut={search.shortcut}
@@ -273,7 +274,7 @@ interface PageHeaderActionsProps {
 }
 
 const PageHeaderActions = ({ children }: PageHeaderActionsProps) => {
-  return <div className="flex items-start gap-3">{children}</div>;
+  return <div className="flex items-center gap-3">{children}</div>;
 };
 
 PageHeaderActions.displayName = "PageHeader.Actions";
@@ -477,22 +478,18 @@ export const PageHeaderSkeleton = ({
       {/* Tabs Skeleton */}
       {hasTabs && (
         <div className={`${paddingClasses}`}>
-          <div
-            className={cx(
-              "flex items-center gap-2",
-              tabStyle === "underline" && "border-b border-secondary"
-            )}
-          >
-            {Array.from({ length: tabCount }).map((_, index) => (
-              <Skeleton
-                key={index}
-                className={cx(
-                  "h-10 rounded",
-                  tabStyle === "underline" ? "w-20" : "w-24"
-                )}
-              />
-            ))}
-          </div>
+          <TabsSkeleton
+            count={tabCount}
+            type={
+              tabStyle as
+                | "underline"
+                | "button-brand"
+                | "button-gray"
+                | "button-border"
+                | "button-minimal"
+            }
+            size="sm"
+          />
         </div>
       )}
     </div>

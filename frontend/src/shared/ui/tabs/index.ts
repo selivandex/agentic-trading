@@ -8,5 +8,7 @@ export {
   TabList,
   Tab,
   TabPanel,
+  TabsSkeleton,
+  type TabsSkeletonProps,
 } from "./tabs";
 

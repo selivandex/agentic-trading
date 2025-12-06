@@ -8,12 +8,12 @@ import (
 
 // Test item type for filters
 type FilterTestItem struct {
-	ID             int
-	Name           string
-	Status         string
-	RiskTolerance  string
+	ID               int
+	Name             string
+	Status           string
+	RiskTolerance    string
 	AllocatedCapital float64
-	Active         bool
+	Active           bool
 }
 
 func TestApplyFilters(t *testing.T) {

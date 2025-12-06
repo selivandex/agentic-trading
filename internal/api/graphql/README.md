@@ -24,6 +24,7 @@ Repository Layer (Infrastructure)
 - JWT authentication via HTTP-only cookies (1 year TTL)
 - All custom scalars properly marshaled (UUID, Time, Decimal, JSONObject)
 - Request/operation logging with sensitive data sanitization
+- **HTTP status codes for authentication errors** (401 for unauthorized, 403 for forbidden)
 
 ## Structure
 
@@ -49,7 +50,10 @@ internal/api/graphql/
 │   ├── auth.go          # JWT authentication from cookies
 │   ├── auth_test.go
 │   ├── logging.go       # Request/operation logging
-│   └── logging_test.go
+│   ├── logging_test.go
+│   ├── error_presenter.go # HTTP status code handling
+│   ├── error_presenter_test.go
+│   └── batch.go         # Batch request support
 └── handler.go           # GraphQL HTTP handler setup
 ```
 
@@ -126,6 +130,35 @@ All mutations and protected queries use JWT from HTTP-only cookie:
 - Secure: `true` (production only)
 - SameSite: `Strict`
 - MaxAge: 1 year (31,536,000 seconds)
+
+**HTTP Status Codes:**
+
+The API now returns proper HTTP status codes for authentication errors:
+
+- `401 Unauthorized` - Missing or invalid authentication token
+- `403 Forbidden` - Valid token but insufficient permissions
+- `404 Not Found` - Resource not found
+- `400 Bad Request` - Invalid input
+- `409 Conflict` - Resource already exists
+- `503 Service Unavailable` - Service temporarily unavailable
+- `504 Gateway Timeout` - Request timeout
+
+Error responses include both HTTP status code AND GraphQL error with extension code:
+
+```json
+{
+  "errors": [
+    {
+      "message": "user not authenticated: unauthorized",
+      "path": ["me"],
+      "extensions": {
+        "code": "UNAUTHENTICATED"
+      }
+    }
+  ],
+  "data": { "me": null }
+}
+```
 
 ## Schema Overview
 

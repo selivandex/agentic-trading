@@ -377,7 +377,8 @@ func TestGraphQLHandler_MeQuery_Integration(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		setup.handler.ServeHTTP(recorder, req)
 
-		assert.Equal(t, http.StatusOK, recorder.Code)
+		// Now returns 401 instead of 200 with error in body
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
 
 		var response GraphQLResponse
 		err := json.Unmarshal(recorder.Body.Bytes(), &response)
@@ -414,7 +415,8 @@ func TestGraphQLHandler_MeQuery_Integration(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		setup.handler.ServeHTTP(recorder, req)
 
-		assert.Equal(t, http.StatusOK, recorder.Code)
+		// Now returns 401 instead of 200 with error in body
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
 
 		var response GraphQLResponse
 		err := json.Unmarshal(recorder.Body.Bytes(), &response)
@@ -422,6 +424,131 @@ func TestGraphQLHandler_MeQuery_Integration(t *testing.T) {
 
 		// Should have error
 		assert.NotEmpty(t, response.Errors)
+	})
+}
+
+func TestGraphQLHandler_UnauthorizedReturns401_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	setup := setupGraphQLTest(t)
+	defer setup.pg.Close()
+
+	t.Run("Me query without auth token returns 401", func(t *testing.T) {
+		meQuery := `
+			query {
+				me {
+					id
+					email
+				}
+			}
+		`
+
+		reqBody := GraphQLRequest{
+			Query: meQuery,
+		}
+
+		bodyBytes, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/graphql", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		recorder := httptest.NewRecorder()
+		setup.handler.ServeHTTP(recorder, req)
+
+		// Should return 401 status code
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code,
+			"Expected 401 Unauthorized for unauthenticated request")
+
+		var response GraphQLResponse
+		err := json.Unmarshal(recorder.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		// Should have error in response
+		assert.NotEmpty(t, response.Errors, "Expected GraphQL error in response")
+		if len(response.Errors) > 0 {
+			errorMsg := response.Errors[0]["message"].(string)
+			assert.Contains(t, errorMsg, "unauthorized", "Error message should mention unauthorized")
+
+			// Check error extension code
+			if extensions, ok := response.Errors[0]["extensions"].(map[string]interface{}); ok {
+				code := extensions["code"].(string)
+				assert.Equal(t, "UNAUTHENTICATED", code, "Error extension should have UNAUTHENTICATED code")
+			}
+		}
+	})
+
+	t.Run("Strategies query without auth token returns 401", func(t *testing.T) {
+		strategiesQuery := `
+			query {
+				strategies(first: 10) {
+					edges {
+						node {
+							id
+							name
+						}
+					}
+				}
+			}
+		`
+
+		reqBody := GraphQLRequest{
+			Query: strategiesQuery,
+		}
+
+		bodyBytes, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/graphql", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		recorder := httptest.NewRecorder()
+		setup.handler.ServeHTTP(recorder, req)
+
+		// Should return 401 status code
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code,
+			"Expected 401 Unauthorized for unauthenticated request")
+
+		var response GraphQLResponse
+		err := json.Unmarshal(recorder.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		// Should have error in response
+		assert.NotEmpty(t, response.Errors, "Expected GraphQL error in response")
+	})
+
+	t.Run("Query with invalid token returns 401", func(t *testing.T) {
+		meQuery := `
+			query {
+				me {
+					id
+					email
+				}
+			}
+		`
+
+		reqBody := GraphQLRequest{
+			Query: meQuery,
+		}
+
+		bodyBytes, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/graphql", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer invalid-token-12345")
+
+		recorder := httptest.NewRecorder()
+		setup.handler.ServeHTTP(recorder, req)
+
+		// Should return 401 for invalid token (or 200 if auth middleware skips invalid tokens)
+		// Based on current middleware implementation, invalid tokens are logged but request continues
+		// So we expect the resolver to return unauthorized error with 401 status
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code,
+			"Expected 401 Unauthorized for invalid token")
+
+		var response GraphQLResponse
+		err := json.Unmarshal(recorder.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		// Should have error in response
+		assert.NotEmpty(t, response.Errors, "Expected GraphQL error in response")
 	})
 }
 

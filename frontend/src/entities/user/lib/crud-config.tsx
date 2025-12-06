@@ -33,12 +33,22 @@ export const userCrudConfig: CrudConfig<User> = {
   resourceName: "User",
   resourceNamePlural: "Users",
 
+  // Base path for navigation
+  basePath: "/users",
+
+  // Display name for breadcrumbs and titles
+  getDisplayName: (user) => {
+    const name = `${user.firstName} ${user.lastName}`.trim();
+    return name || user.email || user.telegramUsername || "Unknown User";
+  },
+
   // GraphQL operations
   graphql: {
     list: {
       query: GET_USERS_QUERY,
       dataPath: "users",
       variables: {},
+      useConnection: true, // Relay pagination
     },
     show: {
       query: GET_USER_QUERY,
@@ -115,10 +125,7 @@ export const userCrudConfig: CrudConfig<User> = {
           AGGRESSIVE: "error" as const,
         };
         return (
-          <Badge
-            color={colorMap[user.settings.riskLevel] ?? "gray"}
-            size="sm"
-          >
+          <Badge color={colorMap[user.settings.riskLevel] ?? "gray"} size="sm">
             {user.settings.riskLevel}
           </Badge>
         );
@@ -280,31 +287,28 @@ export const userCrudConfig: CrudConfig<User> = {
     },
   ],
 
-  // Custom actions
-  actions: [
-    {
-      key: "activate",
-      label: "Activate",
-      onClick: async (user) => {
-        console.log("Activate user:", user.id);
-        // Will be implemented via mutation
-      },
-      hidden: (user) => user.isActive,
-    },
-    {
-      key: "deactivate",
-      label: "Deactivate",
-      onClick: async (user) => {
-        console.log("Deactivate user:", user.id);
-        // Will be implemented via mutation
-      },
-      hidden: (user) => !user.isActive,
-      destructive: true,
-    },
-  ],
+  // Custom actions (will be overridden in UserManager component with real mutations)
+  actions: [],
+
+  // Bulk actions (will be overridden in UserManager component with real mutations)
+  bulkActions: [],
+
+  // Tabs configuration (scopes from backend)
+  tabs: {
+    enabled: true,
+    type: "underline",
+    size: "md",
+    filterVariable: "scope",
+    // defaultScope not set - will use first scope from backend
+  },
+
+  // Dynamic filters configuration (filters from backend)
+  dynamicFilters: {
+    enabled: true,
+  },
 
   // Feature flags
-  enableSelection: false, // No bulk operations for users
+  enableSelection: true,
   enableSearch: true,
   defaultPageSize: 20,
 

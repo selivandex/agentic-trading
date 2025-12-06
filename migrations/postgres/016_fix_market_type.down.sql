@@ -1,0 +1,2 @@
+-- Rollback is not needed as this is a data fix
+-- Empty market_type values were invalid anyway

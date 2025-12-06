@@ -40,6 +40,9 @@ func Handler(
 	// Create GraphQL server with options
 	srv := handler.NewDefaultServer(schema)
 
+	// Set error presenter to handle HTTP status codes for auth errors
+	srv.SetErrorPresenter(middleware.ErrorPresenter())
+
 	// Add logging middleware for operation tracking
 	loggingMiddleware := middleware.NewLoggingMiddleware(log)
 	srv.AroundOperations(loggingMiddleware.OperationMiddleware())
@@ -50,14 +53,17 @@ func Handler(
 	// Batch middleware for handling array of GraphQL requests
 	batchMiddleware := middleware.NewBatchMiddleware(log)
 
-	// Apply middlewares (order matters: batch -> logging -> auth -> handler)
+	// Apply middlewares (order matters: batch -> status -> logging -> auth -> handler)
 	// 1. Batch support - handles array of GraphQL requests
-	// 2. HTTP logging - logs all HTTP requests
-	// 3. Auth - validates JWT and adds user to context
-	// 4. GraphQL handler with operation logging
+	// 2. HTTP status - sets proper HTTP status codes for errors
+	// 3. HTTP logging - logs all HTTP requests
+	// 4. Auth - validates JWT and adds user to context
+	// 5. GraphQL handler with operation logging
 	return batchMiddleware.Handler(
-		loggingMiddleware.HTTPLoggingMiddleware(
-			authMiddleware.Handler(srv),
+		middleware.HTTPStatusMiddleware(
+			loggingMiddleware.HTTPLoggingMiddleware(
+				authMiddleware.Handler(srv),
+			),
 		),
 	)
 }

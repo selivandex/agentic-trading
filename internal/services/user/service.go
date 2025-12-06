@@ -516,3 +516,44 @@ func (s *Service) SetPremium(ctx context.Context, userID uuid.UUID, isPremium bo
 func (s *Service) List(ctx context.Context, limit, offset int) ([]*user.User, error) {
 	return s.domainService.List(ctx, limit, offset)
 }
+
+// GetUsersWithScope returns users filtered by scope, search and filters
+// Scope examples: "all", "active", "inactive", "premium", "free"
+// Delegates to repository layer for SQL-based filtering
+func (s *Service) GetUsersWithScope(ctx context.Context, scopeID *string, search *string, filters map[string]interface{}) ([]*user.User, error) {
+	s.log.Infow("Getting users with scope",
+		"scope", scopeID,
+		"search", search,
+		"has_filters", len(filters) > 0,
+	)
+
+	// Delegate to repository layer
+	users, err := s.domainService.GetUsersWithScope(ctx, scopeID, search, filters)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get users with scope")
+	}
+
+	s.log.Infow("Users retrieved",
+		"count", len(users),
+	)
+
+	return users, nil
+}
+
+// GetUsersScopes returns counts for each scope
+// Uses SQL GROUP BY for efficiency
+func (s *Service) GetUsersScopes(ctx context.Context) (map[string]int, error) {
+	s.log.Infow("Getting users scopes")
+
+	// Delegate to repository layer
+	scopes, err := s.domainService.GetUsersScopes(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get users scopes")
+	}
+
+	s.log.Infow("Users scopes retrieved",
+		"scopes", scopes,
+	)
+
+	return scopes, nil
+}

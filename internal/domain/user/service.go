@@ -349,3 +349,23 @@ func (s *Service) UpdateMaxPositions(ctx context.Context, userID uuid.UUID, maxP
 
 	return nil
 }
+
+// GetUsersWithScope returns users filtered by scope, search and filters
+// Delegates to repository layer for SQL-based filtering
+func (s *Service) GetUsersWithScope(ctx context.Context, scopeID *string, search *string, filters map[string]interface{}) ([]*User, error) {
+	users, err := s.repo.GetUsersWithScope(ctx, scopeID, search, filters)
+	if err != nil {
+		return nil, errors.Wrap(err, "get users with scope")
+	}
+	return users, nil
+}
+
+// GetUsersScopes returns counts for each scope
+// Delegates to repository layer for SQL GROUP BY
+func (s *Service) GetUsersScopes(ctx context.Context) (map[string]int, error) {
+	scopes, err := s.repo.GetUsersScopes(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "get users scopes")
+	}
+	return scopes, nil
+}

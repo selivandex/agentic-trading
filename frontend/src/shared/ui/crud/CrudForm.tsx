@@ -16,12 +16,12 @@ import { Input } from "@/shared/base/input/input";
 import { TextArea } from "@/shared/base/textarea/textarea";
 import { Select } from "@/shared/base/select/select";
 import { Checkbox } from "@/shared/base/checkbox/checkbox";
-import { PageHeaderSkeleton } from "@/shared/ui/page-header";
 import { useCrudContext } from "@/shared/lib/crud/context";
 import { useCrudShowQuery } from "@/shared/lib/crud/use-crud-query";
 import { useCrudMutations } from "@/shared/lib/crud/use-crud-mutations";
 import { useCrudBreadcrumbs } from "@/shared/lib/crud/use-crud-breadcrumbs";
-import { PageHeader } from "@/shared/ui/page-header";
+import { PageHeader, PageHeaderSkeleton } from "@/shared/ui/page-header";
+import { PageFooter, PageFooterSkeleton } from "@/shared/ui/page-footer";
 import { Skeleton } from "@/shared/ui/skeleton/skeleton";
 import { logger } from "@/shared/lib";
 import type { CrudEntity, CrudFormField } from "@/shared/lib/crud/types";
@@ -53,9 +53,18 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
     isLoading: mutationLoading,
   } = useCrudMutations<TEntity>(config);
 
-  // Build validation schema from form fields
+  // Build validation schema from form fields (filtered by mode)
+  const relevantFields =
+    mode === "edit" && config.transformBeforeUpdate && entity
+      ? // In edit mode, only validate fields that will be updated
+        config.formFields.filter((field) => {
+          const updateData = config.transformBeforeUpdate!(entity as TEntity);
+          return field.name in updateData;
+        })
+      : config.formFields;
+
   const validationSchema =
-    config.formValidationSchema ?? buildValidationSchema(config.formFields);
+    config.formValidationSchema ?? buildValidationSchema(relevantFields);
 
   // Initialize form
   const {
@@ -68,6 +77,13 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
       createDynamicZodResolver<Record<string, unknown>>(validationSchema),
     defaultValues: buildDefaultValues(config.formFields),
   });
+
+  // Log form errors when they change
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      logger.error("Form validation errors:", errors);
+    }
+  }, [errors]);
 
   // Load entity data into form (edit mode)
   useEffect(() => {
@@ -91,15 +107,21 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
   const onSubmit = useCallback(
     async (data: Record<string, unknown>) => {
       try {
+        logger.info("Form submission started", { mode, entityId, data });
+
         if (mode === "new") {
+          logger.info("Creating new entity");
           await create(data);
           actions.goToIndex();
         } else if (mode === "edit" && entityId) {
+          logger.info("Updating entity", { entityId });
           await update(entityId, data);
           actions.goToIndex();
         }
+
+        logger.info("Form submission completed successfully");
       } catch (error) {
-        // Error is handled by mutation hook
+        // Error is handled by mutation hook (toast.error)
         logger.error("Form submission error:", error);
       }
     },
@@ -111,88 +133,106 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
   // Render loading state
   if (mode === "edit" && entityLoading) {
     return (
-      <div className="mx-auto mb-8 flex flex-col gap-5">
+      <div className="flex flex-col h-full">
         {/* Page Header skeleton */}
         <PageHeaderSkeleton
-          background="transparent"
+          background="primary"
           showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
           breadcrumbCount={breadcrumbs?.length ?? 0}
           showTitle
-          actionCount={1}
+          actionCount={0}
         />
 
-        <div className={paddingClasses}>
-          <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-            <div className="space-y-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ))}
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className={`${paddingClasses} pb-8`}>
+            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+              <div className="space-y-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Page Footer skeleton */}
+        <PageFooterSkeleton background="primary" actionCount={2} />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto mb-8 flex flex-col gap-5">
-      {/* Page Header with Breadcrumbs, Title, and Actions */}
+    <div className="flex flex-col h-full">
+      {/* Page Header with Breadcrumbs and Title */}
       <PageHeader
-        background="transparent"
+        background="primary"
         breadcrumbs={breadcrumbs}
         showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
         title={`${mode === "new" ? "New" : "Edit"} ${config.resourceName}`}
         backHref={config.basePath}
         onBackClick={() => actions.goToIndex()}
-      >
-        <PageHeader.Actions>
-          <Button
-            color="secondary"
-            size="md"
-            onClick={() => actions.goToIndex()}
-            isDisabled={mutationLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            size="md"
-            isDisabled={mutationLoading}
-            onClick={handleSubmit((data) =>
-              onSubmit(data as Record<string, unknown>)
-            )}
-          >
-            {mutationLoading
-              ? "Saving..."
-              : mode === "new"
-              ? "Create"
-              : "Update"}
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
+      />
 
-      <div className={paddingClasses}>
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit((data) =>
-            onSubmit(data as Record<string, unknown>)
-          )}
-          className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
-        >
-          <div className="space-y-6">
-            {config.formFields
-              .filter((field) => !field.hidden)
-              .map((field) => (
-                <div key={field.name}>
-                  {renderFormField(field, control, errors)}
-                </div>
-              ))}
+      {/* Form */}
+      <form
+        onSubmit={handleSubmit((data) =>
+          onSubmit(data as Record<string, unknown>)
+        )}
+        className="flex flex-col flex-1"
+      >
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className={`${paddingClasses} pb-8`}>
+            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+              <div className="space-y-6">
+                {config.formFields
+                  .filter((field) => {
+                    // Evaluate hidden based on mode
+                    const isHidden =
+                      typeof field.hidden === "function"
+                        ? field.hidden(mode)
+                        : field.hidden;
+                    return !isHidden;
+                  })
+                  .map((field) => (
+                    <div key={field.name}>
+                      {renderFormField(field, control, errors, mode)}
+                    </div>
+                  ))}
+              </div>
+            </div>
           </div>
-        </form>
-      </div>
+        </div>
+
+        {/* Page Footer with Action Buttons - stays at bottom */}
+        <PageFooter
+          background="primary"
+          actions={
+            <>
+              <Button
+                color="secondary"
+                size="md"
+                onClick={() => actions.goToIndex()}
+                isDisabled={mutationLoading}
+                type="button"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="md" isDisabled={mutationLoading}>
+                {mutationLoading
+                  ? "Saving..."
+                  : mode === "new"
+                  ? "Create"
+                  : "Update"}
+              </Button>
+            </>
+          }
+        />
+      </form>
     </div>
   );
 }
@@ -282,9 +322,16 @@ function buildDefaultValues(fields: CrudFormField[]): Record<string, unknown> {
 function renderFormField(
   field: CrudFormField,
   control: ReturnType<typeof useForm>["control"],
-  errors: ReturnType<typeof useForm>["formState"]["errors"]
+  errors: ReturnType<typeof useForm>["formState"]["errors"],
+  mode: "new" | "edit"
 ) {
   const error = errors[field.name]?.message as string | undefined;
+
+  // Evaluate disabled based on mode
+  const isDisabled =
+    typeof field.disabled === "function"
+      ? field.disabled(mode)
+      : field.disabled;
 
   return (
     <Controller
@@ -298,7 +345,7 @@ function renderFormField(
             value,
             onChange,
             error,
-            disabled: field.disabled,
+            disabled: isDisabled,
           });
           return <>{rendered}</>;
         }
@@ -312,7 +359,7 @@ function renderFormField(
                 placeholder={field.placeholder}
                 hint={field.helperText}
                 isInvalid={!!error}
-                isDisabled={field.disabled}
+                isDisabled={isDisabled}
                 value={value as string}
                 onChange={onChange}
                 onBlur={onBlur}
@@ -327,6 +374,7 @@ function renderFormField(
                 placeholder={field.placeholder}
                 hint={field.helperText}
                 isInvalid={!!error}
+                isDisabled={isDisabled}
                 selectedKey={value as string}
                 onSelectionChange={onChange}
               >
@@ -344,7 +392,7 @@ function renderFormField(
                 <Checkbox
                   isSelected={value as boolean}
                   onChange={onChange}
-                  isDisabled={field.disabled}
+                  isDisabled={isDisabled}
                 />
                 <div className="flex-1">
                   <label className="text-sm font-medium text-gray-900">
@@ -371,7 +419,7 @@ function renderFormField(
                 placeholder={field.placeholder}
                 hint={field.helperText}
                 isInvalid={!!error}
-                isDisabled={field.disabled}
+                isDisabled={isDisabled}
                 value={value as string}
                 onChange={onChange}
                 onBlur={onBlur}
@@ -387,7 +435,7 @@ function renderFormField(
                 placeholder={field.placeholder}
                 hint={field.helperText}
                 isInvalid={!!error}
-                isDisabled={field.disabled}
+                isDisabled={isDisabled}
                 value={value as string}
                 onChange={(val) => onChange(parseFloat(val as string))}
                 onBlur={onBlur}
@@ -403,7 +451,7 @@ function renderFormField(
                 placeholder={field.placeholder}
                 hint={field.helperText}
                 isInvalid={!!error}
-                isDisabled={field.disabled}
+                isDisabled={isDisabled}
                 value={value as string}
                 onChange={onChange}
                 onBlur={onBlur}

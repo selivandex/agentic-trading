@@ -5,10 +5,11 @@
 import React from "react";
 import { Plus } from "@untitledui/icons";
 import { Button } from "@/components/base/buttons/button";
+import { EmptyState } from "@/shared/application";
 import type { CrudConfig, CrudEntity } from "@/shared/lib/crud/types";
 
 /**
- * Empty state presentation component
+ * Empty state presentation component using shared EmptyState
  */
 interface CrudEmptyStateProps<TEntity extends CrudEntity> {
   config: CrudConfig<TEntity>;
@@ -20,18 +21,28 @@ export function CrudEmptyState<TEntity extends CrudEntity>({
   onNew,
 }: CrudEmptyStateProps<TEntity>) {
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <h2 className="text-lg font-semibold text-primary">
-        No {config.resourceNamePlural.toLowerCase()}
-      </h2>
-      <p className="mt-2 text-sm text-secondary">
-        {config.emptyStateMessage ??
-          `Get started by creating a new ${config.resourceName.toLowerCase()}`}
-      </p>
-      <Button size="lg" iconLeading={Plus} onClick={onNew} className="mt-4">
-        New {config.resourceName}
-      </Button>
+    <div className="py-12">
+      <EmptyState size="md">
+        <EmptyState.Header>
+          <EmptyState.FeaturedIcon color="gray" />
+        </EmptyState.Header>
+
+        <EmptyState.Content>
+          <EmptyState.Title>
+            No {config.resourceNamePlural.toLowerCase()}
+          </EmptyState.Title>
+          <EmptyState.Description>
+            {config.emptyStateMessage ??
+              `Get started by creating a new ${config.resourceName.toLowerCase()}`}
+          </EmptyState.Description>
+        </EmptyState.Content>
+
+        <EmptyState.Footer>
+          <Button size="md" iconLeading={Plus} onClick={onNew}>
+            New {config.resourceName}
+          </Button>
+        </EmptyState.Footer>
+      </EmptyState>
     </div>
   );
 }
-

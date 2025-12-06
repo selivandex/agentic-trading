@@ -203,18 +203,25 @@ func (r *queryResolver) UserByTelegramID(ctx context.Context, telegramID string)
 	return r.UserService.GetByTelegramID(ctx, tid)
 }
 
-// Users is the resolver for the users field.
-func (r *queryResolver) Users(ctx context.Context, limit *int, offset *int) ([]*user.User, error) {
-	// For now, just get active users (admin feature can be enhanced later)
-	return r.UserService.GetActiveUsers(ctx)
-}
-
 // UsersConnection is the resolver for the usersConnection field.
-func (r *queryResolver) UsersConnection(ctx context.Context, first *int, after *string, last *int, before *string) (*generated.UserConnection, error) {
-	// Get all active users (admin query)
-	allUsers, err := r.UserService.GetActiveUsers(ctx)
+func (r *queryResolver) UsersConnection(ctx context.Context, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*generated.UserConnection, error) {
+	// Use default scope if not provided
+	effectiveScope := scope
+	if effectiveScope == nil {
+		defaultScope := "all"
+		effectiveScope = &defaultScope
+	}
+
+	// Get filtered users from service (uses SQL WHERE, not in-memory filtering)
+	filtered, err := r.UserService.GetUsersWithScope(ctx, effectiveScope, search, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+
+	// Get scope counts from service (uses SQL GROUP BY)
+	scopeCounts, err := r.UserService.GetUsersScopes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
 	// Apply pagination
@@ -229,7 +236,7 @@ func (r *queryResolver) UsersConnection(ctx context.Context, first *int, after *
 		return nil, fmt.Errorf("invalid pagination params: %w", err)
 	}
 
-	totalCount := len(allUsers)
+	totalCount := len(filtered)
 	offset, limit, err := relay.CalculateOffsetLimit(params, totalCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate pagination: %w", err)
@@ -244,33 +251,16 @@ func (r *queryResolver) UsersConnection(ctx context.Context, first *int, after *
 		offset = totalCount
 	}
 
-	items := allUsers[offset:end]
+	items := filtered[offset:end]
 
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
+	// Build connection with scopes and filters using helper
+	return buildUserConnection(items, totalCount, params, offset, scopeCounts)
+}
 
-	// Convert to GraphQL types
-	edges := make([]*generated.UserEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.UserEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	return &generated.UserConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-	}, nil
+// Users is the resolver for the users field.
+func (r *queryResolver) Users(ctx context.Context, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*generated.UserConnection, error) {
+	// Delegate to UsersConnection method (same implementation)
+	return r.UsersConnection(ctx, scope, search, filters, first, after, last, before)
 }
 
 // TelegramID is the resolver for the telegramID field.

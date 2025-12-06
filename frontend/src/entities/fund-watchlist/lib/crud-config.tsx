@@ -30,7 +30,10 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
   resourceNamePlural: "Watchlist Items",
 
   // Base path for navigation
-  basePath: "/fund-watchlist",
+  basePath: "/watchlist",
+
+  // Display name for breadcrumbs and titles
+  getDisplayName: (watchlist) => watchlist.symbol,
 
   // GraphQL operations
   graphql: {
@@ -78,10 +81,7 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
           FUTURES: "purple",
         };
         return (
-          <Badge
-            color={colorMap[marketType] ?? "gray"}
-            size="sm"
-          >
+          <Badge color={colorMap[marketType] ?? "gray"} size="sm">
             {marketType}
           </Badge>
         );
@@ -112,18 +112,17 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
       sortable: true,
       render: (item) => {
         if (item.tier === undefined || item.tier === null) return "—";
-        const colorMap: Record<number, "success" | "blue" | "warning" | "gray"> =
-          {
-            1: "success",
-            2: "blue",
-            3: "warning",
-            4: "gray",
-          };
+        const colorMap: Record<
+          number,
+          "success" | "blue" | "warning" | "gray"
+        > = {
+          1: "success",
+          2: "blue",
+          3: "warning",
+          4: "gray",
+        };
         return (
-          <Badge
-            color={colorMap[item.tier] ?? "gray"}
-            size="sm"
-          >
+          <Badge color={colorMap[item.tier] ?? "gray"} size="sm">
             Tier {item.tier}
           </Badge>
         );
@@ -186,6 +185,7 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
         .min(1, "Symbol is required")
         .max(20, "Symbol too long")
         .toUpperCase(),
+      disabled: (mode) => mode === "edit", // Read-only in edit mode
       colSpan: 6,
     },
     {
@@ -197,6 +197,7 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
         { label: "Futures", value: "FUTURES" },
       ],
       validation: z.enum(["SPOT", "FUTURES"]),
+      //disabled: (mode) => mode === "edit", // Read-only in edit mode
       colSpan: 6,
     },
     {
@@ -264,8 +265,7 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
   defaultPageSize: 20,
 
   // Custom messages
-  emptyStateMessage:
-    "No watchlist items yet. Add symbols to start monitoring.",
+  emptyStateMessage: "No watchlist items yet. Add symbols to start monitoring.",
   errorMessage: "Failed to load watchlist items. Please try again.",
 
   // Data transformations
@@ -283,8 +283,17 @@ export const fundWatchlistCrudConfig: CrudConfig<FundWatchlist> = {
     tier: Number(data.tier),
   }),
 
-  transformBeforeUpdate: (data) => ({
-    category: data.category ? (data.category as string).toUpperCase() : undefined,
-    tier: data.tier !== undefined ? Number(data.tier) : undefined,
-  }),
+  transformBeforeUpdate: (data) => {
+    const updateInput: Record<string, unknown> = {};
+
+    if (data.category) {
+      updateInput.category = (data.category as string).toUpperCase();
+    }
+
+    if (data.tier !== undefined) {
+      updateInput.tier = Number(data.tier);
+    }
+
+    return updateInput;
+  },
 };

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -282,4 +284,130 @@ func normalizeUserTimestamps(u *user.User) {
 			u.UpdatedAt = u.CreatedAt
 		}
 	}
+}
+
+// GetUsersWithScope returns users filtered by scope, search and filters
+// Scope examples: "all", "active", "inactive", "premium", "free"
+// Search: searches across firstName, lastName, email, telegram_username
+// Filters: dynamic filters as key-value map
+func (r *UserRepository) GetUsersWithScope(ctx context.Context, scopeID *string, search *string, filters map[string]any) ([]*user.User, error) {
+	var users []*user.User
+
+	// Build WHERE clause based on scope
+	whereClauses := []string{}
+	args := []interface{}{}
+	argPos := 1
+
+	// Apply scope filter
+	if scopeID != nil && *scopeID != "" && *scopeID != "all" {
+		switch *scopeID {
+		case "active":
+			whereClauses = append(whereClauses, fmt.Sprintf("is_active = $%d", argPos))
+			args = append(args, true)
+			argPos++
+		case "inactive":
+			whereClauses = append(whereClauses, fmt.Sprintf("is_active = $%d", argPos))
+			args = append(args, false)
+			argPos++
+		case "premium":
+			whereClauses = append(whereClauses, fmt.Sprintf("is_premium = $%d", argPos))
+			args = append(args, true)
+			argPos++
+		case "free":
+			whereClauses = append(whereClauses, fmt.Sprintf("is_premium = $%d", argPos))
+			args = append(args, false)
+			argPos++
+		}
+	}
+
+	// Apply search filter
+	if search != nil && *search != "" {
+		searchPattern := "%" + *search + "%"
+		whereClauses = append(whereClauses, fmt.Sprintf(
+			"(first_name ILIKE $%d OR last_name ILIKE $%d OR email ILIKE $%d OR telegram_username ILIKE $%d)",
+			argPos, argPos, argPos, argPos,
+		))
+		args = append(args, searchPattern)
+		argPos++
+	}
+
+	// Build query
+	query := `
+		SELECT id, telegram_id, telegram_username, email, password_hash, first_name, last_name,
+			   language_code, is_active, is_premium, limit_profile_id, settings, created_at, updated_at
+		FROM users`
+
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var u user.User
+		var settingsJSON []byte
+
+		err := rows.Scan(
+			&u.ID, &u.TelegramID, &u.TelegramUsername, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName,
+			&u.LanguageCode, &u.IsActive, &u.IsPremium, &u.LimitProfileID, &settingsJSON, &u.CreatedAt, &u.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Unmarshal settings
+		if len(settingsJSON) > 0 {
+			if err := json.Unmarshal(settingsJSON, &u.Settings); err != nil {
+				u.Settings = user.DefaultSettings()
+			}
+		} else {
+			u.Settings = user.DefaultSettings()
+		}
+
+		normalizeUserTimestamps(&u)
+
+		users = append(users, &u)
+	}
+
+	return users, rows.Err()
+}
+
+// GetUsersScopes returns count for each scope
+// Uses SQL GROUP BY for efficiency
+func (r *UserRepository) GetUsersScopes(ctx context.Context) (map[string]int, error) {
+	result := make(map[string]int)
+
+	// Get total count
+	var totalCount int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&totalCount)
+	if err != nil {
+		return nil, err
+	}
+	result["all"] = totalCount
+
+	// Get active/inactive counts
+	var activeCount int
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&activeCount)
+	if err != nil {
+		return nil, err
+	}
+	result["active"] = activeCount
+	result["inactive"] = totalCount - activeCount
+
+	// Get premium/free counts
+	var premiumCount int
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE is_premium = true").Scan(&premiumCount)
+	if err != nil {
+		return nil, err
+	}
+	result["premium"] = premiumCount
+	result["free"] = totalCount - premiumCount
+
+	return result, nil
 }

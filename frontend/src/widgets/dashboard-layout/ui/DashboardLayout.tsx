@@ -3,12 +3,13 @@
 "use client";
 
 import {
-  LayoutDashboard,
-  TrendingUp,
+  HomeLine,
+  TrendUp01,
   Eye,
-  User as UserIcon,
-  Settings,
-} from "lucide-react";
+  User01 as UserIcon,
+  Settings01,
+  Users01,
+} from "@untitledui/icons";
 import { signOut } from "next-auth/react";
 import type { User } from "@/entities/user";
 import type { NavItemType } from "@/components/application/app-navigation/config";
@@ -33,12 +34,17 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     {
       label: "Dashboard",
       href: "/dashboard",
-      icon: LayoutDashboard,
+      icon: HomeLine,
+    },
+    {
+      label: "Users",
+      href: "/users",
+      icon: Users01,
     },
     {
       label: "Strategies",
       href: "/strategies",
-      icon: TrendingUp,
+      icon: TrendUp01,
     },
     {
       label: "Watchlist",
@@ -53,7 +59,7 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     {
       label: "Settings",
       href: "/settings",
-      icon: Settings,
+      icon: Settings01,
     },
   ];
 

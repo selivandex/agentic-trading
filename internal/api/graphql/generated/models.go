@@ -315,6 +315,10 @@ type UserConnection struct {
 	PageInfo *PageInfo `json:"pageInfo"`
 	// Total count of items (if available)
 	TotalCount int `json:"totalCount"`
+	// Available filter scopes with counts
+	Scopes []*Scope `json:"scopes"`
+	// Available dynamic filters
+	Filters []*Filter `json:"filters"`
 }
 
 // Edge type for User

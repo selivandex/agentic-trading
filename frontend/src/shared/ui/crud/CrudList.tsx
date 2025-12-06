@@ -19,8 +19,9 @@ import { CrudLoadingState } from "./views/CrudLoadingState";
 import { CrudEmptyState } from "./views/CrudEmptyState";
 import { CrudErrorState } from "./views/CrudErrorState";
 import { CrudPagination } from "./views/CrudPagination";
-import { CrudTabs } from "./views/CrudTabs";
 import { CrudDynamicFilters } from "./views/CrudDynamicFilters";
+import { PageHeaderSkeleton } from "@/shared/ui/page-header";
+import { TabsSkeleton } from "@/shared/ui/tabs";
 
 /**
  * CRUD List Component
@@ -163,42 +164,103 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
     );
   }
 
+  // Convert scopes to PageHeader tabs format
+  const tabItems = useMemo(() => {
+    if (!config.tabs?.enabled || !scopes || scopes.length === 0) {
+      return undefined;
+    }
+
+    return scopes.map((scope) => ({
+      id: scope.id,
+      label: scope.name,
+      badge: scope.count,
+    }));
+  }, [config.tabs?.enabled, scopes]);
+
+  // Map CRUD tab style to PageHeader tab style
+  const tabStyleMap = {
+    "button-brand": "button-brand",
+    "button-gray": "button-gray",
+    "button-border": "button-border",
+    "button-minimal": "button-minimal",
+    "underline": "underline",
+  } as const;
+
+  const pageHeaderTabStyle = config.tabs?.type
+    ? tabStyleMap[config.tabs.type]
+    : "underline";
+
+  // Check if tabs are loading separately
+  const tabsLoading =
+    config.tabs?.enabled && loading && (!scopes || scopes.length === 0);
+  const showTabsSkeleton = tabsLoading && entities.length > 0;
+
   return (
     <div className="mx-auto mb-8 flex flex-col gap-5">
-      {/* Page Header with Breadcrumbs, Title, and Actions */}
-      <PageHeader
-        background="transparent"
-        breadcrumbs={breadcrumbs}
-        showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
-        title={config.resourceNamePlural}
-        description={`Manage your ${config.resourceNamePlural.toLowerCase()}`}
-        search={
-          config.enableSearch !== false
-            ? {
-                placeholder: `Search ${config.resourceNamePlural.toLowerCase()}...`,
-                value: state.searchQuery ?? "",
-                onChange: handleSearchChange,
-              }
-            : undefined
-        }
-      >
-        <PageHeader.Actions>
-          <Button color="primary" size="md" onClick={() => actions.goToNew()}>
-            New {config.resourceName}
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
-
-      {/* Tabs for filtering (rendered if backend provides scopes) */}
-      {config.tabs?.enabled && scopes && scopes.length > 0 && (
-        <div className={paddingClasses}>
-          <CrudTabs
-            config={config.tabs}
-            activeScope={state.activeTab}
-            scopes={scopes}
-            onScopeChange={actions.setActiveTab}
-          />
-        </div>
+      {/* Page Header with Breadcrumbs, Title, Tabs, and Actions */}
+      {loading && !entities.length ? (
+        /* Full skeleton during initial load */
+        <PageHeaderSkeleton
+          background="primary"
+          showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
+          breadcrumbCount={breadcrumbs?.length ?? 0}
+          showTitle
+          showDescription
+          showSearch={config.enableSearch !== false}
+          actionCount={1}
+          tabCount={config.tabs?.enabled ? 3 : 0}
+          tabStyle={pageHeaderTabStyle}
+        />
+      ) : (
+        /* Regular header */
+        <>
+          <PageHeader
+            background="primary"
+            breadcrumbs={breadcrumbs}
+            showBreadcrumbs={!!breadcrumbs && breadcrumbs.length > 0}
+            title={config.resourceNamePlural}
+            description={`Manage your ${config.resourceNamePlural.toLowerCase()}`}
+            search={
+              config.enableSearch !== false
+                ? {
+                    placeholder: `Search ${config.resourceNamePlural.toLowerCase()}...`,
+                    value: state.searchQuery ?? "",
+                    onChange: handleSearchChange,
+                  }
+                : undefined
+            }
+            tabs={showTabsSkeleton ? undefined : tabItems}
+            selectedTab={state.activeTab}
+            onTabChange={actions.setActiveTab}
+            tabStyle={pageHeaderTabStyle}
+          >
+            <PageHeader.Actions>
+              <Button color="primary" size="md" onClick={() => actions.goToNew()}>
+                New {config.resourceName}
+              </Button>
+            </PageHeader.Actions>
+          </PageHeader>
+          {/* Tabs skeleton - shown separately when tabs are loading */}
+          {showTabsSkeleton && (
+            <div className="px-4 lg:px-8">
+              <TabsSkeleton
+                count={3}
+                type={
+                  pageHeaderTabStyle === "underline"
+                    ? "underline"
+                    : pageHeaderTabStyle === "button-brand"
+                    ? "button-brand"
+                    : pageHeaderTabStyle === "button-gray"
+                    ? "button-gray"
+                    : pageHeaderTabStyle === "button-border"
+                    ? "button-border"
+                    : "button-minimal"
+                }
+                size="sm"
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Main content with optional sidebar */}

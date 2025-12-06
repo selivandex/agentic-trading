@@ -70,6 +70,22 @@ func (m *MockUserRepository) List(ctx context.Context, limit, offset int) ([]*us
 	return args.Get(0).([]*user.User), args.Error(1)
 }
 
+func (m *MockUserRepository) GetUsersWithScope(ctx context.Context, scope *string, search *string, filters map[string]any) ([]*user.User, error) {
+	args := m.Called(ctx, scope, search, filters)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*user.User), args.Error(1)
+}
+
+func (m *MockUserRepository) GetUsersScopes(ctx context.Context) (map[string]int, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]int), args.Error(1)
+}
+
 func testLogger() *logger.Logger {
 	zapLogger, _ := zap.NewDevelopment()
 	return &logger.Logger{SugaredLogger: zapLogger.Sugar()}

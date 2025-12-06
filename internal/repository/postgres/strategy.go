@@ -92,7 +92,7 @@ func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 	query := `
 		SELECT id, user_id, name, description, status,
 			   allocated_capital, current_equity, cash_reserve,
-			   risk_tolerance, rebalance_frequency, target_allocations,
+			   market_type, risk_tolerance, rebalance_frequency, target_allocations,
 			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
 			   created_at, updated_at, closed_at, last_rebalanced_at,
 			   reasoning_log
@@ -115,7 +115,7 @@ func (r *StrategyRepository) GetActiveByUserID(ctx context.Context, userID uuid.
 	query := `
 		SELECT id, user_id, name, description, status,
 			   allocated_capital, current_equity, cash_reserve,
-			   risk_tolerance, rebalance_frequency, target_allocations,
+			   market_type, risk_tolerance, rebalance_frequency, target_allocations,
 			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
 			   created_at, updated_at, closed_at, last_rebalanced_at,
 			   reasoning_log
@@ -138,7 +138,7 @@ func (r *StrategyRepository) GetAllActive(ctx context.Context) ([]*strategy.Stra
 	query := `
 		SELECT id, user_id, name, description, status,
 			   allocated_capital, current_equity, cash_reserve,
-			   risk_tolerance, rebalance_frequency, target_allocations,
+			   market_type, risk_tolerance, rebalance_frequency, target_allocations,
 			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
 			   created_at, updated_at, closed_at, last_rebalanced_at,
 			   reasoning_log
@@ -162,7 +162,7 @@ func (r *StrategyRepository) GetWithFilter(ctx context.Context, filter strategy.
 	query := `
 		SELECT id, user_id, name, description, status,
 			   allocated_capital, current_equity, cash_reserve,
-			   risk_tolerance, rebalance_frequency, target_allocations,
+			   market_type, risk_tolerance, rebalance_frequency, target_allocations,
 			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
 			   created_at, updated_at, closed_at, last_rebalanced_at,
 			   reasoning_log
@@ -367,24 +367,25 @@ func (r *StrategyRepository) Update(ctx context.Context, s *strategy.Strategy) e
 			allocated_capital = $5,
 			current_equity = $6,
 			cash_reserve = $7,
-			risk_tolerance = $8,
-			rebalance_frequency = $9,
-			target_allocations = $10,
-			total_pnl = $11,
-			total_pnl_percent = $12,
-			sharpe_ratio = $13,
-			max_drawdown = $14,
-			win_rate = $15,
-			updated_at = $16,
-			closed_at = $17,
-			last_rebalanced_at = $18,
-			reasoning_log = $19
+			market_type = $8,
+			risk_tolerance = $9,
+			rebalance_frequency = $10,
+			target_allocations = $11,
+			total_pnl = $12,
+			total_pnl_percent = $13,
+			sharpe_ratio = $14,
+			max_drawdown = $15,
+			win_rate = $16,
+			updated_at = $17,
+			closed_at = $18,
+			last_rebalanced_at = $19,
+			reasoning_log = $20
 		WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query,
 		s.ID, s.Name, s.Description, s.Status,
 		s.AllocatedCapital, s.CurrentEquity, s.CashReserve,
-		s.RiskTolerance, s.RebalanceFrequency, s.TargetAllocations,
+		s.MarketType, s.RiskTolerance, s.RebalanceFrequency, s.TargetAllocations,
 		s.TotalPnL, s.TotalPnLPercent, s.SharpeRatio, s.MaxDrawdown, s.WinRate,
 		s.UpdatedAt, s.ClosedAt, s.LastRebalancedAt,
 		s.ReasoningLog,

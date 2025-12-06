@@ -21,16 +21,16 @@ func testLogger() *logger.Logger {
 
 // MockDomainService is a mock for fundwatchlist domain service
 type MockDomainService struct {
-	createFunc       func(context.Context, *fundwatchlist.Watchlist) error
-	getByIDFunc      func(context.Context, uuid.UUID) (*fundwatchlist.Watchlist, error)
-	getBySymbolFunc  func(context.Context, string, string) (*fundwatchlist.Watchlist, error)
-	getActiveFunc    func(context.Context) ([]*fundwatchlist.Watchlist, error)
-	getAllFunc       func(context.Context) ([]*fundwatchlist.Watchlist, error)
-	updateFunc       func(context.Context, *fundwatchlist.Watchlist) error
-	deleteFunc       func(context.Context, uuid.UUID) error
-	isActiveFunc     func(context.Context, string, string) (bool, error)
-	pauseFunc        func(context.Context, string, string, string) error
-	resumeFunc       func(context.Context, string, string) error
+	createFunc      func(context.Context, *fundwatchlist.Watchlist) error
+	getByIDFunc     func(context.Context, uuid.UUID) (*fundwatchlist.Watchlist, error)
+	getBySymbolFunc func(context.Context, string, string) (*fundwatchlist.Watchlist, error)
+	getActiveFunc   func(context.Context) ([]*fundwatchlist.Watchlist, error)
+	getAllFunc      func(context.Context) ([]*fundwatchlist.Watchlist, error)
+	updateFunc      func(context.Context, *fundwatchlist.Watchlist) error
+	deleteFunc      func(context.Context, uuid.UUID) error
+	isActiveFunc    func(context.Context, string, string) (bool, error)
+	pauseFunc       func(context.Context, string, string, string) error
+	resumeFunc      func(context.Context, string, string) error
 }
 
 func (m *MockDomainService) Create(ctx context.Context, w *fundwatchlist.Watchlist) error {
@@ -279,11 +279,11 @@ func TestService_GetMonitored(t *testing.T) {
 				},
 			}
 
-		log := testLogger()
-		mockRepo := &MockRepository{}
-		svc := NewService(mockDomainSvc, mockRepo, log)
+			log := testLogger()
+			mockRepo := &MockRepository{}
+			svc := NewService(mockDomainSvc, mockRepo, log)
 
-		result, err := svc.GetMonitored(context.Background(), tt.marketType)
+			result, err := svc.GetMonitored(context.Background(), tt.marketType)
 
 			assert.NoError(t, err)
 			assert.Len(t, result, tt.expected)
@@ -364,11 +364,11 @@ func TestService_TogglePause(t *testing.T) {
 				},
 			}
 
-		log := testLogger()
-		mockRepo := &MockRepository{}
-		svc := NewService(mockDomainSvc, mockRepo, log)
+			log := testLogger()
+			mockRepo := &MockRepository{}
+			svc := NewService(mockDomainSvc, mockRepo, log)
 
-		result, err := svc.TogglePause(context.Background(), id, tt.isPaused, tt.reason)
+			result, err := svc.TogglePause(context.Background(), id, tt.isPaused, tt.reason)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.isPaused, result.IsPaused)

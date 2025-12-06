@@ -57,7 +57,7 @@ export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
           showTitle
           actionCount={2}
         />
-        <div className={paddingClasses}>
+        <div className={`${paddingClasses} pb-8`}>
           <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
             <div className="space-y-6">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -137,7 +137,7 @@ export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
         </PageHeader.Actions>
       </PageHeader>
 
-      <div className={paddingClasses}>
+      <div className={`${paddingClasses} pb-8`}>
         {/* Content */}
         <CrudShowContent
           config={config}

@@ -6,7 +6,9 @@
  * Watchlist of trading symbols being monitored by the fund
  */
 
-export interface FundWatchlist {
+import type { CrudEntity } from "@/shared/lib/crud";
+
+export interface FundWatchlist extends CrudEntity {
   id: string;
   symbol: string;
   marketType: string;

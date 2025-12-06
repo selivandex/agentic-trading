@@ -25,7 +25,7 @@ export const PageFooter = ({
   return (
     <div
       className={cx(
-        "relative w-full flex items-center justify-end py-4 border-t border-secondary",
+        "w-full flex items-center justify-end py-4 border-t border-gray-200 shadow-sm",
         background === "primary" ? "bg-primary" : "bg-transparent",
         paddingClasses,
         className
@@ -41,9 +41,6 @@ PageFooter.displayName = "PageFooter";
 
 /**
  * PageFooterSkeleton - Loading state for PageFooter component
- *
- * Accepts the same props as PageFooter and automatically displays
- * skeleton placeholders for the provided layout configuration.
  */
 export type PageFooterSkeletonProps = Omit<PageFooterProps, "actions"> & {
   /** Number of action buttons to show */
@@ -60,7 +57,7 @@ export const PageFooterSkeleton = ({
   return (
     <div
       className={cx(
-        "relative w-full flex items-center justify-end py-4 border-t border-secondary",
+        "w-full flex items-center justify-end py-4 border-t border-gray-200 shadow-sm",
         background === "primary" ? "bg-primary" : "bg-transparent",
         paddingClasses,
         className

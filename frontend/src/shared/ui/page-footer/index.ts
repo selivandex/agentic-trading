@@ -1,13 +1,4 @@
-/**
- * Page Footer Component
- * Main page footer with navigation and copyright
- */
+/** @format */
 
-export { PageFooter, type PageFooterProps } from "./page-footer";
-
-
-
-
-
-
-
+export { PageFooter, PageFooterSkeleton } from "./page-footer";
+export type { PageFooterProps, PageFooterSkeletonProps } from "./page-footer";

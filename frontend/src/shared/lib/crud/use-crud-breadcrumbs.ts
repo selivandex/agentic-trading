@@ -27,6 +27,26 @@ function buildResourceGroupHierarchy(
 }
 
 /**
+ * Get display name for entity
+ */
+function getEntityDisplayName<TEntity extends CrudEntity>(
+  entity: TEntity,
+  config: CrudConfig<TEntity>
+): string {
+  // Use custom getDisplayName if provided
+  if (config.getDisplayName) {
+    return config.getDisplayName(entity);
+  }
+
+  // Fallback to common fields: name, title, or ID
+  return (
+    (entity as { name?: string }).name ??
+    (entity as { title?: string }).title ??
+    `${config.resourceName} #${entity.id}`
+  );
+}
+
+/**
  * Generate breadcrumbs from CRUD config and current mode
  */
 function generateBreadcrumbs<TEntity extends CrudEntity>(
@@ -58,10 +78,7 @@ function generateBreadcrumbs<TEntity extends CrudEntity>(
   switch (mode) {
     case "show":
       if (entity) {
-        const entityLabel =
-          (entity as { name?: string }).name ??
-          (entity as { title?: string }).title ??
-          `${config.resourceName} #${entity.id}`;
+        const entityLabel = getEntityDisplayName(entity, config);
         items.push({
           label: entityLabel,
           href: `${config.basePath}/${entity.id}`,
@@ -75,10 +92,7 @@ function generateBreadcrumbs<TEntity extends CrudEntity>(
       break;
     case "edit":
       if (entity) {
-        const entityLabel =
-          (entity as { name?: string }).name ??
-          (entity as { title?: string }).title ??
-          `${config.resourceName} #${entity.id}`;
+        const entityLabel = getEntityDisplayName(entity, config);
         items.push({
           label: entityLabel,
           href: `${config.basePath}/${entity.id}`,
@@ -160,4 +174,3 @@ export function useCrudBreadcrumbs<TEntity extends CrudEntity>(
     return items.length > 0 ? items : undefined;
   }, [config, mode, entity]);
 }
-

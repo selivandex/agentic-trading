@@ -63,10 +63,10 @@ export interface CrudFormField<TEntity extends CrudEntity = CrudEntity> {
   options?: Array<{ label: string; value: string | number }>;
   /** Custom render function for complex fields */
   render?: (props: CrudFormFieldRenderProps<TEntity>) => ReactNode;
-  /** Whether field is disabled */
-  disabled?: boolean;
-  /** Whether field is hidden */
-  hidden?: boolean;
+  /** Whether field is disabled (can be boolean or function based on mode) */
+  disabled?: boolean | ((mode: "new" | "edit") => boolean);
+  /** Whether field is hidden (can be boolean or function based on mode) */
+  hidden?: boolean | ((mode: "new" | "edit") => boolean);
   /** Grid column span (1-12) */
   colSpan?: number;
   /** Default value for create form */
@@ -409,6 +409,13 @@ export interface CrudConfig<TEntity extends CrudEntity = CrudEntity> {
   basePath?: string;
   /** Resource group for hierarchical organization (e.g., "Content", "Settings") */
   resourceGroup?: CrudResourceGroup;
+  /**
+   * Get display name for entity (used in breadcrumbs, titles, etc.)
+   * If not provided, falls back to: entity.name ?? entity.title ?? `Resource #${id}`
+   * @example (strategy) => strategy.name
+   * @example (user) => `${user.firstName} ${user.lastName}`
+   */
+  getDisplayName?: (entity: TEntity) => string;
   /** GraphQL operations */
   graphql: CrudGraphQLConfig<TEntity>;
   /** Column definitions for table */

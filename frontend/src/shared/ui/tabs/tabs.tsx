@@ -19,6 +19,7 @@ import {
 } from "react-aria-components";
 import type { BadgeColors } from "@/components/base/badges/badge-types";
 import { Badge } from "@/components/base/badges/badges";
+import { Skeleton } from "@/shared/ui/skeleton/skeleton";
 import { cx } from "@/utils/cx";
 
 type Orientation = "horizontal" | "vertical";
@@ -221,15 +222,22 @@ interface TabComponentProps extends AriaTabProps {
   children?: ReactNode | ((props: AriaTabRenderProps) => ReactNode);
   /** The badge displayed next to the label. */
   badge?: number | string;
+  /** @deprecated href is not used - use onSelectionChange in Tabs component for client-side routing */
+  href?: string;
 }
 
 export const Tab = (props: TabComponentProps) => {
-  const { label, children, badge, ...otherProps } = props;
+  const { label, children, badge, href, ...otherProps } = props;
   const {
     size = "sm",
     type = "button-brand",
     fullWidth,
   } = useContext(TabListContext);
+
+  // Note: We explicitly exclude href from otherProps to prevent AriaTab
+  // from using native navigation. Use onSelectionChange in Tabs component instead.
+  // This ensures client-side routing without page reloads.
+  void href; // Mark as intentionally unused
 
   return (
     <AriaTab
@@ -290,3 +298,65 @@ export const Tabs = ({
 Tabs.Panel = TabPanel;
 Tabs.List = TabList;
 Tabs.Item = Tab;
+
+/**
+ * TabsSkeleton - Loading skeleton for Tabs
+ */
+export interface TabsSkeletonProps {
+  /** Number of tab items to show */
+  count?: number;
+  /** Tab style variant */
+  type?: HorizontalTypes | VerticalTypes;
+  /** Tab size */
+  size?: "sm" | "md" | "lg";
+  /** Orientation */
+  orientation?: Orientation;
+  /** Additional className */
+  className?: string;
+}
+
+export const TabsSkeleton = ({
+  count = 3,
+  type = "underline",
+  size = "md",
+  orientation = "horizontal",
+  className,
+}: TabsSkeletonProps) => {
+  const isVertical = orientation === "vertical";
+  const isUnderline = type === "underline";
+  const isLine = type === "line";
+
+  // Height based on size
+  const heightClass = {
+    sm: "h-8",
+    md: "h-10",
+    lg: "h-11",
+  }[size];
+
+  // Width based on type and orientation
+  const widthClass = isVertical
+    ? "w-full"
+    : isUnderline || isLine
+    ? "w-20"
+    : "w-24";
+
+  return (
+    <div
+      className={cx(
+        "flex gap-2",
+        isVertical ? "flex-col" : "flex-row items-center",
+        (isUnderline || isLine) && "border-b border-secondary",
+        className
+      )}
+    >
+      {Array.from({ length: count }).map((_, index) => (
+        <Skeleton
+          key={index}
+          className={cx(heightClass, widthClass, "rounded")}
+        />
+      ))}
+    </div>
+  );
+};
+
+TabsSkeleton.displayName = "TabsSkeleton";

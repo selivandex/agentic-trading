@@ -17,7 +17,7 @@ export default function EditStrategyPage({
   const { id } = use(params);
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="h-full">
       <Crud config={strategyCrudConfig} mode="edit" entityId={id} />
     </div>
   );

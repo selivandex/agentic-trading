@@ -2,8 +2,7 @@
 
 "use client";
 
-import { Crud } from "@/shared/ui/crud";
-import { userCrudConfig } from "@/entities/user";
+import { UserManager } from "@/entities/user";
 
 /**
  * Users Management Page
@@ -13,15 +12,12 @@ import { userCrudConfig } from "@/entities/user";
  * - View user details and settings
  * - Edit user settings (risk parameters, limits, etc.)
  * - Activate/deactivate users
+ * - Batch operations (activate/deactivate multiple users)
  *
  * Note: Users cannot be created or deleted through this interface.
  * - Users are created via Telegram/OAuth registration
  * - Users can only be deactivated, not deleted (data retention)
  */
 export default function UsersPage() {
-  return (
-    <div className="container mx-auto py-8">
-      <Crud config={userCrudConfig} />
-    </div>
-  );
+  return <UserManager />;
 }

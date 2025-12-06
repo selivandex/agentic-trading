@@ -2,21 +2,21 @@ package resolvers
 
 import (
 	"fmt"
+
 	"prometheus/internal/api/graphql/generated"
-	"prometheus/internal/domain/strategy"
+	"prometheus/internal/domain/user"
 	"prometheus/pkg/relay"
 )
 
-// buildStrategyConnection is a helper function to build GraphQL connection with scopes and filters
-// This avoids code duplication between UserStrategies and Strategies resolvers
-func buildStrategyConnection(
-	items []*strategy.Strategy,
+// buildUserConnection is a helper function to build GraphQL connection with scopes and filters
+// This avoids code duplication and provides consistent structure
+func buildUserConnection(
+	items []*user.User,
 	totalCount int,
 	params relay.PaginationParams,
 	offset int,
 	scopeCounts map[string]int,
-	rangeStats *strategy.RangeStats,
-) (*generated.StrategyConnection, error) {
+) (*generated.UserConnection, error) {
 	// Build relay connection
 	conn, err := relay.NewConnection(items, totalCount, params, offset)
 	if err != nil {
@@ -24,16 +24,16 @@ func buildStrategyConnection(
 	}
 
 	// Convert to GraphQL types
-	edges := make([]*generated.StrategyEdge, len(conn.Edges))
+	edges := make([]*generated.UserEdge, len(conn.Edges))
 	for i, edge := range conn.Edges {
-		edges[i] = &generated.StrategyEdge{
+		edges[i] = &generated.UserEdge{
 			Node:   edge.Node,
 			Cursor: edge.Cursor,
 		}
 	}
 
 	// Build scopes with counts
-	scopeDefs := getStrategyScopeDefinitions()
+	scopeDefs := getUserScopeDefinitions()
 	scopes := make([]*generated.Scope, len(scopeDefs))
 	for i, scopeDef := range scopeDefs {
 		scopes[i] = &generated.Scope{
@@ -44,7 +44,7 @@ func buildStrategyConnection(
 	}
 
 	// Build filters from definitions
-	filterDefs := getStrategyFilterDefinitions()
+	filterDefs := getUserFilterDefinitions()
 	filters := make([]*generated.Filter, 0, len(filterDefs))
 
 	for _, filterDef := range filterDefs {
@@ -57,26 +57,8 @@ func buildStrategyConnection(
 		}
 
 		// Apply min/max from range stats for NUMBER_RANGE filters
+		// Currently not implemented for users - can be added later if needed
 		var min, max *float64
-		if rangeStats != nil && filterDef.Type == relay.FilterTypeNumberRange {
-			switch filterDef.ID {
-			case "capital_range":
-				minVal, _ := rangeStats.MinCapital.Float64()
-				maxVal, _ := rangeStats.MaxCapital.Float64()
-				min = &minVal
-				max = &maxVal
-			case "pnl_range":
-				minVal, _ := rangeStats.MinPnLPercent.Float64()
-				maxVal, _ := rangeStats.MaxPnLPercent.Float64()
-				min = &minVal
-				max = &maxVal
-			}
-
-			// Skip NUMBER_RANGE filters if min === max (no range available)
-			if min != nil && max != nil && *min == *max {
-				continue
-			}
-		}
 
 		filters = append(filters, &generated.Filter{
 			ID:           filterDef.ID,
@@ -90,7 +72,7 @@ func buildStrategyConnection(
 		})
 	}
 
-	return &generated.StrategyConnection{
+	return &generated.UserConnection{
 		Edges: edges,
 		PageInfo: &generated.PageInfo{
 			HasNextPage:     conn.PageInfo.HasNextPage,
@@ -103,3 +85,4 @@ func buildStrategyConnection(
 		Filters:    filters,
 	}, nil
 }
+

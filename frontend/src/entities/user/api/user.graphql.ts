@@ -95,12 +95,58 @@ export const SET_USER_ACTIVE_MUTATION = gql`
   }
 `;
 
-// Get all users (admin only)
+// Get all users (admin only) - with Relay pagination, scopes, and filters
 export const GET_USERS_QUERY = gql`
   ${USER_FRAGMENT}
-  query GetUsers($limit: Int, $offset: Int) {
-    users(limit: $limit, offset: $offset) {
-      ...UserFields
+  query GetUsers(
+    $scope: String
+    $search: String
+    $filters: JSONObject
+    $first: Int
+    $after: String
+    $last: Int
+    $before: String
+  ) {
+    users(
+      scope: $scope
+      search: $search
+      filters: $filters
+      first: $first
+      after: $after
+      last: $last
+      before: $before
+    ) {
+      edges {
+        node {
+          ...UserFields
+        }
+        cursor
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
+      scopes {
+        id
+        name
+        count
+      }
+      filters {
+        id
+        name
+        type
+        options {
+          value
+          label
+        }
+        defaultValue
+        placeholder
+        min
+        max
+      }
     }
   }
 `;

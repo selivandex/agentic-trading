@@ -105,10 +105,8 @@ func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, scope *str
 	mergedFilters := make(map[string]interface{})
 
 	// Add filters from map parameter
-	if filters != nil {
-		for k, v := range filters {
-			mergedFilters[k] = v
-		}
+	for k, v := range filters {
+		mergedFilters[k] = v
 	}
 
 	// Add legacy parameters (for backward compatibility)

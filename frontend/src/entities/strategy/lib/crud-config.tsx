@@ -33,6 +33,9 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
   // Base path for navigation
   basePath: "/strategies",
 
+  // Display name for breadcrumbs and titles
+  getDisplayName: (strategy) => strategy.name,
+
   // GraphQL operations
   graphql: {
     list: {
@@ -185,6 +188,7 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       helperText: "Select the user who owns this strategy",
       validation: z.string().uuid("Please select a user"),
       render: (props) => <UserSelectField {...props} />,
+      disabled: (mode) => mode === "edit", // Read-only in edit mode
       colSpan: 12,
     },
     {
@@ -218,6 +222,7 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
         .number()
         .min(100, "Minimum $100")
         .max(10000000, "Maximum $10,000,000"),
+      disabled: (mode) => mode === "edit", // Read-only in edit mode
       colSpan: 6,
     },
     {
@@ -229,6 +234,7 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
         { label: "Futures", value: "futures" },
       ],
       validation: z.enum(["spot", "futures"]),
+      disabled: (mode) => mode === "edit", // Read-only in edit mode
       colSpan: 6,
     },
     {

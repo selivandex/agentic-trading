@@ -51,6 +51,16 @@ type UserConnection {
   Total count of items (if available)
   """
   totalCount: Int!
+
+  """
+  Available filter scopes with counts
+  """
+  scopes: [Scope!]!
+
+  """
+  Available dynamic filters
+  """
+  filters: [Filter!]!
 }
 
 type Settings {
@@ -143,17 +153,28 @@ extend type Query {
   # Get user by telegram ID
   userByTelegramID(telegramID: String!): User
 
-  # Get all users (admin only, legacy)
-  users(limit: Int, offset: Int): [User!]!
-    @deprecated(reason: "Use usersConnection instead")
-
-  # Get all users (admin only, Relay Connection)
+  # Get all users (admin only, Relay Connection with scopes and filters)
   usersConnection(
+    scope: String
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
     before: String
   ): UserConnection!
+
+  # Legacy alias for usersConnection (deprecated, use usersConnection)
+  users(
+    scope: String
+    search: String
+    filters: JSONObject
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): UserConnection!
+    @deprecated(reason: "Use usersConnection instead")
 }
 
 # Mutations

@@ -10,7 +10,7 @@ import { strategyCrudConfig } from "@/entities/strategy";
  */
 export default function NewStrategyPage() {
   return (
-    <div className="container mx-auto py-8">
+    <div className="h-full">
       <Crud config={strategyCrudConfig} mode="new" />
     </div>
   );
