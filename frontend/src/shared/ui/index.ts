@@ -36,6 +36,9 @@ export * from "./page-header";
 // Page Footer
 export * from "./page-footer";
 
+// Panel
+export * from "./panel";
+
 // Skeleton
 export * from "./skeleton";
 

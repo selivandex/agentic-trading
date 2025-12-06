@@ -398,6 +398,50 @@ export interface CrudTabsConfig {
 }
 
 /**
+ * Show page layout configuration
+ */
+export type CrudShowLayout = "single-column" | "two-column" | "custom";
+
+/**
+ * Show page customization configuration
+ */
+export interface CrudShowConfig<TEntity extends CrudEntity = CrudEntity> {
+  /**
+   * Layout type for show page
+   * - "single-column": Default layout with fields in single column
+   * - "two-column": Main content on left, sidebar on right
+   * - "custom": Fully custom content (requires customContent)
+   * @default "single-column"
+   */
+  layout?: CrudShowLayout;
+  /**
+   * Custom content renderer (replaces all default content)
+   * Use this for complete control over show page layout
+   * @example (entity) => <CustomUserProfile user={entity} />
+   */
+  customContent?: (entity: TEntity) => ReactNode;
+  /**
+   * Sidebar content (only used with "two-column" layout)
+   * @example (user) => <ExchangeAccountsList userId={user.id} />
+   */
+  sidebar?: (entity: TEntity) => ReactNode;
+  /**
+   * Main content renderer (overrides default field list)
+   * Use with "two-column" layout to customize left side
+   * @example (user) => <UserDetailsPanel user={user} />
+   */
+  mainContent?: (entity: TEntity) => ReactNode;
+  /**
+   * Additional content before default fields
+   */
+  beforeContent?: (entity: TEntity) => ReactNode;
+  /**
+   * Additional content after default fields
+   */
+  afterContent?: (entity: TEntity) => ReactNode;
+}
+
+/**
  * Complete CRUD configuration
  */
 export interface CrudConfig<TEntity extends CrudEntity = CrudEntity> {
@@ -442,6 +486,8 @@ export interface CrudConfig<TEntity extends CrudEntity = CrudEntity> {
   dynamicFilters?: CrudDynamicFiltersConfig;
   /** Breadcrumbs configuration */
   breadcrumbs?: CrudBreadcrumbsConfig<TEntity>;
+  /** Show page customization */
+  show?: CrudShowConfig<TEntity>;
   /** Custom empty state message */
   emptyStateMessage?: string;
   /** Custom error message */

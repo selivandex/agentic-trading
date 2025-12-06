@@ -3,6 +3,7 @@
 import { z } from "zod";
 import type { CrudConfig } from "@/shared/lib/crud";
 import { Badge } from "@/components/base/badges/badges";
+import { Panel } from "@/shared/ui/panel";
 import type { User } from "../model/types";
 import {
   GET_USERS_QUERY,
@@ -305,6 +306,309 @@ export const userCrudConfig: CrudConfig<User> = {
   // Dynamic filters configuration (filters from backend)
   dynamicFilters: {
     enabled: true,
+  },
+
+  // Show page customization
+  show: {
+    layout: "two-column",
+    mainContent: (user) => (
+      <>
+        {/* User Profile Info */}
+        <Panel>
+          <Panel.Header title="Profile Information" />
+          <Panel.Divider />
+          <Panel.Content>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    First Name
+                  </dt>
+                  <dd className="mt-1 text-base text-primary">
+                    {user.firstName || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    Last Name
+                  </dt>
+                  <dd className="mt-1 text-base text-primary">
+                    {user.lastName || "—"}
+                  </dd>
+                </div>
+              </div>
+
+              <div>
+                <dt className="text-sm font-medium text-secondary">Email</dt>
+                <dd className="mt-1 text-base text-primary">
+                  {user.email || "—"}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-sm font-medium text-secondary">
+                  Telegram Username
+                </dt>
+                <dd className="mt-1 text-base text-primary">
+                  {user.telegramUsername ? `@${user.telegramUsername}` : "—"}
+                </dd>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-secondary">Status</dt>
+                  <dd className="mt-1">
+                    <Badge color={user.isActive ? "success" : "gray"} size="sm">
+                      {user.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    Premium
+                  </dt>
+                  <dd className="mt-1">
+                    <Badge color={user.isPremium ? "brand" : "gray"} size="sm">
+                      {user.isPremium ? "Premium" : "Free"}
+                    </Badge>
+                  </dd>
+                </div>
+              </div>
+
+              <div>
+                <dt className="text-sm font-medium text-secondary">
+                  Member Since
+                </dt>
+                <dd className="mt-1 text-base text-primary">
+                  {new Date(user.createdAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </dd>
+              </div>
+            </div>
+          </Panel.Content>
+        </Panel>
+
+        {/* Risk Settings */}
+        <Panel className="mt-6">
+          <Panel.Header
+            title="Risk Settings"
+            subtitle="Trading risk parameters"
+          />
+          <Panel.Divider />
+          <Panel.Content>
+            <div className="space-y-4">
+              <div>
+                <dt className="text-sm font-medium text-secondary">
+                  Risk Level
+                </dt>
+                <dd className="mt-1">
+                  <Badge
+                    color={
+                      user.settings.riskLevel === "CONSERVATIVE"
+                        ? "success"
+                        : user.settings.riskLevel === "MODERATE"
+                        ? "warning"
+                        : "error"
+                    }
+                    size="sm"
+                  >
+                    {user.settings.riskLevel}
+                  </Badge>
+                </dd>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    Max Positions
+                  </dt>
+                  <dd className="mt-1 text-base text-primary">
+                    {user.settings.maxPositions}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    Max Portfolio Risk
+                  </dt>
+                  <dd className="mt-1 text-base text-primary">
+                    {user.settings.maxPortfolioRisk}%
+                  </dd>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    Max Daily Drawdown
+                  </dt>
+                  <dd className="mt-1 text-base text-primary">
+                    {user.settings.maxDailyDrawdown}%
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-secondary">
+                    Max Leverage
+                  </dt>
+                  <dd className="mt-1 text-base text-primary">
+                    {user.settings.maxLeverageMultiple}x
+                  </dd>
+                </div>
+              </div>
+            </div>
+          </Panel.Content>
+        </Panel>
+      </>
+    ),
+    sidebar: (user) => (
+      <>
+        {/* Exchange Accounts Panel - TODO: Replace with real GraphQL query for user.id */}
+        {user.id && (
+          <>
+            <Panel>
+              <Panel.Header title="Exchange Accounts" />
+              <Panel.Divider />
+              <Panel.Content noPadding>
+                <div className="divide-y divide-secondary">
+                  {/* Mock data - в реальности тут будет GraphQL запрос */}
+                  <div className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-primary">Binance</div>
+                        <div className="text-sm text-secondary">
+                          Connected 2 days ago
+                        </div>
+                      </div>
+                      <Badge color="success" size="sm">
+                        Active
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-primary">Bybit</div>
+                        <div className="text-sm text-secondary">
+                          Connected 5 days ago
+                        </div>
+                      </div>
+                      <Badge color="success" size="sm">
+                        Active
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-primary">OKX</div>
+                        <div className="text-sm text-secondary">
+                          Connected 1 month ago
+                        </div>
+                      </div>
+                      <Badge color="gray" size="sm">
+                        Inactive
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </Panel.Content>
+              <Panel.Footer>
+                <div className="text-sm text-secondary">
+                  Total: 3 accounts connected
+                </div>
+              </Panel.Footer>
+            </Panel>
+
+            {/* Recent Activity Panel */}
+            <Panel className="mt-6">
+              <Panel.Header title="Recent Activity" />
+              <Panel.Divider />
+              <Panel.Content noPadding>
+                <div className="divide-y divide-secondary">
+                  <div className="px-6 py-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">
+                          Opened BTC/USDT position
+                        </p>
+                        <p className="text-xs text-secondary">2 hours ago</p>
+                      </div>
+                      <Badge color="success" size="sm">
+                        Trade
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="px-6 py-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">
+                          Updated risk settings
+                        </p>
+                        <p className="text-xs text-secondary">1 day ago</p>
+                      </div>
+                      <Badge color="gray" size="sm">
+                        Settings
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="px-6 py-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">
+                          Connected Binance account
+                        </p>
+                        <p className="text-xs text-secondary">2 days ago</p>
+                      </div>
+                      <Badge color="brand" size="sm">
+                        Account
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </Panel.Content>
+            </Panel>
+
+            {/* Statistics Panel */}
+            <Panel className="mt-6">
+              <Panel.Header title="Statistics" />
+              <Panel.Divider />
+              <Panel.Content>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-secondary">Total Trades</span>
+                    <span className="text-sm font-semibold text-primary">
+                      247
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-secondary">Win Rate</span>
+                    <span className="text-sm font-semibold text-success">
+                      64.5%
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-secondary">Total P&L</span>
+                    <span className="text-sm font-semibold text-success">
+                      +$12,450
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-secondary">
+                      Active Positions
+                    </span>
+                    <span className="text-sm font-semibold text-primary">
+                      5
+                    </span>
+                  </div>
+                </div>
+              </Panel.Content>
+            </Panel>
+          </>
+        )}
+      </>
+    ),
   },
 
   // Feature flags
