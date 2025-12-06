@@ -10,95 +10,115 @@ import {
   PAUSE_STRATEGY_MUTATION,
   RESUME_STRATEGY_MUTATION,
   CLOSE_STRATEGY_MUTATION,
-} from "@/entities/strategy/api/strategy.graphql";
-import type {
-  Strategy,
-  StrategyStatus,
-  CreateStrategyInput,
-  UpdateStrategyInput,
-} from "@/entities/strategy/model/types";
+  type Strategy,
+  type StrategyStatus,
+  type CreateStrategyInput,
+  type UpdateStrategyInput,
+} from "@/entities/strategy";
 
 /**
  * Hook to get strategy by ID
  */
-export function useStrategy(id: string) {
+export const useStrategy = (id: string) => {
   return useQuery<{ strategy: Strategy | null }>(GET_STRATEGY_QUERY, {
     variables: { id },
     skip: !id,
   });
-}
+};
 
 /**
  * Hook to get user strategies
  */
-export function useUserStrategies(userID: string, status?: StrategyStatus) {
-  return useQuery<{ userStrategies: Strategy[] }>(GET_USER_STRATEGIES_QUERY, {
-    variables: { userID, status },
+export const useUserStrategies = (
+  userID: string,
+  first?: number,
+  after?: string,
+  status?: StrategyStatus
+) => {
+  return useQuery<{
+    userStrategies: {
+      edges: Array<{ node: Strategy; cursor: string }>;
+      pageInfo: {
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+        startCursor?: string;
+        endCursor?: string;
+      };
+      totalCount: number;
+    };
+  }>(GET_USER_STRATEGIES_QUERY, {
+    variables: { userID, first, after, status },
     skip: !userID,
   });
-}
+};
 
 /**
- * Hook to get all strategies (admin)
+ * Hook to get all strategies
  */
-export function useAllStrategies(
-  limit?: number,
-  offset?: number,
+export const useAllStrategies = (
+  first?: number,
+  after?: string,
   status?: StrategyStatus
-) {
-  return useQuery<{ strategies: Strategy[] }>(GET_ALL_STRATEGIES_QUERY, {
-    variables: { limit, offset, status },
+) => {
+  return useQuery<{
+    strategies: {
+      edges: Array<{ node: Strategy; cursor: string }>;
+      pageInfo: {
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+        startCursor?: string;
+        endCursor?: string;
+      };
+      totalCount: number;
+    };
+  }>(GET_ALL_STRATEGIES_QUERY, {
+    variables: { first, after, status },
   });
-}
+};
 
 /**
  * Hook to create strategy
  */
-export function useCreateStrategy() {
+export const useCreateStrategy = () => {
   return useMutation<
     { createStrategy: Strategy },
     { userID: string; input: CreateStrategyInput }
-  >(CREATE_STRATEGY_MUTATION, {
-    refetchQueries: ["GetUserStrategies"],
-  });
-}
+  >(CREATE_STRATEGY_MUTATION);
+};
 
 /**
  * Hook to update strategy
  */
-export function useUpdateStrategy() {
+export const useUpdateStrategy = () => {
   return useMutation<
     { updateStrategy: Strategy },
     { id: string; input: UpdateStrategyInput }
   >(UPDATE_STRATEGY_MUTATION);
-}
+};
 
 /**
  * Hook to pause strategy
  */
-export function usePauseStrategy() {
+export const usePauseStrategy = () => {
   return useMutation<{ pauseStrategy: Strategy }, { id: string }>(
     PAUSE_STRATEGY_MUTATION
   );
-}
+};
 
 /**
  * Hook to resume strategy
  */
-export function useResumeStrategy() {
+export const useResumeStrategy = () => {
   return useMutation<{ resumeStrategy: Strategy }, { id: string }>(
     RESUME_STRATEGY_MUTATION
   );
-}
+};
 
 /**
  * Hook to close strategy
  */
-export function useCloseStrategy() {
+export const useCloseStrategy = () => {
   return useMutation<{ closeStrategy: Strategy }, { id: string }>(
-    CLOSE_STRATEGY_MUTATION,
-    {
-      refetchQueries: ["GetUserStrategies"],
-    }
+    CLOSE_STRATEGY_MUTATION
   );
-}
+};

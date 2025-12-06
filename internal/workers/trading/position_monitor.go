@@ -89,19 +89,19 @@ func (pm *PositionMonitor) Run(ctx context.Context) error {
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-		pm.Log().Infow("Position monitoring interrupted by shutdown",
-			"users_processed", successCount,
-			"users_remaining", len(activeUsers)-successCount-errorCount,
-		)
+			pm.Log().Infow("Position monitoring interrupted by shutdown",
+				"users_processed", successCount,
+				"users_remaining", len(activeUsers)-successCount-errorCount,
+			)
 			return ctx.Err()
 		default:
 		}
 
 		if err := pm.monitorUserPositions(ctx, usr.ID); err != nil {
-		pm.Log().Errorw("Failed to monitor user positions",
-			"user_id", usr.ID,
-			"error", err,
-		)
+			pm.Log().Errorw("Failed to monitor user positions",
+				"user_id", usr.ID,
+				"error", err,
+			)
 			errorCount++
 			// Continue with other users
 			continue
@@ -148,10 +148,10 @@ func (pm *PositionMonitor) monitorUserPositions(ctx context.Context, userID uuid
 		}
 
 		if err := pm.monitorAccountPositions(ctx, accountID, accountPositions); err != nil {
-		pm.Log().Errorw("Failed to monitor positions for account",
-			"account_id", accountID,
-			"error", err,
-		)
+			pm.Log().Errorw("Failed to monitor positions for account",
+				"account_id", accountID,
+				"error", err,
+			)
 			// Continue with other accounts even if one fails
 		}
 	}
@@ -184,11 +184,11 @@ func (pm *PositionMonitor) monitorAccountPositions(ctx context.Context, accountI
 		}
 
 		if err := pm.updatePosition(ctx, exchangeClient, pos); err != nil {
-		pm.Log().Errorw("Failed to update position",
-			"position_id", pos.ID,
-			"symbol", pos.Symbol,
-			"error", err,
-		)
+			pm.Log().Errorw("Failed to update position",
+				"position_id", pos.ID,
+				"symbol", pos.Symbol,
+				"error", err,
+			)
 			// Continue with other positions
 			continue
 		}
@@ -240,10 +240,10 @@ func (pm *PositionMonitor) updatePosition(ctx context.Context, exchange exchange
 	// Check position triggers and generate events (stop/target approaching, profit milestones, time decay)
 	if pm.eventGenerator != nil {
 		if err := pm.eventGenerator.CheckPositionTriggers(ctx, pos, currentPrice, exchangeName); err != nil {
-		pm.Log().Errorw("Failed to check position triggers",
-			"position_id", pos.ID,
-			"error", err,
-		)
+			pm.Log().Errorw("Failed to check position triggers",
+				"position_id", pos.ID,
+				"error", err,
+			)
 		}
 	}
 

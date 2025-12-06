@@ -95,4 +95,12 @@ export const SET_USER_ACTIVE_MUTATION = gql`
   }
 `;
 
-
+// Get all users (admin only)
+export const GET_USERS_QUERY = gql`
+  ${USER_FRAGMENT}
+  query GetUsers($limit: Int, $offset: Int) {
+    users(limit: $limit, offset: $offset) {
+      ...UserFields
+    }
+  }
+`;

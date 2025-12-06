@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -464,18 +465,25 @@ func (wc WebSocketConfig) GetMarketTypes() []string {
 func findProjectRoot() string {
 	dir, err := os.Getwd()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to get working directory: %v, using '.'\n", err)
 		return "."
 	}
 
+	originalDir := dir
+	fmt.Fprintf(os.Stderr, "🔍 Starting search for project root from: %s\n", dir)
+
 	// Walk up the directory tree looking for go.mod
 	for {
-		if _, err := os.Stat(fmt.Sprintf("%s/go.mod", dir)); err == nil {
+		goModPath := fmt.Sprintf("%s/go.mod", dir)
+		if _, err := os.Stat(goModPath); err == nil {
+			fmt.Fprintf(os.Stderr, "✓ Found go.mod at: %s\n", dir)
 			return dir
 		}
 
-		parent := fmt.Sprintf("%s/..", dir)
+		parent := filepath.Clean(filepath.Join(dir, ".."))
 		if parent == dir || dir == "/" {
 			// Reached root without finding go.mod
+			fmt.Fprintf(os.Stderr, "⚠️  Could not find go.mod from %s, using '.'\n", originalDir)
 			return "."
 		}
 		dir = parent
@@ -492,15 +500,22 @@ func Load() (*Config, error) {
 	// Find project root to load .env files from there
 	projectRoot := findProjectRoot()
 
+	var envPath string
 	switch env {
 	case "test":
 		// Try loading .env.test for test environment
-		envPath := fmt.Sprintf("%s/.env.test", projectRoot)
-		_ = godotenv.Load(envPath)
+		envPath = filepath.Join(projectRoot, ".env.test")
 	default:
 		// Default: load .env for development/production
-		envPath := fmt.Sprintf("%s/.env", projectRoot)
-		_ = godotenv.Load(envPath)
+		envPath = filepath.Join(projectRoot, ".env")
+	}
+
+	fmt.Fprintf(os.Stderr, "📂 Attempting to load env file from: %s\n", envPath)
+
+	if err := godotenv.Load(envPath); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Failed to load %s: %v (this is OK if env vars are set directly)\n", envPath, err)
+	} else {
+		fmt.Fprintf(os.Stderr, "✓ Successfully loaded: %s\n", envPath)
 	}
 
 	var cfg Config

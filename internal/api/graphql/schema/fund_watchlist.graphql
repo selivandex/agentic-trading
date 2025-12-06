@@ -24,6 +24,41 @@ type FundWatchlist {
   updatedAt: Time!
 }
 
+"""
+Edge type for FundWatchlist
+"""
+type FundWatchlistEdge {
+  """
+  The item at the end of the edge
+  """
+  node: FundWatchlist!
+
+  """
+  A cursor for use in pagination
+  """
+  cursor: String!
+}
+
+"""
+Connection type for FundWatchlist collection
+"""
+type FundWatchlistConnection {
+  """
+  A list of edges
+  """
+  edges: [FundWatchlistEdge!]!
+
+  """
+  Information to aid in pagination
+  """
+  pageInfo: PageInfo!
+
+  """
+  Total count of items (if available)
+  """
+  totalCount: Int!
+}
+
 input CreateFundWatchlistInput {
   symbol: String!
   marketType: String!
@@ -47,17 +82,37 @@ extend type Query {
   # Get watchlist item by symbol
   fundWatchlistBySymbol(symbol: String!, marketType: String!): FundWatchlist
 
-  # Get all watchlist items
+  # Get all watchlist items (legacy, use fundWatchlistsConnection)
   fundWatchlists(
     limit: Int
     offset: Int
     isActive: Boolean
     category: String
     tier: Int
-  ): [FundWatchlist!]!
+  ): [FundWatchlist!]! @deprecated(reason: "Use fundWatchlistsConnection instead")
 
-  # Get monitored symbols (active and not paused)
-  monitoredSymbols(marketType: String): [FundWatchlist!]!
+  # Get monitored symbols (active and not paused, legacy)
+  monitoredSymbols(marketType: String): [FundWatchlist!]! @deprecated(reason: "Use monitoredSymbolsConnection instead")
+
+  # Get all watchlist items (Relay Connection)
+  fundWatchlistsConnection(
+    isActive: Boolean
+    category: String
+    tier: Int
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): FundWatchlistConnection!
+
+  # Get monitored symbols (active and not paused, Relay Connection)
+  monitoredSymbolsConnection(
+    marketType: String
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): FundWatchlistConnection!
 }
 
 # Mutations

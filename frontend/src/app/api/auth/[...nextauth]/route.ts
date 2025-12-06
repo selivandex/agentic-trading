@@ -33,11 +33,12 @@ export async function POST(request: NextRequest) {
   // Check if this is a signout request
   if (url.pathname.includes("/signout")) {
     try {
-      // Extract Rails JWT from NextAuth session (server-side)
+      // Extract Go JWT from NextAuth session (server-side)
       // This is the same way /api/graphql proxy extracts the token
       const token = await getToken({
         req: request,
-        secret: process.env.NEXTAUTH_SECRET
+        secret: process.env.NEXTAUTH_SECRET,
+        cookieName: "prometheus.session-token", // Must match authConfig.cookies.sessionToken.name
       });
       const railsAccessToken = token?.accessToken as string | undefined;
 

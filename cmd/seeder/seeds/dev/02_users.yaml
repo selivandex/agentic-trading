@@ -1,0 +1,82 @@
+# Development users with their nested entities
+# Each user contains their exchange accounts, strategies, positions, etc.
+
+users:
+  - telegram_id: 123456789
+    telegram_username: "dev_user"
+    first_name: "John"
+    last_name: "Developer"
+    language_code: "en"
+    is_active: true
+    is_premium: true
+    limit_profile_name: "Conservative"
+    settings:
+      risk_level: "moderate"
+      max_positions: 5
+
+    exchange_accounts:
+      - exchange: "binance"
+        label: "Dev Binance Testnet"
+        is_testnet: true
+        is_active: true
+
+      - exchange: "bybit"
+        label: "Dev Bybit Testnet"
+        is_testnet: true
+        is_active: true
+
+    strategies:
+      - name: "BTC Momentum Strategy"
+        description: "Momentum-based strategy for Bitcoin trading"
+        status: "active"
+        allocated_capital: "10000"
+        current_equity: "10500"
+        cash_reserve: "5000"
+        market_type: "spot"
+        risk_tolerance: "moderate"
+        target_allocations:
+          "BTC/USDT": 0.6
+          "ETH/USDT": 0.4
+
+      - name: "Multi-Asset Portfolio"
+        description: "Diversified portfolio across multiple assets"
+        status: "active"
+        allocated_capital: "5000"
+        current_equity: "5200"
+        cash_reserve: "2500"
+        market_type: "spot"
+        risk_tolerance: "conservative"
+        target_allocations:
+          "BTC/USDT": 0.4
+          "ETH/USDT": 0.3
+          "SOL/USDT": 0.2
+          "BNB/USDT": 0.1
+
+  - telegram_id: 987654321
+    telegram_username: "test_user"
+    first_name: "Jane"
+    last_name: "Tester"
+    language_code: "en"
+    is_active: true
+    is_premium: false
+    limit_profile_name: "Conservative"
+    settings:
+      risk_level: "conservative"
+
+    exchange_accounts:
+      - exchange: "binance"
+        label: "Test Binance Account"
+        is_testnet: true
+        is_active: true
+
+    strategies:
+      - name: "Conservative BTC Strategy"
+        description: "Low-risk Bitcoin strategy"
+        status: "active"
+        allocated_capital: "1000"
+        current_equity: "1020"
+        cash_reserve: "500"
+        market_type: "spot"
+        risk_tolerance: "conservative"
+        target_allocations:
+          "BTC/USDT": 1.0

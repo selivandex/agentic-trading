@@ -1,0 +1,25 @@
+# Development users
+# These users are for local development and testing
+
+users:
+  - id: "650e8400-e29b-41d4-a716-446655440000"
+    telegram_id: 123456789
+    telegram_username: "dev_user"
+    first_name: "John"
+    last_name: "Developer"
+    language_code: "en"
+    is_active: true
+    is_premium: true
+    limit_profile_id: "550e8400-e29b-41d4-a716-446655440000"
+    risk_level: "moderate"
+
+  - id: "650e8400-e29b-41d4-a716-446655440001"
+    telegram_id: 987654321
+    telegram_username: "test_user"
+    first_name: "Jane"
+    last_name: "Tester"
+    language_code: "en"
+    is_active: true
+    is_premium: false
+    limit_profile_id: "550e8400-e29b-41d4-a716-446655440000"
+    risk_level: "conservative"

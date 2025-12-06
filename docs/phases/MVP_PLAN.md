@@ -19,12 +19,14 @@ Orders now execute on Binance. OrderExecutor worker polls pending orders and sen
 ## Current Status: Starting Phase 2
 
 ### What's Working:
+
 - ✅ `/invest` flow (Telegram interactive menu)
 - ✅ PortfolioArchitect creates initial portfolio
 - ✅ Orders execute on Binance testnet
 - ✅ Positions tracked in DB
 
 ### What's Next (Phase 2):
+
 - 🔨 PortfolioReviewWorker - reviews portfolio every 30 min
 - 🔨 Expert agents as tools (TechnicalAnalyzer, SMCAnalyzer)
 - 🔨 Save decisions + expert analyses to DB

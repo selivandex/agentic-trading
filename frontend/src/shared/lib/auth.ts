@@ -12,6 +12,7 @@ import Credentials from "next-auth/providers/credentials";
 import { createServerApolloClient } from "@/shared/api/apollo-server-client";
 import { GetCurrentUserDocument } from "@/shared/api/generated/graphql";
 import { ApolloError, gql } from "@apollo/client";
+import { logger } from "./logger";
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -23,16 +24,12 @@ export const authConfig: NextAuthConfig = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          console.error("[Auth] Missing credentials");
-          return null;
+          throw new Error("Email and password are required");
         }
 
         try {
           // Create server-side Apollo Client for auth mutation
           const client = createServerApolloClient();
-
-          console.log("[Auth] Attempting login for:", credentials.email);
-          console.log("[Auth] Apollo client created:", !!client);
 
           // Use raw GraphQL string instead of generated document for server-side compatibility
           const LOGIN_MUTATION = gql`
@@ -56,63 +53,39 @@ export const authConfig: NextAuthConfig = {
             }
           `;
 
-          console.log("[Auth] LOGIN_MUTATION:", LOGIN_MUTATION);
-          console.log("[Auth] LOGIN_MUTATION.loc:", LOGIN_MUTATION.loc);
-          console.log("[Auth] LOGIN_MUTATION.definitions:", LOGIN_MUTATION.definitions);
-
           const variables = {
             email: credentials.email as string,
             password: credentials.password as string,
           };
-          console.log("[Auth] Variables:", variables);
 
-          let mutateResult;
-          try {
-            mutateResult = await client.mutate({
-              mutation: LOGIN_MUTATION,
-              variables,
-            });
-            console.log("[Auth] Mutate raw result:", mutateResult);
-          } catch (mutateError) {
-            console.error("[Auth] Mutate threw error:", mutateError);
-            console.error("[Auth] Error details:", {
-              message: mutateError instanceof Error ? mutateError.message : String(mutateError),
-              name: mutateError instanceof Error ? mutateError.name : undefined,
-              stack: mutateError instanceof Error ? mutateError.stack : undefined,
-            });
-            throw mutateError;
-          }
+          const mutateResult = await client.mutate({
+            mutation: LOGIN_MUTATION,
+            variables,
+          });
 
           const { data, errors } = mutateResult;
 
-          console.log("[Auth] Mutate completed - data:", data);
-          console.log("[Auth] Mutate completed - errors:", errors);
-
           if (errors && errors.length > 0) {
-            console.error("[Auth] GraphQL errors:", errors);
-            return null;
+            // Throw error with message from GraphQL to pass it to the client
+            const errorMessage = errors[0]?.message || "Authentication failed";
+            throw new Error(errorMessage);
           }
 
-          console.log("[Auth] Login response data:", JSON.stringify(data, null, 2));
-          console.log("[Auth] data?.login:", data?.login);
-          console.log("[Auth] data?.login?.user:", data?.login?.user);
-          console.log("[Auth] data?.login?.token:", data?.login?.token);
-
           if (!data?.login?.user) {
-            console.error("[Auth] No user in response", {
-              hasData: !!data,
-              hasLogin: !!data?.login,
-              hasUser: !!data?.login?.user,
-              dataKeys: data ? Object.keys(data) : [],
-              loginKeys: data?.login ? Object.keys(data.login) : []
-            });
-            return null;
+            throw new Error("Invalid response from server");
           }
 
           const user = data.login.user;
 
+          console.log('[Next-Auth Authorize] Login successful:', {
+            userId: user.id,
+            email: user.email,
+            hasToken: !!data.login.token,
+            tokenLength: data.login.token?.length,
+          });
+
           // Return user object for Next-Auth session
-          return {
+          const authUser = {
             id: user.id,
             email: user.email || "",
             name: user.firstName
@@ -122,9 +95,19 @@ export const authConfig: NextAuthConfig = {
             // Store access token in session (will be used for cookie)
             accessToken: data.login.token,
           };
+
+          console.log('[Next-Auth Authorize] Returning user with accessToken:', {
+            hasAccessToken: !!authUser.accessToken,
+          });
+
+          return authUser;
         } catch (error) {
-          console.error("[Auth] Exception during login:", error);
-          return null;
+          logger.error("[Auth] Login failed:", error);
+          // Re-throw to pass error message to the client
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error("Authentication failed. Please try again.");
         }
       },
     }),
@@ -136,8 +119,17 @@ export const authConfig: NextAuthConfig = {
   },
   callbacks: {
     async jwt({ token, user, account, trigger }) {
+      console.log('[Next-Auth JWT] Callback triggered:', {
+        hasAccount: !!account,
+        hasUser: !!user,
+        trigger,
+        hasAccessTokenInToken: !!token.accessToken,
+        userAccessToken: user?.accessToken?.substring(0, 20),
+      });
+
       // Initial sign in - store accessToken in JWT (server-side only)
       if (account && user) {
+        console.log('[Next-Auth JWT] Initial sign in - storing accessToken');
         token.accessToken = user.accessToken;
         token.userId = user.id;
         token.lastFetch = Date.now();
@@ -146,9 +138,12 @@ export const authConfig: NextAuthConfig = {
       // If no accessToken, session is invalid - return empty token
       // This happens after 401 error invalidates the session
       if (!token.accessToken) {
-        console.warn('[Next-Auth] No accessToken in JWT - session invalid');
+        logger.warn('[Next-Auth] No accessToken in JWT - session invalid');
+        console.log('[Next-Auth JWT] Returning empty token - will invalidate session');
         return {};
       }
+
+      console.log('[Next-Auth JWT] Token has accessToken, continuing...');
 
       // Fetch full user data from GraphQL (with memberships)
       // Refresh every 5 minutes or on update trigger
@@ -179,7 +174,7 @@ export const authConfig: NextAuthConfig = {
             );
 
             if (hasAuthError) {
-              console.error('[Next-Auth] 401 error on GetCurrentUser - invalidating session');
+              logger.error('[Next-Auth] 401 error on GetCurrentUser - invalidating session');
               // Return empty token to invalidate NextAuth session
               // This will cause middleware to redirect to /login
               return {};
@@ -196,14 +191,14 @@ export const authConfig: NextAuthConfig = {
               (error.networkError as { statusCode?: number } | null)?.statusCode;
 
             if (statusCode === 401) {
-              console.error(
+              logger.error(
                 "[Next-Auth] 401 network error on GetCurrentUser - invalidating session"
               );
               return {};
             }
           }
 
-          console.error("[Next-Auth] Failed to fetch full user data:", error);
+          logger.error("[Next-Auth] Failed to fetch full user data:", error);
           // Don't invalidate session on other network errors, just keep old data
         }
       }
@@ -211,6 +206,12 @@ export const authConfig: NextAuthConfig = {
       return token;
     },
     async session({ session, token }): Promise<Session> {
+      console.log('[Next-Auth Session] Callback triggered:', {
+        hasToken: !!token,
+        hasAccessToken: !!token.accessToken,
+        hasFullUser: !!token.fullUser,
+      });
+
       // Populate session with full user data from GraphQL
       if (token.fullUser) {
         return {
@@ -221,6 +222,7 @@ export const authConfig: NextAuthConfig = {
 
       // Fallback: if no fullUser yet, return minimal user data
       // This should only happen briefly during initial sign in
+      console.warn('[Next-Auth Session] No fullUser in token - returning default session');
       return session;
     },
   },

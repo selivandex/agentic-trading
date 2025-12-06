@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # Strategy Entity
 
 Strategy entity represents trading strategies with configuration and performance tracking.
@@ -25,7 +27,7 @@ function StrategiesList({ userID }: { userID: string }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {data?.userStrategies.map((strategy) => (
+      {data?.userStrategies.edges.map(({ node: strategy }) => (
         <StrategyCard key={strategy.id} strategy={strategy} />
       ))}
     </div>

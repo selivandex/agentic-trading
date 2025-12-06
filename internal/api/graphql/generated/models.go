@@ -3,6 +3,7 @@
 package generated
 
 import (
+	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
 
@@ -12,6 +13,14 @@ import (
 type AuthResponse struct {
 	Token string     `json:"token"`
 	User  *user.User `json:"user"`
+}
+
+// Common input arguments for backward pagination
+type BackwardPaginationInput struct {
+	// Returns the last n elements from the list
+	Last int `json:"last"`
+	// Returns the elements in the list that come before the specified cursor
+	Before *string `json:"before,omitempty"`
 }
 
 type CreateFundWatchlistInput struct {
@@ -31,12 +40,50 @@ type CreateStrategyInput struct {
 	TargetAllocations  map[string]any              `json:"targetAllocations,omitempty"`
 }
 
+// Common input arguments for forward pagination
+type ForwardPaginationInput struct {
+	// Returns the first n elements from the list
+	First int `json:"first"`
+	// Returns the elements in the list that come after the specified cursor
+	After *string `json:"after,omitempty"`
+}
+
+// Connection type for FundWatchlist collection
+type FundWatchlistConnection struct {
+	// A list of edges
+	Edges []*FundWatchlistEdge `json:"edges"`
+	// Information to aid in pagination
+	PageInfo *PageInfo `json:"pageInfo"`
+	// Total count of items (if available)
+	TotalCount int `json:"totalCount"`
+}
+
+// Edge type for FundWatchlist
+type FundWatchlistEdge struct {
+	// The item at the end of the edge
+	Node *fundwatchlist.Watchlist `json:"node"`
+	// A cursor for use in pagination
+	Cursor string `json:"cursor"`
+}
+
 type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
 type Mutation struct {
+}
+
+// PageInfo contains information about pagination in a connection
+type PageInfo struct {
+	// When paginating forwards, are there more items?
+	HasNextPage bool `json:"hasNextPage"`
+	// When paginating backwards, are there more items?
+	HasPreviousPage bool `json:"hasPreviousPage"`
+	// When paginating forwards, the cursor to continue
+	EndCursor *string `json:"endCursor,omitempty"`
+	// When paginating backwards, the cursor to continue
+	StartCursor *string `json:"startCursor,omitempty"`
 }
 
 type Query struct {
@@ -47,6 +94,24 @@ type RegisterInput struct {
 	Password  string `json:"password"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+}
+
+// Connection type for Strategy collection
+type StrategyConnection struct {
+	// A list of edges
+	Edges []*StrategyEdge `json:"edges"`
+	// Information to aid in pagination
+	PageInfo *PageInfo `json:"pageInfo"`
+	// Total count of items (if available)
+	TotalCount int `json:"totalCount"`
+}
+
+// Edge type for Strategy
+type StrategyEdge struct {
+	// The item at the end of the edge
+	Node *strategy.Strategy `json:"node"`
+	// A cursor for use in pagination
+	Cursor string `json:"cursor"`
 }
 
 type Subscription struct {
@@ -85,4 +150,22 @@ type UpdateUserSettingsInput struct {
 	MinPositionSizeUsd  *float64 `json:"minPositionSizeUSD,omitempty"`
 	MaxLeverageMultiple *float64 `json:"maxLeverageMultiple,omitempty"`
 	AllowedExchanges    []string `json:"allowedExchanges,omitempty"`
+}
+
+// Connection type for User collection
+type UserConnection struct {
+	// A list of edges
+	Edges []*UserEdge `json:"edges"`
+	// Information to aid in pagination
+	PageInfo *PageInfo `json:"pageInfo"`
+	// Total count of items (if available)
+	TotalCount int `json:"totalCount"`
+}
+
+// Edge type for User
+type UserEdge struct {
+	// The item at the end of the edge
+	Node *user.User `json:"node"`
+	// A cursor for use in pagination
+	Cursor string `json:"cursor"`
 }

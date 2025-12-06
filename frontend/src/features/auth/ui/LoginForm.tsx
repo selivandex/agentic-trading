@@ -1,3 +1,5 @@
+/** @format */
+
 "use client";
 
 import { useState } from "react";
@@ -5,11 +7,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Input } from "@/shared/base";
 import { Button } from "@/shared/base";
-import { logger } from "@/shared/lib";
+import { logger, useTranslation } from "@/shared/lib";
 
 export const LoginForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +25,20 @@ export const LoginForm = () => {
     setLoading(true);
 
     try {
-      // Use Next-Auth signIn
+      // First, validate credentials and get detailed error message if any
+      const validateResponse = await fetch("/api/auth/validate-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!validateResponse.ok) {
+        const errorData = await validateResponse.json();
+        const errorMessage = getErrorMessage(errorData.error);
+        throw new Error(errorMessage);
+      }
+
+      // If validation passed, proceed with NextAuth signIn
       const result = await signIn("credentials", {
         email,
         password,
@@ -30,7 +46,9 @@ export const LoginForm = () => {
       });
 
       if (!result?.ok) {
-        throw new Error(result?.error || "Sign in failed");
+        // This should rarely happen since we pre-validated
+        const errorMessage = getErrorMessage(result?.error);
+        throw new Error(errorMessage);
       }
 
       // Get redirect URL from query params or default to dashboard
@@ -41,13 +59,40 @@ export const LoginForm = () => {
     } catch (err) {
       logger.error("Sign in error:", err);
       setFormError(
-        err instanceof Error
-          ? err.message
-          : "Failed to sign in. Please check your credentials."
+        err instanceof Error ? err.message : t("auth.errors.genericError")
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Map backend/NextAuth error messages to user-friendly localized messages
+   */
+  const getErrorMessage = (error?: string | null): string => {
+    if (!error) {
+      return t("auth.errors.genericError");
+    }
+
+    // Check for specific error messages from backend
+    if (error.includes("invalid email or password")) {
+      return t("auth.errors.invalidCredentials");
+    }
+
+    if (error.includes("CredentialsSignin")) {
+      return t("auth.errors.invalidCredentials");
+    }
+
+    if (error.includes("Invalid response from server")) {
+      return t("auth.errors.serverError");
+    }
+
+    if (error.includes("Authentication failed")) {
+      return t("auth.errors.authenticationFailed");
+    }
+
+    // Return original error if no mapping found
+    return error;
   };
 
   return (
@@ -59,32 +104,29 @@ export const LoginForm = () => {
       )}
 
       <Input
-        label="Email"
+        label={t("auth.login.emailLabel")}
         type="email"
         value={email}
         onChange={(value) => setEmail(value as string)}
         isRequired
         isDisabled={loading}
-        placeholder="Enter your email"
+        placeholder={t("auth.login.emailPlaceholder")}
       />
 
       <Input
-        label="Password"
+        label={t("auth.login.passwordLabel")}
         type="password"
         value={password}
         onChange={(value) => setPassword(value as string)}
         isRequired
         isDisabled={loading}
-        placeholder="Enter your password"
+        placeholder={t("auth.login.passwordPlaceholder")}
       />
 
-      <Button
-        type="submit"
-        disabled={loading}
-        size="xl"
-        className="w-full"
-      >
-        {loading ? "Signing in..." : "Sign in"}
+      <Button type="submit" disabled={loading} size="xl" className="w-full">
+        {loading
+          ? t("auth.login.submittingButton")
+          : t("auth.login.submitButton")}
       </Button>
     </form>
   );

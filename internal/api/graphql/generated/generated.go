@@ -74,6 +74,17 @@ type ComplexityRoot struct {
 		UpdatedAt      func(childComplexity int) int
 	}
 
+	FundWatchlistConnection struct {
+		Edges      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	FundWatchlistEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CloseStrategy            func(childComplexity int, id uuid.UUID) int
 		CreateFundWatchlist      func(childComplexity int, input CreateFundWatchlistInput) int
@@ -92,19 +103,29 @@ type ComplexityRoot struct {
 		UpdateUserSettings       func(childComplexity int, userID uuid.UUID, input UpdateUserSettingsInput) int
 	}
 
+	PageInfo struct {
+		EndCursor       func(childComplexity int) int
+		HasNextPage     func(childComplexity int) int
+		HasPreviousPage func(childComplexity int) int
+		StartCursor     func(childComplexity int) int
+	}
+
 	Query struct {
-		FundWatchlist         func(childComplexity int, id uuid.UUID) int
-		FundWatchlistBySymbol func(childComplexity int, symbol string, marketType string) int
-		FundWatchlists        func(childComplexity int, limit *int, offset *int, isActive *bool, category *string, tier *int) int
-		Health                func(childComplexity int) int
-		Me                    func(childComplexity int) int
-		MonitoredSymbols      func(childComplexity int, marketType *string) int
-		Strategies            func(childComplexity int, limit *int, offset *int, status *strategy.StrategyStatus) int
-		Strategy              func(childComplexity int, id uuid.UUID) int
-		User                  func(childComplexity int, id uuid.UUID) int
-		UserByTelegramID      func(childComplexity int, telegramID string) int
-		UserStrategies        func(childComplexity int, userID uuid.UUID, status *strategy.StrategyStatus) int
-		Users                 func(childComplexity int, limit *int, offset *int) int
+		FundWatchlist              func(childComplexity int, id uuid.UUID) int
+		FundWatchlistBySymbol      func(childComplexity int, symbol string, marketType string) int
+		FundWatchlists             func(childComplexity int, limit *int, offset *int, isActive *bool, category *string, tier *int) int
+		FundWatchlistsConnection   func(childComplexity int, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) int
+		Health                     func(childComplexity int) int
+		Me                         func(childComplexity int) int
+		MonitoredSymbols           func(childComplexity int, marketType *string) int
+		MonitoredSymbolsConnection func(childComplexity int, marketType *string, first *int, after *string, last *int, before *string) int
+		Strategies                 func(childComplexity int, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) int
+		Strategy                   func(childComplexity int, id uuid.UUID) int
+		User                       func(childComplexity int, id uuid.UUID) int
+		UserByTelegramID           func(childComplexity int, telegramID string) int
+		UserStrategies             func(childComplexity int, userID uuid.UUID, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) int
+		Users                      func(childComplexity int, limit *int, offset *int) int
+		UsersConnection            func(childComplexity int, first *int, after *string, last *int, before *string) int
 	}
 
 	Settings struct {
@@ -152,6 +173,17 @@ type ComplexityRoot struct {
 		WinRate            func(childComplexity int) int
 	}
 
+	StrategyConnection struct {
+		Edges      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	StrategyEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	Subscription struct {
 		Empty func(childComplexity int) int
 	}
@@ -170,6 +202,17 @@ type ComplexityRoot struct {
 		TelegramID       func(childComplexity int) int
 		TelegramUsername func(childComplexity int) int
 		UpdatedAt        func(childComplexity int) int
+	}
+
+	UserConnection struct {
+		Edges      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	UserEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 }
 
@@ -200,12 +243,15 @@ type QueryResolver interface {
 	FundWatchlistBySymbol(ctx context.Context, symbol string, marketType string) (*fundwatchlist.Watchlist, error)
 	FundWatchlists(ctx context.Context, limit *int, offset *int, isActive *bool, category *string, tier *int) ([]*fundwatchlist.Watchlist, error)
 	MonitoredSymbols(ctx context.Context, marketType *string) ([]*fundwatchlist.Watchlist, error)
+	FundWatchlistsConnection(ctx context.Context, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) (*FundWatchlistConnection, error)
+	MonitoredSymbolsConnection(ctx context.Context, marketType *string, first *int, after *string, last *int, before *string) (*FundWatchlistConnection, error)
 	Strategy(ctx context.Context, id uuid.UUID) (*strategy.Strategy, error)
-	UserStrategies(ctx context.Context, userID uuid.UUID, status *strategy.StrategyStatus) ([]*strategy.Strategy, error)
-	Strategies(ctx context.Context, limit *int, offset *int, status *strategy.StrategyStatus) ([]*strategy.Strategy, error)
+	UserStrategies(ctx context.Context, userID uuid.UUID, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) (*StrategyConnection, error)
+	Strategies(ctx context.Context, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) (*StrategyConnection, error)
 	User(ctx context.Context, id uuid.UUID) (*user.User, error)
 	UserByTelegramID(ctx context.Context, telegramID string) (*user.User, error)
 	Users(ctx context.Context, limit *int, offset *int) ([]*user.User, error)
+	UsersConnection(ctx context.Context, first *int, after *string, last *int, before *string) (*UserConnection, error)
 }
 type StrategyResolver interface {
 	UserID(ctx context.Context, obj *strategy.Strategy) (uuid.UUID, error)
@@ -328,6 +374,38 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.FundWatchlist.UpdatedAt(childComplexity), true
+
+	case "FundWatchlistConnection.edges":
+		if e.complexity.FundWatchlistConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.FundWatchlistConnection.Edges(childComplexity), true
+	case "FundWatchlistConnection.pageInfo":
+		if e.complexity.FundWatchlistConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.FundWatchlistConnection.PageInfo(childComplexity), true
+	case "FundWatchlistConnection.totalCount":
+		if e.complexity.FundWatchlistConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.FundWatchlistConnection.TotalCount(childComplexity), true
+
+	case "FundWatchlistEdge.cursor":
+		if e.complexity.FundWatchlistEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.FundWatchlistEdge.Cursor(childComplexity), true
+	case "FundWatchlistEdge.node":
+		if e.complexity.FundWatchlistEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.FundWatchlistEdge.Node(childComplexity), true
 
 	case "Mutation.closeStrategy":
 		if e.complexity.Mutation.CloseStrategy == nil {
@@ -485,6 +563,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.UpdateUserSettings(childComplexity, args["userID"].(uuid.UUID), args["input"].(UpdateUserSettingsInput)), true
 
+	case "PageInfo.endCursor":
+		if e.complexity.PageInfo.EndCursor == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.EndCursor(childComplexity), true
+	case "PageInfo.hasNextPage":
+		if e.complexity.PageInfo.HasNextPage == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.HasNextPage(childComplexity), true
+	case "PageInfo.hasPreviousPage":
+		if e.complexity.PageInfo.HasPreviousPage == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.HasPreviousPage(childComplexity), true
+	case "PageInfo.startCursor":
+		if e.complexity.PageInfo.StartCursor == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.StartCursor(childComplexity), true
+
 	case "Query.fundWatchlist":
 		if e.complexity.Query.FundWatchlist == nil {
 			break
@@ -518,6 +621,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.FundWatchlists(childComplexity, args["limit"].(*int), args["offset"].(*int), args["isActive"].(*bool), args["category"].(*string), args["tier"].(*int)), true
+	case "Query.fundWatchlistsConnection":
+		if e.complexity.Query.FundWatchlistsConnection == nil {
+			break
+		}
+
+		args, err := ec.field_Query_fundWatchlistsConnection_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FundWatchlistsConnection(childComplexity, args["isActive"].(*bool), args["category"].(*string), args["tier"].(*int), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.health":
 		if e.complexity.Query.Health == nil {
 			break
@@ -541,6 +655,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MonitoredSymbols(childComplexity, args["marketType"].(*string)), true
+	case "Query.monitoredSymbolsConnection":
+		if e.complexity.Query.MonitoredSymbolsConnection == nil {
+			break
+		}
+
+		args, err := ec.field_Query_monitoredSymbolsConnection_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MonitoredSymbolsConnection(childComplexity, args["marketType"].(*string), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.strategies":
 		if e.complexity.Query.Strategies == nil {
 			break
@@ -551,7 +676,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Strategies(childComplexity, args["limit"].(*int), args["offset"].(*int), args["status"].(*strategy.StrategyStatus)), true
+		return e.complexity.Query.Strategies(childComplexity, args["status"].(*strategy.StrategyStatus), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.strategy":
 		if e.complexity.Query.Strategy == nil {
 			break
@@ -595,7 +720,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.UserStrategies(childComplexity, args["userID"].(uuid.UUID), args["status"].(*strategy.StrategyStatus)), true
+		return e.complexity.Query.UserStrategies(childComplexity, args["userID"].(uuid.UUID), args["status"].(*strategy.StrategyStatus), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.users":
 		if e.complexity.Query.Users == nil {
 			break
@@ -607,6 +732,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Users(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
+	case "Query.usersConnection":
+		if e.complexity.Query.UsersConnection == nil {
+			break
+		}
+
+		args, err := ec.field_Query_usersConnection_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UsersConnection(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 
 	case "Settings.allowedExchanges":
 		if e.complexity.Settings.AllowedExchanges == nil {
@@ -844,6 +980,38 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Strategy.WinRate(childComplexity), true
 
+	case "StrategyConnection.edges":
+		if e.complexity.StrategyConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.StrategyConnection.Edges(childComplexity), true
+	case "StrategyConnection.pageInfo":
+		if e.complexity.StrategyConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.StrategyConnection.PageInfo(childComplexity), true
+	case "StrategyConnection.totalCount":
+		if e.complexity.StrategyConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.StrategyConnection.TotalCount(childComplexity), true
+
+	case "StrategyEdge.cursor":
+		if e.complexity.StrategyEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.StrategyEdge.Cursor(childComplexity), true
+	case "StrategyEdge.node":
+		if e.complexity.StrategyEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.StrategyEdge.Node(childComplexity), true
+
 	case "Subscription._empty":
 		if e.complexity.Subscription.Empty == nil {
 			break
@@ -930,6 +1098,38 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.User.UpdatedAt(childComplexity), true
 
+	case "UserConnection.edges":
+		if e.complexity.UserConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.Edges(childComplexity), true
+	case "UserConnection.pageInfo":
+		if e.complexity.UserConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.PageInfo(childComplexity), true
+	case "UserConnection.totalCount":
+		if e.complexity.UserConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.TotalCount(childComplexity), true
+
+	case "UserEdge.cursor":
+		if e.complexity.UserEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.UserEdge.Cursor(childComplexity), true
+	case "UserEdge.node":
+		if e.complexity.UserEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.UserEdge.Node(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -938,8 +1138,10 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputBackwardPaginationInput,
 		ec.unmarshalInputCreateFundWatchlistInput,
 		ec.unmarshalInputCreateStrategyInput,
+		ec.unmarshalInputForwardPaginationInput,
 		ec.unmarshalInputLoginInput,
 		ec.unmarshalInputRegisterInput,
 		ec.unmarshalInputUpdateFundWatchlistInput,
@@ -1124,6 +1326,41 @@ type FundWatchlist {
   updatedAt: Time!
 }
 
+"""
+Edge type for FundWatchlist
+"""
+type FundWatchlistEdge {
+  """
+  The item at the end of the edge
+  """
+  node: FundWatchlist!
+
+  """
+  A cursor for use in pagination
+  """
+  cursor: String!
+}
+
+"""
+Connection type for FundWatchlist collection
+"""
+type FundWatchlistConnection {
+  """
+  A list of edges
+  """
+  edges: [FundWatchlistEdge!]!
+
+  """
+  Information to aid in pagination
+  """
+  pageInfo: PageInfo!
+
+  """
+  Total count of items (if available)
+  """
+  totalCount: Int!
+}
+
 input CreateFundWatchlistInput {
   symbol: String!
   marketType: String!
@@ -1147,17 +1384,37 @@ extend type Query {
   # Get watchlist item by symbol
   fundWatchlistBySymbol(symbol: String!, marketType: String!): FundWatchlist
 
-  # Get all watchlist items
+  # Get all watchlist items (legacy, use fundWatchlistsConnection)
   fundWatchlists(
     limit: Int
     offset: Int
     isActive: Boolean
     category: String
     tier: Int
-  ): [FundWatchlist!]!
+  ): [FundWatchlist!]! @deprecated(reason: "Use fundWatchlistsConnection instead")
 
-  # Get monitored symbols (active and not paused)
-  monitoredSymbols(marketType: String): [FundWatchlist!]!
+  # Get monitored symbols (active and not paused, legacy)
+  monitoredSymbols(marketType: String): [FundWatchlist!]! @deprecated(reason: "Use monitoredSymbolsConnection instead")
+
+  # Get all watchlist items (Relay Connection)
+  fundWatchlistsConnection(
+    isActive: Boolean
+    category: String
+    tier: Int
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): FundWatchlistConnection!
+
+  # Get monitored symbols (active and not paused, Relay Connection)
+  monitoredSymbolsConnection(
+    marketType: String
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): FundWatchlistConnection!
 }
 
 # Mutations
@@ -1180,6 +1437,66 @@ extend type Mutation {
     isPaused: Boolean!
     reason: String
   ): FundWatchlist!
+}
+`, BuiltIn: false},
+	{Name: "../schema/relay.graphql", Input: `# @format
+
+# Relay Connection Pattern
+# https://relay.dev/graphql/connections.htm
+
+"""
+PageInfo contains information about pagination in a connection
+"""
+type PageInfo {
+  """
+  When paginating forwards, are there more items?
+  """
+  hasNextPage: Boolean!
+
+  """
+  When paginating backwards, are there more items?
+  """
+  hasPreviousPage: Boolean!
+
+  """
+  When paginating forwards, the cursor to continue
+  """
+  endCursor: String
+
+  """
+  When paginating backwards, the cursor to continue
+  """
+  startCursor: String
+}
+
+"""
+Common input arguments for forward pagination
+"""
+input ForwardPaginationInput {
+  """
+  Returns the first n elements from the list
+  """
+  first: Int!
+
+  """
+  Returns the elements in the list that come after the specified cursor
+  """
+  after: String
+}
+
+"""
+Common input arguments for backward pagination
+"""
+input BackwardPaginationInput {
+  """
+  Returns the last n elements from the list
+  """
+  last: Int!
+
+  """
+  Returns the elements in the list that come before the specified cursor
+  """
+  before: String
 }
 `, BuiltIn: false},
 	{Name: "../schema/scalars.graphql", Input: `# @format
@@ -1291,6 +1608,41 @@ type Strategy {
   reasoningLog: JSONObject
 }
 
+"""
+Edge type for Strategy
+"""
+type StrategyEdge {
+  """
+  The item at the end of the edge
+  """
+  node: Strategy!
+
+  """
+  A cursor for use in pagination
+  """
+  cursor: String!
+}
+
+"""
+Connection type for Strategy collection
+"""
+type StrategyConnection {
+  """
+  A list of edges
+  """
+  edges: [StrategyEdge!]!
+
+  """
+  Information to aid in pagination
+  """
+  pageInfo: PageInfo!
+
+  """
+  Total count of items (if available)
+  """
+  totalCount: Int!
+}
+
 input CreateStrategyInput {
   name: String!
   description: String!
@@ -1314,11 +1666,24 @@ extend type Query {
   # Get strategy by ID
   strategy(id: UUID!): Strategy
 
-  # Get all strategies for a user
-  userStrategies(userID: UUID!, status: StrategyStatus): [Strategy!]!
+  # Get strategies for a specific user
+  userStrategies(
+    userID: UUID!
+    status: StrategyStatus
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): StrategyConnection!
 
-  # Get all strategies (admin only)
-  strategies(limit: Int, offset: Int, status: StrategyStatus): [Strategy!]!
+  # Get strategies for current user
+  strategies(
+    status: StrategyStatus
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): StrategyConnection!
 }
 
 # Mutations
@@ -1357,6 +1722,41 @@ type User {
   settings: Settings!
   createdAt: Time!
   updatedAt: Time!
+}
+
+"""
+Edge type for User
+"""
+type UserEdge {
+  """
+  The item at the end of the edge
+  """
+  node: User!
+
+  """
+  A cursor for use in pagination
+  """
+  cursor: String!
+}
+
+"""
+Connection type for User collection
+"""
+type UserConnection {
+  """
+  A list of edges
+  """
+  edges: [UserEdge!]!
+
+  """
+  Information to aid in pagination
+  """
+  pageInfo: PageInfo!
+
+  """
+  Total count of items (if available)
+  """
+  totalCount: Int!
 }
 
 type Settings {
@@ -1405,8 +1805,16 @@ extend type Query {
   # Get user by telegram ID
   userByTelegramID(telegramID: String!): User
 
-  # Get all users (admin only)
-  users(limit: Int, offset: Int): [User!]!
+  # Get all users (admin only, legacy)
+  users(limit: Int, offset: Int): [User!]! @deprecated(reason: "Use usersConnection instead")
+
+  # Get all users (admin only, Relay Connection)
+  usersConnection(
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): UserConnection!
 }
 
 # Mutations
@@ -1641,6 +2049,47 @@ func (ec *executionContext) field_Query_fundWatchlist_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_fundWatchlistsConnection_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "isActive", ec.unmarshalOBoolean2ᚖbool)
+	if err != nil {
+		return nil, err
+	}
+	args["isActive"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "category", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["category"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "tier", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["tier"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg6
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_fundWatchlists_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1672,6 +2121,37 @@ func (ec *executionContext) field_Query_fundWatchlists_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_monitoredSymbolsConnection_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "marketType", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["marketType"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg4
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_monitoredSymbols_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1686,21 +2166,31 @@ func (ec *executionContext) field_Query_monitoredSymbols_args(ctx context.Contex
 func (ec *executionContext) field_Query_strategies_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalOStrategyStatus2ᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategyStatus)
 	if err != nil {
 		return nil, err
 	}
-	args["limit"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	args["status"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
 	}
-	args["offset"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalOStrategyStatus2ᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategyStatus)
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["status"] = arg2
+	args["after"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg4
 	return args, nil
 }
 
@@ -1739,6 +2229,26 @@ func (ec *executionContext) field_Query_userStrategies_args(ctx context.Context,
 		return nil, err
 	}
 	args["status"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg5
 	return args, nil
 }
 
@@ -1750,6 +2260,32 @@ func (ec *executionContext) field_Query_user_args(ctx context.Context, rawArgs m
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_usersConnection_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg3
 	return args, nil
 }
 
@@ -2221,6 +2757,191 @@ func (ec *executionContext) fieldContext_FundWatchlist_updatedAt(_ context.Conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FundWatchlistConnection_edges(ctx context.Context, field graphql.CollectedField, obj *FundWatchlistConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FundWatchlistConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNFundWatchlistEdge2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FundWatchlistConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FundWatchlistConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_FundWatchlistEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_FundWatchlistEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FundWatchlistEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FundWatchlistConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *FundWatchlistConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FundWatchlistConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNPageInfo2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FundWatchlistConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FundWatchlistConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FundWatchlistConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *FundWatchlistConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FundWatchlistConnection_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FundWatchlistConnection_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FundWatchlistConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FundWatchlistEdge_node(ctx context.Context, field graphql.CollectedField, obj *FundWatchlistEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FundWatchlistEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNFundWatchlist2ᚖprometheusᚋinternalᚋdomainᚋfundwatchlistᚐWatchlist,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FundWatchlistEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FundWatchlistEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_FundWatchlist_id(ctx, field)
+			case "symbol":
+				return ec.fieldContext_FundWatchlist_symbol(ctx, field)
+			case "marketType":
+				return ec.fieldContext_FundWatchlist_marketType(ctx, field)
+			case "category":
+				return ec.fieldContext_FundWatchlist_category(ctx, field)
+			case "tier":
+				return ec.fieldContext_FundWatchlist_tier(ctx, field)
+			case "isActive":
+				return ec.fieldContext_FundWatchlist_isActive(ctx, field)
+			case "isPaused":
+				return ec.fieldContext_FundWatchlist_isPaused(ctx, field)
+			case "pausedReason":
+				return ec.fieldContext_FundWatchlist_pausedReason(ctx, field)
+			case "lastAnalyzedAt":
+				return ec.fieldContext_FundWatchlist_lastAnalyzedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_FundWatchlist_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_FundWatchlist_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FundWatchlist", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FundWatchlistEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *FundWatchlistEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FundWatchlistEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FundWatchlistEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FundWatchlistEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3197,6 +3918,122 @@ func (ec *executionContext) fieldContext_Mutation_setUserActive(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_hasNextPage,
+		func(ctx context.Context) (any, error) {
+			return obj.HasNextPage, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PageInfo_hasPreviousPage(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_hasPreviousPage,
+		func(ctx context.Context) (any, error) {
+			return obj.HasPreviousPage, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_hasPreviousPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_endCursor,
+		func(ctx context.Context) (any, error) {
+			return obj.EndCursor, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_endCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PageInfo_startCursor(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_startCursor,
+		func(ctx context.Context) (any, error) {
+			return obj.StartCursor, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_startCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_health(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3543,6 +4380,104 @@ func (ec *executionContext) fieldContext_Query_monitoredSymbols(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_fundWatchlistsConnection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_fundWatchlistsConnection,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().FundWatchlistsConnection(ctx, fc.Args["isActive"].(*bool), fc.Args["category"].(*string), fc.Args["tier"].(*int), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+		},
+		nil,
+		ec.marshalNFundWatchlistConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_fundWatchlistsConnection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_FundWatchlistConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_FundWatchlistConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_FundWatchlistConnection_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FundWatchlistConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_fundWatchlistsConnection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_monitoredSymbolsConnection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_monitoredSymbolsConnection,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().MonitoredSymbolsConnection(ctx, fc.Args["marketType"].(*string), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+		},
+		nil,
+		ec.marshalNFundWatchlistConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_monitoredSymbolsConnection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_FundWatchlistConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_FundWatchlistConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_FundWatchlistConnection_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FundWatchlistConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_monitoredSymbolsConnection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_strategy(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3640,10 +4575,10 @@ func (ec *executionContext) _Query_userStrategies(ctx context.Context, field gra
 		ec.fieldContext_Query_userStrategies,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().UserStrategies(ctx, fc.Args["userID"].(uuid.UUID), fc.Args["status"].(*strategy.StrategyStatus))
+			return ec.resolvers.Query().UserStrategies(ctx, fc.Args["userID"].(uuid.UUID), fc.Args["status"].(*strategy.StrategyStatus), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
 		},
 		nil,
-		ec.marshalNStrategy2ᚕᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategyᚄ,
+		ec.marshalNStrategyConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyConnection,
 		true,
 		true,
 	)
@@ -3657,54 +4592,14 @@ func (ec *executionContext) fieldContext_Query_userStrategies(ctx context.Contex
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Strategy_id(ctx, field)
-			case "userID":
-				return ec.fieldContext_Strategy_userID(ctx, field)
-			case "user":
-				return ec.fieldContext_Strategy_user(ctx, field)
-			case "name":
-				return ec.fieldContext_Strategy_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Strategy_description(ctx, field)
-			case "status":
-				return ec.fieldContext_Strategy_status(ctx, field)
-			case "allocatedCapital":
-				return ec.fieldContext_Strategy_allocatedCapital(ctx, field)
-			case "currentEquity":
-				return ec.fieldContext_Strategy_currentEquity(ctx, field)
-			case "cashReserve":
-				return ec.fieldContext_Strategy_cashReserve(ctx, field)
-			case "marketType":
-				return ec.fieldContext_Strategy_marketType(ctx, field)
-			case "riskTolerance":
-				return ec.fieldContext_Strategy_riskTolerance(ctx, field)
-			case "rebalanceFrequency":
-				return ec.fieldContext_Strategy_rebalanceFrequency(ctx, field)
-			case "targetAllocations":
-				return ec.fieldContext_Strategy_targetAllocations(ctx, field)
-			case "totalPnL":
-				return ec.fieldContext_Strategy_totalPnL(ctx, field)
-			case "totalPnLPercent":
-				return ec.fieldContext_Strategy_totalPnLPercent(ctx, field)
-			case "sharpeRatio":
-				return ec.fieldContext_Strategy_sharpeRatio(ctx, field)
-			case "maxDrawdown":
-				return ec.fieldContext_Strategy_maxDrawdown(ctx, field)
-			case "winRate":
-				return ec.fieldContext_Strategy_winRate(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Strategy_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Strategy_updatedAt(ctx, field)
-			case "closedAt":
-				return ec.fieldContext_Strategy_closedAt(ctx, field)
-			case "lastRebalancedAt":
-				return ec.fieldContext_Strategy_lastRebalancedAt(ctx, field)
-			case "reasoningLog":
-				return ec.fieldContext_Strategy_reasoningLog(ctx, field)
+			case "edges":
+				return ec.fieldContext_StrategyConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_StrategyConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_StrategyConnection_totalCount(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Strategy", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type StrategyConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -3729,10 +4624,10 @@ func (ec *executionContext) _Query_strategies(ctx context.Context, field graphql
 		ec.fieldContext_Query_strategies,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Strategies(ctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int), fc.Args["status"].(*strategy.StrategyStatus))
+			return ec.resolvers.Query().Strategies(ctx, fc.Args["status"].(*strategy.StrategyStatus), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
 		},
 		nil,
-		ec.marshalNStrategy2ᚕᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategyᚄ,
+		ec.marshalNStrategyConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyConnection,
 		true,
 		true,
 	)
@@ -3746,54 +4641,14 @@ func (ec *executionContext) fieldContext_Query_strategies(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Strategy_id(ctx, field)
-			case "userID":
-				return ec.fieldContext_Strategy_userID(ctx, field)
-			case "user":
-				return ec.fieldContext_Strategy_user(ctx, field)
-			case "name":
-				return ec.fieldContext_Strategy_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Strategy_description(ctx, field)
-			case "status":
-				return ec.fieldContext_Strategy_status(ctx, field)
-			case "allocatedCapital":
-				return ec.fieldContext_Strategy_allocatedCapital(ctx, field)
-			case "currentEquity":
-				return ec.fieldContext_Strategy_currentEquity(ctx, field)
-			case "cashReserve":
-				return ec.fieldContext_Strategy_cashReserve(ctx, field)
-			case "marketType":
-				return ec.fieldContext_Strategy_marketType(ctx, field)
-			case "riskTolerance":
-				return ec.fieldContext_Strategy_riskTolerance(ctx, field)
-			case "rebalanceFrequency":
-				return ec.fieldContext_Strategy_rebalanceFrequency(ctx, field)
-			case "targetAllocations":
-				return ec.fieldContext_Strategy_targetAllocations(ctx, field)
-			case "totalPnL":
-				return ec.fieldContext_Strategy_totalPnL(ctx, field)
-			case "totalPnLPercent":
-				return ec.fieldContext_Strategy_totalPnLPercent(ctx, field)
-			case "sharpeRatio":
-				return ec.fieldContext_Strategy_sharpeRatio(ctx, field)
-			case "maxDrawdown":
-				return ec.fieldContext_Strategy_maxDrawdown(ctx, field)
-			case "winRate":
-				return ec.fieldContext_Strategy_winRate(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Strategy_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Strategy_updatedAt(ctx, field)
-			case "closedAt":
-				return ec.fieldContext_Strategy_closedAt(ctx, field)
-			case "lastRebalancedAt":
-				return ec.fieldContext_Strategy_lastRebalancedAt(ctx, field)
-			case "reasoningLog":
-				return ec.fieldContext_Strategy_reasoningLog(ctx, field)
+			case "edges":
+				return ec.fieldContext_StrategyConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_StrategyConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_StrategyConnection_totalCount(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Strategy", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type StrategyConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -4011,6 +4866,55 @@ func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_users_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_usersConnection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_usersConnection,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().UsersConnection(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+		},
+		nil,
+		ec.marshalNUserConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_usersConnection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_UserConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_UserConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_UserConnection_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_usersConnection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5284,6 +6188,215 @@ func (ec *executionContext) fieldContext_Strategy_reasoningLog(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _StrategyConnection_edges(ctx context.Context, field graphql.CollectedField, obj *StrategyConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StrategyConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNStrategyEdge2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StrategyConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StrategyConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_StrategyEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_StrategyEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StrategyEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StrategyConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *StrategyConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StrategyConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNPageInfo2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StrategyConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StrategyConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StrategyConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *StrategyConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StrategyConnection_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StrategyConnection_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StrategyConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StrategyEdge_node(ctx context.Context, field graphql.CollectedField, obj *StrategyEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StrategyEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNStrategy2ᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategy,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StrategyEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StrategyEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Strategy_id(ctx, field)
+			case "userID":
+				return ec.fieldContext_Strategy_userID(ctx, field)
+			case "user":
+				return ec.fieldContext_Strategy_user(ctx, field)
+			case "name":
+				return ec.fieldContext_Strategy_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Strategy_description(ctx, field)
+			case "status":
+				return ec.fieldContext_Strategy_status(ctx, field)
+			case "allocatedCapital":
+				return ec.fieldContext_Strategy_allocatedCapital(ctx, field)
+			case "currentEquity":
+				return ec.fieldContext_Strategy_currentEquity(ctx, field)
+			case "cashReserve":
+				return ec.fieldContext_Strategy_cashReserve(ctx, field)
+			case "marketType":
+				return ec.fieldContext_Strategy_marketType(ctx, field)
+			case "riskTolerance":
+				return ec.fieldContext_Strategy_riskTolerance(ctx, field)
+			case "rebalanceFrequency":
+				return ec.fieldContext_Strategy_rebalanceFrequency(ctx, field)
+			case "targetAllocations":
+				return ec.fieldContext_Strategy_targetAllocations(ctx, field)
+			case "totalPnL":
+				return ec.fieldContext_Strategy_totalPnL(ctx, field)
+			case "totalPnLPercent":
+				return ec.fieldContext_Strategy_totalPnLPercent(ctx, field)
+			case "sharpeRatio":
+				return ec.fieldContext_Strategy_sharpeRatio(ctx, field)
+			case "maxDrawdown":
+				return ec.fieldContext_Strategy_maxDrawdown(ctx, field)
+			case "winRate":
+				return ec.fieldContext_Strategy_winRate(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Strategy_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Strategy_updatedAt(ctx, field)
+			case "closedAt":
+				return ec.fieldContext_Strategy_closedAt(ctx, field)
+			case "lastRebalancedAt":
+				return ec.fieldContext_Strategy_lastRebalancedAt(ctx, field)
+			case "reasoningLog":
+				return ec.fieldContext_Strategy_reasoningLog(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Strategy", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StrategyEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *StrategyEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StrategyEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StrategyEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StrategyEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription__empty(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -5719,6 +6832,195 @@ func (ec *executionContext) fieldContext_User_updatedAt(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserConnection_edges(ctx context.Context, field graphql.CollectedField, obj *UserConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNUserEdge2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "node":
+				return ec.fieldContext_UserEdge_node(ctx, field)
+			case "cursor":
+				return ec.fieldContext_UserEdge_cursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *UserConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNPageInfo2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *UserConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserConnection_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserConnection_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserEdge_node(ctx context.Context, field graphql.CollectedField, obj *UserEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖprometheusᚋinternalᚋdomainᚋuserᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "telegramID":
+				return ec.fieldContext_User_telegramID(ctx, field)
+			case "telegramUsername":
+				return ec.fieldContext_User_telegramUsername(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "firstName":
+				return ec.fieldContext_User_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_User_lastName(ctx, field)
+			case "languageCode":
+				return ec.fieldContext_User_languageCode(ctx, field)
+			case "isActive":
+				return ec.fieldContext_User_isActive(ctx, field)
+			case "isPremium":
+				return ec.fieldContext_User_isPremium(ctx, field)
+			case "limitProfileID":
+				return ec.fieldContext_User_limitProfileID(ctx, field)
+			case "settings":
+				return ec.fieldContext_User_settings(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *UserEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7170,6 +8472,40 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputBackwardPaginationInput(ctx context.Context, obj any) (BackwardPaginationInput, error) {
+	var it BackwardPaginationInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"last", "before"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "last":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Last = data
+		case "before":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Before = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateFundWatchlistInput(ctx context.Context, obj any) (CreateFundWatchlistInput, error) {
 	var it CreateFundWatchlistInput
 	asMap := map[string]any{}
@@ -7281,6 +8617,40 @@ func (ec *executionContext) unmarshalInputCreateStrategyInput(ctx context.Contex
 				return it, err
 			}
 			it.TargetAllocations = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputForwardPaginationInput(ctx context.Context, obj any) (ForwardPaginationInput, error) {
+	var it ForwardPaginationInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"first", "after"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "first":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.First = data
+		case "after":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.After = data
 		}
 	}
 
@@ -7777,6 +9147,99 @@ func (ec *executionContext) _FundWatchlist(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var fundWatchlistConnectionImplementors = []string{"FundWatchlistConnection"}
+
+func (ec *executionContext) _FundWatchlistConnection(ctx context.Context, sel ast.SelectionSet, obj *FundWatchlistConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, fundWatchlistConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FundWatchlistConnection")
+		case "edges":
+			out.Values[i] = ec._FundWatchlistConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._FundWatchlistConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._FundWatchlistConnection_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var fundWatchlistEdgeImplementors = []string{"FundWatchlistEdge"}
+
+func (ec *executionContext) _FundWatchlistEdge(ctx context.Context, sel ast.SelectionSet, obj *FundWatchlistEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, fundWatchlistEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FundWatchlistEdge")
+		case "node":
+			out.Values[i] = ec._FundWatchlistEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cursor":
+			out.Values[i] = ec._FundWatchlistEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -7898,6 +9361,54 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pageInfoImplementors = []string{"PageInfo"}
+
+func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet, obj *PageInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pageInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PageInfo")
+		case "hasNextPage":
+			out.Values[i] = ec._PageInfo_hasNextPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "hasPreviousPage":
+			out.Values[i] = ec._PageInfo_hasPreviousPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "endCursor":
+			out.Values[i] = ec._PageInfo_endCursor(ctx, field, obj)
+		case "startCursor":
+			out.Values[i] = ec._PageInfo_startCursor(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8063,6 +9574,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "fundWatchlistsConnection":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_fundWatchlistsConnection(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "monitoredSymbolsConnection":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_monitoredSymbolsConnection(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "strategy":
 			field := field
 
@@ -8174,6 +9729,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_users(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "usersConnection":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_usersConnection(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -8580,6 +10157,99 @@ func (ec *executionContext) _Strategy(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
+var strategyConnectionImplementors = []string{"StrategyConnection"}
+
+func (ec *executionContext) _StrategyConnection(ctx context.Context, sel ast.SelectionSet, obj *StrategyConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, strategyConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StrategyConnection")
+		case "edges":
+			out.Values[i] = ec._StrategyConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._StrategyConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._StrategyConnection_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var strategyEdgeImplementors = []string{"StrategyEdge"}
+
+func (ec *executionContext) _StrategyEdge(ctx context.Context, sel ast.SelectionSet, obj *StrategyEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, strategyEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StrategyEdge")
+		case "node":
+			out.Values[i] = ec._StrategyEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cursor":
+			out.Values[i] = ec._StrategyEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var subscriptionImplementors = []string{"Subscription"}
 
 func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
@@ -8911,6 +10581,99 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Values[i] = ec._User_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var userConnectionImplementors = []string{"UserConnection"}
+
+func (ec *executionContext) _UserConnection(ctx context.Context, sel ast.SelectionSet, obj *UserConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserConnection")
+		case "edges":
+			out.Values[i] = ec._UserConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._UserConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._UserConnection_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var userEdgeImplementors = []string{"UserEdge"}
+
+func (ec *executionContext) _UserEdge(ctx context.Context, sel ast.SelectionSet, obj *UserEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserEdge")
+		case "node":
+			out.Values[i] = ec._UserEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cursor":
+			out.Values[i] = ec._UserEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -9393,6 +11156,74 @@ func (ec *executionContext) marshalNFundWatchlist2ᚖprometheusᚋinternalᚋdom
 	return ec._FundWatchlist(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNFundWatchlistConnection2prometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistConnection(ctx context.Context, sel ast.SelectionSet, v FundWatchlistConnection) graphql.Marshaler {
+	return ec._FundWatchlistConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNFundWatchlistConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistConnection(ctx context.Context, sel ast.SelectionSet, v *FundWatchlistConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FundWatchlistConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFundWatchlistEdge2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*FundWatchlistEdge) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFundWatchlistEdge2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFundWatchlistEdge2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistEdge(ctx context.Context, sel ast.SelectionSet, v *FundWatchlistEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FundWatchlistEdge(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -9429,6 +11260,16 @@ func (ec *executionContext) marshalNMarketType2prometheusᚋinternalᚋdomainᚋ
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNPageInfo2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *PageInfo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PageInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNRebalanceFrequency2prometheusᚋinternalᚋdomainᚋstrategyᚐRebalanceFrequency(ctx context.Context, v any) (strategy.RebalanceFrequency, error) {
@@ -9478,7 +11319,31 @@ func (ec *executionContext) marshalNStrategy2prometheusᚋinternalᚋdomainᚋst
 	return ec._Strategy(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNStrategy2ᚕᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategyᚄ(ctx context.Context, sel ast.SelectionSet, v []*strategy.Strategy) graphql.Marshaler {
+func (ec *executionContext) marshalNStrategy2ᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategy(ctx context.Context, sel ast.SelectionSet, v *strategy.Strategy) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Strategy(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNStrategyConnection2prometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyConnection(ctx context.Context, sel ast.SelectionSet, v StrategyConnection) graphql.Marshaler {
+	return ec._StrategyConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNStrategyConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyConnection(ctx context.Context, sel ast.SelectionSet, v *StrategyConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StrategyConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNStrategyEdge2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*StrategyEdge) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -9502,7 +11367,7 @@ func (ec *executionContext) marshalNStrategy2ᚕᚖprometheusᚋinternalᚋdomai
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNStrategy2ᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategy(ctx, sel, v[i])
+			ret[i] = ec.marshalNStrategyEdge2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyEdge(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -9522,14 +11387,14 @@ func (ec *executionContext) marshalNStrategy2ᚕᚖprometheusᚋinternalᚋdomai
 	return ret
 }
 
-func (ec *executionContext) marshalNStrategy2ᚖprometheusᚋinternalᚋdomainᚋstrategyᚐStrategy(ctx context.Context, sel ast.SelectionSet, v *strategy.Strategy) graphql.Marshaler {
+func (ec *executionContext) marshalNStrategyEdge2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐStrategyEdge(ctx context.Context, sel ast.SelectionSet, v *StrategyEdge) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._Strategy(ctx, sel, v)
+	return ec._StrategyEdge(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNStrategyStatus2prometheusᚋinternalᚋdomainᚋstrategyᚐStrategyStatus(ctx context.Context, v any) (strategy.StrategyStatus, error) {
@@ -9684,6 +11549,74 @@ func (ec *executionContext) marshalNUser2ᚖprometheusᚋinternalᚋdomainᚋuse
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserConnection2prometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserConnection(ctx context.Context, sel ast.SelectionSet, v UserConnection) graphql.Marshaler {
+	return ec._UserConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUserConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserConnection(ctx context.Context, sel ast.SelectionSet, v *UserConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserEdge2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*UserEdge) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNUserEdge2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNUserEdge2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐUserEdge(ctx context.Context, sel ast.SelectionSet, v *UserEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserEdge(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {

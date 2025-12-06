@@ -58,12 +58,14 @@ func (bot *Bot) HandleReasoningCommand(ctx context.Context, sessionID string) er
 ```
 
 **Implementation:**
+
 1. Add command to telegram handler registry
 2. Query session_events table by session_id
 3. Format for readability (collapse tool responses, highlight decisions)
 4. Add pagination for long sessions (>10 steps)
 
 **Optional but recommended:**
+
 ```go
 // /last_decision <strategy_id>
 // Shows most recent PortfolioManager reasoning for this strategy

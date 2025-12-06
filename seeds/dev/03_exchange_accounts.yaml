@@ -1,0 +1,30 @@
+# Development exchange accounts
+# These are testnet accounts for development
+
+exchange_accounts:
+  - id: "750e8400-e29b-41d4-a716-446655440000"
+    user_id: "650e8400-e29b-41d4-a716-446655440000"
+    exchange: "binance"
+    label: "Dev Binance Testnet"
+    api_key: "test_api_key_binance_dev"
+    secret: "test_secret_binance_dev"
+    is_active: true
+    is_testnet: true
+
+  - id: "750e8400-e29b-41d4-a716-446655440001"
+    user_id: "650e8400-e29b-41d4-a716-446655440000"
+    exchange: "bybit"
+    label: "Dev Bybit Testnet"
+    api_key: "test_api_key_bybit_dev"
+    secret: "test_secret_bybit_dev"
+    is_active: true
+    is_testnet: true
+
+  - id: "750e8400-e29b-41d4-a716-446655440002"
+    user_id: "650e8400-e29b-41d4-a716-446655440001"
+    exchange: "binance"
+    label: "Test Binance Account"
+    api_key: "test_api_key_binance_dev_2"
+    secret: "test_secret_binance_dev_2"
+    is_active: true
+    is_testnet: true

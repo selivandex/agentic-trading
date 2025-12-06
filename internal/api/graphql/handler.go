@@ -47,12 +47,18 @@ func Handler(
 	// Wrap with auth middleware (extracts JWT from Cookie header set by Next.js)
 	authMiddleware := middleware.NewAuthMiddleware(authSvc, log)
 
-	// Apply middlewares (order matters: logging -> auth -> handler)
-	// 1. HTTP logging - logs all HTTP requests
-	// 2. Auth - validates JWT and adds user to context
-	// 3. GraphQL handler with operation logging
-	return loggingMiddleware.HTTPLoggingMiddleware(
-		authMiddleware.Handler(srv),
+	// Batch middleware for handling array of GraphQL requests
+	batchMiddleware := middleware.NewBatchMiddleware(log)
+
+	// Apply middlewares (order matters: batch -> logging -> auth -> handler)
+	// 1. Batch support - handles array of GraphQL requests
+	// 2. HTTP logging - logs all HTTP requests
+	// 3. Auth - validates JWT and adds user to context
+	// 4. GraphQL handler with operation logging
+	return batchMiddleware.Handler(
+		loggingMiddleware.HTTPLoggingMiddleware(
+			authMiddleware.Handler(srv),
+		),
 	)
 }
 

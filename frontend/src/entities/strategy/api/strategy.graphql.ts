@@ -60,23 +60,69 @@ export const GET_STRATEGY_QUERY = gql`
 // Get user strategies
 export const GET_USER_STRATEGIES_QUERY = gql`
   ${STRATEGY_FRAGMENT}
-  query GetUserStrategies($userID: UUID!, $status: StrategyStatus) {
-    userStrategies(userID: $userID, status: $status) {
-      ...StrategyFields
+  query GetUserStrategies(
+    $userID: UUID!
+    $status: StrategyStatus
+    $first: Int
+    $after: String
+    $last: Int
+    $before: String
+  ) {
+    userStrategies(
+      userID: $userID
+      status: $status
+      first: $first
+      after: $after
+      last: $last
+      before: $before
+    ) {
+      edges {
+        node {
+          ...StrategyFields
+        }
+        cursor
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
     }
   }
 `;
 
-// Get all strategies (admin)
+// Get all strategies
 export const GET_ALL_STRATEGIES_QUERY = gql`
   ${STRATEGY_WITH_USER_FRAGMENT}
   query GetAllStrategies(
-    $limit: Int
-    $offset: Int
     $status: StrategyStatus
+    $first: Int
+    $after: String
+    $last: Int
+    $before: String
   ) {
-    strategies(limit: $limit, offset: $offset, status: $status) {
-      ...StrategyWithUserFields
+    strategies(
+      status: $status
+      first: $first
+      after: $after
+      last: $last
+      before: $before
+    ) {
+      edges {
+        node {
+          ...StrategyWithUserFields
+        }
+        cursor
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
     }
   }
 `;
@@ -130,5 +176,3 @@ export const CLOSE_STRATEGY_MUTATION = gql`
     }
   }
 `;
-
-

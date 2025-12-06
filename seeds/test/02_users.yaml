@@ -1,0 +1,23 @@
+# Test environment users
+# Minimal users for integration tests
+
+users:
+  - id: "650e8400-e29b-41d4-a716-446655440000"
+    telegram_id: 111111111
+    telegram_username: "test_user"
+    first_name: "Test"
+    last_name: "User"
+    language_code: "en"
+    is_active: true
+    is_premium: false
+    limit_profile_id: "550e8400-e29b-41d4-a716-446655440000"
+    settings:
+      risk_level: "conservative"
+      max_positions: 3
+      max_position_size: 1000.0
+      max_daily_loss: 100.0
+      enable_notifications: false
+      notify_on_trade: false
+      notify_on_risk: false
+      preferred_assets:
+        - "BTC/USDT"

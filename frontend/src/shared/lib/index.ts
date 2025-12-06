@@ -8,6 +8,7 @@ export { AppProvider } from "./project-provider";
 export { toUTCISO, nowUTCISO } from "./date-utils";
 export { logger } from "./logger";
 export { useDebounce } from "./use-debounce";
+export { useTranslation, getTranslation } from "./use-translation";
 export {
   useErrorTracker,
   ErrorTrackerProvider,

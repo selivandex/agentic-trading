@@ -1,0 +1,32 @@
+# @format
+
+# Development limit profiles
+# These define trading limits and features for different user tiers
+
+limit_profiles:
+  - name: "Conservative"
+    description: "Conservative trading limits for beginners"
+    max_positions: 3
+    max_position_size: 1000
+    max_leverage: 2
+    max_total_exposure: 3000
+    monthly_ai_requests: 100
+    is_active: true
+
+  - name: "Moderate"
+    description: "Moderate trading limits for experienced traders"
+    max_positions: 5
+    max_position_size: 5000
+    max_leverage: 5
+    max_total_exposure: 25000
+    monthly_ai_requests: 1000
+    is_active: true
+
+  - name: "Aggressive"
+    description: "Aggressive trading limits for professional traders"
+    max_positions: 10
+    max_position_size: 20000
+    max_leverage: 10
+    max_total_exposure: 200000
+    monthly_ai_requests: 10000
+    is_active: true

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"prometheus/internal/api/graphql/generated"
 	"prometheus/internal/domain/user"
+	"prometheus/pkg/relay"
 
 	"github.com/google/uuid"
 )
@@ -112,6 +113,70 @@ func (r *queryResolver) Users(ctx context.Context, limit *int, offset *int) ([]*
 	return r.UserService.GetActiveUsers(ctx)
 }
 
+// UsersConnection is the resolver for the usersConnection field.
+func (r *queryResolver) UsersConnection(ctx context.Context, first *int, after *string, last *int, before *string) (*generated.UserConnection, error) {
+	// Get all active users (admin query)
+	allUsers, err := r.UserService.GetActiveUsers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+
+	// Apply pagination
+	params := relay.PaginationParams{
+		First:  first,
+		After:  after,
+		Last:   last,
+		Before: before,
+	}
+
+	if err := params.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid pagination params: %w", err)
+	}
+
+	totalCount := len(allUsers)
+	offset, limit, err := relay.CalculateOffsetLimit(params, totalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate pagination: %w", err)
+	}
+
+	// Apply offset and limit
+	end := offset + limit
+	if end > totalCount {
+		end = totalCount
+	}
+	if offset > totalCount {
+		offset = totalCount
+	}
+
+	items := allUsers[offset:end]
+
+	// Build relay connection
+	conn, err := relay.NewConnection(items, totalCount, params, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Convert to GraphQL types
+	edges := make([]*generated.UserEdge, len(conn.Edges))
+	for i, edge := range conn.Edges {
+		edges[i] = &generated.UserEdge{
+			Node:   edge.Node,
+			Cursor: edge.Cursor,
+		}
+	}
+
+	return &generated.UserConnection{
+		Edges: edges,
+		PageInfo: &generated.PageInfo{
+			HasNextPage:     conn.PageInfo.HasNextPage,
+			HasPreviousPage: conn.PageInfo.HasPreviousPage,
+			StartCursor:     conn.PageInfo.StartCursor,
+			EndCursor:       conn.PageInfo.EndCursor,
+		},
+		TotalCount: conn.TotalCount,
+	}, nil
+}
+
 // TelegramID is the resolver for the telegramID field.
 func (r *userResolver) TelegramID(ctx context.Context, obj *user.User) (*string, error) {
 	if obj.TelegramID == nil || *obj.TelegramID == 0 {
@@ -163,19 +228,3 @@ func (r *userResolver) LimitProfileID(ctx context.Context, obj *user.User) (*uui
 func (r *Resolver) User() generated.UserResolver { return &userResolver{r} }
 
 type userResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *userResolver) Settings(ctx context.Context, obj *user.User) (*user.Settings, error) {
-	// Return user settings directly from domain model
-	return &obj.Settings, nil
-}
-func (r *userResolver) Email(ctx context.Context, obj *user.User) (*string, error) {
-	return obj.Email, nil
-}
-*/

@@ -3,6 +3,8 @@ package seeds
 import (
 	"context"
 	"database/sql"
+
+	"prometheus/pkg/logger"
 )
 
 // DBTX is the interface that both *sql.DB and *sql.Tx satisfy
@@ -17,6 +19,7 @@ type DBTX interface {
 type Seeder struct {
 	db  DBTX
 	ctx context.Context
+	log *logger.Logger
 }
 
 // New creates a new Seeder instance
@@ -24,6 +27,7 @@ func New(db DBTX) *Seeder {
 	return &Seeder{
 		db:  db,
 		ctx: context.Background(),
+		log: logger.Get().With("component", "seeds"),
 	}
 }
 
@@ -33,9 +37,14 @@ func (s *Seeder) WithContext(ctx context.Context) *Seeder {
 	return s
 }
 
+// Log returns the logger instance
+func (s *Seeder) Log() *logger.Logger {
+	return s.log
+}
+
 // User starts building a User entity
 func (s *Seeder) User() *UserBuilder {
-	return NewUserBuilder(s.db, s.ctx)
+	return NewUserBuilder(s.db, s.ctx, s.log)
 }
 
 // LimitProfile starts building a LimitProfile entity
@@ -66,4 +75,9 @@ func (s *Seeder) Order() *OrderBuilder {
 // Memory starts building a Memory entity
 func (s *Seeder) Memory() *MemoryBuilder {
 	return NewMemoryBuilder(s.db, s.ctx)
+}
+
+// Agent starts building an Agent entity
+func (s *Seeder) Agent() *AgentBuilder {
+	return NewAgentBuilder(s.db, s.ctx)
 }

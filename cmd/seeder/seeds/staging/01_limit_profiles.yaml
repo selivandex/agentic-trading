@@ -1,0 +1,30 @@
+# Staging limit profiles
+# Realistic production-like data for staging environment
+
+limit_profiles:
+  - name: "Starter"
+    description: "Starter tier for new users"
+    max_positions: 2
+    max_position_size: 500
+    max_leverage: 2
+    max_total_exposure: 1000
+    monthly_ai_requests: 50
+    is_active: true
+
+  - name: "Pro"
+    description: "Pro tier for experienced traders"
+    max_positions: 5
+    max_position_size: 5000
+    max_leverage: 5
+    max_total_exposure: 25000
+    monthly_ai_requests: 1000
+    is_active: true
+
+  - name: "Expert"
+    description: "Expert tier for professional traders"
+    max_positions: 10
+    max_position_size: 20000
+    max_leverage: 10
+    max_total_exposure: 200000
+    monthly_ai_requests: 10000
+    is_active: true

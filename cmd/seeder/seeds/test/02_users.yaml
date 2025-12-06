@@ -1,0 +1,14 @@
+# Test environment users
+# Minimal users for integration tests
+
+users:
+  - telegram_id: 111111111
+    telegram_username: "test_user"
+    first_name: "Test"
+    last_name: "User"
+    language_code: "en"
+    is_active: true
+    is_premium: false
+    limit_profile_name: "Test Default"
+    settings:
+      risk_level: "conservative"

@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"prometheus/internal/api/graphql/generated"
+	"prometheus/internal/api/graphql/middleware"
 	"prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
 	strategyService "prometheus/internal/services/strategy"
+	"prometheus/pkg/relay"
 
 	"github.com/google/uuid"
 )
@@ -60,31 +62,159 @@ func (r *queryResolver) Strategy(ctx context.Context, id uuid.UUID) (*strategy.S
 }
 
 // UserStrategies is the resolver for the userStrategies field.
-func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, status *strategy.StrategyStatus) ([]*strategy.Strategy, error) {
-	// Get active strategies for user
-	strategies, err := r.StrategyService.GetActiveStrategies(ctx, userID)
+func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) (*generated.StrategyConnection, error) {
+	// Get all strategies for user
+	allStrategies, err := r.StrategyService.GetActiveStrategies(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get strategies: %w", err)
 	}
 
 	// Filter by status if provided
+	filtered := allStrategies
 	if status != nil {
-		filtered := make([]*strategy.Strategy, 0)
-		for _, s := range strategies {
+		filtered = make([]*strategy.Strategy, 0)
+		for _, s := range allStrategies {
 			if s.Status == *status {
 				filtered = append(filtered, s)
 			}
 		}
-		return filtered, nil
 	}
 
-	return strategies, nil
+	// Apply pagination
+	params := relay.PaginationParams{
+		First:  first,
+		After:  after,
+		Last:   last,
+		Before: before,
+	}
+
+	if err := params.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid pagination params: %w", err)
+	}
+
+	totalCount := len(filtered)
+	offset, limit, err := relay.CalculateOffsetLimit(params, totalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate pagination: %w", err)
+	}
+
+	// Apply offset and limit
+	end := offset + limit
+	if end > totalCount {
+		end = totalCount
+	}
+	if offset > totalCount {
+		offset = totalCount
+	}
+
+	items := filtered[offset:end]
+
+	// Build relay connection
+	conn, err := relay.NewConnection(items, totalCount, params, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Convert to GraphQL types
+	edges := make([]*generated.StrategyEdge, len(conn.Edges))
+	for i, edge := range conn.Edges {
+		edges[i] = &generated.StrategyEdge{
+			Node:   edge.Node,
+			Cursor: edge.Cursor,
+		}
+	}
+
+	return &generated.StrategyConnection{
+		Edges: edges,
+		PageInfo: &generated.PageInfo{
+			HasNextPage:     conn.PageInfo.HasNextPage,
+			HasPreviousPage: conn.PageInfo.HasPreviousPage,
+			StartCursor:     conn.PageInfo.StartCursor,
+			EndCursor:       conn.PageInfo.EndCursor,
+		},
+		TotalCount: conn.TotalCount,
+	}, nil
 }
 
 // Strategies is the resolver for the strategies field.
-func (r *queryResolver) Strategies(ctx context.Context, limit *int, offset *int, status *strategy.StrategyStatus) ([]*strategy.Strategy, error) {
-	// TODO: implement admin query for all strategies
-	return nil, fmt.Errorf("Strategies admin query not yet implemented")
+func (r *queryResolver) Strategies(ctx context.Context, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) (*generated.StrategyConnection, error) {
+	// Get current user from context (auth middleware)
+	currentUser := middleware.UserFromContext(ctx)
+	if currentUser == nil {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	// Get all strategies for current user
+	allStrategies, err := r.StrategyService.GetActiveStrategies(ctx, currentUser.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategies: %w", err)
+	}
+
+	// Filter by status if provided
+	filtered := allStrategies
+	if status != nil {
+		filtered = make([]*strategy.Strategy, 0)
+		for _, s := range allStrategies {
+			if s.Status == *status {
+				filtered = append(filtered, s)
+			}
+		}
+	}
+
+	// Apply pagination
+	params := relay.PaginationParams{
+		First:  first,
+		After:  after,
+		Last:   last,
+		Before: before,
+	}
+
+	if err := params.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid pagination params: %w", err)
+	}
+
+	totalCount := len(filtered)
+	offset, limit, err := relay.CalculateOffsetLimit(params, totalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate pagination: %w", err)
+	}
+
+	// Apply offset and limit
+	end := offset + limit
+	if end > totalCount {
+		end = totalCount
+	}
+	if offset > totalCount {
+		offset = totalCount
+	}
+
+	items := filtered[offset:end]
+
+	// Build relay connection
+	conn, err := relay.NewConnection(items, totalCount, params, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Convert to GraphQL types
+	edges := make([]*generated.StrategyEdge, len(conn.Edges))
+	for i, edge := range conn.Edges {
+		edges[i] = &generated.StrategyEdge{
+			Node:   edge.Node,
+			Cursor: edge.Cursor,
+		}
+	}
+
+	return &generated.StrategyConnection{
+		Edges: edges,
+		PageInfo: &generated.PageInfo{
+			HasNextPage:     conn.PageInfo.HasNextPage,
+			HasPreviousPage: conn.PageInfo.HasPreviousPage,
+			StartCursor:     conn.PageInfo.StartCursor,
+			EndCursor:       conn.PageInfo.EndCursor,
+		},
+		TotalCount: conn.TotalCount,
+	}, nil
 }
 
 // UserID is the resolver for the userID field.

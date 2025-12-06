@@ -2,30 +2,35 @@ package seeds
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"prometheus/internal/domain/user"
 	"prometheus/internal/testsupport"
+	"prometheus/pkg/logger"
 )
 
 // UserBuilder provides a fluent API for creating User entities
 type UserBuilder struct {
 	db     DBTX
+	log    *logger.Logger
 	ctx    context.Context
 	entity *user.User
 }
 
 // NewUserBuilder creates a new UserBuilder with sensible defaults
-func NewUserBuilder(db DBTX, ctx context.Context) *UserBuilder {
+func NewUserBuilder(db DBTX, ctx context.Context, log *logger.Logger) *UserBuilder {
 	now := time.Now()
 	telegramID := testsupport.UniqueTelegramID()
 
 	return &UserBuilder{
 		db:  db,
 		ctx: ctx,
+		log: log,
 		entity: &user.User{
 			ID:               uuid.New(),
 			TelegramID:       &telegramID,
@@ -58,6 +63,25 @@ func (b *UserBuilder) WithTelegramID(id int64) *UserBuilder {
 // WithUsername sets the Telegram username
 func (b *UserBuilder) WithUsername(username string) *UserBuilder {
 	b.entity.TelegramUsername = username
+	return b
+}
+
+// WithEmail sets the email address
+func (b *UserBuilder) WithEmail(email string) *UserBuilder {
+	b.entity.Email = &email
+	return b
+}
+
+func (b *UserBuilder) WithPassword(password string) *UserBuilder {
+	// Hash password
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		b.log.Errorw("Failed to hash password", "error", err)
+		return b // Don't break chain - continue without password
+	}
+
+	hashString := string(passwordHash)
+	b.entity.PasswordHash = &hashString
 	return b
 }
 
@@ -122,27 +146,35 @@ func (b *UserBuilder) Build() *user.User {
 
 // Insert inserts the user into the database and returns the entity
 func (b *UserBuilder) Insert() (*user.User, error) {
+	// Marshal settings to JSON
+	settingsJSON, err := json.Marshal(b.entity.Settings)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
 	query := `
 		INSERT INTO users (
-			id, telegram_id, telegram_username, first_name, last_name,
+			id, telegram_id, telegram_username, email, password_hash, first_name, last_name,
 			language_code, is_active, is_premium, limit_profile_id,
 			settings, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 
-	_, err := b.db.ExecContext(
+	_, err = b.db.ExecContext(
 		b.ctx,
 		query,
 		b.entity.ID,
 		b.entity.TelegramID,
 		b.entity.TelegramUsername,
+		b.entity.Email,
+		b.entity.PasswordHash,
 		b.entity.FirstName,
 		b.entity.LastName,
 		b.entity.LanguageCode,
 		b.entity.IsActive,
 		b.entity.IsPremium,
 		b.entity.LimitProfileID,
-		b.entity.Settings,
+		settingsJSON,
 		b.entity.CreatedAt,
 		b.entity.UpdatedAt,
 	)

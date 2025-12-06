@@ -1,0 +1,27 @@
+# Development limit profiles
+# These are used to set trading limits for users
+
+limit_profiles:
+  - id: "550e8400-e29b-41d4-a716-446655440000"
+    name: "Conservative"
+    max_positions: 3
+    max_position_size: 1000
+    max_leverage: 2
+    max_total_exposure: 3000
+    monthly_ai_requests: 100
+
+  - id: "550e8400-e29b-41d4-a716-446655440001"
+    name: "Moderate"
+    max_positions: 5
+    max_position_size: 5000
+    max_leverage: 5
+    max_total_exposure: 25000
+    monthly_ai_requests: 1000
+
+  - id: "550e8400-e29b-41d4-a716-446655440002"
+    name: "Aggressive"
+    max_positions: 10
+    max_position_size: 20000
+    max_leverage: 10
+    max_total_exposure: 200000
+    monthly_ai_requests: 10000

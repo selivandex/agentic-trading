@@ -47,31 +47,64 @@ func NewAuthMiddleware(authService TokenValidator, log *logger.Logger) *AuthMidd
 }
 
 // Handler wraps HTTP handler with JWT authentication
-// Token is extracted from HTTP-only cookie
+// Token can be extracted from:
+// 1. Authorization Bearer header (preferred for Next.js proxy)
+// 2. HTTP-only cookie (for direct browser requests)
 func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try to get auth token from cookie
-		cookie, err := r.Cookie(AuthCookieName)
+		var tokenString string
+		var source string
+
+		// Try Authorization header first (Next.js proxy sends this)
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			tokenString = authHeader[7:]
+			source = "bearer_header"
+			m.log.Infow("Found auth token in Bearer header",
+				"token_length", len(tokenString),
+			)
+		} else {
+			// Fallback to cookie (direct browser requests)
+			cookie, err := r.Cookie(AuthCookieName)
+			if err != nil {
+				// No auth token found - continue without user in context
+				// This allows public queries to work
+				m.log.Debugw("No auth token found (no Bearer header, no cookie)",
+					"path", r.URL.Path,
+				)
+				next.ServeHTTP(w, r)
+				return
+			}
+			tokenString = cookie.Value
+			source = "cookie"
+			m.log.Infow("Found auth token in cookie",
+				"cookie_name", AuthCookieName,
+				"token_length", len(tokenString),
+			)
+		}
+
+		// Validate token and get user
+		usr, err := m.authService.ValidateToken(r.Context(), tokenString)
 		if err != nil {
-			// No auth cookie - continue without user in context
-			// This allows public queries to work
+			// Invalid token - log and continue without user
+			m.log.Warnw("Invalid auth token",
+				"error", err,
+				"source", source,
+				"remote_addr", r.RemoteAddr,
+			)
+			// Clear invalid cookie if token was from cookie
+			if source == "cookie" {
+				clearCookie(w)
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Validate token and get user
-		usr, err := m.authService.ValidateToken(r.Context(), cookie.Value)
-		if err != nil {
-			// Invalid token - log and continue without user
-			m.log.Debugw("Invalid auth token",
-				"error", err,
-				"remote_addr", r.RemoteAddr,
-			)
-			// Clear invalid cookie
-			clearCookie(w)
-			next.ServeHTTP(w, r)
-			return
-		}
+		m.log.Infow("User authenticated successfully",
+			"user_id", usr.ID,
+			"email", usr.Email,
+			"source", source,
+		)
 
 		// Add user to context
 		ctx := context.WithValue(r.Context(), userContextKey, usr)

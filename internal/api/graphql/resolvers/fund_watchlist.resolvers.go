@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"prometheus/internal/api/graphql/generated"
 	"prometheus/internal/domain/fundwatchlist"
+	"prometheus/pkg/relay"
 
 	"github.com/google/uuid"
 )
@@ -102,6 +103,149 @@ func (r *queryResolver) FundWatchlists(ctx context.Context, limit *int, offset *
 // MonitoredSymbols is the resolver for the monitoredSymbols field.
 func (r *queryResolver) MonitoredSymbols(ctx context.Context, marketType *string) ([]*fundwatchlist.Watchlist, error) {
 	return r.FundWatchlistService.GetMonitored(ctx, marketType)
+}
+
+// FundWatchlistsConnection is the resolver for the fundWatchlistsConnection field.
+func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
+	// Get all watchlist items
+	allItems, err := r.FundWatchlistService.GetAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get watchlist items: %w", err)
+	}
+
+	// Filter by criteria
+	filtered := make([]*fundwatchlist.Watchlist, 0)
+	for _, item := range allItems {
+		if isActive != nil && item.IsActive != *isActive {
+			continue
+		}
+		if category != nil && item.Category != *category {
+			continue
+		}
+		if tier != nil && item.Tier != *tier {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+
+	// Apply pagination
+	params := relay.PaginationParams{
+		First:  first,
+		After:  after,
+		Last:   last,
+		Before: before,
+	}
+
+	if err := params.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid pagination params: %w", err)
+	}
+
+	totalCount := len(filtered)
+	offset, limit, err := relay.CalculateOffsetLimit(params, totalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate pagination: %w", err)
+	}
+
+	// Apply offset and limit
+	end := offset + limit
+	if end > totalCount {
+		end = totalCount
+	}
+	if offset > totalCount {
+		offset = totalCount
+	}
+
+	items := filtered[offset:end]
+
+	// Build relay connection
+	conn, err := relay.NewConnection(items, totalCount, params, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Convert to GraphQL types
+	edges := make([]*generated.FundWatchlistEdge, len(conn.Edges))
+	for i, edge := range conn.Edges {
+		edges[i] = &generated.FundWatchlistEdge{
+			Node:   edge.Node,
+			Cursor: edge.Cursor,
+		}
+	}
+
+	return &generated.FundWatchlistConnection{
+		Edges: edges,
+		PageInfo: &generated.PageInfo{
+			HasNextPage:     conn.PageInfo.HasNextPage,
+			HasPreviousPage: conn.PageInfo.HasPreviousPage,
+			StartCursor:     conn.PageInfo.StartCursor,
+			EndCursor:       conn.PageInfo.EndCursor,
+		},
+		TotalCount: conn.TotalCount,
+	}, nil
+}
+
+// MonitoredSymbolsConnection is the resolver for the monitoredSymbolsConnection field.
+func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, marketType *string, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
+	// Get monitored symbols
+	allItems, err := r.FundWatchlistService.GetMonitored(ctx, marketType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monitored symbols: %w", err)
+	}
+
+	// Apply pagination
+	params := relay.PaginationParams{
+		First:  first,
+		After:  after,
+		Last:   last,
+		Before: before,
+	}
+
+	if err := params.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid pagination params: %w", err)
+	}
+
+	totalCount := len(allItems)
+	offset, limit, err := relay.CalculateOffsetLimit(params, totalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate pagination: %w", err)
+	}
+
+	// Apply offset and limit
+	end := offset + limit
+	if end > totalCount {
+		end = totalCount
+	}
+	if offset > totalCount {
+		offset = totalCount
+	}
+
+	items := allItems[offset:end]
+
+	// Build relay connection
+	conn, err := relay.NewConnection(items, totalCount, params, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Convert to GraphQL types
+	edges := make([]*generated.FundWatchlistEdge, len(conn.Edges))
+	for i, edge := range conn.Edges {
+		edges[i] = &generated.FundWatchlistEdge{
+			Node:   edge.Node,
+			Cursor: edge.Cursor,
+		}
+	}
+
+	return &generated.FundWatchlistConnection{
+		Edges: edges,
+		PageInfo: &generated.PageInfo{
+			HasNextPage:     conn.PageInfo.HasNextPage,
+			HasPreviousPage: conn.PageInfo.HasPreviousPage,
+			StartCursor:     conn.PageInfo.StartCursor,
+			EndCursor:       conn.PageInfo.EndCursor,
+		},
+		TotalCount: conn.TotalCount,
+	}, nil
 }
 
 // FundWatchlist returns generated.FundWatchlistResolver implementation.

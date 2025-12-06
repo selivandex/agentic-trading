@@ -78,19 +78,19 @@ func (pc *PnLCalculator) Run(ctx context.Context) error {
 		// Check for context cancellation (graceful shutdown)
 		select {
 		case <-ctx.Done():
-		pc.Log().Infow("PnL calculation interrupted by shutdown",
-			"users_processed", successCount,
-			"users_remaining", len(activeUsers)-successCount-errorCount,
-		)
+			pc.Log().Infow("PnL calculation interrupted by shutdown",
+				"users_processed", successCount,
+				"users_remaining", len(activeUsers)-successCount-errorCount,
+			)
 			return ctx.Err()
 		default:
 		}
 
 		if err := pc.calculateUserPnL(ctx, usr.ID); err != nil {
-		pc.Log().Errorw("Failed to calculate user PnL",
-			"user_id", usr.ID,
-			"error", err,
-		)
+			pc.Log().Errorw("Failed to calculate user PnL",
+				"user_id", usr.ID,
+				"error", err,
+			)
 			errorCount++
 			// Continue with other users
 			continue

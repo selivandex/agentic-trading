@@ -6,7 +6,9 @@
  * Core user entity with settings and profile information
  */
 
-export interface User {
+import type { CrudEntity } from "@/shared/lib/crud";
+
+export interface User extends CrudEntity {
   id: string;
   telegramID?: string | null;
   telegramUsername?: string | null;

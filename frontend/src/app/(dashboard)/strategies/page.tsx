@@ -1,36 +1,24 @@
 /** @format */
 
-import { redirect } from "next/navigation";
-import { auth } from "@/shared/lib/auth";
+"use client";
+
+import { Crud } from "@/shared/ui/crud";
+import { strategyCrudConfig } from "@/entities/strategy";
 
 /**
- * Strategies Page
- * 
- * List and manage trading strategies
+ * Strategies Management Page
+ *
+ * Full CRUD interface for managing trading strategies:
+ * - List view with search, sort, pagination
+ * - Create new strategy
+ * - Edit existing strategy
+ * - View strategy details
+ * - Delete strategy
  */
-export default async function StrategiesPage() {
-  const session = await auth();
-  
-  if (!session?.user) {
-    redirect("/login");
-  }
-  
+export default function StrategiesPage() {
   return (
-    <div className="min-h-screen bg-primary p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-display-lg font-semibold text-primary">
-            Trading Strategies
-          </h1>
-        </div>
-        
-        <div className="bg-primary border border-primary rounded-lg p-12 text-center">
-          <p className="text-secondary">
-            No strategies yet. Create your first strategy to get started.
-          </p>
-        </div>
-      </div>
+    <div className="container mx-auto py-8">
+      <Crud config={strategyCrudConfig} />
     </div>
   );
 }
-

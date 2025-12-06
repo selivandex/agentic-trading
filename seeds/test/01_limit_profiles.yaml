@@ -1,0 +1,11 @@
+# Test environment limit profiles
+# Minimal set for integration tests
+
+limit_profiles:
+  - id: "550e8400-e29b-41d4-a716-446655440000"
+    name: "Test Default"
+    max_daily_loss: 100.0
+    max_positions: 3
+    max_position_size: 1000.0
+    max_leverage: 2.0
+    is_default: true

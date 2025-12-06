@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"prometheus/internal/domain/exchange_account"
 )
@@ -155,7 +156,7 @@ func (b *ExchangeAccountBuilder) Insert() (*exchange_account.ExchangeAccount, er
 		b.entity.SecretEncrypted,
 		b.entity.Passphrase,
 		b.entity.IsTestnet,
-		b.entity.Permissions,
+		pq.Array(b.entity.Permissions),
 		b.entity.IsActive,
 		b.entity.LastSyncAt,
 		b.entity.CreatedAt,

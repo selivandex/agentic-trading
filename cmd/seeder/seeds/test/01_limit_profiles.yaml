@@ -1,0 +1,12 @@
+# Test environment limit profiles
+# Minimal set for integration tests
+
+limit_profiles:
+  - name: "Test Default"
+    description: "Default limit profile for tests"
+    max_positions: 3
+    max_position_size: 1000
+    max_leverage: 2
+    max_total_exposure: 3000
+    monthly_ai_requests: 100
+    is_active: true

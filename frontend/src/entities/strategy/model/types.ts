@@ -7,6 +7,7 @@
  */
 
 import type { User } from "@/entities/user";
+import type { CrudEntity } from "@/shared/lib/crud";
 
 export enum StrategyStatus {
   ACTIVE = "ACTIVE",
@@ -32,7 +33,7 @@ export enum RebalanceFrequency {
   NEVER = "NEVER",
 }
 
-export interface Strategy {
+export interface Strategy extends CrudEntity {
   id: string;
   userID: string;
   user?: User | null;

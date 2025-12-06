@@ -1,9 +1,10 @@
-.PHONY: help docker-up docker-down docker-logs clean deps proto-gen g-gen
-.PHONY: db-create db-drop db-reset migrate-up migrate-down migrate-status migrate-force migrate-create
-.PHONY: db-pg-create db-pg-drop migrate-pg-up migrate-pg-down migrate-pg-status
-.PHONY: db-ch-create db-ch-drop migrate-ch-up migrate-ch-down migrate-ch-status
+.PHONY: help docker-up docker-down docker-logs clean deps proto- graphql
+.PHONY: db-create db-drop db-reset db-migrate db-rollback db-migrate-status db-migrate-force db-create-migration
+.PHONY: db-create-pg db-drop-gp db-migrate-pg db-rollback-pg db-status-pg
+.PHONY: db-create-ch db-drop-ch db-migrate-ch db-rollback-ch db-status-ch
+.PHONY: db-seed db-seed-validate
 .PHONY: kafka-topics-create kafka-topics-list kafka-topics-delete
-.PHONY: test-db-create test-db-drop test-db-reset test-migrate-up
+.PHONY: db-test-create db-test-drop db-test-prepare db-test-migrate
 .PHONY: gen-encryption-key lint fmt test test-short test-integration test-coverage test-repo
 .PHONY: build build-linux build-prod run run-dev setup
 .PHONY: docker-build docker-run
@@ -39,25 +40,29 @@ help:
 	@echo "  make db-create          - Create all databases (PostgreSQL + ClickHouse)"
 	@echo "  make db-drop            - Drop all databases (with confirmation)"
 	@echo "  make db-reset           - Drop, create, and migrate all databases"
-	@echo "  make migrate-up         - Apply all migrations (PostgreSQL + ClickHouse)"
-	@echo "  make migrate-down       - Rollback 1 migration (PostgreSQL + ClickHouse)"
-	@echo "  make migrate-status     - Show migration status for all databases"
-	@echo "  make migrate-force      - Force migration version (fix dirty state)"
-	@echo "  make migrate-create     - Create new migration file"
+	@echo "  make db-migrate         - Apply all migrations (PostgreSQL + ClickHouse)"
+	@echo "  make db-rollback       - Rollback 1 migration (PostgreSQL + ClickHouse)"
+	@echo "  make db-migrate-status     - Show migration status for all databases"
+	@echo "  make db-migrate-force      - Force migration version (fix dirty state)"
+	@echo "  make db-create-migration     - Create new migration file"
 	@echo ""
 	@echo "🗄️  PostgreSQL Only:"
-	@echo "  make db-pg-create       - Create PostgreSQL database"
-	@echo "  make db-pg-drop         - Drop PostgreSQL database"
-	@echo "  make migrate-pg-up      - Apply PostgreSQL migrations"
-	@echo "  make migrate-pg-down    - Rollback PostgreSQL migrations"
-	@echo "  make migrate-pg-status  - Show PostgreSQL migration status"
+	@echo "  make db-create-pg       - Create PostgreSQL database"
+	@echo "  make db-drop-gp         - Drop PostgreSQL database"
+	@echo "  make db-migrate-pg      - Apply PostgreSQL migrations"
+	@echo "  make db-rollback-pg    - Rollback PostgreSQL migrations"
+	@echo "  make db-status-pg  - Show PostgreSQL migration status"
 	@echo ""
 	@echo "🗄️  ClickHouse Only:"
-	@echo "  make db-ch-create       - Create ClickHouse database"
-	@echo "  make db-ch-drop         - Drop ClickHouse database"
-	@echo "  make migrate-ch-up      - Apply ClickHouse migrations"
-	@echo "  make migrate-ch-down    - Rollback ClickHouse migrations"
-	@echo "  make migrate-ch-status  - Show ClickHouse migration status"
+	@echo "  make db-create-ch       - Create ClickHouse database"
+	@echo "  make db-drop-ch         - Drop ClickHouse database"
+	@echo "  make db-migrate-ch      - Apply ClickHouse migrations"
+	@echo "  make db-rollback-ch    - Rollback ClickHouse migrations"
+	@echo "  make db-status-ch  - Show ClickHouse migration status"
+	@echo ""
+	@echo "🌱 Database Seeds (idempotent):"
+	@echo "  make db-seed            - Apply seeds (ENV=dev|staging|test, default: dev)"
+	@echo "  make db-seed-validate   - Validate seed files without applying"
 	@echo ""
 	@echo "📨 Kafka:"
 	@echo "  make kafka-topics-create - Create all required Kafka topics"
@@ -65,10 +70,10 @@ help:
 	@echo "  make kafka-topics-delete - Delete all application topics"
 	@echo ""
 	@echo "🧪 Test Databases:"
-	@echo "  make test-db-create     - Create test databases (PostgreSQL + ClickHouse, uses .env.test)"
-	@echo "  make test-db-drop       - Drop test databases"
-	@echo "  make test-db-reset      - Reset test databases (drop + create + migrate)"
-	@echo "  make test-migrate-up    - Apply migrations to test databases"
+	@echo "  make db-test-create     - Create test databases (PostgreSQL + ClickHouse, uses .env.test)"
+	@echo "  make db-test-drop       - Drop test databases"
+	@echo "  make db-test-prepare      - Reset test databases (drop + create + migrate)"
+	@echo "  make db-test-migrate    - Apply migrations to test databases"
 	@echo ""
 	@echo "🔧 Development:"
 	@echo "  make gen-encryption-key - Generate encryption key"
@@ -81,8 +86,8 @@ help:
 	@echo "  make run                - Run application"
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make deps               - Install dependencies"
-	@echo "  make proto-gen          - Generate protobuf code"
-	@echo "  make g-gen              - Generate GraphQL code"
+	@echo "  make proto-          - Generate protobuf code"
+	@echo "  make graphql              - Generate GraphQL code"
 	@echo "  make setup              - Full setup (deps + docker + db + migrations)"
 	@echo ""
 	@echo "🚀 Server Control:"
@@ -107,28 +112,28 @@ docker-logs:
 # PostgreSQL Commands
 # ============================================================================
 
-db-pg-create:
+db-create-pg:
 	@echo "Creating PostgreSQL database: $(DB_PG_NAME)..."
 	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "CREATE DATABASE $(DB_PG_NAME);" 2>/dev/null || echo "PostgreSQL database already exists"
 	@echo "✓ PostgreSQL database ready: $(DB_PG_NAME)"
 
-db-pg-drop:
+db-drop-gp:
 	@echo "Dropping PostgreSQL database: $(DB_PG_NAME)..."
 	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$(DB_PG_NAME)' AND pid <> pg_backend_pid();" 2>/dev/null || true
 	@PGPASSWORD=$(DB_PG_PASSWORD) psql -h $(DB_PG_HOST) -p $(DB_PG_PORT) -U $(DB_PG_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_PG_NAME);"
 	@echo "✓ PostgreSQL database dropped"
 
-migrate-pg-up:
+db-migrate-pg:
 	@echo "Running PostgreSQL migrations on $(DB_PG_NAME)..."
 	@migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres up
 	@echo "✓ PostgreSQL migrations completed"
 
-migrate-pg-down:
+db-rollback-pg:
 	@echo "Rolling back PostgreSQL migrations (1 step) on $(DB_PG_NAME)..."
 	@migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres down 1
 	@echo "✓ PostgreSQL rollback completed"
 
-migrate-pg-status:
+db-status-pg:
 	@echo "PostgreSQL migration status for $(DB_PG_NAME):"
 	@migrate -database "postgres://$(DB_PG_USER):$(DB_PG_PASSWORD)@$(DB_PG_HOST):$(DB_PG_PORT)/$(DB_PG_NAME)?sslmode=$(DB_PG_SSL_MODE)" -path migrations/postgres version
 
@@ -136,27 +141,27 @@ migrate-pg-status:
 # ClickHouse Commands
 # ============================================================================
 
-db-ch-create:
+db-create-ch:
 	@echo "Creating ClickHouse database: $(DB_CH_NAME)..."
 	@docker exec flowly-clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $(DB_CH_NAME);" 2>/dev/null || echo "ClickHouse database already exists"
 	@echo "✓ ClickHouse database ready: $(DB_CH_NAME)"
 
-db-ch-drop:
+db-drop-ch:
 	@echo "Dropping ClickHouse database: $(DB_CH_NAME)..."
 	@docker exec flowly-clickhouse clickhouse-client --query "DROP DATABASE IF EXISTS $(DB_CH_NAME);"
 	@echo "✓ ClickHouse database dropped"
 
-migrate-ch-up:
+db-migrate-ch:
 	@echo "Running ClickHouse migrations on $(DB_CH_NAME)..."
 	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse up
 	@echo "✓ ClickHouse migrations completed"
 
-migrate-ch-down:
+db-rollback-ch:
 	@echo "Rolling back ClickHouse migrations (1 step) on $(DB_CH_NAME)..."
 	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse down 1
 	@echo "✓ ClickHouse rollback completed"
 
-migrate-ch-status:
+db-status-ch:
 	@echo "ClickHouse migration status for $(DB_CH_NAME):"
 	@migrate -database "clickhouse://$(DB_CH_HOST):$(DB_CH_PORT)?database=$(DB_CH_NAME)&username=$(DB_CH_USER)&password=$(DB_CH_PASSWORD)&x-multi-statement=true" -path migrations/clickhouse version
 
@@ -182,36 +187,36 @@ kafka-topics-delete:
 # Combined Database Commands (PostgreSQL + ClickHouse)
 # ============================================================================
 
-db-create: db-pg-create db-ch-create
+db-create: db-create-pg db-create-ch
 	@echo "✓ All databases created"
 
 db-drop:
 	@echo "⚠️  WARNING: Dropping all databases..."
-	@$(MAKE) db-pg-drop
-	@$(MAKE) db-ch-drop
+	@$(MAKE) db-drop-gp
+	@$(MAKE) db-drop-ch
 	@echo "✓ All databases dropped"
 
-db-reset: db-drop db-create migrate-up
+db-reset: db-drop db-create db-migrate
 	@echo "✓ Databases reset complete"
 
 # ============================================================================
 # Test Database Commands (uses same functions with .env.test config)
 # ============================================================================
 
-test-db-create:
+db-test-create:
 	@if [ ! -f .env.test ]; then \
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
 	@set -a; . ./.env.test; set +a; \
-	$(MAKE) db-pg-create \
+	$(MAKE) db-create-pg \
 		DB_PG_HOST=$$POSTGRES_HOST \
 		DB_PG_PORT=$$POSTGRES_PORT \
 		DB_PG_USER=$$POSTGRES_USER \
 		DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
 		DB_PG_NAME=$$POSTGRES_DB \
 		DB_PG_SSL_MODE=$$POSTGRES_SSL_MODE; \
-	$(MAKE) db-ch-create \
+	$(MAKE) db-create-ch \
 		DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
 		DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
 		DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
@@ -219,20 +224,20 @@ test-db-create:
 		DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}
 	@echo "✓ All test databases created"
 
-test-db-drop:
+db-test-drop:
 	@if [ ! -f .env.test ]; then \
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
 	@echo "⚠️  WARNING: Dropping all test databases..."
 	@set -a; . ./.env.test; set +a; \
-	$(MAKE) db-pg-drop \
+	$(MAKE) db-drop-gp \
 		DB_PG_HOST=$$POSTGRES_HOST \
 		DB_PG_PORT=$$POSTGRES_PORT \
 		DB_PG_USER=$$POSTGRES_USER \
 		DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
 		DB_PG_NAME=$$POSTGRES_DB; \
-	$(MAKE) db-ch-drop \
+	$(MAKE) db-drop-ch \
 		DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
 		DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
 		DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
@@ -240,31 +245,31 @@ test-db-drop:
 		DB_CH_NAME=$${CLICKHOUSE_DB:-test_$(CLICKHOUSE_DB)}
 	@echo "✓ All test databases dropped"
 
-test-db-reset:
+db-test-prepare:
 	@if [ ! -f .env.test ]; then \
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
 	@set -a; . ./.env.test; set +a; \
-	$(MAKE) test-db-drop && \
-	$(MAKE) test-db-create && \
-	$(MAKE) test-migrate-up
+	$(MAKE) db-test-drop && \
+	$(MAKE) db-test-create && \
+	$(MAKE) db-test-migrate
 	@echo "✓ Test databases reset complete"
 
-test-migrate-up:
+db-test-migrate:
 	@if [ ! -f .env.test ]; then \
 		echo "❌ .env.test file not found"; \
 		exit 1; \
 	fi
 	@set -a; . ./.env.test; set +a; \
-	$(MAKE) migrate-pg-up \
+	$(MAKE) db-migrate-pg \
 		DB_PG_HOST=$$POSTGRES_HOST \
 		DB_PG_PORT=$$POSTGRES_PORT \
 		DB_PG_USER=$$POSTGRES_USER \
 		DB_PG_PASSWORD=$$POSTGRES_PASSWORD \
 		DB_PG_NAME=$$POSTGRES_DB \
 		DB_PG_SSL_MODE=$$POSTGRES_SSL_MODE; \
-	$(MAKE) migrate-ch-up \
+	$(MAKE) db-migrate-ch \
 		DB_CH_HOST=$${CLICKHOUSE_HOST:-$(CLICKHOUSE_HOST)} \
 		DB_CH_PORT=$${CLICKHOUSE_PORT:-$(CLICKHOUSE_PORT)} \
 		DB_CH_USER=$${CLICKHOUSE_USER:-$(CLICKHOUSE_USER)} \
@@ -276,15 +281,15 @@ test-migrate-up:
 # Migration Commands (Combined)
 # ============================================================================
 
-migrate-up: migrate-pg-up migrate-ch-up
+db-migrate: db-migrate-pg db-migrate-ch
 	@echo "✓ All migrations completed"
 
-migrate-down: migrate-pg-down migrate-ch-down
+db-rollback: db-rollback-pg db-rollback-ch
 	@echo "✓ All rollbacks completed"
 
-migrate-status: migrate-pg-status migrate-ch-status
+db-migrate-status: db-status-pg db-status-ch
 
-migrate-force:
+db-migrate-force:
 	@echo "Select database:"
 	@echo "  1) PostgreSQL"
 	@echo "  2) ClickHouse"
@@ -299,10 +304,26 @@ migrate-force:
 		exit 1; \
 	fi
 
-migrate-create:
+db-create-migration:
 	@read -p "Enter migration name: " name; \
 	migrate create -ext sql -dir migrations/postgres -seq $$name
 	@echo "✓ Migration files created in migrations/postgres/"
+
+# ============================================================================
+# Database Seeds (idempotent - can be run multiple times)
+# ============================================================================
+
+ENV ?= dev
+
+db-seed:
+	@echo "Applying seeds for environment: $(ENV)..."
+	@go run ./cmd/seeder --env $(ENV)
+	@echo "✓ Seeds applied successfully"
+
+db-seed-validate:
+	@echo "Validating seeds for environment: $(ENV)..."
+	@go run ./cmd/seeder --env $(ENV) --dry-run
+	@echo "✓ Validation passed"
 
 # Security
 gen-encryption-key:
@@ -317,7 +338,7 @@ fmt:
 	goimports -w .
 
 # Testing
-test: test-db-reset
+test: db-test-prepare
 	@echo "Running all tests (unit + integration)..."
 	ENV=test go test -v -race ./...
 
@@ -332,7 +353,7 @@ test-coverage:
 
 test-integration:
 	@echo "Running integration tests (requires test database)..."
-	@echo "Make sure test database is ready: make test-db-reset"
+	@echo "Make sure test database is ready: make db-test-prepare"
 	@if [ -f .env.test ]; then \
 		set -a; . ./.env.test; set +a; \
 		go test -v -race ./internal/repository/postgres/...; \
@@ -372,14 +393,14 @@ deps:
 	go mod verify
 
 # Protobuf generation
-proto-gen:
+proto-:
 	@echo "Generating protobuf code..."
 	protoc --go_out=. --go_opt=paths=source_relative \
 		internal/events/proto/events.proto
 	@echo "✓ Protobuf code generated"
 
 # GraphQL code generation
-g-gen:
+graphql:
 	@echo "Generating GraphQL code..."
 	go run github.com/99designs/gqlgen generate
 	@echo "✓ GraphQL code generated"
@@ -391,7 +412,7 @@ clean:
 	go clean -cache
 
 # Development setup
-setup: deps docker-up db-create migrate-up kafka-topics-create
+setup: deps docker-up db-create db-migrate kafka-topics-create
 	@echo "✓ Development environment ready!"
 	@echo "  - PostgreSQL + ClickHouse databases created"
 	@echo "  - Migrations applied"

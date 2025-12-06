@@ -64,6 +64,41 @@ type Strategy {
   reasoningLog: JSONObject
 }
 
+"""
+Edge type for Strategy
+"""
+type StrategyEdge {
+  """
+  The item at the end of the edge
+  """
+  node: Strategy!
+
+  """
+  A cursor for use in pagination
+  """
+  cursor: String!
+}
+
+"""
+Connection type for Strategy collection
+"""
+type StrategyConnection {
+  """
+  A list of edges
+  """
+  edges: [StrategyEdge!]!
+
+  """
+  Information to aid in pagination
+  """
+  pageInfo: PageInfo!
+
+  """
+  Total count of items (if available)
+  """
+  totalCount: Int!
+}
+
 input CreateStrategyInput {
   name: String!
   description: String!
@@ -87,11 +122,24 @@ extend type Query {
   # Get strategy by ID
   strategy(id: UUID!): Strategy
 
-  # Get all strategies for a user
-  userStrategies(userID: UUID!, status: StrategyStatus): [Strategy!]!
+  # Get strategies for a specific user
+  userStrategies(
+    userID: UUID!
+    status: StrategyStatus
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): StrategyConnection!
 
-  # Get all strategies (admin only)
-  strategies(limit: Int, offset: Int, status: StrategyStatus): [Strategy!]!
+  # Get strategies for current user
+  strategies(
+    status: StrategyStatus
+    first: Int
+    after: String
+    last: Int
+    before: String
+  ): StrategyConnection!
 }
 
 # Mutations

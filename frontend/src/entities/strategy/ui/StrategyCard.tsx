@@ -9,7 +9,6 @@ import {
   formatRiskTolerance,
   formatCurrency,
   formatPercentage,
-  getPnLColorClass,
 } from "@/entities/strategy/lib/formatters";
 
 interface StrategyCardProps {
