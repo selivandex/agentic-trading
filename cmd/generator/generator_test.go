@@ -438,6 +438,119 @@ func TestDetectScopes_Strategies(t *testing.T) {
 	}
 }
 
+// TestGenerateFormFields tests form fields generation from schema
+func TestGenerateFormFields(t *testing.T) {
+	if os.Getenv("INTEGRATION_TEST") == "" {
+		t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run")
+	}
+
+	_ = godotenv.Load("../../.env")
+	ctx := context.Background()
+	zapLogger, _ := zap.NewDevelopment()
+	log := &logger.Logger{SugaredLogger: zapLogger.Sugar()}
+
+	gen := NewGenerator(log)
+	db, err := connectDB()
+	require.NoError(t, err)
+	defer db.Close()
+	gen.db = db
+
+	schema, err := analyzeTableFromDB(ctx, db, "user_strategies")
+	require.NoError(t, err)
+
+	formFields := gen.generateFormFields(schema)
+
+	t.Run("has form fields", func(t *testing.T) {
+		assert.NotEmpty(t, formFields, "Should generate form fields")
+		t.Logf("Generated %d form fields", len(formFields))
+		for _, field := range formFields {
+			t.Logf("  - %s (%s): validation=%s, colSpan=%d",
+				field.Name, field.Type, field.Validation, field.ColSpan)
+		}
+	})
+
+	t.Run("skips auto-generated fields", func(t *testing.T) {
+		for _, field := range formFields {
+			assert.NotEqual(t, "id", field.Name)
+			assert.NotEqual(t, "createdAt", field.Name)
+			assert.NotEqual(t, "updatedAt", field.Name)
+		}
+	})
+
+	t.Run("maps types correctly", func(t *testing.T) {
+		fieldsByName := make(map[string]FormField)
+		for _, field := range formFields {
+			fieldsByName[field.Name] = field
+		}
+
+		// String field
+		if field, ok := fieldsByName["name"]; ok {
+			assert.Equal(t, "text", field.Type)
+			assert.NotEmpty(t, field.Validation)
+		}
+
+		// Enum field (if has status)
+		if field, ok := fieldsByName["status"]; ok {
+			assert.Equal(t, "select", field.Type)
+			assert.NotEmpty(t, field.Options)
+		}
+
+		// Foreign key (if has userId)
+		if field, ok := fieldsByName["userId"]; ok {
+			assert.Equal(t, "custom", field.Type)
+			assert.Contains(t, field.Render, "SelectField")
+		}
+	})
+}
+
+// TestGenerateDisplayColumns tests display columns generation
+func TestGenerateDisplayColumns(t *testing.T) {
+	if os.Getenv("INTEGRATION_TEST") == "" {
+		t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run")
+	}
+
+	_ = godotenv.Load("../../.env")
+	ctx := context.Background()
+	zapLogger, _ := zap.NewDevelopment()
+	log := &logger.Logger{SugaredLogger: zapLogger.Sugar()}
+
+	gen := NewGenerator(log)
+	db, err := connectDB()
+	require.NoError(t, err)
+	defer db.Close()
+	gen.db = db
+
+	schema, err := analyzeTableFromDB(ctx, db, "user_strategies")
+	require.NoError(t, err)
+
+	columns := gen.generateDisplayColumns(schema)
+
+	t.Run("has display columns", func(t *testing.T) {
+		assert.NotEmpty(t, columns, "Should generate display columns")
+		t.Logf("Generated %d display columns", len(columns))
+		for _, col := range columns {
+			t.Logf("  - %s (%s): sortable=%v, width=%s",
+				col.Key, col.Label, col.Sortable, col.Width)
+		}
+	})
+
+	t.Run("has actions column", func(t *testing.T) {
+		var hasActions bool
+		for _, col := range columns {
+			if col.Key == "actions" {
+				hasActions = true
+				assert.Equal(t, "", col.Label)
+			}
+		}
+		assert.True(t, hasActions, "Should have actions column")
+	})
+
+	t.Run("limits number of columns", func(t *testing.T) {
+		// Should not have too many columns (max ~7)
+		assert.LessOrEqual(t, len(columns), 7, "Should limit number of columns")
+	})
+}
+
 // TestTypeMappings tests PostgreSQL to Go/GraphQL/TS type conversions
 func TestTypeMappings(t *testing.T) {
 	tests := []struct {

@@ -12,7 +12,9 @@ import {
   CREATE_{{toUpper .ResourceName}}_MUTATION,
   UPDATE_{{toUpper .ResourceName}}_MUTATION,
 } from "@/entities/{{toKebab .ResourceName}}";
-
+{{range .FormFields}}{{if eq .Type "custom"}}// TODO: Import select field component for {{.Label}}
+// import { {{trimSuffix (replace .Render "(props) => <" "") "SelectField {...props} />"}}SelectField } from "@/entities/...";
+{{end}}{{end}}
 /**
  * CRUD Configuration for {{.ResourceName}} entity
  * Auto-generated from table: {{.TableName}}
@@ -56,38 +58,29 @@ export const {{toCamel .ResourceName}}CrudConfig: CrudConfig<{{.ResourceName}}> 
 
   // Table columns
   columns: [
-    {
-      key: "name",
-      label: "Name",
-      sortable: true,
-      width: "25%",
-    },
 {{range .DisplayColumns}}    {
-      key: "{{toCamel .Name}}",
-      label: "{{toTitle .Name}}",
-      sortable: {{if .Sortable}}true{{else}}false{{end}},
-      {{if .Render}}render: (entity) => {{.Render}},{{end}}
-      {{if .HideOnMobile}}hideOnMobile: true,{{end}}
+      key: "{{.Key}}",
+      label: "{{.Label}}",
+      sortable: {{if .Sortable}}true{{else}}false{{end}},{{if .Width}}
+      width: "{{.Width}}",{{end}}{{if .Render}}
+      render: {{.Render}},{{end}}{{if .HideOnMobile}}
+      hideOnMobile: true,{{end}}
     },
-{{end}}    {
-      key: "actions",
-      label: "",
-      width: "10%",
-    },
-  ],
+{{end}}  ],
 
   // Form fields
   formFields: [
 {{range .FormFields}}    {
       name: "{{.Name}}",
       label: "{{.Label}}",
-      type: "{{.Type}}",
-      {{if .Placeholder}}placeholder: "{{.Placeholder}}",{{end}}
-      {{if .HelperText}}helperText: "{{.HelperText}}",{{end}}
-      validation: {{.Validation}},
-      {{if .Options}}options: {{.Options}},{{end}}
-      {{if .DefaultValue}}defaultValue: {{.DefaultValue}},{{end}}
-      {{if .Disabled}}disabled: {{.Disabled}},{{end}}
+      type: "{{.Type}}",{{if .Placeholder}}
+      placeholder: "{{.Placeholder}}",{{end}}{{if .HelperText}}
+      helperText: "{{.HelperText}}",{{end}}
+      validation: {{.Validation}},{{if .Options}}
+      options: {{.Options}},{{end}}{{if .Render}}
+      render: {{.Render}},{{end}}{{if .DefaultValue}}
+      defaultValue: {{.DefaultValue}},{{end}}{{if .Disabled}}
+      disabled: {{.Disabled}},{{end}}
       colSpan: {{.ColSpan}},
     },
 {{end}}  ],

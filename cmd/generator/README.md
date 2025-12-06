@@ -58,11 +58,22 @@ make generate-resource table=sessions --backend-only
 ### Frontend (React/Next.js)
 
 1. **Entity Layer** (`frontend/src/entities/{resource}/`)
-   - TypeScript types
-   - GraphQL queries/mutations
-   - CRUD config with:
-     - Table columns (from PG columns)
-     - Form fields (from PG columns + validation)
+   - TypeScript types (auto-mapped from PG types)
+   - GraphQL queries/mutations (with Relay pagination)
+   - **CRUD config with auto-generated:**
+     - **Table columns** - up to 6 display columns with render functions:
+       - Enum → Badge component
+       - Boolean → Badge (Yes/No)
+       - Decimal → Formatted number (2 decimals)
+       - Foreign key → Related entity name
+       - Timestamp → Formatted date
+     - **Form fields** - smart mapping from DB columns:
+       - Text/varchar → text input with validation
+       - Enum → select with options
+       - Boolean → checkbox
+       - Number/decimal → number input
+       - Timestamp → datetime picker
+       - Foreign key → custom select field
      - Filters (from column types)
      - Scopes (from detected enums)
    - Manager component with actions
