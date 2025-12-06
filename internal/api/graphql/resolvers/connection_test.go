@@ -3,6 +3,7 @@ package resolvers_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"prometheus/internal/api/graphql/resolvers"
@@ -140,11 +141,14 @@ func TestUserStrategiesConnection(t *testing.T) {
 		conn, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil, // status filter
+			nil,     // scope
+			nil,     // status filter
+			nil,     // search
+			nil,     // filters
 			&first,
-			nil, // after
-			nil, // last
-			nil, // before
+			nil,     // after
+			nil,     // last
+			nil,     // before
 		)
 
 		require.NoError(t, err)
@@ -163,7 +167,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		firstPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
+			nil,     // scope
+			nil,     // status
+			nil,     // search
+			nil,     // filters
 			&first,
 			nil,
 			nil,
@@ -175,7 +182,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		secondPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
+			nil,     // scope
+			nil,     // status
+			nil,     // search
+			nil,     // filters
 			&first,
 			firstPage.PageInfo.EndCursor,
 			nil,
@@ -195,15 +205,18 @@ func TestUserStrategiesConnection(t *testing.T) {
 		// Get first two pages
 		first := 5
 		firstPage, _ := setup.resolver.Query().UserStrategies(
-			ctx, setup.testUser.ID, nil, &first, nil, nil, nil)
+			ctx, setup.testUser.ID, nil, nil, nil, nil, &first, nil, nil, nil)
 		secondPage, _ := setup.resolver.Query().UserStrategies(
-			ctx, setup.testUser.ID, nil, &first, firstPage.PageInfo.EndCursor, nil, nil)
+			ctx, setup.testUser.ID, nil, nil, nil, nil, &first, firstPage.PageInfo.EndCursor, nil, nil)
 
 		// Get third (last) page
 		thirdPage, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			nil,
+			nil,     // scope
+			nil,     // status
+			nil,     // search
+			nil,     // filters
 			&first,
 			secondPage.PageInfo.EndCursor,
 			nil,
@@ -223,7 +236,10 @@ func TestUserStrategiesConnection(t *testing.T) {
 		conn, err := setup.resolver.Query().UserStrategies(
 			ctx,
 			setup.testUser.ID,
-			&activeStatus,
+			nil,           // scope
+			&activeStatus, // status
+			nil,           // search
+			nil,           // filters
 			&first,
 			nil,
 			nil,
@@ -237,6 +253,75 @@ func TestUserStrategiesConnection(t *testing.T) {
 		}
 	})
 
+	t.Run("search by name", func(t *testing.T) {
+		// Search for specific strategy by name
+		search := "Test Strategy E"
+		first := 20
+
+		conn, err := setup.resolver.Query().UserStrategies(
+			ctx,
+			setup.testUser.ID,
+			nil,     // scope
+			nil,     // status
+			&search, // search
+			nil,     // filters
+			&first,
+			nil,
+			nil,
+			nil,
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, 1, conn.TotalCount)
+		assert.Len(t, conn.Edges, 1)
+		assert.Contains(t, conn.Edges[0].Node.Name, "Test Strategy E")
+	})
+
+	t.Run("search by partial name - case insensitive", func(t *testing.T) {
+		// Search for strategies containing "test" (should match all)
+		search := "test"
+		first := 20
+
+		conn, err := setup.resolver.Query().UserStrategies(
+			ctx,
+			setup.testUser.ID,
+			nil,     // scope
+			nil,     // status
+			&search, // search
+			nil,     // filters
+			&first,
+			nil,
+			nil,
+			nil,
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, 15, conn.TotalCount) // All 15 strategies contain "test" in name
+		for _, edge := range conn.Edges {
+			assert.Contains(t, strings.ToLower(edge.Node.Name), "test")
+		}
+	})
+
+	t.Run("search with no results", func(t *testing.T) {
+		search := "NonExistentStrategy"
+		first := 20
+
+		conn, err := setup.resolver.Query().UserStrategies(
+			ctx,
+			setup.testUser.ID,
+			nil,
+			&search,
+			&first,
+			nil,
+			nil,
+			nil,
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, 0, conn.TotalCount)
+		assert.Empty(t, conn.Edges)
+	})
+
 	t.Run("empty result", func(t *testing.T) {
 		nonExistentUser := uuid.New()
 		first := 10
@@ -245,6 +330,7 @@ func TestUserStrategiesConnection(t *testing.T) {
 			ctx,
 			nonExistentUser,
 			nil,
+			nil, // search
 			&first,
 			nil,
 			nil,
@@ -266,6 +352,7 @@ func TestUserStrategiesConnection(t *testing.T) {
 			ctx,
 			setup.testUser.ID,
 			nil,
+			nil, // search
 			&first,
 			nil,
 			&last,
@@ -582,6 +669,7 @@ func TestConnectionEdgeCursors(t *testing.T) {
 			ctx,
 			setup.testUser.ID,
 			nil,
+			nil, // search
 			&first,
 			nil,
 			nil,
@@ -594,6 +682,7 @@ func TestConnectionEdgeCursors(t *testing.T) {
 			ctx,
 			setup.testUser.ID,
 			nil,
+			nil, // search
 			&first,
 			firstPage.PageInfo.EndCursor,
 			nil,

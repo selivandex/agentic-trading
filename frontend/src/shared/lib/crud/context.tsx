@@ -3,8 +3,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { createContext, useContext, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { CrudActions, CrudConfig, CrudEntity, CrudState } from "./types";
 
 /**
@@ -52,21 +52,92 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
   initialMode = "index",
   _initialEntityId,
 }: CrudProviderProps<TEntity>) {
-  // State
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Initialize state from URL params
   const [mode, setMode] = useState<CrudState<TEntity>["mode"]>(initialMode);
   const [currentEntity, setCurrentEntity] = useState<TEntity | null>(null);
   const [selectedEntities, setSelectedEntities] = useState<TEntity[]>([]);
-  const [filters, setFilters] = useState<Record<string, unknown>>({});
-  const [page] = useState(1); // Keep for state interface compatibility
+  const [filters, setFiltersState] = useState<Record<string, unknown>>(() => {
+    // Parse filters from URL on mount
+    const filtersParam = searchParams.get("filters");
+    if (filtersParam) {
+      try {
+        return JSON.parse(decodeURIComponent(filtersParam));
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  });
+  const [page] = useState(1);
   const [pageSize] = useState(config.defaultPageSize ?? 20);
-  const [sort, setSort] = useState<CrudState<TEntity>["sort"]>();
-  const [searchQuery, setSearchQuery] = useState<string>();
+  const [sort, setSort] = useState<CrudState<TEntity>["sort"]>(() => {
+    const sortBy = searchParams.get("sortBy");
+    const sortDirection = searchParams.get("sortDirection");
+    if (sortBy && sortDirection) {
+      return { column: sortBy, direction: sortDirection as "asc" | "desc" };
+    }
+    return undefined;
+  });
+  const [searchQuery, setSearchQuery] = useState<string | undefined>(
+    searchParams.get("search") || undefined
+  );
   const [cursors, setCursors] = useState<CrudState<TEntity>["cursors"]>({});
   const [totalCount, setTotalCount] = useState<number>();
   const [pageInfo, setPageInfo] = useState<CrudState<TEntity>["pageInfo"]>();
+  const [activeTab, setActiveTabState] = useState<string | undefined>(
+    searchParams.get("tab") || undefined
+  );
 
-  // Next.js router for navigation
-  const router = useRouter();
+  // Update URL when filters/search/sort/tab change
+  useEffect(() => {
+    if (mode !== "index") return; // Only sync URL for list view
+
+    const params = new URLSearchParams();
+
+    // Add filters to URL
+    if (Object.keys(filters).length > 0) {
+      params.set("filters", encodeURIComponent(JSON.stringify(filters)));
+    }
+
+    // Add search to URL
+    if (searchQuery) {
+      params.set("search", searchQuery);
+    }
+
+    // Add sort to URL
+    if (sort) {
+      params.set("sortBy", sort.column);
+      params.set("sortDirection", sort.direction);
+    }
+
+    // Add active tab to URL
+    if (activeTab) {
+      params.set("tab", activeTab);
+    }
+
+    // Update URL without causing a full page reload
+    const newUrl = params.toString()
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname;
+
+    router.replace(newUrl, { scroll: false });
+  }, [filters, searchQuery, sort, activeTab, mode, router]);
+
+  // Wrapper for setFilters that updates state
+  const setFilters = (newFilters: Record<string, unknown>) => {
+    setFiltersState(newFilters);
+  };
+
+  // Wrapper for setActiveTab
+  const setActiveTab = (tabKey: string) => {
+    setActiveTabState(tabKey);
+    // Reset pagination when changing tabs
+    setCursors({});
+    setSelectedEntities([]);
+  };
 
   // State object
   const state = useMemo<CrudState<TEntity>>(
@@ -82,6 +153,7 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
       cursors,
       totalCount,
       pageInfo,
+      activeTab,
     }),
     [
       mode,
@@ -95,6 +167,7 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
       cursors,
       totalCount,
       pageInfo,
+      activeTab,
     ]
   );
 
@@ -164,6 +237,7 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
         setSort({ column, direction });
       },
       setSearchQuery,
+      setActiveTab,
       refresh: async () => {
         // Trigger refetch - implemented by components
       },
@@ -192,6 +266,7 @@ export function CrudProvider<TEntity extends CrudEntity = CrudEntity>({
       setCursors,
       setSort,
       setSearchQuery,
+      setActiveTab,
       setPageInfo,
       setTotalCount,
     ]

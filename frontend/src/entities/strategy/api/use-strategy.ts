@@ -10,6 +10,10 @@ import {
   PAUSE_STRATEGY_MUTATION,
   RESUME_STRATEGY_MUTATION,
   CLOSE_STRATEGY_MUTATION,
+  BATCH_DELETE_STRATEGIES_MUTATION,
+  BATCH_PAUSE_STRATEGIES_MUTATION,
+  BATCH_RESUME_STRATEGIES_MUTATION,
+  BATCH_CLOSE_STRATEGIES_MUTATION,
   type Strategy,
   type StrategyStatus,
   type CreateStrategyInput,
@@ -33,7 +37,8 @@ export const useUserStrategies = (
   userID: string,
   first?: number,
   after?: string,
-  status?: StrategyStatus
+  status?: StrategyStatus,
+  search?: string
 ) => {
   return useQuery<{
     userStrategies: {
@@ -47,7 +52,7 @@ export const useUserStrategies = (
       totalCount: number;
     };
   }>(GET_USER_STRATEGIES_QUERY, {
-    variables: { userID, first, after, status },
+    variables: { userID, first, after, status, search },
     skip: !userID,
   });
 };
@@ -58,7 +63,8 @@ export const useUserStrategies = (
 export const useAllStrategies = (
   first?: number,
   after?: string,
-  status?: StrategyStatus
+  status?: StrategyStatus,
+  search?: string
 ) => {
   return useQuery<{
     strategies: {
@@ -72,7 +78,7 @@ export const useAllStrategies = (
       totalCount: number;
     };
   }>(GET_ALL_STRATEGIES_QUERY, {
-    variables: { first, after, status },
+    variables: { first, after, status, search },
   });
 };
 
@@ -120,5 +126,41 @@ export const useResumeStrategy = () => {
 export const useCloseStrategy = () => {
   return useMutation<{ closeStrategy: Strategy }, { id: string }>(
     CLOSE_STRATEGY_MUTATION
+  );
+};
+
+/**
+ * Hook to batch delete strategies (hard delete, only for closed strategies)
+ */
+export const useBatchDeleteStrategies = () => {
+  return useMutation<{ batchDeleteStrategies: number }, { ids: string[] }>(
+    BATCH_DELETE_STRATEGIES_MUTATION
+  );
+};
+
+/**
+ * Hook to batch pause strategies
+ */
+export const useBatchPauseStrategies = () => {
+  return useMutation<{ batchPauseStrategies: number }, { ids: string[] }>(
+    BATCH_PAUSE_STRATEGIES_MUTATION
+  );
+};
+
+/**
+ * Hook to batch resume strategies
+ */
+export const useBatchResumeStrategies = () => {
+  return useMutation<{ batchResumeStrategies: number }, { ids: string[] }>(
+    BATCH_RESUME_STRATEGIES_MUTATION
+  );
+};
+
+/**
+ * Hook to batch close strategies
+ */
+export const useBatchCloseStrategies = () => {
+  return useMutation<{ batchCloseStrategies: number }, { ids: string[] }>(
+    BATCH_CLOSE_STRATEGIES_MUTATION
   );
 };

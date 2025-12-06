@@ -22,6 +22,19 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
   const variables = useMemo(() => {
     const baseVariables = config.graphql.list.variables ?? {};
 
+    // Resolve global scope variables from config
+    const configScopeVariables =
+      typeof config.graphql.list.scope === "function"
+        ? config.graphql.list.scope()
+        : config.graphql.list.scope ?? {};
+
+    // Add active tab filter variable if tabs are enabled
+    const tabFilterVariables: Record<string, unknown> = {};
+    if (config.tabs?.enabled && state.activeTab) {
+      const filterVariable = config.tabs.filterVariable ?? "scope";
+      tabFilterVariables[filterVariable] = state.activeTab;
+    }
+
     if (useConnection) {
       // Relay cursor-based pagination
       const paginationVariables: Record<string, unknown> = {
@@ -53,6 +66,8 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
 
       return {
         ...baseVariables,
+        ...configScopeVariables,
+        ...tabFilterVariables, // Tab filter
         ...paginationVariables,
         ...sortVariables,
         ...searchVariables,
@@ -82,6 +97,8 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
 
       return {
         ...baseVariables,
+        ...configScopeVariables,
+        ...tabFilterVariables, // Tab filter
         ...paginationVariables,
         ...sortVariables,
         ...searchVariables,
@@ -105,6 +122,8 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
         entities: [] as TEntity[],
         pageInfo: undefined,
         totalCount: undefined,
+        scopes: undefined,
+        filters: undefined,
       };
     }
 
@@ -121,6 +140,8 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
           entities: [] as TEntity[],
           pageInfo: undefined,
           totalCount: undefined,
+          scopes: undefined,
+          filters: undefined,
         };
       }
 
@@ -128,6 +149,8 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
         entities: connection.edges.map((edge) => edge.node),
         pageInfo: connection.pageInfo,
         totalCount: connection.totalCount,
+        scopes: connection.scopes,
+        filters: connection.filters,
       };
     } else {
       // Legacy array response
@@ -135,6 +158,8 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
         entities: get(data, config.graphql.list.dataPath, []) as TEntity[],
         pageInfo: undefined,
         totalCount: undefined,
+        scopes: undefined,
+        filters: undefined,
       };
     }
   }, [data, config.graphql.list.dataPath, useConnection]);
@@ -158,13 +183,19 @@ export function useCrudShowQuery<TEntity extends CrudEntity = CrudEntity>(
     skip?: boolean;
   },
 ) {
-  const variables = useMemo(
-    () => ({
+  const variables = useMemo(() => {
+    // Resolve scope variables (can be object or function)
+    const scopeVariables =
+      typeof config.graphql.show.scope === "function"
+        ? config.graphql.show.scope()
+        : config.graphql.show.scope ?? {};
+
+    return {
       ...config.graphql.show.variables,
+      ...scopeVariables,
       id,
-    }),
-    [config, id],
-  );
+    };
+  }, [config, id]);
 
   const { data, loading, error, refetch } = useQuery(
     config.graphql.show.query,

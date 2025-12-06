@@ -8,6 +8,26 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// FilterOptions defines filter criteria for strategy queries
+type FilterOptions struct {
+	UserID   *uuid.UUID
+	Status   *StrategyStatus
+	Search   *string          // Search by name
+	Statuses []StrategyStatus // Filter by multiple statuses
+
+	// Additional filters
+	RiskTolerance        *RiskTolerance
+	RiskTolerances       []RiskTolerance
+	MarketType           *MarketType
+	MarketTypes          []MarketType
+	RebalanceFrequency   *RebalanceFrequency
+	RebalanceFrequencies []RebalanceFrequency
+	MinCapital           *decimal.Decimal
+	MaxCapital           *decimal.Decimal
+	MinPnLPercent        *decimal.Decimal
+	MaxPnLPercent        *decimal.Decimal
+}
+
 // Repository defines operations for strategy persistence
 type Repository interface {
 	// Create creates a new strategy
@@ -24,6 +44,12 @@ type Repository interface {
 
 	// GetAllActive retrieves all active strategies across all users
 	GetAllActive(ctx context.Context) ([]*Strategy, error)
+
+	// GetWithFilter retrieves strategies with filter options (SQL WHERE)
+	GetWithFilter(ctx context.Context, filter FilterOptions) ([]*Strategy, error)
+
+	// CountByStatus returns count of strategies grouped by status for a user
+	CountByStatus(ctx context.Context, userID uuid.UUID) (map[StrategyStatus]int, error)
 
 	// Update updates an existing strategy
 	Update(ctx context.Context, strategy *Strategy) error

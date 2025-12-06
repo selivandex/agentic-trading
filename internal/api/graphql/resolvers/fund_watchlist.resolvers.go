@@ -87,7 +87,7 @@ func (r *queryResolver) MonitoredSymbols(ctx context.Context, marketType *string
 }
 
 // FundWatchlistsConnection is the resolver for the fundWatchlistsConnection field.
-func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
+func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, scope *string, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
 	// Get all watchlist items
 	allItems, err := r.FundWatchlistService.GetAll(ctx)
 	if err != nil {
@@ -166,7 +166,7 @@ func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, isActive *
 }
 
 // MonitoredSymbolsConnection is the resolver for the monitoredSymbolsConnection field.
-func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, marketType *string, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
+func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, scope *string, marketType *string, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
 	// Get monitored symbols
 	allItems, err := r.FundWatchlistService.GetMonitored(ctx, marketType)
 	if err != nil {
@@ -233,18 +233,3 @@ func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, marketTy
 func (r *Resolver) FundWatchlist() generated.FundWatchlistResolver { return &fundWatchlistResolver{r} }
 
 type fundWatchlistResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *mutationResolver) DeleteManyFundWatchlists(ctx context.Context, ids []uuid.UUID) (int, error) {
-	return r.FundWatchlistService.DeleteManyWatchlists(ctx, ids)
-}
-func (r *mutationResolver) DeleteManyFundWatchlists(ctx context.Context, ids []uuid.UUID) (int, error) {
-	panic(fmt.Errorf("not implemented: DeleteManyFundWatchlists - deleteManyFundWatchlists"))
-}
-*/

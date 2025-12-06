@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -151,6 +152,188 @@ func (r *StrategyRepository) GetAllActive(ctx context.Context) ([]*strategy.Stra
 	}
 
 	return strategies, nil
+}
+
+// GetWithFilter retrieves strategies with filter options (SQL WHERE)
+func (r *StrategyRepository) GetWithFilter(ctx context.Context, filter strategy.FilterOptions) ([]*strategy.Strategy, error) {
+	var strategies []*strategy.Strategy
+
+	// Build dynamic query
+	query := `
+		SELECT id, user_id, name, description, status,
+			   allocated_capital, current_equity, cash_reserve,
+			   risk_tolerance, rebalance_frequency, target_allocations,
+			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
+			   created_at, updated_at, closed_at, last_rebalanced_at,
+			   reasoning_log
+		FROM user_strategies
+		WHERE 1=1`
+
+	args := []interface{}{}
+	argIdx := 1
+
+	// Add user_id filter
+	if filter.UserID != nil {
+		query += ` AND user_id = $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.UserID)
+		argIdx++
+	}
+
+	// Add status filter (single)
+	if filter.Status != nil {
+		query += ` AND status = $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.Status)
+		argIdx++
+	}
+
+	// Add statuses filter (multiple)
+	if len(filter.Statuses) > 0 {
+		placeholders := ""
+		for i, status := range filter.Statuses {
+			if i > 0 {
+				placeholders += ","
+			}
+			placeholders += `$` + fmt.Sprintf("%d", argIdx)
+			args = append(args, status)
+			argIdx++
+		}
+		query += ` AND status IN (` + placeholders + `)`
+	}
+
+	// Add search filter (ILIKE for case-insensitive search)
+	if filter.Search != nil && *filter.Search != "" {
+		query += ` AND name ILIKE $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, "%"+*filter.Search+"%")
+		argIdx++
+	}
+
+	// Add risk_tolerance filter (single)
+	if filter.RiskTolerance != nil {
+		query += ` AND risk_tolerance = $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.RiskTolerance)
+		argIdx++
+	}
+
+	// Add risk_tolerances filter (multiple)
+	if len(filter.RiskTolerances) > 0 {
+		placeholders := ""
+		for i, rt := range filter.RiskTolerances {
+			if i > 0 {
+				placeholders += ","
+			}
+			placeholders += `$` + fmt.Sprintf("%d", argIdx)
+			args = append(args, rt)
+			argIdx++
+		}
+		query += ` AND risk_tolerance IN (` + placeholders + `)`
+	}
+
+	// Add market_type filter (single)
+	if filter.MarketType != nil {
+		query += ` AND market_type = $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.MarketType)
+		argIdx++
+	}
+
+	// Add market_types filter (multiple)
+	if len(filter.MarketTypes) > 0 {
+		placeholders := ""
+		for i, mt := range filter.MarketTypes {
+			if i > 0 {
+				placeholders += ","
+			}
+			placeholders += `$` + fmt.Sprintf("%d", argIdx)
+			args = append(args, mt)
+			argIdx++
+		}
+		query += ` AND market_type IN (` + placeholders + `)`
+	}
+
+	// Add rebalance_frequency filter (single)
+	if filter.RebalanceFrequency != nil {
+		query += ` AND rebalance_frequency = $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.RebalanceFrequency)
+		argIdx++
+	}
+
+	// Add rebalance_frequencies filter (multiple)
+	if len(filter.RebalanceFrequencies) > 0 {
+		placeholders := ""
+		for i, rf := range filter.RebalanceFrequencies {
+			if i > 0 {
+				placeholders += ","
+			}
+			placeholders += `$` + fmt.Sprintf("%d", argIdx)
+			args = append(args, rf)
+			argIdx++
+		}
+		query += ` AND rebalance_frequency IN (` + placeholders + `)`
+	}
+
+	// Add min_capital filter
+	if filter.MinCapital != nil {
+		query += ` AND allocated_capital >= $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.MinCapital)
+		argIdx++
+	}
+
+	// Add max_capital filter
+	if filter.MaxCapital != nil {
+		query += ` AND allocated_capital <= $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.MaxCapital)
+		argIdx++
+	}
+
+	// Add min_pnl_percent filter
+	if filter.MinPnLPercent != nil {
+		query += ` AND total_pnl_percent >= $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.MinPnLPercent)
+		argIdx++
+	}
+
+	// Add max_pnl_percent filter
+	if filter.MaxPnLPercent != nil {
+		query += ` AND total_pnl_percent <= $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.MaxPnLPercent)
+		argIdx++
+	}
+
+	query += ` ORDER BY created_at DESC`
+
+	err := r.db.SelectContext(ctx, &strategies, query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get strategies with filter")
+	}
+
+	return strategies, nil
+}
+
+// CountByStatus returns count of strategies grouped by status for a user
+func (r *StrategyRepository) CountByStatus(ctx context.Context, userID uuid.UUID) (map[strategy.StrategyStatus]int, error) {
+	type statusCount struct {
+		Status strategy.StrategyStatus `db:"status"`
+		Count  int                     `db:"count"`
+	}
+
+	query := `
+		SELECT status, COUNT(*) as count
+		FROM user_strategies
+		WHERE user_id = $1
+		GROUP BY status`
+
+	var counts []statusCount
+	err := r.db.SelectContext(ctx, &counts, query, userID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count strategies by status")
+	}
+
+	// Convert to map
+	result := make(map[strategy.StrategyStatus]int)
+	for _, c := range counts {
+		result[c.Status] = c.Count
+	}
+
+	return result, nil
 }
 
 // Update updates an existing strategy

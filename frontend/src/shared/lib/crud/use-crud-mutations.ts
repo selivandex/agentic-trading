@@ -27,8 +27,15 @@ export function useCrudMutations<TEntity extends CrudEntity = CrudEntity>(
           ? config.transformBeforeCreate(data)
           : data;
 
+        // Resolve scope variables (can be object or function)
+        const scopeVariables =
+          typeof config.graphql.create.scope === "function"
+            ? config.graphql.create.scope()
+            : config.graphql.create.scope ?? {};
+
         const variables = {
           ...config.graphql.create.variables,
+          ...scopeVariables,
           input: transformedData,
         };
 
@@ -68,8 +75,15 @@ export function useCrudMutations<TEntity extends CrudEntity = CrudEntity>(
           ? config.transformBeforeUpdate(data)
           : data;
 
+        // Resolve scope variables (can be object or function)
+        const scopeVariables =
+          typeof config.graphql.update.scope === "function"
+            ? config.graphql.update.scope()
+            : config.graphql.update.scope ?? {};
+
         const variables = {
           ...config.graphql.update.variables,
+          ...scopeVariables,
           id,
           input: transformedData,
         };
@@ -110,8 +124,15 @@ export function useCrudMutations<TEntity extends CrudEntity = CrudEntity>(
       }
 
       try {
+        // Resolve scope variables (can be object or function)
+        const scopeVariables =
+          typeof config.graphql.destroy.scope === "function"
+            ? config.graphql.destroy.scope()
+            : config.graphql.destroy.scope ?? {};
+
         const variables = {
           ...config.graphql.destroy.variables,
+          ...scopeVariables,
           id,
         };
 

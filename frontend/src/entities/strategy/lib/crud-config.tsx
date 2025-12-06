@@ -208,6 +208,20 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
   // Bulk actions (overridden in StrategyManager component with real mutations)
   bulkActions: [],
 
+  // Tabs configuration (scopes from backend)
+  tabs: {
+    enabled: true,
+    type: "underline",
+    size: "md",
+    filterVariable: "scope",
+    // defaultScope not set - will use first scope from backend
+  },
+
+  // Dynamic filters configuration (filters from backend)
+  dynamicFilters: {
+    enabled: true,
+  },
+
   // Feature flags
   enableSelection: true,
   enableSearch: true,

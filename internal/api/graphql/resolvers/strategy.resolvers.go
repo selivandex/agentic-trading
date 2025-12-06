@@ -19,6 +19,77 @@ import (
 	"github.com/google/uuid"
 )
 
+// buildStrategyConnection is a helper function to build GraphQL connection with scopes and filters
+// This avoids code duplication between UserStrategies and Strategies resolvers
+func buildStrategyConnection(
+	items []*strategy.Strategy,
+	totalCount int,
+	params relay.PaginationParams,
+	offset int,
+	scopeCounts map[string]int,
+) (*generated.StrategyConnection, error) {
+	// Build relay connection
+	conn, err := relay.NewConnection(items, totalCount, params, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Convert to GraphQL types
+	edges := make([]*generated.StrategyEdge, len(conn.Edges))
+	for i, edge := range conn.Edges {
+		edges[i] = &generated.StrategyEdge{
+			Node:   edge.Node,
+			Cursor: edge.Cursor,
+		}
+	}
+
+	// Build scopes with counts
+	scopeDefs := getStrategyScopeDefinitions()
+	scopes := make([]*generated.Scope, len(scopeDefs))
+	for i, scopeDef := range scopeDefs {
+		scopes[i] = &generated.Scope{
+			ID:    scopeDef.ID,
+			Name:  scopeDef.Name,
+			Count: scopeCounts[scopeDef.ID],
+		}
+	}
+
+	// Build filters from definitions
+	filterDefs := getStrategyFilterDefinitions()
+	filters := make([]*generated.Filter, len(filterDefs))
+	for i, filterDef := range filterDefs {
+		options := make([]*generated.FilterOption, len(filterDef.Options))
+		for j, opt := range filterDef.Options {
+			options[j] = &generated.FilterOption{
+				Value: opt.Value,
+				Label: opt.Label,
+			}
+		}
+
+		filters[i] = &generated.Filter{
+			ID:           filterDef.ID,
+			Name:         filterDef.Name,
+			Type:         generated.FilterType(filterDef.Type),
+			Options:      options,
+			DefaultValue: filterDef.DefaultValue,
+			Placeholder:  filterDef.Placeholder,
+		}
+	}
+
+	return &generated.StrategyConnection{
+		Edges: edges,
+		PageInfo: &generated.PageInfo{
+			HasNextPage:     conn.PageInfo.HasNextPage,
+			HasPreviousPage: conn.PageInfo.HasPreviousPage,
+			StartCursor:     conn.PageInfo.StartCursor,
+			EndCursor:       conn.PageInfo.EndCursor,
+		},
+		TotalCount: conn.TotalCount,
+		Scopes:     scopes,
+		Filters:    filters,
+	}, nil
+}
+
 // CreateStrategy is the resolver for the createStrategy field.
 func (r *mutationResolver) CreateStrategy(ctx context.Context, userID uuid.UUID, input generated.CreateStrategyInput) (*strategy.Strategy, error) {
 	// Parse target allocations if provided
@@ -97,28 +168,46 @@ func (r *mutationResolver) BatchDeleteStrategies(ctx context.Context, ids []uuid
 	return r.StrategyService.BatchDeleteStrategies(ctx, ids)
 }
 
+// BatchPauseStrategies is the resolver for the batchPauseStrategies field.
+func (r *mutationResolver) BatchPauseStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.StrategyService.BatchPauseStrategies(ctx, ids)
+}
+
+// BatchResumeStrategies is the resolver for the batchResumeStrategies field.
+func (r *mutationResolver) BatchResumeStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.StrategyService.BatchResumeStrategies(ctx, ids)
+}
+
+// BatchCloseStrategies is the resolver for the batchCloseStrategies field.
+func (r *mutationResolver) BatchCloseStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
+	return r.StrategyService.BatchCloseStrategies(ctx, ids)
+}
+
 // Strategy is the resolver for the strategy field.
 func (r *queryResolver) Strategy(ctx context.Context, id uuid.UUID) (*strategy.Strategy, error) {
 	return r.StrategyService.GetStrategyByID(ctx, id)
 }
 
 // UserStrategies is the resolver for the userStrategies field.
-func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) (*generated.StrategyConnection, error) {
-	// Get all strategies for user
-	allStrategies, err := r.StrategyService.GetActiveStrategies(ctx, userID)
+func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, scope *string, status *strategy.StrategyStatus, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*generated.StrategyConnection, error) {
+	// Use scope parameter if provided, otherwise fall back to legacy status parameter
+	effectiveScope := scope
+	if effectiveScope == nil && status != nil {
+		// Legacy support: map status to scope
+		statusStr := string(*status)
+		effectiveScope = &statusStr
+	}
+
+	// Get filtered strategies from service (uses SQL WHERE, not in-memory filtering)
+	filtered, err := r.StrategyService.GetStrategiesWithScope(ctx, userID, effectiveScope, search, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get strategies: %w", err)
 	}
 
-	// Filter by status if provided
-	filtered := allStrategies
-	if status != nil {
-		filtered = make([]*strategy.Strategy, 0)
-		for _, s := range allStrategies {
-			if s.Status == *status {
-				filtered = append(filtered, s)
-			}
-		}
+	// Get scope counts from service (uses SQL GROUP BY)
+	scopeCounts, err := r.StrategyService.GetStrategiesScopes(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
 	// Apply pagination
@@ -150,56 +239,36 @@ func (r *queryResolver) UserStrategies(ctx context.Context, userID uuid.UUID, st
 
 	items := filtered[offset:end]
 
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
-
-	// Convert to GraphQL types
-	edges := make([]*generated.StrategyEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.StrategyEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	return &generated.StrategyConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-	}, nil
+	// Build connection with scopes and filters using helper
+	return buildStrategyConnection(items, totalCount, params, offset, scopeCounts)
 }
 
 // Strategies is the resolver for the strategies field.
-func (r *queryResolver) Strategies(ctx context.Context, status *strategy.StrategyStatus, first *int, after *string, last *int, before *string) (*generated.StrategyConnection, error) {
+func (r *queryResolver) Strategies(ctx context.Context, scope *string, status *strategy.StrategyStatus, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*generated.StrategyConnection, error) {
 	// Get current user from context (auth middleware)
 	currentUser := middleware.UserFromContext(ctx)
 	if currentUser == nil {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 
-	// Get all strategies for current user
-	allStrategies, err := r.StrategyService.GetActiveStrategies(ctx, currentUser.ID)
+	// Use scope parameter if provided, otherwise fall back to legacy status parameter
+	effectiveScope := scope
+	if effectiveScope == nil && status != nil {
+		// Legacy support: map status to scope
+		statusStr := string(*status)
+		effectiveScope = &statusStr
+	}
+
+	// Get filtered strategies from service (uses SQL WHERE, not in-memory filtering)
+	filtered, err := r.StrategyService.GetStrategiesWithScope(ctx, currentUser.ID, effectiveScope, search, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get strategies: %w", err)
 	}
 
-	// Filter by status if provided
-	filtered := allStrategies
-	if status != nil {
-		filtered = make([]*strategy.Strategy, 0)
-		for _, s := range allStrategies {
-			if s.Status == *status {
-				filtered = append(filtered, s)
-			}
-		}
+	// Get scope counts from service (uses SQL GROUP BY)
+	scopeCounts, err := r.StrategyService.GetStrategiesScopes(ctx, currentUser.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
 	// Apply pagination
@@ -231,31 +300,8 @@ func (r *queryResolver) Strategies(ctx context.Context, status *strategy.Strateg
 
 	items := filtered[offset:end]
 
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
-
-	// Convert to GraphQL types
-	edges := make([]*generated.StrategyEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.StrategyEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	return &generated.StrategyConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-	}, nil
+	// Build connection with scopes and filters using helper
+	return buildStrategyConnection(items, totalCount, params, offset, scopeCounts)
 }
 
 // UserID is the resolver for the userID field.
@@ -303,18 +349,3 @@ func (r *strategyResolver) ReasoningLog(ctx context.Context, obj *strategy.Strat
 func (r *Resolver) Strategy() generated.StrategyResolver { return &strategyResolver{r} }
 
 type strategyResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *mutationResolver) DeleteManyStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
-	return r.StrategyService.DeleteManyStrategies(ctx, ids)
-}
-func (r *mutationResolver) DeleteManyStrategies(ctx context.Context, ids []uuid.UUID) (int, error) {
-	panic(fmt.Errorf("not implemented: DeleteManyStrategies - deleteManyStrategies"))
-}
-*/

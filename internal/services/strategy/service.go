@@ -323,6 +323,128 @@ func (s *Service) GetActiveStrategies(ctx context.Context, userID uuid.UUID) ([]
 	return s.domainService.GetActiveByUserID(ctx, userID)
 }
 
+// GetStrategiesWithScope returns strategies filtered by scope and additional filters
+// Scope is translated to status filter at repository level (SQL WHERE)
+// filters is a map of filter_id -> filter_value from GraphQL JSONObject input
+func (s *Service) GetStrategiesWithScope(ctx context.Context, userID uuid.UUID, scopeID *string, search *string, filters map[string]interface{}) ([]*strategy.Strategy, error) {
+	filter := strategy.FilterOptions{
+		UserID: &userID,
+		Search: search,
+	}
+
+	// Map scope to status filter
+	if scopeID != nil && *scopeID != "" && *scopeID != "all" {
+		switch *scopeID {
+		case "active":
+			status := strategy.StrategyActive
+			filter.Status = &status
+		case "paused":
+			status := strategy.StrategyPaused
+			filter.Status = &status
+		case "closed":
+			status := strategy.StrategyClosed
+			filter.Status = &status
+		default:
+			// Unknown scope, return all
+		}
+	}
+
+	// Apply additional filters from map
+	if filters != nil {
+		s.applyFiltersToOptions(&filter, filters)
+	}
+
+	return s.strategyRepo.GetWithFilter(ctx, filter)
+}
+
+// applyFiltersToOptions parses filters map and applies them to FilterOptions
+func (s *Service) applyFiltersToOptions(filter *strategy.FilterOptions, filters map[string]interface{}) {
+	for filterID, filterValue := range filters {
+		if filterValue == nil {
+			continue
+		}
+
+		switch filterID {
+		case "risk_tolerance":
+			if val, ok := filterValue.(string); ok {
+				rt := strategy.RiskTolerance(val)
+				filter.RiskTolerance = &rt
+			}
+
+		case "market_type":
+			if val, ok := filterValue.(string); ok {
+				mt := strategy.MarketType(val)
+				filter.MarketType = &mt
+			}
+
+		case "rebalance_frequency":
+			// Can be single value or array for multiselect
+			switch v := filterValue.(type) {
+			case string:
+				rf := strategy.RebalanceFrequency(v)
+				filter.RebalanceFrequency = &rf
+			case []interface{}:
+				filter.RebalanceFrequencies = make([]strategy.RebalanceFrequency, 0, len(v))
+				for _, item := range v {
+					if str, ok := item.(string); ok {
+						filter.RebalanceFrequencies = append(filter.RebalanceFrequencies, strategy.RebalanceFrequency(str))
+					}
+				}
+			}
+
+		case "min_capital":
+			if val, ok := filterValue.(float64); ok {
+				minCap := decimal.NewFromFloat(val)
+				filter.MinCapital = &minCap
+			}
+
+		case "max_capital":
+			if val, ok := filterValue.(float64); ok {
+				maxCap := decimal.NewFromFloat(val)
+				filter.MaxCapital = &maxCap
+			}
+
+		case "min_pnl_percent":
+			if val, ok := filterValue.(float64); ok {
+				minPnL := decimal.NewFromFloat(val)
+				filter.MinPnLPercent = &minPnL
+			}
+
+		case "max_pnl_percent":
+			if val, ok := filterValue.(float64); ok {
+				maxPnL := decimal.NewFromFloat(val)
+				filter.MaxPnLPercent = &maxPnL
+			}
+		}
+	}
+}
+
+// GetStrategiesScopes returns counts for each scope/status
+// Uses SQL GROUP BY for efficiency
+func (s *Service) GetStrategiesScopes(ctx context.Context, userID uuid.UUID) (map[string]int, error) {
+	// Get counts by status from repository (SQL GROUP BY)
+	statusCounts, err := s.strategyRepo.CountByStatus(ctx, userID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count strategies by status")
+	}
+
+	// Calculate total count for "all" scope
+	totalCount := 0
+	for _, count := range statusCounts {
+		totalCount += count
+	}
+
+	// Map status counts to scope IDs
+	result := map[string]int{
+		"all":    totalCount,
+		"active": statusCounts[strategy.StrategyActive],
+		"paused": statusCounts[strategy.StrategyPaused],
+		"closed": statusCounts[strategy.StrategyClosed],
+	}
+
+	return result, nil
+}
+
 // GetStrategyByID retrieves a strategy by ID
 // Delegates to domain service
 func (s *Service) GetStrategyByID(ctx context.Context, strategyID uuid.UUID) (*strategy.Strategy, error) {
@@ -617,4 +739,121 @@ func (s *Service) BatchDeleteStrategies(ctx context.Context, strategyIDs []uuid.
 	}
 
 	return deleted, nil
+}
+
+// BatchPauseStrategies pauses multiple strategies in batch
+// Returns the number of successfully paused strategies
+func (s *Service) BatchPauseStrategies(ctx context.Context, strategyIDs []uuid.UUID) (int, error) {
+	s.log.Infow("Batch pausing strategies",
+		"count", len(strategyIDs),
+	)
+
+	if len(strategyIDs) == 0 {
+		return 0, errors.ErrInvalidInput
+	}
+
+	paused := 0
+	var lastErr error
+
+	for _, strategyID := range strategyIDs {
+		if _, err := s.PauseStrategy(ctx, strategyID); err != nil {
+			s.log.Warnw("Failed to pause strategy in batch",
+				"strategy_id", strategyID,
+				"error", err,
+			)
+			lastErr = err
+			continue
+		}
+		paused++
+	}
+
+	s.log.Infow("Batch pause completed",
+		"paused", paused,
+		"total", len(strategyIDs),
+	)
+
+	// Return error only if all pauses failed
+	if paused == 0 && lastErr != nil {
+		return 0, lastErr
+	}
+
+	return paused, nil
+}
+
+// BatchResumeStrategies resumes multiple strategies in batch
+// Returns the number of successfully resumed strategies
+func (s *Service) BatchResumeStrategies(ctx context.Context, strategyIDs []uuid.UUID) (int, error) {
+	s.log.Infow("Batch resuming strategies",
+		"count", len(strategyIDs),
+	)
+
+	if len(strategyIDs) == 0 {
+		return 0, errors.ErrInvalidInput
+	}
+
+	resumed := 0
+	var lastErr error
+
+	for _, strategyID := range strategyIDs {
+		if _, err := s.ResumeStrategy(ctx, strategyID); err != nil {
+			s.log.Warnw("Failed to resume strategy in batch",
+				"strategy_id", strategyID,
+				"error", err,
+			)
+			lastErr = err
+			continue
+		}
+		resumed++
+	}
+
+	s.log.Infow("Batch resume completed",
+		"resumed", resumed,
+		"total", len(strategyIDs),
+	)
+
+	// Return error only if all resumes failed
+	if resumed == 0 && lastErr != nil {
+		return 0, lastErr
+	}
+
+	return resumed, nil
+}
+
+// BatchCloseStrategies closes multiple strategies in batch
+// Returns the number of successfully closed strategies
+func (s *Service) BatchCloseStrategies(ctx context.Context, strategyIDs []uuid.UUID) (int, error) {
+	s.log.Infow("Batch closing strategies",
+		"count", len(strategyIDs),
+	)
+
+	if len(strategyIDs) == 0 {
+		return 0, errors.ErrInvalidInput
+	}
+
+	closed := 0
+	var lastErr error
+
+	for _, strategyID := range strategyIDs {
+		if _, err := s.CloseStrategy(ctx, strategyID); err != nil {
+			s.log.Warnw("Failed to close strategy in batch",
+				"strategy_id", strategyID,
+				"error", err,
+			)
+			lastErr = err
+			continue
+		}
+		closed++
+	}
+
+	s.log.Infow("Batch close completed",
+		"closed", closed,
+		"total", len(strategyIDs),
+	)
+
+	// Return error only if all closes failed
+	if closed == 0 && lastErr != nil {
+		return 0, lastErr
+	}
+
+	return closed, nil
 }

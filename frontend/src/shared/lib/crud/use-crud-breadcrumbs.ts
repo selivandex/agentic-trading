@@ -139,7 +139,7 @@ export function useCrudBreadcrumbs<TEntity extends CrudEntity>(
     const shouldAutoGenerate = breadcrumbsConfig?.autoGenerate !== false;
 
     // Check for manual breadcrumbs based on mode
-    let manualItems = breadcrumbsConfig?.[mode];
+    const manualItems = breadcrumbsConfig?.[mode];
 
     if (manualItems && manualItems.length > 0) {
       // Use manual breadcrumbs

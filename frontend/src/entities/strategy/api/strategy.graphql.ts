@@ -62,7 +62,9 @@ export const GET_USER_STRATEGIES_QUERY = gql`
   ${STRATEGY_FRAGMENT}
   query GetUserStrategies(
     $userID: UUID!
+    $scope: String
     $status: StrategyStatus
+    $search: String
     $first: Int
     $after: String
     $last: Int
@@ -70,7 +72,9 @@ export const GET_USER_STRATEGIES_QUERY = gql`
   ) {
     userStrategies(
       userID: $userID
+      scope: $scope
       status: $status
+      search: $search
       first: $first
       after: $after
       last: $last
@@ -89,6 +93,22 @@ export const GET_USER_STRATEGIES_QUERY = gql`
         endCursor
       }
       totalCount
+      scopes {
+        id
+        name
+        count
+      }
+      filters {
+        id
+        name
+        type
+        options {
+          value
+          label
+        }
+        defaultValue
+        placeholder
+      }
     }
   }
 `;
@@ -97,14 +117,18 @@ export const GET_USER_STRATEGIES_QUERY = gql`
 export const GET_ALL_STRATEGIES_QUERY = gql`
   ${STRATEGY_WITH_USER_FRAGMENT}
   query GetAllStrategies(
+    $scope: String
     $status: StrategyStatus
+    $search: String
     $first: Int
     $after: String
     $last: Int
     $before: String
   ) {
     strategies(
+      scope: $scope
       status: $status
+      search: $search
       first: $first
       after: $after
       last: $last
@@ -123,6 +147,22 @@ export const GET_ALL_STRATEGIES_QUERY = gql`
         endCursor
       }
       totalCount
+      scopes {
+        id
+        name
+        count
+      }
+      filters {
+        id
+        name
+        type
+        options {
+          value
+          label
+        }
+        defaultValue
+        placeholder
+      }
     }
   }
 `;
@@ -181,5 +221,33 @@ export const CLOSE_STRATEGY_MUTATION = gql`
 export const DELETE_STRATEGY_MUTATION = gql`
   mutation DeleteStrategy($id: UUID!) {
     deleteStrategy(id: $id)
+  }
+`;
+
+// Batch delete strategies (hard delete, only for closed strategies)
+export const BATCH_DELETE_STRATEGIES_MUTATION = gql`
+  mutation BatchDeleteStrategies($ids: [UUID!]!) {
+    batchDeleteStrategies(ids: $ids)
+  }
+`;
+
+// Batch pause strategies
+export const BATCH_PAUSE_STRATEGIES_MUTATION = gql`
+  mutation BatchPauseStrategies($ids: [UUID!]!) {
+    batchPauseStrategies(ids: $ids)
+  }
+`;
+
+// Batch resume strategies
+export const BATCH_RESUME_STRATEGIES_MUTATION = gql`
+  mutation BatchResumeStrategies($ids: [UUID!]!) {
+    batchResumeStrategies(ids: $ids)
+  }
+`;
+
+// Batch close strategies
+export const BATCH_CLOSE_STRATEGIES_MUTATION = gql`
+  mutation BatchCloseStrategies($ids: [UUID!]!) {
+    batchCloseStrategies(ids: $ids)
   }
 `;

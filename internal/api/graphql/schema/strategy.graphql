@@ -97,6 +97,16 @@ type StrategyConnection {
   Total count of items (if available)
   """
   totalCount: Int!
+
+  """
+  Available filter scopes with counts
+  """
+  scopes: [Scope!]!
+
+  """
+  Available dynamic filters
+  """
+  filters: [Filter!]!
 }
 
 input CreateStrategyInput {
@@ -125,7 +135,10 @@ extend type Query {
   # Get strategies for a specific user
   userStrategies(
     userID: UUID!
-    status: StrategyStatus
+    scope: String
+    status: StrategyStatus @deprecated(reason: "Use scope parameter instead")
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
@@ -134,7 +147,10 @@ extend type Query {
 
   # Get strategies for current user
   strategies(
-    status: StrategyStatus
+    scope: String
+    status: StrategyStatus @deprecated(reason: "Use scope parameter instead")
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
@@ -164,4 +180,13 @@ extend type Mutation {
 
   # Batch delete strategies (hard delete, only for closed strategies)
   batchDeleteStrategies(ids: [UUID!]!): Int!
+
+  # Batch pause strategies
+  batchPauseStrategies(ids: [UUID!]!): Int!
+
+  # Batch resume strategies
+  batchResumeStrategies(ids: [UUID!]!): Int!
+
+  # Batch close strategies
+  batchCloseStrategies(ids: [UUID!]!): Int!
 }

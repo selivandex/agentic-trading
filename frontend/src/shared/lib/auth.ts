@@ -33,7 +33,7 @@ export const authConfig: NextAuthConfig = {
 
           // Use raw GraphQL string instead of generated document for server-side compatibility
           const LOGIN_MUTATION = gql`
-            mutation Login($email: String!, $password: String!) {
+            mutation LoginServer($email: String!, $password: String!) {
               login(input: { email: $email, password: $password }) {
                 token
                 user {

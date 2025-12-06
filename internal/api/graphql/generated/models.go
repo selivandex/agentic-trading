@@ -3,10 +3,14 @@
 package generated
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"prometheus/internal/domain/agent"
 	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/internal/domain/strategy"
 	"prometheus/internal/domain/user"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -91,6 +95,37 @@ type CreateUserInput struct {
 	Settings         *SettingsInput `json:"settings,omitempty"`
 }
 
+// Filter represents a dynamic filter definition
+type Filter struct {
+	// Unique identifier for the filter
+	ID string `json:"id"`
+	// Human-readable name for the filter
+	Name string `json:"name"`
+	// Type of filter input
+	Type FilterType `json:"type"`
+	// Static options for select/multiselect filters
+	// If optionsQuery is specified, this field should be null
+	Options []*FilterOption `json:"options,omitempty"`
+	// GraphQL query name to fetch dynamic options
+	// Example: "users" will call users query to get list of users
+	OptionsQuery *string `json:"optionsQuery,omitempty"`
+	// Arguments to pass to optionsQuery (JSON)
+	// Example: {"role": "ADMIN"}
+	OptionsQueryArgs map[string]any `json:"optionsQueryArgs,omitempty"`
+	// Default value (optional)
+	DefaultValue *string `json:"defaultValue,omitempty"`
+	// Placeholder text (optional)
+	Placeholder *string `json:"placeholder,omitempty"`
+}
+
+// FilterOption represents an option for select/multiselect filters
+type FilterOption struct {
+	// Value of the option
+	Value string `json:"value"`
+	// Display label for the option
+	Label string `json:"label"`
+}
+
 // Common input arguments for forward pagination
 type ForwardPaginationInput struct {
 	// Returns the first n elements from the list
@@ -107,6 +142,10 @@ type FundWatchlistConnection struct {
 	PageInfo *PageInfo `json:"pageInfo"`
 	// Total count of items (if available)
 	TotalCount int `json:"totalCount"`
+	// Available filter scopes with counts
+	Scopes []*Scope `json:"scopes"`
+	// Available dynamic filters
+	Filters []*Filter `json:"filters"`
 }
 
 // Edge type for FundWatchlist
@@ -147,6 +186,16 @@ type RegisterInput struct {
 	LastName  string `json:"lastName"`
 }
 
+// Scope represents a filter/tab with item count
+type Scope struct {
+	// Unique identifier for the scope
+	ID string `json:"id"`
+	// Human-readable name for the scope
+	Name string `json:"name"`
+	// Number of items that match this scope
+	Count int `json:"count"`
+}
+
 type SettingsInput struct {
 	DefaultAIProvider   *string  `json:"defaultAIProvider,omitempty"`
 	DefaultAIModel      *string  `json:"defaultAIModel,omitempty"`
@@ -174,6 +223,10 @@ type StrategyConnection struct {
 	PageInfo *PageInfo `json:"pageInfo"`
 	// Total count of items (if available)
 	TotalCount int `json:"totalCount"`
+	// Available filter scopes with counts
+	Scopes []*Scope `json:"scopes"`
+	// Available dynamic filters
+	Filters []*Filter `json:"filters"`
 }
 
 // Edge type for Strategy
@@ -264,4 +317,72 @@ type UserEdge struct {
 	Node *user.User `json:"node"`
 	// A cursor for use in pagination
 	Cursor string `json:"cursor"`
+}
+
+// FilterType represents the type of filter input
+type FilterType string
+
+const (
+	FilterTypeText        FilterType = "TEXT"
+	FilterTypeNumber      FilterType = "NUMBER"
+	FilterTypeDate        FilterType = "DATE"
+	FilterTypeSelect      FilterType = "SELECT"
+	FilterTypeMultiselect FilterType = "MULTISELECT"
+	FilterTypeBoolean     FilterType = "BOOLEAN"
+	FilterTypeDateRange   FilterType = "DATE_RANGE"
+	FilterTypeNumberRange FilterType = "NUMBER_RANGE"
+)
+
+var AllFilterType = []FilterType{
+	FilterTypeText,
+	FilterTypeNumber,
+	FilterTypeDate,
+	FilterTypeSelect,
+	FilterTypeMultiselect,
+	FilterTypeBoolean,
+	FilterTypeDateRange,
+	FilterTypeNumberRange,
+}
+
+func (e FilterType) IsValid() bool {
+	switch e {
+	case FilterTypeText, FilterTypeNumber, FilterTypeDate, FilterTypeSelect, FilterTypeMultiselect, FilterTypeBoolean, FilterTypeDateRange, FilterTypeNumberRange:
+		return true
+	}
+	return false
+}
+
+func (e FilterType) String() string {
+	return string(e)
+}
+
+func (e *FilterType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FilterType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FilterType", str)
+	}
+	return nil
+}
+
+func (e FilterType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FilterType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FilterType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

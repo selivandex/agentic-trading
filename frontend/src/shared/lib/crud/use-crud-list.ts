@@ -15,8 +15,17 @@ export function useCrudList<TEntity extends CrudEntity>(
   state: CrudState<TEntity>
 ) {
   // Fetch data
-  const { entities, pageInfo, totalCount, loading, error, refetch, fetchMore } =
-    useCrudListQuery<TEntity>(config, state);
+  const {
+    entities,
+    pageInfo,
+    totalCount,
+    scopes,
+    filters,
+    loading,
+    error,
+    refetch,
+    fetchMore,
+  } = useCrudListQuery<TEntity>(config, state);
 
   // Table columns
   const columns = useMemo(() => {
@@ -38,10 +47,11 @@ export function useCrudList<TEntity extends CrudEntity>(
     columns,
     pageInfo,
     totalCount,
+    scopes,
+    filters,
     loading,
     error,
     refetch,
     fetchMore,
   };
 }
-

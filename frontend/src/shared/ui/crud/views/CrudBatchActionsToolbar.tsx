@@ -47,24 +47,31 @@ export function CrudBatchActionsToolbar<TEntity extends CrudEntity>({
       </div>
 
       <div className="flex items-center gap-2">
-        {config.bulkActions.map((action) => (
-          <Button
-            key={action.key}
-            size="sm"
-            color={action.destructive ? "secondary-destructive" : "secondary"}
-            iconLeading={action.icon}
-            onClick={() => onExecuteAction(action.key)}
-            isDisabled={
-              action.disabled
-                ? selectedEntities.some((entity) => action.disabled?.(entity))
-                : false
+        {config.bulkActions
+          .filter((action) => {
+            // Check if action should be hidden for batch
+            if (action.hiddenForBatch) {
+              return !action.hiddenForBatch(selectedEntities);
             }
-          >
-            {action.label}
-          </Button>
-        ))}
+            return true;
+          })
+          .map((action) => (
+            <Button
+              key={action.key}
+              size="sm"
+              color={action.destructive ? "secondary-destructive" : "secondary"}
+              iconLeading={action.icon}
+              onClick={() => onExecuteAction(action.key)}
+              isDisabled={
+                action.disabled
+                  ? selectedEntities.some((entity) => action.disabled?.(entity))
+                  : false
+              }
+            >
+              {action.label}
+            </Button>
+          ))}
       </div>
     </div>
   );
 }
-

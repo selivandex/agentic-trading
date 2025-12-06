@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { TableCard } from "@/components/application/table/table";
 import { Button } from "@/shared/base/buttons/button";
 import { useCrudContext } from "@/shared/lib/crud/context";
@@ -19,6 +19,8 @@ import { CrudLoadingState } from "./views/CrudLoadingState";
 import { CrudEmptyState } from "./views/CrudEmptyState";
 import { CrudErrorState } from "./views/CrudErrorState";
 import { CrudPagination } from "./views/CrudPagination";
+import { CrudTabs } from "./views/CrudTabs";
+import { CrudDynamicFilters } from "./views/CrudDynamicFilters";
 
 /**
  * CRUD List Component
@@ -41,6 +43,8 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
     columns,
     pageInfo,
     totalCount,
+    scopes,
+    filters,
     loading,
     error,
     refetch,
@@ -72,6 +76,26 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
 
   // Breadcrumbs
   const breadcrumbs = useCrudBreadcrumbs<TEntity>(config, "index");
+
+  // Auto-select default scope when scopes are loaded
+  useEffect(() => {
+    if (
+      config.tabs?.enabled &&
+      scopes &&
+      scopes.length > 0 &&
+      !state.activeTab
+    ) {
+      // Find configured default scope or use first scope
+      const defaultScopeId = config.tabs.defaultScope;
+      const defaultScope = defaultScopeId
+        ? scopes.find((s) => s.id === defaultScopeId)
+        : scopes[0];
+      
+      if (defaultScope) {
+        actions.setActiveTab(defaultScope.id);
+      }
+    }
+  }, [scopes, state.activeTab, config.tabs?.enabled, config.tabs?.defaultScope, actions]);
 
   // Load more handler
   const handleLoadMore = useCallback(async () => {
@@ -108,6 +132,8 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
 
   const hasSelection = state.selectedEntities.length > 0;
   const paddingClasses = "px-4 lg:px-8";
+  const hasFilters =
+    config.dynamicFilters?.enabled && filters && filters.length > 0;
 
   return (
     <div className="mx-auto mb-8 flex flex-col gap-5">
@@ -135,58 +161,100 @@ export function CrudList<TEntity extends CrudEntity = CrudEntity>({
         </PageHeader.Actions>
       </PageHeader>
 
-      <div className={paddingClasses}>
-        <TableCard.Root>
-          {/* Batch Actions Toolbar */}
-          {hasSelection && (
-            <CrudBatchActionsToolbar
-              config={config}
-              selectedCount={state.selectedEntities.length}
-              selectedEntities={state.selectedEntities}
-              onClearSelection={clearSelection}
-              onExecuteAction={executeBatchAction}
-            />
-          )}
+      {/* Tabs for filtering (rendered if backend provides scopes) */}
+      {config.tabs?.enabled && scopes && scopes.length > 0 && (
+        <div className={paddingClasses}>
+          <CrudTabs
+            config={config.tabs}
+            activeScope={state.activeTab}
+            scopes={scopes}
+            onScopeChange={actions.setActiveTab}
+          />
+        </div>
+      )}
 
-          {/* Loading State */}
-          {loading && !entities.length ? (
-            <CrudLoadingState />
-          ) : entities.length === 0 ? (
-            /* Empty State */
-            <CrudEmptyState config={config} onNew={() => actions.goToNew()} />
-          ) : (
-            /* Data View */
-            <>
-              {style === "table" && (
-                <CrudTableView
+      {/* Main content with optional sidebar */}
+      <div className={paddingClasses}>
+        <div className={hasFilters ? "flex gap-6" : ""}>
+          {/* Main content area */}
+          <div className={hasFilters ? "flex-1 min-w-0" : "w-full"}>
+            <TableCard.Root>
+              {/* Batch Actions Toolbar */}
+              {hasSelection && (
+                <CrudBatchActionsToolbar
                   config={config}
-                  state={state}
-                  rows={rows}
-                  columns={columns}
-                  onSelectionChange={handleSelectionChange}
-                  onSortChange={handleSortChange}
-                  onEdit={(id) => actions.goToEdit(id)}
-                  onShow={(id) => actions.goToShow(id)}
-                  onDelete={handleDelete}
-                  destroyLoading={destroyLoading}
+                  selectedCount={state.selectedEntities.length}
+                  selectedEntities={state.selectedEntities}
+                  onClearSelection={clearSelection}
+                  onExecuteAction={executeBatchAction}
                 />
               )}
-              {/* Future: Add grid view (style="grid"), cards view (style="cards"), etc. */}
-            </>
-          )}
-        </TableCard.Root>
 
-        {/* Pagination */}
-        {entities.length > 0 && (
-          <CrudPagination
-            pageInfo={pageInfo}
-            totalCount={totalCount}
-            currentCount={entities.length}
-            pageSize={state.pageSize}
-            loading={loading}
-            onLoadMore={handleLoadMore}
-          />
-        )}
+              {/* Loading State */}
+              {loading && !entities.length ? (
+                <CrudLoadingState />
+              ) : entities.length === 0 ? (
+                /* Empty State */
+                <CrudEmptyState config={config} onNew={() => actions.goToNew()} />
+              ) : (
+                /* Data View */
+                <>
+                  {style === "table" && (
+                    <CrudTableView
+                      config={config}
+                      state={state}
+                      rows={rows}
+                      columns={columns}
+                      onSelectionChange={handleSelectionChange}
+                      onSortChange={handleSortChange}
+                      onEdit={(id) => actions.goToEdit(id)}
+                      onShow={(id) => actions.goToShow(id)}
+                      onDelete={handleDelete}
+                      destroyLoading={destroyLoading}
+                    />
+                  )}
+                  {/* Future: Add grid view (style="grid"), cards view (style="cards"), etc. */}
+                </>
+              )}
+            </TableCard.Root>
+
+            {/* Pagination */}
+            {entities.length > 0 && (
+              <CrudPagination
+                pageInfo={pageInfo}
+                totalCount={totalCount}
+                currentCount={entities.length}
+                pageSize={state.pageSize}
+                loading={loading}
+                onLoadMore={handleLoadMore}
+              />
+            )}
+          </div>
+
+          {/* Right Sidebar - Dynamic Filters */}
+          {hasFilters && (
+            <aside className="w-80 flex-shrink-0">
+              <div className="sticky top-4">
+                <div className="rounded-lg border border-border-secondary bg-primary p-6">
+                  <h3 className="mb-4 text-lg font-semibold text-secondary">
+                    Filters
+                  </h3>
+                  <CrudDynamicFilters
+                    config={config.dynamicFilters!}
+                    filters={filters}
+                    values={state.filters}
+                    onChange={(filterId, value) => {
+                      actions.setFilters({
+                        ...state.filters,
+                        [filterId]: value,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </aside>
+          )}
+        </div>
       </div>
     </div>
   );

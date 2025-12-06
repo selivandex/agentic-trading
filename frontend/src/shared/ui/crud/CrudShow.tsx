@@ -31,7 +31,11 @@ export function CrudShow<TEntity extends CrudEntity = CrudEntity>({
   const { formatFieldValue } = useCrudFieldFormatter();
 
   // Breadcrumbs
-  const breadcrumbs = useCrudBreadcrumbs<TEntity>(config, "show", entity ?? undefined);
+  const breadcrumbs = useCrudBreadcrumbs<TEntity>(
+    config,
+    "show",
+    entity ?? undefined
+  );
 
   const paddingClasses = "px-4 lg:px-8";
 

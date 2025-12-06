@@ -21,9 +21,15 @@ export function useCrudBatchActions<TEntity extends CrudEntity>(
       const action = config.bulkActions?.find((a) => a.key === actionKey);
       if (!action) return;
 
-      // Execute action for all selected entities
-      for (const entity of selectedEntities) {
-        await action.onClick(entity);
+      // Use batch handler if available, otherwise fallback to individual calls
+      if (action.onBatchClick) {
+        // Execute batch action once for all entities
+        await action.onBatchClick(selectedEntities);
+      } else {
+        // Fallback: execute action for each entity individually
+        for (const entity of selectedEntities) {
+          await action.onClick(entity);
+        }
       }
 
       // Clear selection and refetch
@@ -37,4 +43,3 @@ export function useCrudBatchActions<TEntity extends CrudEntity>(
     executeBatchAction,
   };
 }
-

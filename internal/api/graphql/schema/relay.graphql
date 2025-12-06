@@ -57,3 +57,100 @@ input BackwardPaginationInput {
   """
   before: String
 }
+
+"""
+Scope represents a filter/tab with item count
+"""
+type Scope {
+  """
+  Unique identifier for the scope
+  """
+  id: String!
+
+  """
+  Human-readable name for the scope
+  """
+  name: String!
+
+  """
+  Number of items that match this scope
+  """
+  count: Int!
+}
+
+"""
+FilterType represents the type of filter input
+"""
+enum FilterType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTISELECT
+  BOOLEAN
+  DATE_RANGE
+  NUMBER_RANGE
+}
+
+"""
+FilterOption represents an option for select/multiselect filters
+"""
+type FilterOption {
+  """
+  Value of the option
+  """
+  value: String!
+
+  """
+  Display label for the option
+  """
+  label: String!
+}
+
+"""
+Filter represents a dynamic filter definition
+"""
+type Filter {
+  """
+  Unique identifier for the filter
+  """
+  id: String!
+
+  """
+  Human-readable name for the filter
+  """
+  name: String!
+
+  """
+  Type of filter input
+  """
+  type: FilterType!
+
+  """
+  Static options for select/multiselect filters
+  If optionsQuery is specified, this field should be null
+  """
+  options: [FilterOption!]
+
+  """
+  GraphQL query name to fetch dynamic options
+  Example: "users" will call users query to get list of users
+  """
+  optionsQuery: String
+
+  """
+  Arguments to pass to optionsQuery (JSON)
+  Example: {"role": "ADMIN"}
+  """
+  optionsQueryArgs: JSONObject
+
+  """
+  Default value (optional)
+  """
+  defaultValue: String
+
+  """
+  Placeholder text (optional)
+  """
+  placeholder: String
+}

@@ -103,12 +103,73 @@ export interface Edge<TEntity> {
 }
 
 /**
+ * Scope from backend (used for tabs)
+ * Matches GraphQL Scope type from backend
+ */
+export interface Scope {
+  /** Unique identifier for the scope */
+  id: string;
+  /** Human-readable name for the scope */
+  name: string;
+  /** Number of items that match this scope */
+  count: number;
+}
+
+/**
+ * Filter type from backend
+ * Matches GraphQL FilterType enum
+ */
+export type FilterType =
+  | "TEXT"
+  | "NUMBER"
+  | "DATE"
+  | "SELECT"
+  | "MULTISELECT"
+  | "BOOLEAN"
+  | "DATE_RANGE"
+  | "NUMBER_RANGE";
+
+/**
+ * Filter option from backend
+ * Matches GraphQL FilterOption type
+ */
+export interface FilterOption {
+  /** Value of the option */
+  value: string;
+  /** Display label for the option */
+  label: string;
+}
+
+/**
+ * Filter metadata from backend
+ * Matches GraphQL Filter type
+ */
+export interface FilterMetadata {
+  /** Unique identifier for the filter */
+  id: string;
+  /** Human-readable name for the filter */
+  name: string;
+  /** Type of filter input */
+  type: FilterType;
+  /** Options for select/multiselect filters */
+  options?: FilterOption[];
+  /** Default value (optional) */
+  defaultValue?: string;
+  /** Placeholder text (optional) */
+  placeholder?: string;
+}
+
+/**
  * Relay Connection
  */
 export interface Connection<TEntity> {
   edges: Edge<TEntity>[];
   pageInfo: PageInfo;
   totalCount?: number;
+  /** Available filter scopes with counts (optional) */
+  scopes?: Scope[];
+  /** Available dynamic filters (optional) */
+  filters?: FilterMetadata[];
 }
 
 /**
@@ -130,30 +191,56 @@ export interface CrudGraphQLConfig<
     dataPath: string;
     /** Whether this query uses Relay connections (default: true) */
     useConnection?: boolean;
+    /**
+     * Scope variables that are always included in list queries
+     * These are merged with pagination/filter/search variables
+     * Example: { userID: "123" } to filter by user
+     */
+    scope?: Record<string, unknown> | (() => Record<string, unknown>);
   };
   /** Query for fetching single entity */
   show: {
     query: DocumentNode;
     variables: TShowVariables;
     dataPath: string;
+    /**
+     * Scope variables that are always included in show queries
+     * Example: { userID: "123" } to ensure user owns the entity
+     */
+    scope?: Record<string, unknown> | (() => Record<string, unknown>);
   };
   /** Mutation for creating entity */
   create: {
     mutation: DocumentNode;
     variables: TCreateVariables;
     dataPath: string;
+    /**
+     * Scope variables that are always included in create mutations
+     * Example: { userID: "123" } to auto-assign ownership
+     */
+    scope?: Record<string, unknown> | (() => Record<string, unknown>);
   };
   /** Mutation for updating entity */
   update: {
     mutation: DocumentNode;
     variables: TUpdateVariables;
     dataPath: string;
+    /**
+     * Scope variables that are always included in update mutations
+     * Example: { userID: "123" } to ensure user owns the entity
+     */
+    scope?: Record<string, unknown> | (() => Record<string, unknown>);
   };
   /** Mutation for deleting entity (optional) */
   destroy?: {
     mutation: DocumentNode;
     variables: TDeleteVariables;
     dataPath: string;
+    /**
+     * Scope variables that are always included in destroy mutations
+     * Example: { userID: "123" } to ensure user owns the entity
+     */
+    scope?: Record<string, unknown> | (() => Record<string, unknown>);
   };
 }
 
@@ -167,14 +254,18 @@ export interface CrudAction<TEntity extends CrudEntity = CrudEntity> {
   label: string;
   /** Icon component (must be a React component, not JSX) */
   icon?: React.FC<{ className?: string }>;
-  /** Action handler */
+  /** Action handler for single entity (used in row actions and fallback for bulk) */
   onClick: (entity: TEntity) => void | Promise<void>;
+  /** Batch action handler for multiple entities (optional, for bulk operations) */
+  onBatchClick?: (entities: TEntity[]) => void | Promise<void>;
   /** Whether action is destructive */
   destructive?: boolean;
   /** Whether action is disabled */
   disabled?: (entity: TEntity) => boolean;
-  /** Whether action is hidden */
+  /** Whether action is hidden for single entity */
   hidden?: (entity: TEntity) => boolean;
+  /** Whether action is hidden for batch (receives all selected entities) */
+  hiddenForBatch?: (entities: TEntity[]) => boolean;
 }
 
 /**
@@ -232,7 +323,8 @@ export interface CrudBreadcrumbsConfig<TEntity extends CrudEntity = CrudEntity> 
 }
 
 /**
- * Filter configuration
+ * Filter configuration (DEPRECATED - use dynamic filters from backend)
+ * @deprecated Use dynamic filters from backend via Connection.filters
  */
 export interface CrudFilter {
   /** Filter key */
@@ -250,6 +342,55 @@ export interface CrudFilter {
     value: unknown;
     onChange: (value: unknown) => void;
   }) => ReactNode;
+}
+
+/**
+ * Dynamic filters configuration
+ * Filters come from backend, this is just display config
+ */
+export interface CrudDynamicFiltersConfig {
+  /** Whether dynamic filters are enabled */
+  enabled: boolean;
+  /** Custom render function for specific filter types (optional) */
+  customRenderer?: (
+    filter: FilterMetadata,
+    value: unknown,
+    onChange: (value: unknown) => void
+  ) => ReactNode;
+}
+
+/**
+ * Tabs configuration for list view
+ * Tabs data comes from backend as scopes, this is just display config
+ */
+export interface CrudTabsConfig {
+  /** Whether tabs are enabled */
+  enabled: boolean;
+  /** Tab style type */
+  type?: "button-brand" | "button-gray" | "button-border" | "button-minimal" | "underline";
+  /** Tab size */
+  size?: "sm" | "md";
+  /** Full width tabs */
+  fullWidth?: boolean;
+  /**
+   * GraphQL variable name for active tab filter
+   * This variable will be passed to list query with active scope id
+   * Example: "status", "scope", "filter"
+   * @default "scope"
+   */
+  filterVariable?: string;
+  /**
+   * Default scope ID to select (optional)
+   * If not provided, first scope will be selected
+   * Example: "all", "active"
+   */
+  defaultScope?: string;
+  /**
+   * Icon mapping function (optional)
+   * Maps scope id to React icon component
+   * Example: (scopeId) => scopeId === 'active' ? ActiveIcon : DefaultIcon
+   */
+  iconMapper?: (scopeId: string) => React.FC<{ className?: string }> | undefined;
 }
 
 /**
@@ -276,8 +417,18 @@ export interface CrudConfig<TEntity extends CrudEntity = CrudEntity> {
   showActions?: CrudAction<TEntity>[];
   /** Bulk actions for selected rows */
   bulkActions?: CrudAction<TEntity>[];
-  /** Filters for list view */
+  /** Filters for list view (DEPRECATED - use dynamicFilters) */
   filters?: CrudFilter[];
+  /** 
+   * Tabs configuration for list view (optional)
+   * Tabs data (labels, counts) come from backend in list query response
+   */
+  tabs?: CrudTabsConfig;
+  /**
+   * Dynamic filters configuration (optional)
+   * Filter definitions come from backend in list query response
+   */
+  dynamicFilters?: CrudDynamicFiltersConfig;
   /** Breadcrumbs configuration */
   breadcrumbs?: CrudBreadcrumbsConfig<TEntity>;
   /** Custom empty state message */
@@ -332,6 +483,8 @@ export interface CrudState<TEntity extends CrudEntity = CrudEntity> {
   totalCount?: number;
   /** Page info from Relay */
   pageInfo?: PageInfo;
+  /** Active tab key (if tabs are enabled) */
+  activeTab?: string;
 }
 
 /**
@@ -364,6 +517,8 @@ export interface CrudActions<TEntity extends CrudEntity = CrudEntity> {
   setSort: (column: string, direction: "asc" | "desc") => void;
   /** Update search query */
   setSearchQuery: (query: string) => void;
+  /** Set active tab */
+  setActiveTab: (tabKey: string) => void;
   /** Refresh data */
   refresh: () => Promise<void>;
   /** Update pagination state from query results */

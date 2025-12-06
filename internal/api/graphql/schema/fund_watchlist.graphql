@@ -57,6 +57,16 @@ type FundWatchlistConnection {
   Total count of items (if available)
   """
   totalCount: Int!
+
+  """
+  Available filter scopes with counts
+  """
+  scopes: [Scope!]!
+
+  """
+  Available dynamic filters
+  """
+  filters: [Filter!]!
 }
 
 input CreateFundWatchlistInput {
@@ -96,7 +106,8 @@ extend type Query {
 
   # Get all watchlist items (Relay Connection)
   fundWatchlistsConnection(
-    isActive: Boolean
+    scope: String
+    isActive: Boolean @deprecated(reason: "Use scope parameter instead")
     category: String
     tier: Int
     first: Int
@@ -107,6 +118,7 @@ extend type Query {
 
   # Get monitored symbols (active and not paused, Relay Connection)
   monitoredSymbolsConnection(
+    scope: String
     marketType: String
     first: Int
     after: String
