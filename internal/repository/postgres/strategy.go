@@ -31,23 +31,23 @@ func (r *StrategyRepository) Create(ctx context.Context, s *strategy.Strategy) e
 		INSERT INTO user_strategies (
 			id, user_id, name, description, status,
 			allocated_capital, current_equity, cash_reserve,
-			risk_tolerance, rebalance_frequency, target_allocations,
+			market_type, risk_tolerance, rebalance_frequency, target_allocations,
 			total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
 			created_at, updated_at, closed_at, last_rebalanced_at,
 			reasoning_log
 		) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8,
-			$9, $10, $11,
-			$12, $13, $14, $15, $16,
-			$17, $18, $19, $20,
-			$21
+			$9, $10, $11, $12,
+			$13, $14, $15, $16, $17,
+			$18, $19, $20, $21,
+			$22
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		s.ID, s.UserID, s.Name, s.Description, s.Status,
 		s.AllocatedCapital, s.CurrentEquity, s.CashReserve,
-		s.RiskTolerance, s.RebalanceFrequency, s.TargetAllocations,
+		s.MarketType, s.RiskTolerance, s.RebalanceFrequency, s.TargetAllocations,
 		s.TotalPnL, s.TotalPnLPercent, s.SharpeRatio, s.MaxDrawdown, s.WinRate,
 		s.CreatedAt, s.UpdatedAt, s.ClosedAt, s.LastRebalancedAt,
 		s.ReasoningLog,
@@ -67,7 +67,7 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*strate
 	query := `
 		SELECT id, user_id, name, description, status,
 			   allocated_capital, current_equity, cash_reserve,
-			   risk_tolerance, rebalance_frequency, target_allocations,
+			   market_type, risk_tolerance, rebalance_frequency, target_allocations,
 			   total_pnl, total_pnl_percent, sharpe_ratio, max_drawdown, win_rate,
 			   created_at, updated_at, closed_at, last_rebalanced_at,
 			   reasoning_log
@@ -295,6 +295,27 @@ func (r *StrategyRepository) GetWithFilter(ctx context.Context, filter strategy.
 	if filter.MaxPnLPercent != nil {
 		query += ` AND total_pnl_percent <= $` + fmt.Sprintf("%d", argIdx)
 		args = append(args, *filter.MaxPnLPercent)
+		argIdx++
+	}
+
+	// Add created_at_from filter
+	if filter.CreatedAtFrom != nil {
+		query += ` AND created_at >= $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.CreatedAtFrom)
+		argIdx++
+	}
+
+	// Add created_at_to filter
+	if filter.CreatedAtTo != nil {
+		query += ` AND created_at <= $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.CreatedAtTo)
+		argIdx++
+	}
+
+	// Add filter_user_id filter (different from UserID which is always set)
+	if filter.FilterUserID != nil {
+		query += ` AND user_id = $` + fmt.Sprintf("%d", argIdx)
+		args = append(args, *filter.FilterUserID)
 		argIdx++
 	}
 

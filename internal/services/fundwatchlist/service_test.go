@@ -103,6 +103,58 @@ func (m *MockDomainService) Resume(ctx context.Context, symbol, marketType strin
 	return nil
 }
 
+// MockRepository is a mock for fundwatchlist repository
+type MockRepository struct {
+	getWithFiltersFunc func(context.Context, fundwatchlist.FilterOptions) ([]*fundwatchlist.Watchlist, error)
+	countByScopeFunc   func(context.Context) (map[string]int, error)
+}
+
+func (m *MockRepository) Create(ctx context.Context, entry *fundwatchlist.Watchlist) error {
+	return nil
+}
+
+func (m *MockRepository) GetByID(ctx context.Context, id uuid.UUID) (*fundwatchlist.Watchlist, error) {
+	return nil, errors.ErrNotFound
+}
+
+func (m *MockRepository) GetBySymbol(ctx context.Context, symbol, marketType string) (*fundwatchlist.Watchlist, error) {
+	return nil, errors.ErrNotFound
+}
+
+func (m *MockRepository) GetActive(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
+	return []*fundwatchlist.Watchlist{}, nil
+}
+
+func (m *MockRepository) GetAll(ctx context.Context) ([]*fundwatchlist.Watchlist, error) {
+	return []*fundwatchlist.Watchlist{}, nil
+}
+
+func (m *MockRepository) GetWithFilters(ctx context.Context, filter fundwatchlist.FilterOptions) ([]*fundwatchlist.Watchlist, error) {
+	if m.getWithFiltersFunc != nil {
+		return m.getWithFiltersFunc(ctx, filter)
+	}
+	return []*fundwatchlist.Watchlist{}, nil
+}
+
+func (m *MockRepository) CountByScope(ctx context.Context) (map[string]int, error) {
+	if m.countByScopeFunc != nil {
+		return m.countByScopeFunc(ctx)
+	}
+	return map[string]int{}, nil
+}
+
+func (m *MockRepository) Update(ctx context.Context, entry *fundwatchlist.Watchlist) error {
+	return nil
+}
+
+func (m *MockRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (m *MockRepository) IsActive(ctx context.Context, symbol, marketType string) (bool, error) {
+	return false, nil
+}
+
 func TestService_GetByID(t *testing.T) {
 	id := uuid.New()
 	expected := &fundwatchlist.Watchlist{
@@ -122,7 +174,8 @@ func TestService_GetByID(t *testing.T) {
 	}
 
 	log := testLogger()
-	svc := NewService(mockDomainSvc, log)
+	mockRepo := &MockRepository{}
+	svc := NewService(mockDomainSvc, mockRepo, log)
 
 	result, err := svc.GetByID(context.Background(), id)
 
@@ -151,7 +204,8 @@ func TestService_GetBySymbol(t *testing.T) {
 	}
 
 	log := testLogger()
-	svc := NewService(mockDomainSvc, log)
+	mockRepo := &MockRepository{}
+	svc := NewService(mockDomainSvc, mockRepo, log)
 
 	result, err := svc.GetBySymbol(context.Background(), symbol, marketType)
 
@@ -225,10 +279,11 @@ func TestService_GetMonitored(t *testing.T) {
 				},
 			}
 
-			log := testLogger()
-			svc := NewService(mockDomainSvc, log)
+		log := testLogger()
+		mockRepo := &MockRepository{}
+		svc := NewService(mockDomainSvc, mockRepo, log)
 
-			result, err := svc.GetMonitored(context.Background(), tt.marketType)
+		result, err := svc.GetMonitored(context.Background(), tt.marketType)
 
 			assert.NoError(t, err)
 			assert.Len(t, result, tt.expected)
@@ -246,7 +301,8 @@ func TestService_CreateWatchlist(t *testing.T) {
 	}
 
 	log := testLogger()
-	svc := NewService(mockDomainSvc, log)
+	mockRepo := &MockRepository{}
+	svc := NewService(mockDomainSvc, mockRepo, log)
 
 	params := CreateWatchlistParams{
 		Symbol:     "BTC/USDT",
@@ -308,10 +364,11 @@ func TestService_TogglePause(t *testing.T) {
 				},
 			}
 
-			log := testLogger()
-			svc := NewService(mockDomainSvc, log)
+		log := testLogger()
+		mockRepo := &MockRepository{}
+		svc := NewService(mockDomainSvc, mockRepo, log)
 
-			result, err := svc.TogglePause(context.Background(), id, tt.isPaused, tt.reason)
+		result, err := svc.TogglePause(context.Background(), id, tt.isPaused, tt.reason)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.isPaused, result.IsPaused)
@@ -334,7 +391,8 @@ func TestService_DeleteWatchlist(t *testing.T) {
 	}
 
 	log := testLogger()
-	svc := NewService(mockDomainSvc, log)
+	mockRepo := &MockRepository{}
+	svc := NewService(mockDomainSvc, mockRepo, log)
 
 	err := svc.DeleteWatchlist(context.Background(), id)
 

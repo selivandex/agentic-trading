@@ -1,15 +1,18 @@
 /** @format */
 
-import { useQuery, useMutation } from "@apollo/client";
+import { useQuery, useMutation, gql } from "@apollo/client";
 import {
   GET_FUND_WATCHLIST_QUERY,
   GET_FUND_WATCHLIST_BY_SYMBOL_QUERY,
   GET_FUND_WATCHLISTS_QUERY,
+  GET_FUND_WATCHLISTS_CONNECTION_QUERY,
   GET_MONITORED_SYMBOLS_QUERY,
   CREATE_FUND_WATCHLIST_MUTATION,
   UPDATE_FUND_WATCHLIST_MUTATION,
   DELETE_FUND_WATCHLIST_MUTATION,
   TOGGLE_FUND_WATCHLIST_PAUSE_MUTATION,
+  PAUSE_FUND_WATCHLIST_MUTATION,
+  RESUME_FUND_WATCHLIST_MUTATION,
 } from "@/entities/fund-watchlist";
 import type {
   FundWatchlist,
@@ -115,4 +118,44 @@ export function useToggleFundWatchlistPause() {
     { toggleFundWatchlistPause: FundWatchlist },
     { id: string; isPaused: boolean; reason?: string }
   >(TOGGLE_FUND_WATCHLIST_PAUSE_MUTATION);
+}
+
+/**
+ * Hook to pause watchlist item
+ */
+export function usePauseFundWatchlist() {
+  return useMutation<
+    { toggleFundWatchlistPause: FundWatchlist },
+    { id: string; reason?: string }
+  >(PAUSE_FUND_WATCHLIST_MUTATION, {
+    refetchQueries: ["GetFundWatchlistsConnection"],
+  });
+}
+
+/**
+ * Hook to resume watchlist item
+ */
+export function useResumeFundWatchlist() {
+  return useMutation<
+    { toggleFundWatchlistPause: FundWatchlist },
+    { id: string }
+  >(RESUME_FUND_WATCHLIST_MUTATION, {
+    refetchQueries: ["GetFundWatchlistsConnection"],
+  });
+}
+
+/**
+ * Hook to batch delete watchlist items
+ */
+export function useBatchDeleteFundWatchlists() {
+  return useMutation<{ batchDeleteFundWatchlists: number }, { ids: string[] }>(
+    gql`
+      mutation BatchDeleteFundWatchlists($ids: [UUID!]!) {
+        batchDeleteFundWatchlists(ids: $ids)
+      }
+    `,
+    {
+      refetchQueries: ["GetFundWatchlistsConnection"],
+    }
+  );
 }

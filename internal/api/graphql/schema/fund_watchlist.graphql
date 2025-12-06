@@ -99,10 +99,12 @@ extend type Query {
     isActive: Boolean
     category: String
     tier: Int
-  ): [FundWatchlist!]! @deprecated(reason: "Use fundWatchlistsConnection instead")
+  ): [FundWatchlist!]!
+    @deprecated(reason: "Use fundWatchlistsConnection instead")
 
   # Get monitored symbols (active and not paused, legacy)
-  monitoredSymbols(marketType: String): [FundWatchlist!]! @deprecated(reason: "Use monitoredSymbolsConnection instead")
+  monitoredSymbols(marketType: String): [FundWatchlist!]!
+    @deprecated(reason: "Use monitoredSymbolsConnection instead")
 
   # Get all watchlist items (Relay Connection)
   fundWatchlistsConnection(
@@ -110,6 +112,8 @@ extend type Query {
     isActive: Boolean @deprecated(reason: "Use scope parameter instead")
     category: String
     tier: Int
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int

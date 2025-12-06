@@ -87,26 +87,49 @@ func (r *queryResolver) MonitoredSymbols(ctx context.Context, marketType *string
 }
 
 // FundWatchlistsConnection is the resolver for the fundWatchlistsConnection field.
-func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, scope *string, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
-	// Get all watchlist items
-	allItems, err := r.FundWatchlistService.GetAll(ctx)
+func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, scope *string, isActive *bool, category *string, tier *int, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
+	// Use scope parameter if provided, otherwise fall back to legacy isActive parameter
+	effectiveScope := scope
+	if effectiveScope == nil && isActive != nil {
+		// Legacy support: map isActive to scope
+		if *isActive {
+			scopeStr := "active"
+			effectiveScope = &scopeStr
+		} else {
+			scopeStr := "inactive"
+			effectiveScope = &scopeStr
+		}
+	}
+
+	// Build filters map from GraphQL params (merge with explicit filters param)
+	mergedFilters := make(map[string]interface{})
+
+	// Add filters from map parameter
+	if filters != nil {
+		for k, v := range filters {
+			mergedFilters[k] = v
+		}
+	}
+
+	// Add legacy parameters (for backward compatibility)
+	if category != nil {
+		mergedFilters["category"] = *category
+	}
+	if tier != nil {
+		// Convert single tier to array for multiselect filter
+		mergedFilters["tier"] = []interface{}{float64(*tier)}
+	}
+
+	// Get filtered watchlist items from service (uses SQL WHERE, not in-memory filtering)
+	filtered, err := r.FundWatchlistService.GetWatchlistsWithScope(ctx, effectiveScope, search, mergedFilters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get watchlist items: %w", err)
 	}
 
-	// Filter by criteria
-	filtered := make([]*fundwatchlist.Watchlist, 0)
-	for _, item := range allItems {
-		if isActive != nil && item.IsActive != *isActive {
-			continue
-		}
-		if category != nil && item.Category != *category {
-			continue
-		}
-		if tier != nil && item.Tier != *tier {
-			continue
-		}
-		filtered = append(filtered, item)
+	// Get scope counts from service (uses SQL GROUP BY)
+	scopeCounts, err := r.FundWatchlistService.GetWatchlistsScopes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
 	// Apply pagination
@@ -138,39 +161,31 @@ func (r *queryResolver) FundWatchlistsConnection(ctx context.Context, scope *str
 
 	items := filtered[offset:end]
 
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
-
-	// Convert to GraphQL types
-	edges := make([]*generated.FundWatchlistEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.FundWatchlistEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	return &generated.FundWatchlistConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-	}, nil
+	// Build connection with scopes and filters using helper
+	return buildFundWatchlistConnection(items, totalCount, params, offset, scopeCounts)
 }
 
 // MonitoredSymbolsConnection is the resolver for the monitoredSymbolsConnection field.
 func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, scope *string, marketType *string, first *int, after *string, last *int, before *string) (*generated.FundWatchlistConnection, error) {
-	// Get monitored symbols
-	allItems, err := r.FundWatchlistService.GetMonitored(ctx, marketType)
+	// Build filters map for monitored symbols (active and not paused)
+	filters := make(map[string]interface{})
+	if marketType != nil {
+		filters["market_type"] = *marketType
+	}
+
+	// Monitored = active scope
+	activeScope := "active"
+
+	// Get monitored watchlist items from service
+	allItems, err := r.FundWatchlistService.GetWatchlistsWithScope(ctx, &activeScope, nil, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monitored symbols: %w", err)
+	}
+
+	// Get scope counts from service
+	scopeCounts, err := r.FundWatchlistService.GetWatchlistsScopes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
 	// Apply pagination
@@ -202,31 +217,8 @@ func (r *queryResolver) MonitoredSymbolsConnection(ctx context.Context, scope *s
 
 	items := allItems[offset:end]
 
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
-
-	// Convert to GraphQL types
-	edges := make([]*generated.FundWatchlistEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.FundWatchlistEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	return &generated.FundWatchlistConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-	}, nil
+	// Build connection with scopes and filters using helper
+	return buildFundWatchlistConnection(items, totalCount, params, offset, scopeCounts)
 }
 
 // FundWatchlist returns generated.FundWatchlistResolver implementation.

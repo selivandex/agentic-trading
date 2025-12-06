@@ -53,17 +53,22 @@ func getStrategyFilterDefinitions() []relay.FilterDefinition {
 			Type:        relay.FilterTypeNumberRange,
 			Placeholder: strPtr("Select PnL range"),
 		},
-		// Example of dynamic options filter - will fetch users from backend
-		// {
-		// 	ID:           "user_id",
-		// 	Name:         "User",
-		// 	Type:         relay.FilterTypeSelect,
-		// 	OptionsQuery: strPtr("users"), // Frontend will call users query
-		// 	OptionsQueryArgs: map[string]interface{}{
-		// 		"first": 100, // Limit users list
-		// 	},
-		// 	Placeholder:  strPtr("Select user"),
-		// },
+		{
+			ID:          "created_at_range",
+			Name:        "Created Date",
+			Type:        relay.FilterTypeDateRange,
+			Placeholder: strPtr("Select date range"),
+		},
+		{
+			ID:           "user_id",
+			Name:         "User",
+			Type:         relay.FilterTypeSelect,
+			OptionsQuery: strPtr("users"), // Frontend will call users query
+			OptionsQueryArgs: map[string]interface{}{
+				"first": 100, // Limit users list
+			},
+			Placeholder: strPtr("Select user"),
+		},
 	}
 }
 

@@ -43,7 +43,7 @@ export const GET_FUND_WATCHLIST_BY_SYMBOL_QUERY = gql`
   }
 `;
 
-// Get all watchlist items
+// Get all watchlist items (legacy, use fundWatchlistsConnection)
 export const GET_FUND_WATCHLISTS_QUERY = gql`
   ${FUND_WATCHLIST_FRAGMENT}
   query GetFundWatchlists(
@@ -61,6 +61,68 @@ export const GET_FUND_WATCHLISTS_QUERY = gql`
       tier: $tier
     ) {
       ...FundWatchlistFields
+    }
+  }
+`;
+
+// Get all watchlist items with Relay Connection (for CRUD)
+export const GET_FUND_WATCHLISTS_CONNECTION_QUERY = gql`
+  ${FUND_WATCHLIST_FRAGMENT}
+  query GetFundWatchlistsConnection(
+    $scope: String
+    $isActive: Boolean
+    $category: String
+    $tier: Int
+    $search: String
+    $filters: JSONObject
+    $first: Int
+    $after: String
+    $last: Int
+    $before: String
+  ) {
+    fundWatchlistsConnection(
+      scope: $scope
+      isActive: $isActive
+      category: $category
+      tier: $tier
+      search: $search
+      filters: $filters
+      first: $first
+      after: $after
+      last: $last
+      before: $before
+    ) {
+      edges {
+        node {
+          ...FundWatchlistFields
+        }
+        cursor
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+      totalCount
+      scopes {
+        id
+        name
+        count
+      }
+      filters {
+        id
+        name
+        type
+        options {
+          value
+          label
+        }
+        defaultValue
+        placeholder
+        min
+        max
+      }
     }
   }
 `;
@@ -119,4 +181,22 @@ export const TOGGLE_FUND_WATCHLIST_PAUSE_MUTATION = gql`
   }
 `;
 
+// Pause watchlist item
+export const PAUSE_FUND_WATCHLIST_MUTATION = gql`
+  ${FUND_WATCHLIST_FRAGMENT}
+  mutation PauseFundWatchlist($id: UUID!, $reason: String) {
+    toggleFundWatchlistPause(id: $id, isPaused: true, reason: $reason) {
+      ...FundWatchlistFields
+    }
+  }
+`;
 
+// Resume watchlist item
+export const RESUME_FUND_WATCHLIST_MUTATION = gql`
+  ${FUND_WATCHLIST_FRAGMENT}
+  mutation ResumeFundWatchlist($id: UUID!) {
+    toggleFundWatchlistPause(id: $id, isPaused: false, reason: null) {
+      ...FundWatchlistFields
+    }
+  }
+`;

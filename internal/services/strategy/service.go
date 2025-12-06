@@ -3,6 +3,8 @@ package strategy
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -367,13 +369,15 @@ func (s *Service) applyFiltersToOptions(filter *strategy.FilterOptions, filters 
 		switch filterID {
 		case "risk_tolerance":
 			if val, ok := filterValue.(string); ok {
-				rt := strategy.RiskTolerance(val)
+				// Convert to lowercase to match PostgreSQL enum values
+				rt := strategy.RiskTolerance(strings.ToLower(val))
 				filter.RiskTolerance = &rt
 			}
 
 		case "market_type":
 			if val, ok := filterValue.(string); ok {
-				mt := strategy.MarketType(val)
+				// Convert to lowercase to match PostgreSQL enum values
+				mt := strategy.MarketType(strings.ToLower(val))
 				filter.MarketType = &mt
 			}
 
@@ -381,13 +385,15 @@ func (s *Service) applyFiltersToOptions(filter *strategy.FilterOptions, filters 
 			// Can be single value or array for multiselect
 			switch v := filterValue.(type) {
 			case string:
-				rf := strategy.RebalanceFrequency(v)
+				// Convert to lowercase to match PostgreSQL enum values
+				rf := strategy.RebalanceFrequency(strings.ToLower(v))
 				filter.RebalanceFrequency = &rf
 			case []interface{}:
 				filter.RebalanceFrequencies = make([]strategy.RebalanceFrequency, 0, len(v))
 				for _, item := range v {
 					if str, ok := item.(string); ok {
-						filter.RebalanceFrequencies = append(filter.RebalanceFrequencies, strategy.RebalanceFrequency(str))
+						// Convert to lowercase to match PostgreSQL enum values
+						filter.RebalanceFrequencies = append(filter.RebalanceFrequencies, strategy.RebalanceFrequency(strings.ToLower(str)))
 					}
 				}
 			}
@@ -414,6 +420,28 @@ func (s *Service) applyFiltersToOptions(filter *strategy.FilterOptions, filters 
 			if val, ok := filterValue.(float64); ok {
 				maxPnL := decimal.NewFromFloat(val)
 				filter.MaxPnLPercent = &maxPnL
+			}
+
+		case "created_at_range":
+			// DATE_RANGE filter: expects map with "from" and/or "to" keys
+			if rangeMap, ok := filterValue.(map[string]interface{}); ok {
+				if fromVal, ok := rangeMap["from"].(string); ok {
+					if parsedTime, err := time.Parse(time.RFC3339, fromVal); err == nil {
+						filter.CreatedAtFrom = &parsedTime
+					}
+				}
+				if toVal, ok := rangeMap["to"].(string); ok {
+					if parsedTime, err := time.Parse(time.RFC3339, toVal); err == nil {
+						filter.CreatedAtTo = &parsedTime
+					}
+				}
+			}
+
+		case "user_id":
+			if val, ok := filterValue.(string); ok {
+				if userID, err := uuid.Parse(val); err == nil {
+					filter.FilterUserID = &userID
+				}
 			}
 		}
 	}

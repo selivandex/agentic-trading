@@ -522,10 +522,12 @@ func TestFundWatchlistQueriesWithMutations(t *testing.T) {
 			&isActive, // isActive
 			nil,       // category
 			nil,       // tier
-			&first,
-			nil,
-			nil,
-			nil,
+			nil,       // search
+			nil,       // filters
+			&first,    // first
+			nil,       // after
+			nil,       // last
+			nil,       // before
 		)
 
 		require.NoError(t, err)
@@ -546,10 +548,12 @@ func TestFundWatchlistQueriesWithMutations(t *testing.T) {
 			nil,       // isActive
 			&category, // category
 			nil,       // tier
-			&first,
-			nil,
-			nil,
-			nil,
+			nil,       // search
+			nil,       // filters
+			&first,    // first
+			nil,       // after
+			nil,       // last
+			nil,       // before
 		)
 
 		require.NoError(t, err)

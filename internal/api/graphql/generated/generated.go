@@ -189,7 +189,7 @@ type ComplexityRoot struct {
 		FundWatchlist              func(childComplexity int, id uuid.UUID) int
 		FundWatchlistBySymbol      func(childComplexity int, symbol string, marketType string) int
 		FundWatchlists             func(childComplexity int, limit *int, offset *int, isActive *bool, category *string, tier *int) int
-		FundWatchlistsConnection   func(childComplexity int, scope *string, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) int
+		FundWatchlistsConnection   func(childComplexity int, scope *string, isActive *bool, category *string, tier *int, search *string, filters map[string]any, first *int, after *string, last *int, before *string) int
 		Health                     func(childComplexity int) int
 		Me                         func(childComplexity int) int
 		MonitoredSymbols           func(childComplexity int, marketType *string) int
@@ -353,7 +353,7 @@ type QueryResolver interface {
 	FundWatchlistBySymbol(ctx context.Context, symbol string, marketType string) (*fundwatchlist.Watchlist, error)
 	FundWatchlists(ctx context.Context, limit *int, offset *int, isActive *bool, category *string, tier *int) ([]*fundwatchlist.Watchlist, error)
 	MonitoredSymbols(ctx context.Context, marketType *string) ([]*fundwatchlist.Watchlist, error)
-	FundWatchlistsConnection(ctx context.Context, scope *string, isActive *bool, category *string, tier *int, first *int, after *string, last *int, before *string) (*FundWatchlistConnection, error)
+	FundWatchlistsConnection(ctx context.Context, scope *string, isActive *bool, category *string, tier *int, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*FundWatchlistConnection, error)
 	MonitoredSymbolsConnection(ctx context.Context, scope *string, marketType *string, first *int, after *string, last *int, before *string) (*FundWatchlistConnection, error)
 	Strategy(ctx context.Context, id uuid.UUID) (*strategy.Strategy, error)
 	UserStrategies(ctx context.Context, userID uuid.UUID, scope *string, status *strategy.StrategyStatus, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*StrategyConnection, error)
@@ -1194,7 +1194,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.FundWatchlistsConnection(childComplexity, args["scope"].(*string), args["isActive"].(*bool), args["category"].(*string), args["tier"].(*int), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
+		return e.complexity.Query.FundWatchlistsConnection(childComplexity, args["scope"].(*string), args["isActive"].(*bool), args["category"].(*string), args["tier"].(*int), args["search"].(*string), args["filters"].(map[string]any), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.health":
 		if e.complexity.Query.Health == nil {
 			break
@@ -2147,10 +2147,12 @@ extend type Query {
     isActive: Boolean
     category: String
     tier: Int
-  ): [FundWatchlist!]! @deprecated(reason: "Use fundWatchlistsConnection instead")
+  ): [FundWatchlist!]!
+    @deprecated(reason: "Use fundWatchlistsConnection instead")
 
   # Get monitored symbols (active and not paused, legacy)
-  monitoredSymbols(marketType: String): [FundWatchlist!]! @deprecated(reason: "Use monitoredSymbolsConnection instead")
+  monitoredSymbols(marketType: String): [FundWatchlist!]!
+    @deprecated(reason: "Use monitoredSymbolsConnection instead")
 
   # Get all watchlist items (Relay Connection)
   fundWatchlistsConnection(
@@ -2158,6 +2160,8 @@ extend type Query {
     isActive: Boolean @deprecated(reason: "Use scope parameter instead")
     category: String
     tier: Int
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
@@ -3303,26 +3307,36 @@ func (ec *executionContext) field_Query_fundWatchlistsConnection_args(ctx contex
 		return nil, err
 	}
 	args["tier"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "search", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["first"] = arg4
-	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	args["search"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "filters", ec.unmarshalOJSONObject2map)
 	if err != nil {
 		return nil, err
 	}
-	args["after"] = arg5
-	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	args["filters"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
 	}
-	args["last"] = arg6
-	arg7, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	args["first"] = arg6
+	arg7, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["before"] = arg7
+	args["after"] = arg7
+	arg8, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["last"] = arg8
+	arg9, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg9
 	return args, nil
 }
 
@@ -7991,7 +8005,7 @@ func (ec *executionContext) _Query_fundWatchlistsConnection(ctx context.Context,
 		ec.fieldContext_Query_fundWatchlistsConnection,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().FundWatchlistsConnection(ctx, fc.Args["scope"].(*string), fc.Args["isActive"].(*bool), fc.Args["category"].(*string), fc.Args["tier"].(*int), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+			return ec.resolvers.Query().FundWatchlistsConnection(ctx, fc.Args["scope"].(*string), fc.Args["isActive"].(*bool), fc.Args["category"].(*string), fc.Args["tier"].(*int), fc.Args["search"].(*string), fc.Args["filters"].(map[string]any), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
 		},
 		nil,
 		ec.marshalNFundWatchlistConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFundWatchlistConnection,

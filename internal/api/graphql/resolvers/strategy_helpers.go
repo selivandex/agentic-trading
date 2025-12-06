@@ -45,8 +45,9 @@ func buildStrategyConnection(
 
 	// Build filters from definitions
 	filterDefs := getStrategyFilterDefinitions()
-	filters := make([]*generated.Filter, len(filterDefs))
-	for i, filterDef := range filterDefs {
+	filters := make([]*generated.Filter, 0, len(filterDefs))
+	
+	for _, filterDef := range filterDefs {
 		options := make([]*generated.FilterOption, len(filterDef.Options))
 		for j, opt := range filterDef.Options {
 			options[j] = &generated.FilterOption{
@@ -70,9 +71,14 @@ func buildStrategyConnection(
 				min = &minVal
 				max = &maxVal
 			}
+
+			// Skip NUMBER_RANGE filters if min === max (no range available)
+			if min != nil && max != nil && *min == *max {
+				continue
+			}
 		}
 
-		filters[i] = &generated.Filter{
+		filters = append(filters, &generated.Filter{
 			ID:           filterDef.ID,
 			Name:         filterDef.Name,
 			Type:         generated.FilterType(filterDef.Type),
@@ -81,7 +87,7 @@ func buildStrategyConnection(
 			Placeholder:  filterDef.Placeholder,
 			Min:          min,
 			Max:          max,
-		}
+		})
 	}
 
 	return &generated.StrategyConnection{

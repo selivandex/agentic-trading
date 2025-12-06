@@ -61,8 +61,11 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
           }
         : {};
 
-      // Add filters
-      const filterVariables = state.filters;
+      // Add filters as a single JSONObject parameter
+      const filterVariables =
+        Object.keys(state.filters).length > 0
+          ? { filters: state.filters }
+          : {};
 
       return {
         ...baseVariables,
@@ -93,7 +96,11 @@ export function useCrudListQuery<TEntity extends CrudEntity = CrudEntity>(
           }
         : {};
 
-      const filterVariables = state.filters;
+      // Add filters as a single JSONObject parameter
+      const filterVariables =
+        Object.keys(state.filters).length > 0
+          ? { filters: state.filters }
+          : {};
 
       return {
         ...baseVariables,

@@ -95,7 +95,7 @@ func setupResolverTest(t *testing.T) *testSetup {
 
 	// FundWatchlist domain service
 	domainFundWatchlistSvc := fundwatchlist.NewService(fundWatchlistRepo)
-	fundSvc := fundService.NewService(domainFundWatchlistSvc, log)
+	fundSvc := fundService.NewService(domainFundWatchlistSvc, fundWatchlistRepo, log)
 
 	// Create resolver manually (no constructor)
 	resolver := &resolvers.Resolver{
@@ -410,6 +410,8 @@ func TestFundWatchlistsConnection(t *testing.T) {
 			nil, // isActive
 			nil, // category
 			nil, // tier
+			nil, // search
+			nil, // filters
 			&first,
 			nil, // after
 			nil, // last
@@ -434,6 +436,8 @@ func TestFundWatchlistsConnection(t *testing.T) {
 			nil,   // isActive
 			nil,   // category
 			&tier, // tier
+			nil,   // search
+			nil,   // filters
 			&first,
 			nil,
 			nil,
@@ -456,6 +460,8 @@ func TestFundWatchlistsConnection(t *testing.T) {
 			nil,       // isActive
 			&category, // category
 			nil,       // tier
+			nil,       // search
+			nil,       // filters
 			&first,
 			nil,
 			nil,

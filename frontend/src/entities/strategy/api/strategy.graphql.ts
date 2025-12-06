@@ -65,6 +65,7 @@ export const GET_USER_STRATEGIES_QUERY = gql`
     $scope: String
     $status: StrategyStatus
     $search: String
+    $filters: JSONObject
     $first: Int
     $after: String
     $last: Int
@@ -75,6 +76,7 @@ export const GET_USER_STRATEGIES_QUERY = gql`
       scope: $scope
       status: $status
       search: $search
+      filters: $filters
       first: $first
       after: $after
       last: $last
@@ -122,6 +124,7 @@ export const GET_ALL_STRATEGIES_QUERY = gql`
     $scope: String
     $status: StrategyStatus
     $search: String
+    $filters: JSONObject
     $first: Int
     $after: String
     $last: Int
@@ -131,6 +134,7 @@ export const GET_ALL_STRATEGIES_QUERY = gql`
       scope: $scope
       status: $status
       search: $search
+      filters: $filters
       first: $first
       after: $after
       last: $last

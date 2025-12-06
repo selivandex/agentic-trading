@@ -26,6 +26,13 @@ type FilterOptions struct {
 	MaxCapital           *decimal.Decimal
 	MinPnLPercent        *decimal.Decimal
 	MaxPnLPercent        *decimal.Decimal
+
+	// Date range filters
+	CreatedAtFrom *time.Time
+	CreatedAtTo   *time.Time
+
+	// User filter (for admin/multi-user queries)
+	FilterUserID *uuid.UUID // Separate from UserID to allow filtering by specific user
 }
 
 // Repository defines operations for strategy persistence

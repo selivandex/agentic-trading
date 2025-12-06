@@ -65,7 +65,63 @@ export const strategyCrudConfig: CrudConfig<Strategy> = {
       key: "name",
       label: "Name",
       sortable: true,
-      width: "25%",
+      width: "20%",
+    },
+    {
+      key: "user",
+      label: "User",
+      sortable: false,
+      render: (strategy) => {
+        if (!strategy.user) return "—";
+        const name =
+          `${strategy.user.firstName} ${strategy.user.lastName}`.trim();
+        return (
+          name ||
+          strategy.user.email ||
+          strategy.user.telegramUsername ||
+          "Unknown"
+        );
+      },
+      hideOnMobile: true,
+    },
+    {
+      key: "riskTolerance",
+      label: "Risk",
+      sortable: true,
+      render: (strategy) => {
+        const colorMap = {
+          conservative: "success" as const,
+          moderate: "warning" as const,
+          aggressive: "error" as const,
+        };
+        const label =
+          strategy.riskTolerance.charAt(0).toUpperCase() +
+          strategy.riskTolerance.slice(1);
+        return (
+          <Badge color={colorMap[strategy.riskTolerance] ?? "gray"} size="sm">
+            {label}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "marketType",
+      label: "Market",
+      sortable: true,
+      render: (strategy) => {
+        const colorMap = {
+          spot: "blue" as const,
+          futures: "purple" as const,
+        };
+        const label =
+          strategy.marketType.charAt(0).toUpperCase() +
+          strategy.marketType.slice(1);
+        return (
+          <Badge color={colorMap[strategy.marketType] ?? "gray"} size="sm">
+            {label}
+          </Badge>
+        );
+      },
     },
     {
       key: "status",

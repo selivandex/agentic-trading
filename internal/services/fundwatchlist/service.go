@@ -2,6 +2,7 @@ package fundwatchlist
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -14,13 +15,15 @@ import (
 // Following Clean Architecture: uses domain service, not repository directly
 type Service struct {
 	domainService fundwatchlist.DomainService // Domain service interface
+	repo          fundwatchlist.Repository    // Direct access for complex queries
 	log           *logger.Logger
 }
 
 // NewService creates a new fund watchlist service
-func NewService(domainService fundwatchlist.DomainService, log *logger.Logger) *Service {
+func NewService(domainService fundwatchlist.DomainService, repo fundwatchlist.Repository, log *logger.Logger) *Service {
 	return &Service{
 		domainService: domainService,
+		repo:          repo,
 		log:           log.With("service", "fundwatchlist_app"),
 	}
 }
@@ -262,4 +265,73 @@ func (s *Service) TogglePause(ctx context.Context, id uuid.UUID, isPaused bool, 
 	)
 
 	return entry, nil
+}
+
+// GetWatchlistsWithScope returns watchlist items filtered by scope and additional filters
+// Scope is translated to status filter at repository level (SQL WHERE)
+// filters is a map of filter_id -> filter_value from GraphQL JSONObject input
+func (s *Service) GetWatchlistsWithScope(ctx context.Context, scopeID *string, search *string, filters map[string]interface{}) ([]*fundwatchlist.Watchlist, error) {
+	filter := fundwatchlist.FilterOptions{
+		Scope:  scopeID,
+		Search: search,
+	}
+
+	// Process dynamic filters from GraphQL
+	if filters != nil {
+		s.processFilters(&filter, filters)
+	}
+
+	// Use repository directly for complex filtering
+	return s.repo.GetWithFilters(ctx, filter)
+}
+
+// GetWatchlistsScopes returns counts for each scope
+// Uses SQL GROUP BY for efficiency
+func (s *Service) GetWatchlistsScopes(ctx context.Context) (map[string]int, error) {
+	// Get counts by scope from repository (SQL GROUP BY)
+	scopeCounts, err := s.repo.CountByScope(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count watchlists by scope")
+	}
+
+	return scopeCounts, nil
+}
+
+// processFilters converts GraphQL filter map to repository filter options
+func (s *Service) processFilters(filter *fundwatchlist.FilterOptions, filters map[string]interface{}) {
+	for filterID, filterValue := range filters {
+		switch filterID {
+		case "market_type":
+			if val, ok := filterValue.(string); ok {
+				filter.MarketType = &val
+			}
+
+		case "category":
+			if val, ok := filterValue.(string); ok {
+				filter.Category = &val
+			}
+
+		case "tier":
+			// tier filter is multiselect - array of strings
+			if val, ok := filterValue.([]interface{}); ok {
+				tiers := make([]int, 0, len(val))
+				for _, v := range val {
+					// Try string first (from GraphQL)
+					if strVal, ok := v.(string); ok {
+						// Convert string to int
+						var tier int
+						if _, err := fmt.Sscanf(strVal, "%d", &tier); err == nil {
+							tiers = append(tiers, tier)
+						}
+					} else if intVal, ok := v.(float64); ok {
+						// Also support direct int values
+						tiers = append(tiers, int(intVal))
+					}
+				}
+				if len(tiers) > 0 {
+					filter.Tiers = tiers
+				}
+			}
+		}
+	}
 }

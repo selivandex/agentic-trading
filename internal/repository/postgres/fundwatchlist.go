@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"prometheus/internal/domain/fundwatchlist"
 	"prometheus/pkg/errors"
@@ -107,6 +108,114 @@ func (r *FundWatchlistRepository) GetAll(ctx context.Context) ([]*fundwatchlist.
 	}
 
 	return entries, nil
+}
+
+// GetWithFilters retrieves fund watchlist entries with applied filters
+func (r *FundWatchlistRepository) GetWithFilters(ctx context.Context, filter fundwatchlist.FilterOptions) ([]*fundwatchlist.Watchlist, error) {
+	var entries []*fundwatchlist.Watchlist
+
+	query := `SELECT * FROM fund_watchlist WHERE 1=1`
+	args := []interface{}{}
+	argIdx := 1
+
+	// Apply scope filter
+	if filter.Scope != nil && *filter.Scope != "" && *filter.Scope != "all" {
+		switch *filter.Scope {
+		case "active":
+			query += " AND is_active = true AND is_paused = false"
+		case "paused":
+			query += " AND is_paused = true"
+		case "inactive":
+			query += " AND is_active = false"
+		}
+	}
+
+	// Apply market type filter
+	if filter.MarketType != nil && *filter.MarketType != "" {
+		query += fmt.Sprintf(" AND market_type = $%d", argIdx)
+		args = append(args, *filter.MarketType)
+		argIdx++
+	}
+
+	// Apply category filter
+	if filter.Category != nil && *filter.Category != "" {
+		query += fmt.Sprintf(" AND category = $%d", argIdx)
+		args = append(args, *filter.Category)
+		argIdx++
+	}
+
+	// Apply tier filter
+	if len(filter.Tiers) > 0 {
+		query += fmt.Sprintf(" AND tier = ANY($%d)", argIdx)
+		args = append(args, pq.Array(filter.Tiers))
+		argIdx++
+	}
+
+	// Apply search filter (symbol search)
+	if filter.Search != nil && *filter.Search != "" {
+		query += fmt.Sprintf(" AND symbol ILIKE $%d", argIdx)
+		args = append(args, "%"+*filter.Search+"%")
+		// argIdx++ is not used further, but kept for consistency
+		// if more filters are added in the future
+		_ = argIdx
+	}
+
+	query += " ORDER BY tier ASC, symbol ASC"
+
+	err := r.db.SelectContext(ctx, &entries, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+// CountByScope returns count of watchlist entries grouped by scope
+func (r *FundWatchlistRepository) CountByScope(ctx context.Context) (map[string]int, error) {
+	counts := make(map[string]int)
+
+	// Count all entries
+	var total int
+	err := r.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM fund_watchlist`)
+	if err != nil {
+		return nil, err
+	}
+	counts["all"] = total
+
+	// Count active (active and not paused)
+	var active int
+	err = r.db.GetContext(ctx, &active, `
+		SELECT COUNT(*) FROM fund_watchlist
+		WHERE is_active = true AND is_paused = false
+	`)
+	if err != nil {
+		return nil, err
+	}
+	counts["active"] = active
+
+	// Count paused
+	var paused int
+	err = r.db.GetContext(ctx, &paused, `
+		SELECT COUNT(*) FROM fund_watchlist
+		WHERE is_paused = true
+	`)
+	if err != nil {
+		return nil, err
+	}
+	counts["paused"] = paused
+
+	// Count inactive
+	var inactive int
+	err = r.db.GetContext(ctx, &inactive, `
+		SELECT COUNT(*) FROM fund_watchlist
+		WHERE is_active = false
+	`)
+	if err != nil {
+		return nil, err
+	}
+	counts["inactive"] = inactive
+
+	return counts, nil
 }
 
 // Update updates a fund watchlist entry

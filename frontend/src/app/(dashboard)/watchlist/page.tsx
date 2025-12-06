@@ -1,36 +1,22 @@
 /** @format */
 
-import { redirect } from "next/navigation";
-import { auth } from "@/shared/lib/auth";
+"use client";
+
+import { FundWatchlistManager } from "@/entities/fund-watchlist";
 
 /**
- * Watchlist Page
- * 
- * Manage fund watchlist
+ * Fund Watchlist Management Page
+ *
+ * Full CRUD interface for managing fund watchlist:
+ * - List view with search, sort, pagination
+ * - Create new watchlist item
+ * - Edit existing watchlist item
+ * - View watchlist item details
+ * - Delete watchlist item
+ * - Pause/Resume actions
+ * - Scopes: All, Active, Paused, Inactive
+ * - Filters: Market Type, Category, Tier
  */
-export default async function WatchlistPage() {
-  const session = await auth();
-  
-  if (!session?.user) {
-    redirect("/login");
-  }
-  
-  return (
-    <div className="min-h-screen bg-primary p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-display-lg font-semibold text-primary">
-            Fund Watchlist
-          </h1>
-        </div>
-        
-        <div className="bg-primary border border-primary rounded-lg p-12 text-center">
-          <p className="text-secondary">
-            No symbols in watchlist. Add symbols to start monitoring.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+export default function WatchlistPage() {
+  return <FundWatchlistManager />;
 }
-

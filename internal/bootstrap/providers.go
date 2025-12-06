@@ -262,7 +262,7 @@ func (c *Container) MustInitServices() {
 	// Fund Watchlist Service (globally monitored symbols)
 	// Clean Architecture: Domain service + Application service
 	domainFundWatchlistService := fundwatchlist.NewService(c.Repos.FundWatchlist)
-	c.Services.FundWatchlist = fundwatchlistsvc.NewService(domainFundWatchlistService, c.Log)
+	c.Services.FundWatchlist = fundwatchlistsvc.NewService(domainFundWatchlistService, c.Repos.FundWatchlist, c.Log)
 
 	c.Services.Session = domainsession.NewService(c.Repos.Session)
 	c.Services.ADKSession = adk.NewSessionService(c.Services.Session)
