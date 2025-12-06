@@ -34,13 +34,13 @@ func TestCreateAgentMutation(t *testing.T) {
 		{
 			name: "successful creation",
 			input: generated.CreateAgentInput{
-				Identifier:    "test_agent_" + randomString(8),
-				Name:          "Test Agent",
-				Description:   "Test Description",
-				Category:      agent.CategoryExpert,
-				SystemPrompt:  "You are a test agent",
-				ModelProvider: string(ai.ProviderNameDeepSeek),
-				ModelName:     string(ai.ModelDeepSeekReasoner),
+				Identifier:    strPtr("test_agent_" + randomString(8)),
+				Name:          strPtr("Test Agent"),
+				Description:   strPtr("Test Description"),
+				Category:      strPtr(agent.CategoryExpert),
+				SystemPrompt:  strPtr("You are a test agent"),
+				ModelProvider: strPtr(string(ai.ProviderNameDeepSeek)),
+				ModelName:     strPtr(string(ai.ModelDeepSeekReasoner)),
 			},
 			wantErr: false,
 			validate: func(t *testing.T, result *agent.Agent) {
@@ -55,19 +55,19 @@ func TestCreateAgentMutation(t *testing.T) {
 		{
 			name: "with custom settings",
 			input: generated.CreateAgentInput{
-				Identifier:     "custom_agent_" + randomString(8),
-				Name:           "Custom Agent",
-				Description:    "Custom settings",
-				Category:       agent.CategoryCoordinator,
-				SystemPrompt:   "Custom prompt",
+				Identifier:     strPtr("custom_agent_" + randomString(8)),
+				Name:           strPtr("Custom Agent"),
+				Description:    strPtr("Custom settings"),
+				Category:       strPtr(agent.CategoryCoordinator),
+				SystemPrompt:   strPtr("Custom prompt"),
 				Instructions:   strPtr("Custom instructions"),
-				ModelProvider:  string(ai.ProviderNameDeepSeek),
-				ModelName:      string(ai.ModelDeepSeekReasoner),
+				ModelProvider:  strPtr(string(ai.ProviderNameDeepSeek)),
+				ModelName:      strPtr(string(ai.ModelDeepSeekReasoner)),
 				Temperature:    float64Ptr(0.5),
 				MaxTokens:      intPtr(8000),
 				MaxCostPerRun:  float64Ptr(1.0),
 				TimeoutSeconds: intPtr(120),
-				AvailableTools: []string{"tool1", "tool2"},
+				AvailableTools: map[string]any{"tools": []string{"tool1", "tool2"}},
 			},
 			wantErr: false,
 			validate: func(t *testing.T, result *agent.Agent) {
@@ -83,13 +83,13 @@ func TestCreateAgentMutation(t *testing.T) {
 		{
 			name: "inactive agent",
 			input: generated.CreateAgentInput{
-				Identifier:    "inactive_agent_" + randomString(8),
-				Name:          "Inactive Agent",
-				Description:   "Inactive",
-				Category:      agent.CategorySpecialist,
-				SystemPrompt:  "Inactive prompt",
-				ModelProvider: string(ai.ProviderNameDeepSeek),
-				ModelName:     string(ai.ModelDeepSeekReasoner),
+				Identifier:    strPtr("inactive_agent_" + randomString(8)),
+				Name:          strPtr("Inactive Agent"),
+				Description:   strPtr("Inactive"),
+				Category:      strPtr(agent.CategorySpecialist),
+				SystemPrompt:  strPtr("Inactive prompt"),
+				ModelProvider: strPtr(string(ai.ProviderNameDeepSeek)),
+				ModelName:     strPtr(string(ai.ModelDeepSeekReasoner)),
 				IsActive:      boolPtr(false),
 			},
 			wantErr: false,
@@ -100,12 +100,12 @@ func TestCreateAgentMutation(t *testing.T) {
 		{
 			name: "missing required identifier",
 			input: generated.CreateAgentInput{
-				Name:          "No Identifier",
-				Description:   "Missing identifier",
-				Category:      agent.CategoryExpert,
-				SystemPrompt:  "Prompt",
-				ModelProvider: string(ai.ProviderNameDeepSeek),
-				ModelName:     string(ai.ModelDeepSeekReasoner),
+				Name:          strPtr("No Identifier"),
+				Description:   strPtr("Missing identifier"),
+				Category:      strPtr(agent.CategoryExpert),
+				SystemPrompt:  strPtr("Prompt"),
+				ModelProvider: strPtr(string(ai.ProviderNameDeepSeek)),
+				ModelName:     strPtr(string(ai.ModelDeepSeekReasoner)),
 			},
 			wantErr:     true,
 			errContains: "identifier is required",
@@ -154,7 +154,7 @@ func TestUpdateAgentMutation(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		agentID     int
+		agentID     uuid.UUID
 		input       generated.UpdateAgentInput
 		wantErr     bool
 		errContains string
@@ -206,7 +206,7 @@ func TestUpdateAgentMutation(t *testing.T) {
 			name:    "update available tools",
 			agentID: testAgent.ID,
 			input: generated.UpdateAgentInput{
-				AvailableTools: []string{"new_tool1", "new_tool2", "new_tool3"},
+				AvailableTools: map[string]any{"tools": []string{"new_tool1", "new_tool2", "new_tool3"}},
 			},
 			wantErr: false,
 			validate: func(t *testing.T, result *agent.Agent) {
@@ -228,7 +228,7 @@ func TestUpdateAgentMutation(t *testing.T) {
 		},
 		{
 			name:        "non-existent agent",
-			agentID:     99999,
+			agentID:     uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 			input:       generated.UpdateAgentInput{Name: strPtr("Test")},
 			wantErr:     true,
 			errContains: "failed to get agent",
@@ -276,7 +276,7 @@ func TestDeleteAgentMutation(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		agentID     int
+		agentID     uuid.UUID
 		wantErr     bool
 		errContains string
 	}{
@@ -287,7 +287,7 @@ func TestDeleteAgentMutation(t *testing.T) {
 		},
 		{
 			name:        "delete non-existent agent",
-			agentID:     99999,
+			agentID:     uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 			wantErr:     true,
 			errContains: "failed to get agent",
 		},
@@ -334,7 +334,7 @@ func TestSetAgentActiveMutation(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		agentID     int
+		agentID     uuid.UUID
 		isActive    bool
 		wantErr     bool
 		errContains string
@@ -353,7 +353,7 @@ func TestSetAgentActiveMutation(t *testing.T) {
 		},
 		{
 			name:        "non-existent agent",
-			agentID:     99999,
+			agentID:     uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 			isActive:    true,
 			wantErr:     true,
 			errContains: "failed to get agent",
@@ -401,7 +401,7 @@ func TestUpdateAgentPromptMutation(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		agentID      int
+		agentID      uuid.UUID
 		systemPrompt string
 		wantErr      bool
 		errContains  string
@@ -414,7 +414,7 @@ func TestUpdateAgentPromptMutation(t *testing.T) {
 		},
 		{
 			name:         "non-existent agent",
-			agentID:      99999,
+			agentID:      uuid.MustParse("00000000-0000-0000-0000-000000000000"),
 			systemPrompt: "Test prompt",
 			wantErr:      true,
 			errContains:  "failed to get agent",
@@ -459,7 +459,7 @@ func TestEnsureSystemAgentsMutation(t *testing.T) {
 		assert.True(t, result)
 
 		// Verify that system agents were created
-		agents, err := setup.resolver.Query().Agents(ctx, nil, nil, intPtr(100), nil, nil, nil)
+		agents, err := setup.resolver.Query().Agents(ctx, nil, nil, nil, intPtr(100), nil, nil, nil)
 		require.NoError(t, err)
 		assert.NotEmpty(t, agents.Edges)
 
@@ -498,13 +498,13 @@ func TestAgentMutationsWorkflow(t *testing.T) {
 	t.Run("complete agent lifecycle", func(t *testing.T) {
 		// 1. Create agent
 		createInput := generated.CreateAgentInput{
-			Identifier:    "lifecycle_agent_" + randomString(8),
-			Name:          "Lifecycle Test Agent",
-			Description:   "Testing full lifecycle",
-			Category:      agent.CategoryExpert,
-			SystemPrompt:  "Initial prompt",
-			ModelProvider: string(ai.ProviderNameDeepSeek),
-			ModelName:     string(ai.ModelDeepSeekReasoner),
+			Identifier:    strPtr("lifecycle_agent_" + randomString(8)),
+			Name:          strPtr("Lifecycle Test Agent"),
+			Description:   strPtr("Testing full lifecycle"),
+			Category:      strPtr(agent.CategoryExpert),
+			SystemPrompt:  strPtr("Initial prompt"),
+			ModelProvider: strPtr(string(ai.ProviderNameDeepSeek)),
+			ModelName:     strPtr(string(ai.ModelDeepSeekReasoner)),
 			Temperature:   float64Ptr(1.0),
 		}
 

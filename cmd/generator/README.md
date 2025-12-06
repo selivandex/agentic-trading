@@ -130,14 +130,14 @@ resources:
   orders:
     skip_columns:
       - internal_notes  # Don't expose in API
-    
+
     scopes:
       # Override auto-detected scopes
       custom:
         - id: "pending_payment"
           name: "Pending Payment"
           where: "status = 'pending' AND payment_status = 'unpaid'"
-    
+
     filters:
       # Add custom filters
       custom:
@@ -145,13 +145,13 @@ resources:
           name: "High Value Orders"
           type: "boolean"
           where: "total_amount > 1000"
-    
+
     actions:
       # Add custom row actions
       - key: "mark_shipped"
         label: "Mark as Shipped"
         mutation: "markOrderShipped"
-    
+
     frontend:
       columns_order:
         - order_number
@@ -255,4 +255,3 @@ $ make generate-resource table=positions
 - [ ] Audit log integration
 - [ ] Version control for generated files
 - [ ] AI-assisted field label/description generation
-

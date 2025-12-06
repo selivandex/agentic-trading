@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"prometheus/pkg/errors"
 	"prometheus/pkg/logger"
 )
@@ -45,8 +47,8 @@ func (s *Service) GetByIdentifier(ctx context.Context, identifier string) (*Agen
 }
 
 // GetByID retrieves agent by ID
-func (s *Service) GetByID(ctx context.Context, id int) (*Agent, error) {
-	if id <= 0 {
+func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Agent, error) {
+	if id == uuid.Nil {
 		return nil, errors.ErrInvalidInput
 	}
 	return s.repo.GetByID(ctx, id)
@@ -54,7 +56,10 @@ func (s *Service) GetByID(ctx context.Context, id int) (*Agent, error) {
 
 // Update updates agent configuration
 func (s *Service) Update(ctx context.Context, a *Agent) error {
-	if a == nil || a.ID <= 0 {
+	if a == nil {
+		return errors.ErrInvalidInput
+	}
+	if a.ID == uuid.Nil {
 		return errors.ErrInvalidInput
 	}
 	if a.SystemPrompt == "" {
@@ -92,8 +97,8 @@ func (s *Service) List(ctx context.Context) ([]*Agent, error) {
 }
 
 // Delete deletes an agent by ID
-func (s *Service) Delete(ctx context.Context, id int) error {
-	if id <= 0 {
+func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	if id == uuid.Nil {
 		return errors.ErrInvalidInput
 	}
 

@@ -1,36 +1,25 @@
 # @format
 
 # Agent types and operations
+# Auto-generated from table: agents
 
 type Agent {
-  id: Int!
+  id: UUID!
   identifier: String!
   name: String!
-  description: String!
-  category: String!
-
-  # Prompts
+  description: String
+  category: String
   systemPrompt: String!
-  instructions: String!
-
-  # Model configuration
-  modelProvider: String!
-  modelName: String!
-  temperature: Float!
-  maxTokens: Int!
-
-  # Tools
-  availableTools: [String!]!
-
-  # Limits
-  maxCostPerRun: Float!
-  timeoutSeconds: Int!
-
-  # Status
-  isActive: Boolean!
-  version: Int!
-
-  # Timestamps
+  instructions: String
+  modelProvider: String
+  modelName: String
+  temperature: Float
+  maxTokens: Int
+  availableTools: JSONObject
+  maxCostPerRun: Float
+  timeoutSeconds: Int
+  isActive: Boolean
+  version: Int
   createdAt: Time!
   updatedAt: Time!
 }
@@ -68,52 +57,67 @@ type AgentConnection {
   Total count of items (if available)
   """
   totalCount: Int!
+
+  """
+  Available filter scopes with counts
+  """
+  scopes: [Scope!]!
+
+  """
+  Available dynamic filters
+  """
+  filters: [Filter!]!
 }
 
 input CreateAgentInput {
-  identifier: String!
-  name: String!
-  description: String!
-  category: String!
-  systemPrompt: String!
-  instructions: String
-  modelProvider: String!
-  modelName: String!
-  temperature: Float
-  maxTokens: Int
-  availableTools: [String!]
-  maxCostPerRun: Float
-  timeoutSeconds: Int
-  isActive: Boolean
+identifier: String
+name: String
+description: String
+category: String
+systemPrompt: String
+instructions: String
+modelProvider: String
+modelName: String
+temperature: Float
+maxTokens: Int
+availableTools: JSONObject
+maxCostPerRun: Float
+timeoutSeconds: Int
+isActive: Boolean
+version: Int
 }
 
 input UpdateAgentInput {
-  name: String
-  description: String
-  category: String
-  systemPrompt: String
-  instructions: String
-  modelProvider: String
-  modelName: String
-  temperature: Float
-  maxTokens: Int
-  availableTools: [String!]
-  maxCostPerRun: Float
-  timeoutSeconds: Int
+identifier: String
+name: String
+description: String
+category: String
+systemPrompt: String
+instructions: String
+modelProvider: String
+modelName: String
+temperature: Float
+maxTokens: Int
+availableTools: JSONObject
+maxCostPerRun: Float
+timeoutSeconds: Int
+isActive: Boolean
+version: Int
 }
 
 # Queries
 extend type Query {
-  # Get agent by ID
-  agent(id: Int!): Agent
+  # Get Agent by ID
+  agent(id: UUID!): Agent
 
-  # Get agent by identifier
+  # Get Agent by identifier
   agentByIdentifier(identifier: String!): Agent
 
-  # Get all agents
+  # Get all Agents with scopes and filters
   agents(
-    category: String
-    isActive: Boolean
+    scope: String
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
@@ -123,24 +127,24 @@ extend type Query {
 
 # Mutations
 extend type Mutation {
-  # Create new agent (admin only)
+  # Create new Agent
   createAgent(input: CreateAgentInput!): Agent!
 
-  # Update agent configuration (admin only)
-  updateAgent(id: Int!, input: UpdateAgentInput!): Agent!
+  # Update Agent
+  updateAgent(id: UUID!, input: UpdateAgentInput!): Agent!
 
-  # Delete agent (admin only)
-  deleteAgent(id: Int!): Boolean!
+  # Delete Agent
+  deleteAgent(id: UUID!): Boolean!
 
-  # Batch delete agents (admin only)
-  batchDeleteAgents(ids: [Int!]!): Int!
+  # Batch delete Agents
+  batchDeleteAgents(ids: [UUID!]!): Int!
 
-  # Activate/deactivate agent
-  setAgentActive(id: Int!, isActive: Boolean!): Agent!
+  # Set Agent active status
+  setAgentActive(id: UUID!, isActive: Boolean!): Agent!
 
-  # Update agent prompt (for tuning)
-  updateAgentPrompt(id: Int!, systemPrompt: String!): Agent!
+  # Update Agent system prompt
+  updateAgentPrompt(id: UUID!, systemPrompt: String!): Agent!
 
-  # Ensure all system agents exist (FindOrCreate pattern)
+  # Ensure system agents exist
   ensureSystemAgents: Boolean!
 }

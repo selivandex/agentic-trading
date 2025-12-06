@@ -25,3 +25,4 @@ limit_profiles:
     max_position_size: 20000.0
     max_leverage: 10.0
     is_default: false
+

@@ -2,6 +2,9 @@ package agent
 
 import (
 	"context"
+	"strings"
+
+	"github.com/google/uuid"
 
 	"prometheus/internal/adapters/ai"
 	"prometheus/internal/domain/agent"
@@ -159,7 +162,7 @@ func (s *Service) List(ctx context.Context) ([]*agent.Agent, error) {
 }
 
 // GetByID retrieves agent by ID
-func (s *Service) GetByID(ctx context.Context, id int) (*agent.Agent, error) {
+func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*agent.Agent, error) {
 	return s.domainService.GetByID(ctx, id)
 }
 
@@ -248,7 +251,7 @@ type UpdateAgentParams struct {
 }
 
 // UpdateAgent updates agent configuration (admin function)
-func (s *Service) UpdateAgent(ctx context.Context, id int, params UpdateAgentParams) (*agent.Agent, error) {
+func (s *Service) UpdateAgent(ctx context.Context, id uuid.UUID, params UpdateAgentParams) (*agent.Agent, error) {
 	s.log.Infow("Updating agent", "agent_id", id)
 
 	// Get existing agent via domain service
@@ -312,7 +315,7 @@ func (s *Service) UpdateAgent(ctx context.Context, id int, params UpdateAgentPar
 }
 
 // DeleteAgent deletes an agent (admin function, hard delete)
-func (s *Service) DeleteAgent(ctx context.Context, id int) error {
+func (s *Service) DeleteAgent(ctx context.Context, id uuid.UUID) error {
 	s.log.Warnw("Deleting agent", "agent_id", id)
 
 	// Get agent to check if it exists
@@ -336,7 +339,7 @@ func (s *Service) DeleteAgent(ctx context.Context, id int) error {
 
 // BatchDeleteAgents deletes multiple agents in batch (admin function)
 // Returns the number of successfully deleted agents
-func (s *Service) BatchDeleteAgents(ctx context.Context, ids []int) (int, error) {
+func (s *Service) BatchDeleteAgents(ctx context.Context, ids []uuid.UUID) (int, error) {
 	s.log.Infow("Batch deleting agents",
 		"count", len(ids),
 	)
@@ -374,7 +377,7 @@ func (s *Service) BatchDeleteAgents(ctx context.Context, ids []int) (int, error)
 }
 
 // SetActive activates or deactivates an agent
-func (s *Service) SetActive(ctx context.Context, id int, isActive bool) (*agent.Agent, error) {
+func (s *Service) SetActive(ctx context.Context, id uuid.UUID, isActive bool) (*agent.Agent, error) {
 	s.log.Infow("Setting agent active status",
 		"agent_id", id,
 		"is_active", isActive,
@@ -403,7 +406,7 @@ func (s *Service) SetActive(ctx context.Context, id int, isActive bool) (*agent.
 }
 
 // UpdatePromptByID updates agent's system prompt by ID
-func (s *Service) UpdatePromptByID(ctx context.Context, id int, newPrompt string) (*agent.Agent, error) {
+func (s *Service) UpdatePromptByID(ctx context.Context, id uuid.UUID, newPrompt string) (*agent.Agent, error) {
 	s.log.Infow("Updating agent prompt", "agent_id", id)
 
 	// Get agent via domain service
@@ -426,6 +429,117 @@ func (s *Service) UpdatePromptByID(ctx context.Context, id int, newPrompt string
 	)
 
 	return a, nil
+}
+
+// GetAgentsWithScope retrieves agents filtered by scope, search, and filters
+func (s *Service) GetAgentsWithScope(ctx context.Context, scope *string, search *string, filters map[string]any) ([]*agent.Agent, error) {
+	// Get all agents
+	allAgents, err := s.domainService.List(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list agents")
+	}
+
+	// Apply scope filter
+	filtered := allAgents
+	if scope != nil && *scope != "" && *scope != "all" {
+		filtered = s.applyScope(filtered, *scope)
+	}
+
+	// Apply search filter
+	if search != nil && *search != "" {
+		filtered = s.applySearch(filtered, *search)
+	}
+
+	// Apply dynamic filters
+	if len(filters) > 0 {
+		filtered = s.applyFilters(filtered, filters)
+	}
+
+	return filtered, nil
+}
+
+// GetAgentsScopes returns count of agents for each scope
+func (s *Service) GetAgentsScopes(ctx context.Context) (map[string]int, error) {
+	allAgents, err := s.domainService.List(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list agents")
+	}
+
+	counts := make(map[string]int)
+	counts["all"] = len(allAgents)
+
+	// Count active/inactive
+	activeCount := 0
+	for _, a := range allAgents {
+		if a.IsActive {
+			activeCount++
+		}
+	}
+	counts["active"] = activeCount
+	counts["not_active"] = len(allAgents) - activeCount
+
+	return counts, nil
+}
+
+// applyScope applies scope filter to agents
+func (s *Service) applyScope(agents []*agent.Agent, scope string) []*agent.Agent {
+	var filtered []*agent.Agent
+	for _, a := range agents {
+		switch scope {
+		case "active":
+			if a.IsActive {
+				filtered = append(filtered, a)
+			}
+		case "not_active":
+			if !a.IsActive {
+				filtered = append(filtered, a)
+			}
+		default:
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered
+}
+
+// applySearch applies search filter to agents (name, identifier, description)
+func (s *Service) applySearch(agents []*agent.Agent, search string) []*agent.Agent {
+	searchLower := strings.ToLower(search)
+	var filtered []*agent.Agent
+	for _, a := range agents {
+		if strings.Contains(strings.ToLower(a.Name), searchLower) ||
+			strings.Contains(strings.ToLower(a.Identifier), searchLower) ||
+			strings.Contains(strings.ToLower(a.Description), searchLower) {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered
+}
+
+// applyFilters applies dynamic filters to agents
+func (s *Service) applyFilters(agents []*agent.Agent, filters map[string]any) []*agent.Agent {
+	var filtered []*agent.Agent
+	for _, a := range agents {
+		if matchesFilters(a, filters) {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered
+}
+
+// matchesFilters checks if agent matches all filter criteria
+func matchesFilters(a *agent.Agent, filters map[string]any) bool {
+	for key, value := range filters {
+		switch key {
+		case "is_active":
+			if boolVal, ok := value.(bool); ok {
+				if a.IsActive != boolVal {
+					return false
+				}
+			}
+			// Add more filter types as needed
+		}
+	}
+	return true
 }
 
 // loadPromptFromTemplate loads agent prompt from template file

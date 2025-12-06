@@ -124,7 +124,7 @@ export const PageHeader = ({
   return (
     <div
       className={cx(
-        "relative w-full flex flex-col gap-4 pt-4 mb-5 border-b border-gray-200",
+        "relative w-full flex flex-col gap-4 pt-4 mb-5 border-b border-border",
         !hasTabs ? "pb-4" : "", // Add padding-bottom when no tabs
         background === "primary" ? "bg-primary" : "bg-transparent",
         className

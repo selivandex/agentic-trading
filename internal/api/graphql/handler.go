@@ -9,6 +9,7 @@ import (
 	"prometheus/internal/api/graphql/generated"
 	"prometheus/internal/api/graphql/middleware"
 	"prometheus/internal/api/graphql/resolvers"
+	agentService "prometheus/internal/services/agent"
 	authService "prometheus/internal/services/auth"
 	fundWatchlistService "prometheus/internal/services/fundwatchlist"
 	strategyService "prometheus/internal/services/strategy"
@@ -22,6 +23,7 @@ func Handler(
 	userSvc *userService.Service,
 	strategySvc *strategyService.Service,
 	fundWatchlistSvc *fundWatchlistService.Service,
+	agentSvc *agentService.Service,
 	log *logger.Logger,
 ) http.Handler {
 	// Create resolver with injected services
@@ -30,6 +32,7 @@ func Handler(
 		UserService:          userSvc,
 		StrategyService:      strategySvc,
 		FundWatchlistService: fundWatchlistSvc,
+		AgentService:         agentSvc,
 		Log:                  log.With("component", "graphql_resolvers"),
 	}
 

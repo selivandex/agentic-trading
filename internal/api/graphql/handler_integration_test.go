@@ -95,8 +95,8 @@ func setupGraphQLTest(t *testing.T) *testSetup {
 	domainUserSvc := user.NewService(userRepo, limitProfileAdapter)
 	userSvc := userservice.NewService(domainUserSvc, log)
 
-	// GraphQL handler (strategy and fundWatchlist services not needed for auth tests)
-	handler := graphql.Handler(authSvc, userSvc, nil, nil, log)
+	// GraphQL handler (strategy, fundWatchlist, and agent services not needed for auth tests)
+	handler := graphql.Handler(authSvc, userSvc, nil, nil, nil, log)
 
 	return &testSetup{
 		pg:          pg,

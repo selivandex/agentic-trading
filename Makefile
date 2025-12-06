@@ -200,6 +200,19 @@ db-reset: db-drop db-create db-migrate
 	@echo "✓ Databases reset complete"
 
 # ============================================================================
+# Code Generation
+# ============================================================================
+
+.PHONY: generate-resource
+generate-resource: ## Generate CRUD from table (usage: make generate-resource table=orders)
+	@if [ -z "$(table)" ]; then \
+		echo "Error: table parameter is required"; \
+		echo "Usage: make generate-resource table=TABLE_NAME [resource=RESOURCE_NAME]"; \
+		exit 1; \
+	fi
+	go run cmd/generator/main.go --table=$(table) $(if $(resource),--resource=$(resource),) $(if $(dry-run),--dry-run,)
+
+# ============================================================================
 # Test Database Commands (uses same functions with .env.test config)
 # ============================================================================
 

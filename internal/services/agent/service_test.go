@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +16,7 @@ import (
 type mockRepository struct {
 	createFunc          func(context.Context, *agent.Agent) error
 	getByIdentifierFunc func(context.Context, string) (*agent.Agent, error)
-	getByIDFunc         func(context.Context, int) (*agent.Agent, error)
+	getByIDFunc         func(context.Context, uuid.UUID) (*agent.Agent, error)
 	updateFunc          func(context.Context, *agent.Agent) error
 	findOrCreateFunc    func(context.Context, *agent.Agent) (*agent.Agent, bool, error)
 	listActiveFunc      func(context.Context) ([]*agent.Agent, error)
@@ -37,7 +38,7 @@ func (m *mockRepository) GetByIdentifier(ctx context.Context, identifier string)
 	return nil, errors.ErrNotFound
 }
 
-func (m *mockRepository) GetByID(ctx context.Context, id int) (*agent.Agent, error) {
+func (m *mockRepository) GetByID(ctx context.Context, id uuid.UUID) (*agent.Agent, error) {
 	if m.getByIDFunc != nil {
 		return m.getByIDFunc(ctx, id)
 	}
@@ -55,7 +56,7 @@ func (m *mockRepository) FindOrCreate(ctx context.Context, a *agent.Agent) (*age
 	if m.findOrCreateFunc != nil {
 		return m.findOrCreateFunc(ctx, a)
 	}
-	a.ID = 1
+	a.ID = uuid.New()
 	return a, true, nil
 }
 
@@ -80,7 +81,7 @@ func (m *mockRepository) List(ctx context.Context) ([]*agent.Agent, error) {
 	return []*agent.Agent{}, nil
 }
 
-func (m *mockRepository) Delete(ctx context.Context, id int) error {
+func (m *mockRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
@@ -106,7 +107,7 @@ func TestService_EnsureSystemAgents(t *testing.T) {
 		mockRepo := &mockRepository{
 			findOrCreateFunc: func(ctx context.Context, a *agent.Agent) (*agent.Agent, bool, error) {
 				callCount++
-				a.ID = callCount
+				a.ID = uuid.New()
 				return a, true, nil // All created
 			},
 		}
@@ -136,7 +137,7 @@ func TestService_EnsureSystemAgents(t *testing.T) {
 		mockRepo := &mockRepository{
 			findOrCreateFunc: func(ctx context.Context, a *agent.Agent) (*agent.Agent, bool, error) {
 				callCount++
-				a.ID = 1
+				a.ID = uuid.New()
 				return a, false, nil // Already exists
 			},
 		}
@@ -155,7 +156,7 @@ func TestService_EnsureSystemAgents(t *testing.T) {
 		mockRepo := &mockRepository{
 			findOrCreateFunc: func(ctx context.Context, a *agent.Agent) (*agent.Agent, bool, error) {
 				callCount++
-				a.ID = callCount
+				a.ID = uuid.New()
 				// Verify placeholder prompt used when template returns empty
 				// mockTemplateRegistry returns "Mocked prompt" as fallback
 				return a, true, nil
@@ -184,7 +185,7 @@ func TestService_EnsureSystemAgents(t *testing.T) {
 				if callCount == 3 {
 					return nil, false, errors.New("database error")
 				}
-				a.ID = callCount
+				a.ID = uuid.New()
 				return a, true, nil
 			},
 		}
@@ -204,7 +205,7 @@ func TestService_UpdatePrompt(t *testing.T) {
 
 	t.Run("updates prompt successfully", func(t *testing.T) {
 		existing := &agent.Agent{
-			ID:           1,
+			ID:           uuid.New(),
 			Identifier:   "test_agent",
 			SystemPrompt: "Old prompt",
 			Version:      1,
@@ -251,7 +252,7 @@ func TestService_UpdatePrompt(t *testing.T) {
 	t.Run("fails when update fails", func(t *testing.T) {
 		mockRepo := &mockRepository{
 			getByIdentifierFunc: func(ctx context.Context, identifier string) (*agent.Agent, error) {
-				return &agent.Agent{ID: 1, Identifier: "test", SystemPrompt: "Old"}, nil
+				return &agent.Agent{ID: uuid.New(), Identifier: "test", SystemPrompt: "Old"}, nil
 			},
 			updateFunc: func(ctx context.Context, a *agent.Agent) error {
 				return errors.New("database error")
@@ -272,7 +273,7 @@ func TestService_GetByIdentifier(t *testing.T) {
 
 	t.Run("delegates to domain service", func(t *testing.T) {
 		expected := &agent.Agent{
-			ID:         1,
+			ID:         uuid.New(),
 			Identifier: "test_agent",
 		}
 
@@ -298,8 +299,8 @@ func TestService_ListActive(t *testing.T) {
 
 	t.Run("returns active agents", func(t *testing.T) {
 		expected := []*agent.Agent{
-			{ID: 1, Identifier: "agent1", IsActive: true},
-			{ID: 2, Identifier: "agent2", IsActive: true},
+			{ID: uuid.New(), Identifier: "agent1", IsActive: true},
+			{ID: uuid.New(), Identifier: "agent2", IsActive: true},
 		}
 
 		mockRepo := &mockRepository{
@@ -323,8 +324,8 @@ func TestService_ListByCategory(t *testing.T) {
 
 	t.Run("returns agents by category", func(t *testing.T) {
 		expected := []*agent.Agent{
-			{ID: 1, Category: agent.CategoryExpert},
-			{ID: 2, Category: agent.CategoryExpert},
+			{ID: uuid.New(), Category: agent.CategoryExpert},
+			{ID: uuid.New(), Category: agent.CategoryExpert},
 		}
 
 		mockRepo := &mockRepository{

@@ -4,16 +4,18 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
+
 	"prometheus/internal/adapters/ai"
 )
 
 // Agent represents an AI agent definition with configuration
 type Agent struct {
-	ID          int    `db:"id"`
-	Identifier  string `db:"identifier"` // portfolio_manager, technical_analyzer
-	Name        string `db:"name"`
-	Description string `db:"description"`
-	Category    string `db:"category"` // expert, coordinator, specialist
+	ID          uuid.UUID `db:"id"`
+	Identifier  string    `db:"identifier"` // portfolio_manager, technical_analyzer
+	Name        string    `db:"name"`
+	Description string    `db:"description"`
+	Category    string    `db:"category"` // expert, coordinator, specialist
 
 	// Prompts (editable in production)
 	SystemPrompt string `db:"system_prompt"`

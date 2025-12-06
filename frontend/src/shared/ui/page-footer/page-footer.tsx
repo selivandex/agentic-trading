@@ -25,7 +25,7 @@ export const PageFooter = ({
   return (
     <div
       className={cx(
-        "w-full flex items-center justify-end py-4 border-t border-gray-200 shadow-sm",
+        "w-full flex items-center justify-end py-4 border-t border-border shadow-sm",
         background === "primary" ? "bg-primary" : "bg-transparent",
         paddingClasses,
         className
@@ -57,7 +57,7 @@ export const PageFooterSkeleton = ({
   return (
     <div
       className={cx(
-        "w-full flex items-center justify-end py-4 border-t border-gray-200 shadow-sm",
+        "w-full flex items-center justify-end py-4 border-t border-border shadow-sm",
         background === "primary" ? "bg-primary" : "bg-transparent",
         paddingClasses,
         className

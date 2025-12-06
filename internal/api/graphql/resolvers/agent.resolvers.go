@@ -13,29 +13,72 @@ import (
 	"prometheus/internal/domain/agent"
 	agentService "prometheus/internal/services/agent"
 	"prometheus/pkg/relay"
+
+	"github.com/google/uuid"
 )
 
 // ModelProvider is the resolver for the modelProvider field.
-func (r *agentResolver) ModelProvider(ctx context.Context, obj *agent.Agent) (string, error) {
-	return string(obj.ModelProvider), nil
+func (r *agentResolver) ModelProvider(ctx context.Context, obj *agent.Agent) (*string, error) {
+	str := string(obj.ModelProvider)
+	return &str, nil
 }
 
 // ModelName is the resolver for the modelName field.
-func (r *agentResolver) ModelName(ctx context.Context, obj *agent.Agent) (string, error) {
-	return string(obj.ModelName), nil
+func (r *agentResolver) ModelName(ctx context.Context, obj *agent.Agent) (*string, error) {
+	str := string(obj.ModelName)
+	return &str, nil
 }
 
 // AvailableTools is the resolver for the availableTools field.
-func (r *agentResolver) AvailableTools(ctx context.Context, obj *agent.Agent) ([]string, error) {
+func (r *agentResolver) AvailableTools(ctx context.Context, obj *agent.Agent) (map[string]any, error) {
 	tools, err := obj.GetAvailableTools()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse available tools: %w", err)
 	}
-	return tools, nil
+	// Convert []string to map[string]any for GraphQL JSONObject
+	result := make(map[string]any)
+	if len(tools) > 0 {
+		result["tools"] = tools
+	}
+	return result, nil
 }
 
 // CreateAgent is the resolver for the createAgent field.
 func (r *mutationResolver) CreateAgent(ctx context.Context, input generated.CreateAgentInput) (*agent.Agent, error) {
+	// Extract required fields with defaults
+	identifier := ""
+	if input.Identifier != nil {
+		identifier = *input.Identifier
+	}
+	name := ""
+	if input.Name != nil {
+		name = *input.Name
+	}
+	description := ""
+	if input.Description != nil {
+		description = *input.Description
+	}
+	category := ""
+	if input.Category != nil {
+		category = *input.Category
+	}
+	systemPrompt := ""
+	if input.SystemPrompt != nil {
+		systemPrompt = *input.SystemPrompt
+	}
+	instructions := ""
+	if input.Instructions != nil {
+		instructions = *input.Instructions
+	}
+	modelProvider := ai.ProviderNameDeepSeek // default
+	if input.ModelProvider != nil {
+		modelProvider = ai.ProviderName(*input.ModelProvider)
+	}
+	modelName := ai.ModelDeepSeekReasoner // default
+	if input.ModelName != nil {
+		modelName = ai.ProviderModelName(*input.ModelName)
+	}
+
 	// Set defaults
 	temperature := 1.0
 	if input.Temperature != nil {
@@ -58,26 +101,27 @@ func (r *mutationResolver) CreateAgent(ctx context.Context, input generated.Crea
 		isActive = *input.IsActive
 	}
 
-	// Available tools default to empty array
+	// Parse available tools from JSONObject
 	availableTools := []string{}
 	if input.AvailableTools != nil {
-		availableTools = input.AvailableTools
-	}
-
-	instructions := ""
-	if input.Instructions != nil {
-		instructions = *input.Instructions
+		if toolsList, ok := input.AvailableTools["tools"].([]interface{}); ok {
+			for _, t := range toolsList {
+				if toolStr, ok := t.(string); ok {
+					availableTools = append(availableTools, toolStr)
+				}
+			}
+		}
 	}
 
 	params := agentService.CreateAgentParams{
-		Identifier:     input.Identifier,
-		Name:           input.Name,
-		Description:    input.Description,
-		Category:       input.Category,
-		SystemPrompt:   input.SystemPrompt,
+		Identifier:     identifier,
+		Name:           name,
+		Description:    description,
+		Category:       category,
+		SystemPrompt:   systemPrompt,
 		Instructions:   instructions,
-		ModelProvider:  ai.ProviderName(input.ModelProvider),
-		ModelName:      ai.ProviderModelName(input.ModelName),
+		ModelProvider:  modelProvider,
+		ModelName:      modelName,
 		Temperature:    temperature,
 		MaxTokens:      maxTokens,
 		AvailableTools: availableTools,
@@ -90,7 +134,7 @@ func (r *mutationResolver) CreateAgent(ctx context.Context, input generated.Crea
 }
 
 // UpdateAgent is the resolver for the updateAgent field.
-func (r *mutationResolver) UpdateAgent(ctx context.Context, id int, input generated.UpdateAgentInput) (*agent.Agent, error) {
+func (r *mutationResolver) UpdateAgent(ctx context.Context, id uuid.UUID, input generated.UpdateAgentInput) (*agent.Agent, error) {
 	var modelProvider *ai.ProviderName
 	if input.ModelProvider != nil {
 		mp := ai.ProviderName(*input.ModelProvider)
@@ -103,6 +147,18 @@ func (r *mutationResolver) UpdateAgent(ctx context.Context, id int, input genera
 		modelName = &mn
 	}
 
+	// Parse available tools from JSONObject
+	var availableTools []string
+	if input.AvailableTools != nil {
+		if toolsList, ok := input.AvailableTools["tools"].([]interface{}); ok {
+			for _, t := range toolsList {
+				if toolStr, ok := t.(string); ok {
+					availableTools = append(availableTools, toolStr)
+				}
+			}
+		}
+	}
+
 	params := agentService.UpdateAgentParams{
 		Name:           input.Name,
 		Description:    input.Description,
@@ -113,7 +169,7 @@ func (r *mutationResolver) UpdateAgent(ctx context.Context, id int, input genera
 		ModelName:      modelName,
 		Temperature:    input.Temperature,
 		MaxTokens:      input.MaxTokens,
-		AvailableTools: input.AvailableTools,
+		AvailableTools: availableTools,
 		MaxCostPerRun:  input.MaxCostPerRun,
 		TimeoutSeconds: input.TimeoutSeconds,
 	}
@@ -122,7 +178,7 @@ func (r *mutationResolver) UpdateAgent(ctx context.Context, id int, input genera
 }
 
 // DeleteAgent is the resolver for the deleteAgent field.
-func (r *mutationResolver) DeleteAgent(ctx context.Context, id int) (bool, error) {
+func (r *mutationResolver) DeleteAgent(ctx context.Context, id uuid.UUID) (bool, error) {
 	if err := r.AgentService.DeleteAgent(ctx, id); err != nil {
 		return false, err
 	}
@@ -130,17 +186,17 @@ func (r *mutationResolver) DeleteAgent(ctx context.Context, id int) (bool, error
 }
 
 // BatchDeleteAgents is the resolver for the batchDeleteAgents field.
-func (r *mutationResolver) BatchDeleteAgents(ctx context.Context, ids []int) (int, error) {
+func (r *mutationResolver) BatchDeleteAgents(ctx context.Context, ids []uuid.UUID) (int, error) {
 	return r.AgentService.BatchDeleteAgents(ctx, ids)
 }
 
 // SetAgentActive is the resolver for the setAgentActive field.
-func (r *mutationResolver) SetAgentActive(ctx context.Context, id int, isActive bool) (*agent.Agent, error) {
+func (r *mutationResolver) SetAgentActive(ctx context.Context, id uuid.UUID, isActive bool) (*agent.Agent, error) {
 	return r.AgentService.SetActive(ctx, id, isActive)
 }
 
 // UpdateAgentPrompt is the resolver for the updateAgentPrompt field.
-func (r *mutationResolver) UpdateAgentPrompt(ctx context.Context, id int, systemPrompt string) (*agent.Agent, error) {
+func (r *mutationResolver) UpdateAgentPrompt(ctx context.Context, id uuid.UUID, systemPrompt string) (*agent.Agent, error) {
 	return r.AgentService.UpdatePromptByID(ctx, id, systemPrompt)
 }
 
@@ -153,7 +209,7 @@ func (r *mutationResolver) EnsureSystemAgents(ctx context.Context) (bool, error)
 }
 
 // Agent is the resolver for the agent field.
-func (r *queryResolver) Agent(ctx context.Context, id int) (*agent.Agent, error) {
+func (r *queryResolver) Agent(ctx context.Context, id uuid.UUID) (*agent.Agent, error) {
 	return r.AgentService.GetByID(ctx, id)
 }
 
@@ -163,32 +219,17 @@ func (r *queryResolver) AgentByIdentifier(ctx context.Context, identifier string
 }
 
 // Agents is the resolver for the agents field.
-func (r *queryResolver) Agents(ctx context.Context, category *string, isActive *bool, first *int, after *string, last *int, before *string) (*generated.AgentConnection, error) {
-	// Get all agents
-	var allAgents []*agent.Agent
-	var err error
-
-	if category != nil {
-		allAgents, err = r.AgentService.ListByCategory(ctx, *category)
-	} else if isActive != nil && *isActive {
-		allAgents, err = r.AgentService.ListActive(ctx)
-	} else {
-		allAgents, err = r.AgentService.List(ctx)
-	}
-
+func (r *queryResolver) Agents(ctx context.Context, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*generated.AgentConnection, error) {
+	// Get filtered agents from service
+	filtered, err := r.AgentService.GetAgentsWithScope(ctx, scope, search, filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get agents: %w", err)
 	}
 
-	// Filter by isActive if provided (and not already filtered by ListActive)
-	filtered := allAgents
-	if isActive != nil && !(category == nil && *isActive) {
-		filtered = make([]*agent.Agent, 0)
-		for _, a := range allAgents {
-			if a.IsActive == *isActive {
-				filtered = append(filtered, a)
-			}
-		}
+	// Get scope counts from service
+	scopeCounts, err := r.AgentService.GetAgentsScopes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scope counts: %w", err)
 	}
 
 	// Apply pagination
@@ -220,31 +261,8 @@ func (r *queryResolver) Agents(ctx context.Context, category *string, isActive *
 
 	items := filtered[paginationOffset:end]
 
-	// Build relay connection
-	conn, err := relay.NewConnection(items, totalCount, params, paginationOffset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection: %w", err)
-	}
-
-	// Convert to GraphQL types
-	edges := make([]*generated.AgentEdge, len(conn.Edges))
-	for i, edge := range conn.Edges {
-		edges[i] = &generated.AgentEdge{
-			Node:   edge.Node,
-			Cursor: edge.Cursor,
-		}
-	}
-
-	return &generated.AgentConnection{
-		Edges: edges,
-		PageInfo: &generated.PageInfo{
-			HasNextPage:     conn.PageInfo.HasNextPage,
-			HasPreviousPage: conn.PageInfo.HasPreviousPage,
-			StartCursor:     conn.PageInfo.StartCursor,
-			EndCursor:       conn.PageInfo.EndCursor,
-		},
-		TotalCount: conn.TotalCount,
-	}, nil
+	// Build connection with scopes and filters
+	return buildAgentConnection(items, totalCount, params, paginationOffset, scopeCounts)
 }
 
 // Agent returns generated.AgentResolver implementation.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ func (m *MockRepository) Create(ctx context.Context, a *Agent) error {
 	return args.Error(0)
 }
 
-func (m *MockRepository) GetByID(ctx context.Context, id int) (*Agent, error) {
+func (m *MockRepository) GetByID(ctx context.Context, id uuid.UUID) (*Agent, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -74,7 +75,7 @@ func (m *MockRepository) ListByCategory(ctx context.Context, category string) ([
 	return args.Get(0).([]*Agent), args.Error(1)
 }
 
-func (m *MockRepository) Delete(ctx context.Context, id int) error {
+func (m *MockRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
@@ -153,7 +154,7 @@ func TestService_GetByIdentifier(t *testing.T) {
 		svc := NewService(repo)
 
 		expected := &Agent{
-			ID:         1,
+			ID:         uuid.New(),
 			Identifier: "test_agent",
 			Name:       "Test Agent",
 		}
@@ -184,7 +185,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo)
 
 		a := &Agent{
-			ID:           1,
+			ID:           uuid.New(),
 			Identifier:   "test",
 			Name:         "Updated",
 			SystemPrompt: "Updated prompt",
@@ -206,12 +207,12 @@ func TestService_Update(t *testing.T) {
 		repo.AssertNotCalled(t, "Update")
 	})
 
-	t.Run("fails with zero ID", func(t *testing.T) {
+	t.Run("fails with nil ID", func(t *testing.T) {
 		repo := new(MockRepository)
 		svc := NewService(repo)
 
 		a := &Agent{
-			ID:           0, // Invalid
+			ID:           uuid.Nil, // Invalid
 			SystemPrompt: "Prompt",
 		}
 
@@ -225,7 +226,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo)
 
 		a := &Agent{
-			ID:           1,
+			ID:           uuid.New(),
 			SystemPrompt: "", // Empty
 		}
 
@@ -248,7 +249,7 @@ func TestService_FindOrCreate(t *testing.T) {
 			SystemPrompt: "Prompt",
 		}
 
-		expected := &Agent{ID: 1, Identifier: "test"}
+		expected := &Agent{ID: uuid.New(), Identifier: "test"}
 		repo.On("FindOrCreate", ctx, a).Return(expected, true, nil)
 
 		result, wasCreated, err := svc.FindOrCreate(ctx, a)
@@ -288,8 +289,8 @@ func TestService_ListByCategory(t *testing.T) {
 		svc := NewService(repo)
 
 		expected := []*Agent{
-			{ID: 1, Identifier: "expert1", Category: CategoryExpert},
-			{ID: 2, Identifier: "expert2", Category: CategoryExpert},
+			{ID: uuid.New(), Identifier: "expert1", Category: CategoryExpert},
+			{ID: uuid.New(), Identifier: "expert2", Category: CategoryExpert},
 		}
 
 		repo.On("ListByCategory", ctx, CategoryExpert).Return(expected, nil)

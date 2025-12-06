@@ -595,6 +595,9 @@ func TestUsersConnection(t *testing.T) {
 		first := 5
 		conn, err := setup.resolver.Query().UsersConnection(
 			ctx,
+			nil, // scope
+			nil, // search
+			nil, // filters
 			&first,
 			nil, // after
 			nil, // last
@@ -615,6 +618,9 @@ func TestUsersConnection(t *testing.T) {
 		// Get first page
 		firstPage, err := setup.resolver.Query().UsersConnection(
 			ctx,
+			nil, // scope
+			nil, // search
+			nil, // filters
 			&first,
 			nil,
 			nil,
@@ -625,6 +631,9 @@ func TestUsersConnection(t *testing.T) {
 		// Get second page
 		secondPage, err := setup.resolver.Query().UsersConnection(
 			ctx,
+			nil, // scope
+			nil, // search
+			nil, // filters
 			&first,
 			firstPage.PageInfo.EndCursor,
 			nil,
@@ -644,6 +653,9 @@ func TestUsersConnection(t *testing.T) {
 
 		conn, err := setup.resolver.Query().UsersConnection(
 			ctx,
+			nil, // scope
+			nil, // search
+			nil, // filters
 			&first,
 			nil,
 			nil,

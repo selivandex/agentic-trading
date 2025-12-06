@@ -19,3 +19,4 @@ export function TextFilter({ filter, value, onChange }: FilterComponentProps) {
     />
   );
 }
+

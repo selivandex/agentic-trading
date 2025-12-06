@@ -36,4 +36,3 @@ func getUserScopeDefinitions() []relay.Scope {
 		},
 	}
 }
-

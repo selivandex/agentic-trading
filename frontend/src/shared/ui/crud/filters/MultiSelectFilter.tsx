@@ -17,3 +17,4 @@ export function MultiSelectFilter({
     <CrudMultiSelectFilter filter={filter} value={value} onChange={onChange} />
   );
 }
+

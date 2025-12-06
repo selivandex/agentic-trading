@@ -23,3 +23,4 @@ export function NumberFilter({ filter, value, onChange }: FilterComponentProps) 
     />
   );
 }
+

@@ -6,9 +6,9 @@ import {
   HomeLine,
   TrendUp01,
   Eye,
-  User01 as UserIcon,
+  User01,
   Settings01,
-  Users01,
+  Star06,
 } from "@untitledui/icons";
 import { signOut } from "next-auth/react";
 import type { User } from "@/entities/user";
@@ -39,7 +39,12 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     {
       label: "Users",
       href: "/users",
-      icon: Users01,
+      icon: User01,
+    },
+    {
+      label: "Agents",
+      href: "/agents",
+      icon: Star06,
     },
     {
       label: "Strategies",
@@ -50,11 +55,6 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       label: "Watchlist",
       href: "/watchlist",
       icon: Eye,
-    },
-    {
-      label: "Profile",
-      href: "/profile",
-      icon: UserIcon,
     },
     {
       label: "Settings",

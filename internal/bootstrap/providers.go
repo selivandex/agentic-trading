@@ -431,6 +431,7 @@ func (c *Container) MustInitApplication() {
 		c.Services.User,
 		c.Services.Strategy,
 		c.Services.FundWatchlist,
+		c.Services.Agent,
 		c.Log,
 	)
 
@@ -723,6 +724,7 @@ func provideHTTPServer(
 	userService *userservice.Service,
 	strategyService *strategyservice.Service,
 	fundWatchlistService *fundwatchlistsvc.Service,
+	agentService *agentservice.Service,
 	log *logger.Logger,
 ) *api.Server {
 	var webhookHandler *tg.WebhookHandler
@@ -738,7 +740,7 @@ func provideHTTPServer(
 	// GraphQL handlers (only in development for now)
 	var graphqlHandler, playgroundHandler http.Handler
 	if cfg.App.Env != "production" {
-		graphqlHandler = graphql.Handler(authService, userService, strategyService, fundWatchlistService, log)
+		graphqlHandler = graphql.Handler(authService, userService, strategyService, fundWatchlistService, agentService, log)
 		playgroundHandler = graphql.PlaygroundHandler()
 		log.Info("✓ GraphQL API enabled (development mode)")
 	}

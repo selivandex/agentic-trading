@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
+
 	"prometheus/internal/domain/agent"
 	"prometheus/pkg/errors"
 )
@@ -41,7 +43,7 @@ func (r *AgentRepository) Create(ctx context.Context, a *agent.Agent) error {
 }
 
 // GetByID retrieves agent by ID
-func (r *AgentRepository) GetByID(ctx context.Context, id int) (*agent.Agent, error) {
+func (r *AgentRepository) GetByID(ctx context.Context, id uuid.UUID) (*agent.Agent, error) {
 	query := `
 		SELECT id, identifier, name, description, category,
 		       system_prompt, instructions,
@@ -260,7 +262,7 @@ func (r *AgentRepository) ListByCategory(ctx context.Context, category string) (
 }
 
 // Delete deletes an agent by ID
-func (r *AgentRepository) Delete(ctx context.Context, id int) error {
+func (r *AgentRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM agents WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id)

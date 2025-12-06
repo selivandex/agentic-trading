@@ -19,3 +19,4 @@ export function DateFilter({ filter, value, onChange }: FilterComponentProps) {
     />
   );
 }
+

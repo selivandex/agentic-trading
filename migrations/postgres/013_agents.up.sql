@@ -2,7 +2,7 @@
 -- Allows changing agent behavior (prompts) without code deployment
 
 CREATE TABLE agents (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     -- Agent identifier (unique key for code references)
     identifier VARCHAR(100) NOT NULL UNIQUE, -- portfolio_manager, technical_analyzer, smc_analyzer

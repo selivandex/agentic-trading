@@ -6,10 +6,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/joho/godotenv"
+	"go.uber.org/zap"
+
 	"prometheus/pkg/logger"
 )
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("Warning: .env file not found, using environment variables")
+	}
+
 	// Parse flags
 	tableName := flag.String("table", "", "PostgreSQL table name")
 	resourceName := flag.String("resource", "", "Resource name (default: PascalCase of table)")
@@ -25,7 +33,8 @@ func main() {
 	}
 
 	// Setup logger
-	log := logger.MustNew("info")
+	zapLogger, _ := zap.NewDevelopment()
+	log := &logger.Logger{SugaredLogger: zapLogger.Sugar()}
 
 	ctx := context.Background()
 
@@ -33,7 +42,7 @@ func main() {
 	gen := NewGenerator(log)
 
 	// Configure generator
-	config := &Config{
+	cfg := &Config{
 		TableName:    *tableName,
 		ResourceName: *resourceName,
 		DryRun:       *dryRun,
@@ -42,11 +51,10 @@ func main() {
 	}
 
 	// Run generation
-	if err := gen.Generate(ctx, config); err != nil {
+	if err := gen.Generate(ctx, cfg); err != nil {
 		log.Errorw("Generation failed", "error", err)
 		os.Exit(1)
 	}
 
 	log.Infow("✅ Generation completed successfully!")
 }
-

@@ -85,4 +85,3 @@ func buildUserConnection(
 		Filters:    filters,
 	}, nil
 }
-

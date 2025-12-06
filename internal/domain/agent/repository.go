@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 // Repository defines the interface for agent data access
@@ -10,7 +12,7 @@ type Repository interface {
 	Create(ctx context.Context, agent *Agent) error
 
 	// GetByID retrieves agent by primary key
-	GetByID(ctx context.Context, id int) (*Agent, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Agent, error)
 
 	// GetByIdentifier retrieves agent by unique identifier
 	GetByIdentifier(ctx context.Context, identifier string) (*Agent, error)
@@ -32,5 +34,5 @@ type Repository interface {
 	ListByCategory(ctx context.Context, category string) ([]*Agent, error)
 
 	// Delete deletes an agent by ID
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

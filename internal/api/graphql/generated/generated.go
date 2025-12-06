@@ -80,7 +80,9 @@ type ComplexityRoot struct {
 
 	AgentConnection struct {
 		Edges      func(childComplexity int) int
+		Filters    func(childComplexity int) int
 		PageInfo   func(childComplexity int) int
+		Scopes     func(childComplexity int) int
 		TotalCount func(childComplexity int) int
 	}
 
@@ -141,7 +143,7 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		BatchCloseStrategies      func(childComplexity int, ids []uuid.UUID) int
-		BatchDeleteAgents         func(childComplexity int, ids []int) int
+		BatchDeleteAgents         func(childComplexity int, ids []uuid.UUID) int
 		BatchDeleteFundWatchlists func(childComplexity int, ids []uuid.UUID) int
 		BatchDeleteStrategies     func(childComplexity int, ids []uuid.UUID) int
 		BatchDeleteUsers          func(childComplexity int, ids []uuid.UUID) int
@@ -152,7 +154,7 @@ type ComplexityRoot struct {
 		CreateFundWatchlist       func(childComplexity int, input CreateFundWatchlistInput) int
 		CreateStrategy            func(childComplexity int, userID uuid.UUID, input CreateStrategyInput) int
 		CreateUser                func(childComplexity int, input CreateUserInput) int
-		DeleteAgent               func(childComplexity int, id int) int
+		DeleteAgent               func(childComplexity int, id uuid.UUID) int
 		DeleteFundWatchlist       func(childComplexity int, id uuid.UUID) int
 		DeleteStrategy            func(childComplexity int, id uuid.UUID) int
 		DeleteUser                func(childComplexity int, id uuid.UUID) int
@@ -163,12 +165,12 @@ type ComplexityRoot struct {
 		PauseStrategy             func(childComplexity int, id uuid.UUID) int
 		Register                  func(childComplexity int, input RegisterInput) int
 		ResumeStrategy            func(childComplexity int, id uuid.UUID) int
-		SetAgentActive            func(childComplexity int, id int, isActive bool) int
+		SetAgentActive            func(childComplexity int, id uuid.UUID, isActive bool) int
 		SetUserActive             func(childComplexity int, userID uuid.UUID, isActive bool) int
 		SetUserPremium            func(childComplexity int, userID uuid.UUID, isPremium bool) int
 		ToggleFundWatchlistPause  func(childComplexity int, id uuid.UUID, isPaused bool, reason *string) int
-		UpdateAgent               func(childComplexity int, id int, input UpdateAgentInput) int
-		UpdateAgentPrompt         func(childComplexity int, id int, systemPrompt string) int
+		UpdateAgent               func(childComplexity int, id uuid.UUID, input UpdateAgentInput) int
+		UpdateAgentPrompt         func(childComplexity int, id uuid.UUID, systemPrompt string) int
 		UpdateFundWatchlist       func(childComplexity int, id uuid.UUID, input UpdateFundWatchlistInput) int
 		UpdateStrategy            func(childComplexity int, id uuid.UUID, input UpdateStrategyInput) int
 		UpdateUser                func(childComplexity int, id uuid.UUID, input UpdateUserInput) int
@@ -183,9 +185,9 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Agent                      func(childComplexity int, id int) int
+		Agent                      func(childComplexity int, id uuid.UUID) int
 		AgentByIdentifier          func(childComplexity int, identifier string) int
-		Agents                     func(childComplexity int, category *string, isActive *bool, first *int, after *string, last *int, before *string) int
+		Agents                     func(childComplexity int, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) int
 		FundWatchlist              func(childComplexity int, id uuid.UUID) int
 		FundWatchlistBySymbol      func(childComplexity int, symbol string, marketType string) int
 		FundWatchlists             func(childComplexity int, limit *int, offset *int, isActive *bool, category *string, tier *int) int
@@ -302,10 +304,10 @@ type ComplexityRoot struct {
 }
 
 type AgentResolver interface {
-	ModelProvider(ctx context.Context, obj *agent.Agent) (string, error)
-	ModelName(ctx context.Context, obj *agent.Agent) (string, error)
+	ModelProvider(ctx context.Context, obj *agent.Agent) (*string, error)
+	ModelName(ctx context.Context, obj *agent.Agent) (*string, error)
 
-	AvailableTools(ctx context.Context, obj *agent.Agent) ([]string, error)
+	AvailableTools(ctx context.Context, obj *agent.Agent) (map[string]any, error)
 }
 type FundWatchlistResolver interface {
 	MarketType(ctx context.Context, obj *fundwatchlist.Watchlist) (string, error)
@@ -313,11 +315,11 @@ type FundWatchlistResolver interface {
 type MutationResolver interface {
 	Empty(ctx context.Context) (*string, error)
 	CreateAgent(ctx context.Context, input CreateAgentInput) (*agent.Agent, error)
-	UpdateAgent(ctx context.Context, id int, input UpdateAgentInput) (*agent.Agent, error)
-	DeleteAgent(ctx context.Context, id int) (bool, error)
-	BatchDeleteAgents(ctx context.Context, ids []int) (int, error)
-	SetAgentActive(ctx context.Context, id int, isActive bool) (*agent.Agent, error)
-	UpdateAgentPrompt(ctx context.Context, id int, systemPrompt string) (*agent.Agent, error)
+	UpdateAgent(ctx context.Context, id uuid.UUID, input UpdateAgentInput) (*agent.Agent, error)
+	DeleteAgent(ctx context.Context, id uuid.UUID) (bool, error)
+	BatchDeleteAgents(ctx context.Context, ids []uuid.UUID) (int, error)
+	SetAgentActive(ctx context.Context, id uuid.UUID, isActive bool) (*agent.Agent, error)
+	UpdateAgentPrompt(ctx context.Context, id uuid.UUID, systemPrompt string) (*agent.Agent, error)
 	EnsureSystemAgents(ctx context.Context) (bool, error)
 	Register(ctx context.Context, input RegisterInput) (*AuthResponse, error)
 	Login(ctx context.Context, input LoginInput) (*AuthResponse, error)
@@ -347,9 +349,9 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
-	Agent(ctx context.Context, id int) (*agent.Agent, error)
+	Agent(ctx context.Context, id uuid.UUID) (*agent.Agent, error)
 	AgentByIdentifier(ctx context.Context, identifier string) (*agent.Agent, error)
-	Agents(ctx context.Context, category *string, isActive *bool, first *int, after *string, last *int, before *string) (*AgentConnection, error)
+	Agents(ctx context.Context, scope *string, search *string, filters map[string]any, first *int, after *string, last *int, before *string) (*AgentConnection, error)
 	Me(ctx context.Context) (*user.User, error)
 	FundWatchlist(ctx context.Context, id uuid.UUID) (*fundwatchlist.Watchlist, error)
 	FundWatchlistBySymbol(ctx context.Context, symbol string, marketType string) (*fundwatchlist.Watchlist, error)
@@ -522,12 +524,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AgentConnection.Edges(childComplexity), true
+	case "AgentConnection.filters":
+		if e.complexity.AgentConnection.Filters == nil {
+			break
+		}
+
+		return e.complexity.AgentConnection.Filters(childComplexity), true
 	case "AgentConnection.pageInfo":
 		if e.complexity.AgentConnection.PageInfo == nil {
 			break
 		}
 
 		return e.complexity.AgentConnection.PageInfo(childComplexity), true
+	case "AgentConnection.scopes":
+		if e.complexity.AgentConnection.Scopes == nil {
+			break
+		}
+
+		return e.complexity.AgentConnection.Scopes(childComplexity), true
 	case "AgentConnection.totalCount":
 		if e.complexity.AgentConnection.TotalCount == nil {
 			break
@@ -767,7 +781,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.BatchDeleteAgents(childComplexity, args["ids"].([]int)), true
+		return e.complexity.Mutation.BatchDeleteAgents(childComplexity, args["ids"].([]uuid.UUID)), true
 	case "Mutation.batchDeleteFundWatchlists":
 		if e.complexity.Mutation.BatchDeleteFundWatchlists == nil {
 			break
@@ -888,7 +902,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.DeleteAgent(childComplexity, args["id"].(int)), true
+		return e.complexity.Mutation.DeleteAgent(childComplexity, args["id"].(uuid.UUID)), true
 	case "Mutation.deleteFundWatchlist":
 		if e.complexity.Mutation.DeleteFundWatchlist == nil {
 			break
@@ -994,7 +1008,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SetAgentActive(childComplexity, args["id"].(int), args["isActive"].(bool)), true
+		return e.complexity.Mutation.SetAgentActive(childComplexity, args["id"].(uuid.UUID), args["isActive"].(bool)), true
 	case "Mutation.setUserActive":
 		if e.complexity.Mutation.SetUserActive == nil {
 			break
@@ -1038,7 +1052,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateAgent(childComplexity, args["id"].(int), args["input"].(UpdateAgentInput)), true
+		return e.complexity.Mutation.UpdateAgent(childComplexity, args["id"].(uuid.UUID), args["input"].(UpdateAgentInput)), true
 	case "Mutation.updateAgentPrompt":
 		if e.complexity.Mutation.UpdateAgentPrompt == nil {
 			break
@@ -1049,7 +1063,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateAgentPrompt(childComplexity, args["id"].(int), args["systemPrompt"].(string)), true
+		return e.complexity.Mutation.UpdateAgentPrompt(childComplexity, args["id"].(uuid.UUID), args["systemPrompt"].(string)), true
 	case "Mutation.updateFundWatchlist":
 		if e.complexity.Mutation.UpdateFundWatchlist == nil {
 			break
@@ -1130,7 +1144,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Agent(childComplexity, args["id"].(int)), true
+		return e.complexity.Query.Agent(childComplexity, args["id"].(uuid.UUID)), true
 	case "Query.agentByIdentifier":
 		if e.complexity.Query.AgentByIdentifier == nil {
 			break
@@ -1152,7 +1166,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Agents(childComplexity, args["category"].(*string), args["isActive"].(*bool), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
+		return e.complexity.Query.Agents(childComplexity, args["scope"].(*string), args["search"].(*string), args["filters"].(map[string]any), args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string)), true
 	case "Query.fundWatchlist":
 		if e.complexity.Query.FundWatchlist == nil {
 			break
@@ -1877,36 +1891,25 @@ var sources = []*ast.Source{
 	{Name: "../schema/agent.graphql", Input: `# @format
 
 # Agent types and operations
+# Auto-generated from table: agents
 
 type Agent {
-  id: Int!
+  id: UUID!
   identifier: String!
   name: String!
-  description: String!
-  category: String!
-
-  # Prompts
+  description: String
+  category: String
   systemPrompt: String!
-  instructions: String!
-
-  # Model configuration
-  modelProvider: String!
-  modelName: String!
-  temperature: Float!
-  maxTokens: Int!
-
-  # Tools
-  availableTools: [String!]!
-
-  # Limits
-  maxCostPerRun: Float!
-  timeoutSeconds: Int!
-
-  # Status
-  isActive: Boolean!
-  version: Int!
-
-  # Timestamps
+  instructions: String
+  modelProvider: String
+  modelName: String
+  temperature: Float
+  maxTokens: Int
+  availableTools: JSONObject
+  maxCostPerRun: Float
+  timeoutSeconds: Int
+  isActive: Boolean
+  version: Int
   createdAt: Time!
   updatedAt: Time!
 }
@@ -1944,52 +1947,67 @@ type AgentConnection {
   Total count of items (if available)
   """
   totalCount: Int!
+
+  """
+  Available filter scopes with counts
+  """
+  scopes: [Scope!]!
+
+  """
+  Available dynamic filters
+  """
+  filters: [Filter!]!
 }
 
 input CreateAgentInput {
-  identifier: String!
-  name: String!
-  description: String!
-  category: String!
-  systemPrompt: String!
-  instructions: String
-  modelProvider: String!
-  modelName: String!
-  temperature: Float
-  maxTokens: Int
-  availableTools: [String!]
-  maxCostPerRun: Float
-  timeoutSeconds: Int
-  isActive: Boolean
+identifier: String
+name: String
+description: String
+category: String
+systemPrompt: String
+instructions: String
+modelProvider: String
+modelName: String
+temperature: Float
+maxTokens: Int
+availableTools: JSONObject
+maxCostPerRun: Float
+timeoutSeconds: Int
+isActive: Boolean
+version: Int
 }
 
 input UpdateAgentInput {
-  name: String
-  description: String
-  category: String
-  systemPrompt: String
-  instructions: String
-  modelProvider: String
-  modelName: String
-  temperature: Float
-  maxTokens: Int
-  availableTools: [String!]
-  maxCostPerRun: Float
-  timeoutSeconds: Int
+identifier: String
+name: String
+description: String
+category: String
+systemPrompt: String
+instructions: String
+modelProvider: String
+modelName: String
+temperature: Float
+maxTokens: Int
+availableTools: JSONObject
+maxCostPerRun: Float
+timeoutSeconds: Int
+isActive: Boolean
+version: Int
 }
 
 # Queries
 extend type Query {
-  # Get agent by ID
-  agent(id: Int!): Agent
+  # Get Agent by ID
+  agent(id: UUID!): Agent
 
-  # Get agent by identifier
+  # Get Agent by identifier
   agentByIdentifier(identifier: String!): Agent
 
-  # Get all agents
+  # Get all Agents with scopes and filters
   agents(
-    category: String
-    isActive: Boolean
+    scope: String
+    search: String
+    filters: JSONObject
     first: Int
     after: String
     last: Int
@@ -1999,25 +2017,25 @@ extend type Query {
 
 # Mutations
 extend type Mutation {
-  # Create new agent (admin only)
+  # Create new Agent
   createAgent(input: CreateAgentInput!): Agent!
 
-  # Update agent configuration (admin only)
-  updateAgent(id: Int!, input: UpdateAgentInput!): Agent!
+  # Update Agent
+  updateAgent(id: UUID!, input: UpdateAgentInput!): Agent!
 
-  # Delete agent (admin only)
-  deleteAgent(id: Int!): Boolean!
+  # Delete Agent
+  deleteAgent(id: UUID!): Boolean!
 
-  # Batch delete agents (admin only)
-  batchDeleteAgents(ids: [Int!]!): Int!
+  # Batch delete Agents
+  batchDeleteAgents(ids: [UUID!]!): Int!
 
-  # Activate/deactivate agent
-  setAgentActive(id: Int!, isActive: Boolean!): Agent!
+  # Set Agent active status
+  setAgentActive(id: UUID!, isActive: Boolean!): Agent!
 
-  # Update agent prompt (for tuning)
-  updateAgentPrompt(id: Int!, systemPrompt: String!): Agent!
+  # Update Agent system prompt
+  updateAgentPrompt(id: UUID!, systemPrompt: String!): Agent!
 
-  # Ensure all system agents exist (FindOrCreate pattern)
+  # Ensure system agents exist
   ensureSystemAgents: Boolean!
 }
 `, BuiltIn: false},
@@ -2847,7 +2865,7 @@ func (ec *executionContext) field_Mutation_batchCloseStrategies_args(ctx context
 func (ec *executionContext) field_Mutation_batchDeleteAgents_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNInt2ᚕintᚄ)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ids", ec.unmarshalNUUID2ᚕgithubᚗcomᚋgoogleᚋuuidᚐUUIDᚄ)
 	if err != nil {
 		return nil, err
 	}
@@ -2973,7 +2991,7 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_deleteAgent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -3061,7 +3079,7 @@ func (ec *executionContext) field_Mutation_resumeStrategy_args(ctx context.Conte
 func (ec *executionContext) field_Mutation_setAgentActive_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -3130,7 +3148,7 @@ func (ec *executionContext) field_Mutation_toggleFundWatchlistPause_args(ctx con
 func (ec *executionContext) field_Mutation_updateAgentPrompt_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -3146,7 +3164,7 @@ func (ec *executionContext) field_Mutation_updateAgentPrompt_args(ctx context.Co
 func (ec *executionContext) field_Mutation_updateAgent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -3248,7 +3266,7 @@ func (ec *executionContext) field_Query_agentByIdentifier_args(ctx context.Conte
 func (ec *executionContext) field_Query_agent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -3259,36 +3277,41 @@ func (ec *executionContext) field_Query_agent_args(ctx context.Context, rawArgs 
 func (ec *executionContext) field_Query_agents_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "category", ec.unmarshalOString2ᚖstring)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "scope", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["category"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "isActive", ec.unmarshalOBoolean2ᚖbool)
+	args["scope"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "search", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["isActive"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	args["search"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "filters", ec.unmarshalOJSONObject2map)
 	if err != nil {
 		return nil, err
 	}
-	args["first"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
+	args["filters"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
 	}
-	args["after"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
+	args["first"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["last"] = arg4
-	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	args["after"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint)
 	if err != nil {
 		return nil, err
 	}
-	args["before"] = arg5
+	args["last"] = arg5
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg6
 	return args, nil
 }
 
@@ -3727,7 +3750,7 @@ func (ec *executionContext) _Agent_id(ctx context.Context, field graphql.Collect
 			return obj.ID, nil
 		},
 		nil,
-		ec.marshalNInt2int,
+		ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
 		true,
 		true,
 	)
@@ -3740,7 +3763,7 @@ func (ec *executionContext) fieldContext_Agent_id(_ context.Context, field graph
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
+			return nil, errors.New("field of type UUID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3814,9 +3837,9 @@ func (ec *executionContext) _Agent_description(ctx context.Context, field graphq
 			return obj.Description, nil
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalOString2string,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -3843,9 +3866,9 @@ func (ec *executionContext) _Agent_category(ctx context.Context, field graphql.C
 			return obj.Category, nil
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalOString2string,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -3901,9 +3924,9 @@ func (ec *executionContext) _Agent_instructions(ctx context.Context, field graph
 			return obj.Instructions, nil
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalOString2string,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -3930,9 +3953,9 @@ func (ec *executionContext) _Agent_modelProvider(ctx context.Context, field grap
 			return ec.resolvers.Agent().ModelProvider(ctx, obj)
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalOString2ᚖstring,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -3959,9 +3982,9 @@ func (ec *executionContext) _Agent_modelName(ctx context.Context, field graphql.
 			return ec.resolvers.Agent().ModelName(ctx, obj)
 		},
 		nil,
-		ec.marshalNString2string,
+		ec.marshalOString2ᚖstring,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -3988,9 +4011,9 @@ func (ec *executionContext) _Agent_temperature(ctx context.Context, field graphq
 			return obj.Temperature, nil
 		},
 		nil,
-		ec.marshalNFloat2float64,
+		ec.marshalOFloat2float64,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4017,9 +4040,9 @@ func (ec *executionContext) _Agent_maxTokens(ctx context.Context, field graphql.
 			return obj.MaxTokens, nil
 		},
 		nil,
-		ec.marshalNInt2int,
+		ec.marshalOInt2int,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4046,9 +4069,9 @@ func (ec *executionContext) _Agent_availableTools(ctx context.Context, field gra
 			return ec.resolvers.Agent().AvailableTools(ctx, obj)
 		},
 		nil,
-		ec.marshalNString2ᚕstringᚄ,
+		ec.marshalOJSONObject2map,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4059,7 +4082,7 @@ func (ec *executionContext) fieldContext_Agent_availableTools(_ context.Context,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type JSONObject does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4075,9 +4098,9 @@ func (ec *executionContext) _Agent_maxCostPerRun(ctx context.Context, field grap
 			return obj.MaxCostPerRun, nil
 		},
 		nil,
-		ec.marshalNFloat2float64,
+		ec.marshalOFloat2float64,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4104,9 +4127,9 @@ func (ec *executionContext) _Agent_timeoutSeconds(ctx context.Context, field gra
 			return obj.TimeoutSeconds, nil
 		},
 		nil,
-		ec.marshalNInt2int,
+		ec.marshalOInt2int,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4133,9 +4156,9 @@ func (ec *executionContext) _Agent_isActive(ctx context.Context, field graphql.C
 			return obj.IsActive, nil
 		},
 		nil,
-		ec.marshalNBoolean2bool,
+		ec.marshalOBoolean2bool,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4162,9 +4185,9 @@ func (ec *executionContext) _Agent_version(ctx context.Context, field graphql.Co
 			return obj.Version, nil
 		},
 		nil,
-		ec.marshalNInt2int,
+		ec.marshalOInt2int,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4337,6 +4360,94 @@ func (ec *executionContext) fieldContext_AgentConnection_totalCount(_ context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentConnection_scopes(ctx context.Context, field graphql.CollectedField, obj *AgentConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentConnection_scopes,
+		func(ctx context.Context) (any, error) {
+			return obj.Scopes, nil
+		},
+		nil,
+		ec.marshalNScope2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐScopeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentConnection_scopes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Scope_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Scope_name(ctx, field)
+			case "count":
+				return ec.fieldContext_Scope_count(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Scope", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentConnection_filters(ctx context.Context, field graphql.CollectedField, obj *AgentConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AgentConnection_filters,
+		func(ctx context.Context) (any, error) {
+			return obj.Filters, nil
+		},
+		nil,
+		ec.marshalNFilter2ᚕᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐFilterᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AgentConnection_filters(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Filter_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Filter_name(ctx, field)
+			case "type":
+				return ec.fieldContext_Filter_type(ctx, field)
+			case "options":
+				return ec.fieldContext_Filter_options(ctx, field)
+			case "optionsQuery":
+				return ec.fieldContext_Filter_optionsQuery(ctx, field)
+			case "optionsQueryArgs":
+				return ec.fieldContext_Filter_optionsQueryArgs(ctx, field)
+			case "defaultValue":
+				return ec.fieldContext_Filter_defaultValue(ctx, field)
+			case "placeholder":
+				return ec.fieldContext_Filter_placeholder(ctx, field)
+			case "min":
+				return ec.fieldContext_Filter_min(ctx, field)
+			case "max":
+				return ec.fieldContext_Filter_max(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Filter", field.Name)
 		},
 	}
 	return fc, nil
@@ -5586,7 +5697,7 @@ func (ec *executionContext) _Mutation_updateAgent(ctx context.Context, field gra
 		ec.fieldContext_Mutation_updateAgent,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateAgent(ctx, fc.Args["id"].(int), fc.Args["input"].(UpdateAgentInput))
+			return ec.resolvers.Mutation().UpdateAgent(ctx, fc.Args["id"].(uuid.UUID), fc.Args["input"].(UpdateAgentInput))
 		},
 		nil,
 		ec.marshalNAgent2ᚖprometheusᚋinternalᚋdomainᚋagentᚐAgent,
@@ -5665,7 +5776,7 @@ func (ec *executionContext) _Mutation_deleteAgent(ctx context.Context, field gra
 		ec.fieldContext_Mutation_deleteAgent,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().DeleteAgent(ctx, fc.Args["id"].(int))
+			return ec.resolvers.Mutation().DeleteAgent(ctx, fc.Args["id"].(uuid.UUID))
 		},
 		nil,
 		ec.marshalNBoolean2bool,
@@ -5706,7 +5817,7 @@ func (ec *executionContext) _Mutation_batchDeleteAgents(ctx context.Context, fie
 		ec.fieldContext_Mutation_batchDeleteAgents,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().BatchDeleteAgents(ctx, fc.Args["ids"].([]int))
+			return ec.resolvers.Mutation().BatchDeleteAgents(ctx, fc.Args["ids"].([]uuid.UUID))
 		},
 		nil,
 		ec.marshalNInt2int,
@@ -5747,7 +5858,7 @@ func (ec *executionContext) _Mutation_setAgentActive(ctx context.Context, field 
 		ec.fieldContext_Mutation_setAgentActive,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().SetAgentActive(ctx, fc.Args["id"].(int), fc.Args["isActive"].(bool))
+			return ec.resolvers.Mutation().SetAgentActive(ctx, fc.Args["id"].(uuid.UUID), fc.Args["isActive"].(bool))
 		},
 		nil,
 		ec.marshalNAgent2ᚖprometheusᚋinternalᚋdomainᚋagentᚐAgent,
@@ -5826,7 +5937,7 @@ func (ec *executionContext) _Mutation_updateAgentPrompt(ctx context.Context, fie
 		ec.fieldContext_Mutation_updateAgentPrompt,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateAgentPrompt(ctx, fc.Args["id"].(int), fc.Args["systemPrompt"].(string))
+			return ec.resolvers.Mutation().UpdateAgentPrompt(ctx, fc.Args["id"].(uuid.UUID), fc.Args["systemPrompt"].(string))
 		},
 		nil,
 		ec.marshalNAgent2ᚖprometheusᚋinternalᚋdomainᚋagentᚐAgent,
@@ -7556,7 +7667,7 @@ func (ec *executionContext) _Query_agent(ctx context.Context, field graphql.Coll
 		ec.fieldContext_Query_agent,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Agent(ctx, fc.Args["id"].(int))
+			return ec.resolvers.Query().Agent(ctx, fc.Args["id"].(uuid.UUID))
 		},
 		nil,
 		ec.marshalOAgent2ᚖprometheusᚋinternalᚋdomainᚋagentᚐAgent,
@@ -7714,7 +7825,7 @@ func (ec *executionContext) _Query_agents(ctx context.Context, field graphql.Col
 		ec.fieldContext_Query_agents,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Agents(ctx, fc.Args["category"].(*string), fc.Args["isActive"].(*bool), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
+			return ec.resolvers.Query().Agents(ctx, fc.Args["scope"].(*string), fc.Args["search"].(*string), fc.Args["filters"].(map[string]any), fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string))
 		},
 		nil,
 		ec.marshalNAgentConnection2ᚖprometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐAgentConnection,
@@ -7737,6 +7848,10 @@ func (ec *executionContext) fieldContext_Query_agents(ctx context.Context, field
 				return ec.fieldContext_AgentConnection_pageInfo(ctx, field)
 			case "totalCount":
 				return ec.fieldContext_AgentConnection_totalCount(ctx, field)
+			case "scopes":
+				return ec.fieldContext_AgentConnection_scopes(ctx, field)
+			case "filters":
+				return ec.fieldContext_AgentConnection_filters(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AgentConnection", field.Name)
 		},
@@ -12472,7 +12587,7 @@ func (ec *executionContext) unmarshalInputCreateAgentInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"identifier", "name", "description", "category", "systemPrompt", "instructions", "modelProvider", "modelName", "temperature", "maxTokens", "availableTools", "maxCostPerRun", "timeoutSeconds", "isActive"}
+	fieldsInOrder := [...]string{"identifier", "name", "description", "category", "systemPrompt", "instructions", "modelProvider", "modelName", "temperature", "maxTokens", "availableTools", "maxCostPerRun", "timeoutSeconds", "isActive", "version"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12481,35 +12596,35 @@ func (ec *executionContext) unmarshalInputCreateAgentInput(ctx context.Context, 
 		switch k {
 		case "identifier":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("identifier"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Identifier = data
 		case "name":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Name = data
 		case "description":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Description = data
 		case "category":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("category"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Category = data
 		case "systemPrompt":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("systemPrompt"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -12523,14 +12638,14 @@ func (ec *executionContext) unmarshalInputCreateAgentInput(ctx context.Context, 
 			it.Instructions = data
 		case "modelProvider":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("modelProvider"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.ModelProvider = data
 		case "modelName":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("modelName"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -12551,7 +12666,7 @@ func (ec *executionContext) unmarshalInputCreateAgentInput(ctx context.Context, 
 			it.MaxTokens = data
 		case "availableTools":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("availableTools"))
-			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			data, err := ec.unmarshalOJSONObject2map(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -12577,6 +12692,13 @@ func (ec *executionContext) unmarshalInputCreateAgentInput(ctx context.Context, 
 				return it, err
 			}
 			it.IsActive = data
+		case "version":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("version"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Version = data
 		}
 	}
 
@@ -13052,13 +13174,20 @@ func (ec *executionContext) unmarshalInputUpdateAgentInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "description", "category", "systemPrompt", "instructions", "modelProvider", "modelName", "temperature", "maxTokens", "availableTools", "maxCostPerRun", "timeoutSeconds"}
+	fieldsInOrder := [...]string{"identifier", "name", "description", "category", "systemPrompt", "instructions", "modelProvider", "modelName", "temperature", "maxTokens", "availableTools", "maxCostPerRun", "timeoutSeconds", "isActive", "version"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "identifier":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("identifier"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Identifier = data
 		case "name":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -13124,7 +13253,7 @@ func (ec *executionContext) unmarshalInputUpdateAgentInput(ctx context.Context, 
 			it.MaxTokens = data
 		case "availableTools":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("availableTools"))
-			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			data, err := ec.unmarshalOJSONObject2map(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -13143,6 +13272,20 @@ func (ec *executionContext) unmarshalInputUpdateAgentInput(ctx context.Context, 
 				return it, err
 			}
 			it.TimeoutSeconds = data
+		case "isActive":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isActive"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsActive = data
+		case "version":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("version"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Version = data
 		}
 	}
 
@@ -13503,14 +13646,8 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "description":
 			out.Values[i] = ec._Agent_description(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "category":
 			out.Values[i] = ec._Agent_category(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "systemPrompt":
 			out.Values[i] = ec._Agent_systemPrompt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -13518,22 +13655,16 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "instructions":
 			out.Values[i] = ec._Agent_instructions(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "modelProvider":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._Agent_modelProvider(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -13560,16 +13691,13 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 		case "modelName":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._Agent_modelName(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -13595,27 +13723,18 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "temperature":
 			out.Values[i] = ec._Agent_temperature(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "maxTokens":
 			out.Values[i] = ec._Agent_maxTokens(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "availableTools":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._Agent_availableTools(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -13641,24 +13760,12 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "maxCostPerRun":
 			out.Values[i] = ec._Agent_maxCostPerRun(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "timeoutSeconds":
 			out.Values[i] = ec._Agent_timeoutSeconds(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "isActive":
 			out.Values[i] = ec._Agent_isActive(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "version":
 			out.Values[i] = ec._Agent_version(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
 		case "createdAt":
 			out.Values[i] = ec._Agent_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -13715,6 +13822,16 @@ func (ec *executionContext) _AgentConnection(ctx context.Context, sel ast.Select
 			}
 		case "totalCount":
 			out.Values[i] = ec._AgentConnection_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "scopes":
+			out.Values[i] = ec._AgentConnection_scopes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "filters":
+			out.Values[i] = ec._AgentConnection_filters(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -16574,36 +16691,6 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
-func (ec *executionContext) unmarshalNInt2ᚕintᚄ(ctx context.Context, v any) ([]int, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
-	var err error
-	res := make([]int, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNInt2int(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.SelectionSet, v []int) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNInt2int(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
 func (ec *executionContext) unmarshalNLoginInput2prometheusᚋinternalᚋapiᚋgraphqlᚋgeneratedᚐLoginInput(ctx context.Context, v any) (LoginInput, error) {
 	res, err := ec.unmarshalInputLoginInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -17385,6 +17472,17 @@ func (ec *executionContext) marshalOFilterOption2ᚕᚖprometheusᚋinternalᚋa
 	return ret
 }
 
+func (ec *executionContext) unmarshalOFloat2float64(ctx context.Context, v any) (float64, error) {
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2float64(ctx context.Context, sel ast.SelectionSet, v float64) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalFloatContext(v)
+	return graphql.WrapContextMarshaler(ctx, res)
+}
+
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
 	if v == nil {
 		return nil, nil
@@ -17407,6 +17505,18 @@ func (ec *executionContext) marshalOFundWatchlist2ᚖprometheusᚋinternalᚋdom
 		return graphql.Null
 	}
 	return ec._FundWatchlist(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(v)
+	return res
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
@@ -17511,6 +17621,18 @@ func (ec *executionContext) marshalOStrategyStatus2ᚖprometheusᚋinternalᚋdo
 	_ = sel
 	_ = ctx
 	res := graphql.MarshalString(string(*v))
+	return res
+}
+
+func (ec *executionContext) unmarshalOString2string(ctx context.Context, v any) (string, error) {
+	res, err := graphql.UnmarshalString(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalString(v)
 	return res
 }
 

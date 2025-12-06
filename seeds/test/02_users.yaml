@@ -21,3 +21,4 @@ users:
       notify_on_risk: false
       preferred_assets:
         - "BTC/USDT"
+

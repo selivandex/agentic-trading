@@ -146,7 +146,7 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto">
           <div className={`${paddingClasses} pb-8`}>
-            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+            <div className="rounded-xl bg-card p-8 shadow-sm">
               <div className="space-y-6">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="space-y-2">
@@ -187,7 +187,7 @@ export function CrudForm<TEntity extends CrudEntity = CrudEntity>({
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto">
           <div className={`${paddingClasses} pb-8`}>
-            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+            <div className="rounded-xl bg-card p-8 shadow-sm">
               <div className="space-y-6">
                 {config.formFields
                   .filter((field) => {
@@ -388,7 +388,7 @@ function renderFormField(
 
           case "checkbox":
             return (
-              <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
+              <div className="flex items-start gap-3 rounded-lg bg-card p-4 shadow-sm">
                 <Checkbox
                   isSelected={value as boolean}
                   onChange={onChange}

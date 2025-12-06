@@ -24,6 +24,10 @@ type AgentConnection struct {
 	PageInfo *PageInfo `json:"pageInfo"`
 	// Total count of items (if available)
 	TotalCount int `json:"totalCount"`
+	// Available filter scopes with counts
+	Scopes []*Scope `json:"scopes"`
+	// Available dynamic filters
+	Filters []*Filter `json:"filters"`
 }
 
 // Edge type for Agent
@@ -48,20 +52,21 @@ type BackwardPaginationInput struct {
 }
 
 type CreateAgentInput struct {
-	Identifier     string   `json:"identifier"`
-	Name           string   `json:"name"`
-	Description    string   `json:"description"`
-	Category       string   `json:"category"`
-	SystemPrompt   string   `json:"systemPrompt"`
-	Instructions   *string  `json:"instructions,omitempty"`
-	ModelProvider  string   `json:"modelProvider"`
-	ModelName      string   `json:"modelName"`
-	Temperature    *float64 `json:"temperature,omitempty"`
-	MaxTokens      *int     `json:"maxTokens,omitempty"`
-	AvailableTools []string `json:"availableTools,omitempty"`
-	MaxCostPerRun  *float64 `json:"maxCostPerRun,omitempty"`
-	TimeoutSeconds *int     `json:"timeoutSeconds,omitempty"`
-	IsActive       *bool    `json:"isActive,omitempty"`
+	Identifier     *string        `json:"identifier,omitempty"`
+	Name           *string        `json:"name,omitempty"`
+	Description    *string        `json:"description,omitempty"`
+	Category       *string        `json:"category,omitempty"`
+	SystemPrompt   *string        `json:"systemPrompt,omitempty"`
+	Instructions   *string        `json:"instructions,omitempty"`
+	ModelProvider  *string        `json:"modelProvider,omitempty"`
+	ModelName      *string        `json:"modelName,omitempty"`
+	Temperature    *float64       `json:"temperature,omitempty"`
+	MaxTokens      *int           `json:"maxTokens,omitempty"`
+	AvailableTools map[string]any `json:"availableTools,omitempty"`
+	MaxCostPerRun  *float64       `json:"maxCostPerRun,omitempty"`
+	TimeoutSeconds *int           `json:"timeoutSeconds,omitempty"`
+	IsActive       *bool          `json:"isActive,omitempty"`
+	Version        *int           `json:"version,omitempty"`
 }
 
 type CreateFundWatchlistInput struct {
@@ -247,18 +252,21 @@ type Subscription struct {
 }
 
 type UpdateAgentInput struct {
-	Name           *string  `json:"name,omitempty"`
-	Description    *string  `json:"description,omitempty"`
-	Category       *string  `json:"category,omitempty"`
-	SystemPrompt   *string  `json:"systemPrompt,omitempty"`
-	Instructions   *string  `json:"instructions,omitempty"`
-	ModelProvider  *string  `json:"modelProvider,omitempty"`
-	ModelName      *string  `json:"modelName,omitempty"`
-	Temperature    *float64 `json:"temperature,omitempty"`
-	MaxTokens      *int     `json:"maxTokens,omitempty"`
-	AvailableTools []string `json:"availableTools,omitempty"`
-	MaxCostPerRun  *float64 `json:"maxCostPerRun,omitempty"`
-	TimeoutSeconds *int     `json:"timeoutSeconds,omitempty"`
+	Identifier     *string        `json:"identifier,omitempty"`
+	Name           *string        `json:"name,omitempty"`
+	Description    *string        `json:"description,omitempty"`
+	Category       *string        `json:"category,omitempty"`
+	SystemPrompt   *string        `json:"systemPrompt,omitempty"`
+	Instructions   *string        `json:"instructions,omitempty"`
+	ModelProvider  *string        `json:"modelProvider,omitempty"`
+	ModelName      *string        `json:"modelName,omitempty"`
+	Temperature    *float64       `json:"temperature,omitempty"`
+	MaxTokens      *int           `json:"maxTokens,omitempty"`
+	AvailableTools map[string]any `json:"availableTools,omitempty"`
+	MaxCostPerRun  *float64       `json:"maxCostPerRun,omitempty"`
+	TimeoutSeconds *int           `json:"timeoutSeconds,omitempty"`
+	IsActive       *bool          `json:"isActive,omitempty"`
+	Version        *int           `json:"version,omitempty"`
 }
 
 type UpdateFundWatchlistInput struct {

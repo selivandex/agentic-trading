@@ -67,4 +67,3 @@ func getUserFilterDefinitions() []relay.FilterDefinition {
 		},
 	}
 }
-

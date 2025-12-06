@@ -10,7 +10,7 @@ CREATE TABLE
     user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     session_id VARCHAR(255), -- ADK session ID for full trace
     -- Agent context
-    agent_id INTEGER NOT NULL REFERENCES agents (id), -- Link to agents table
+    agent_id UUID NOT NULL REFERENCES agents (id), -- Link to agents table
     agent_session_id VARCHAR(255), -- Full ADK session for this decision
     -- Hierarchy (expert analyses link to parent decision)
     parent_decision_id UUID REFERENCES portfolio_decisions (id) ON DELETE CASCADE, -- NULL for main decisions, set for expert analyses
@@ -41,12 +41,21 @@ CREATE TABLE
   );
 
 -- Indexes for fast queries
-CREATE INDEX idx_portfolio_decisions_strategy ON portfolio_decisions(strategy_id, decision_timestamp DESC);
-CREATE INDEX idx_portfolio_decisions_user ON portfolio_decisions(user_id);
-CREATE INDEX idx_portfolio_decisions_symbol ON portfolio_decisions(symbol, decision_timestamp DESC);
-CREATE INDEX idx_portfolio_decisions_agent ON portfolio_decisions(agent_id, decision_timestamp DESC);
-CREATE INDEX idx_portfolio_decisions_session ON portfolio_decisions(session_id) WHERE session_id IS NOT NULL;
-CREATE INDEX idx_portfolio_decisions_parent ON portfolio_decisions(parent_decision_id) WHERE parent_decision_id IS NOT NULL;
+CREATE INDEX idx_portfolio_decisions_strategy ON portfolio_decisions (strategy_id, decision_timestamp DESC);
+
+CREATE INDEX idx_portfolio_decisions_user ON portfolio_decisions (user_id);
+
+CREATE INDEX idx_portfolio_decisions_symbol ON portfolio_decisions (symbol, decision_timestamp DESC);
+
+CREATE INDEX idx_portfolio_decisions_agent ON portfolio_decisions (agent_id, decision_timestamp DESC);
+
+CREATE INDEX idx_portfolio_decisions_session ON portfolio_decisions (session_id)
+WHERE
+  session_id IS NOT NULL;
+
+CREATE INDEX idx_portfolio_decisions_parent ON portfolio_decisions (parent_decision_id)
+WHERE
+  parent_decision_id IS NOT NULL;
 
 -- Permissions
 COMMENT ON TABLE portfolio_decisions IS 'Unified agent reasoning - stores both PortfolioManager decisions AND expert agent analyses';

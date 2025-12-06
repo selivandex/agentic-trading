@@ -118,7 +118,7 @@ export const GET_USERS_QUERY = gql`
     ) {
       edges {
         node {
-          ...UserFields
+      ...UserFields
         }
         cursor
       }

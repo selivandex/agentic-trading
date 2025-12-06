@@ -231,3 +231,4 @@ func SeedUsers(ctx context.Context, s *seeds.Seeder) error {
 - Type-safe at compile time
 - Same code in tests and seeds
 - Refactoring tools work perfectly
+
